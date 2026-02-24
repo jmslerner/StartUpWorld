@@ -27,7 +27,15 @@ func _ready() -> void:
 
 func _process(_delta: float) -> void:
 	_sync_pause_ui(false)
+	# Keep typing focus in the terminal input.
+	if not input.has_focus():
+		input.grab_focus()
 	_update_status_bar()
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_APPLICATION_FOCUS_IN:
+		if is_instance_valid(input):
+			input.grab_focus()
 
 func _on_submit(text: String) -> void:
 	var trimmed := text.strip_edges()
