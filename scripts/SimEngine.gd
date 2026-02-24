@@ -271,7 +271,7 @@ func hire_roles(role: String, count: int) -> String:
 
 	# Guard rails: don't let bulk hire instantly soft-lock the run.
 	var min_runway := 4
-	var max_burn_supported := max(GameState.mrr * 4.0, 5000.0)
+	var max_burn_supported: float = max(GameState.mrr * 4.0, 5000.0)
 
 	while attempts < count:
 		# Check affordability assuming the hire succeeds.
@@ -410,7 +410,7 @@ func launch_conference() -> String:
 	if not _consume_action():
 		return "No action points left this week."
 	var base_cost := 200000.0
-	var cost := max(base_cost, GameState.burn_per_week * 3.0)
+	var cost: float = max(base_cost, GameState.burn_per_week * 3.0)
 	if GameState.cash < cost:
 		return "A conference would cost %s. You only have %s." % [GameState._format_money(cost), GameState._format_money(GameState.cash)]
 	GameState.cash -= cost
@@ -470,7 +470,7 @@ func raise_round(round_name: String, amount: float) -> String:
 	var required_strength := _required_interest_strength(round_name)
 	if GameState.investor_interest_strength < required_strength:
 		return "Your pitch wasn't strong enough for %s. Build more traction and pitch again." % round_name
-	var cap := _raise_cap(round_name) * clamp(GameState.investor_interest_strength, 0.3, 1.0)
+	var cap: float = _raise_cap(round_name) * clamp(GameState.investor_interest_strength, 0.3, 1.0)
 	if amount > cap:
 		return "Investors will only commit up to %s right now." % GameState._format_money(cap)
 	if not _consume_action():
@@ -490,7 +490,7 @@ func _implied_valuation() -> float:
 	if GameState.valuation > 0.0:
 		return GameState.valuation
 	# Early game: make fundraising painful without a priced market valuation.
-	var baseline := max(250000.0, GameState.mrr * 12.0 * 10.0)
+	var baseline: float = max(250000.0, GameState.mrr * 12.0 * 10.0)
 	return baseline
 
 func _raise_cap(round_name: String) -> float:
@@ -531,8 +531,8 @@ func _raise_cap(round_name: String) -> float:
 	traction += GameState.upgrade_fundraise_bonus * 0.5
 	traction = clamp(traction, 0.0, 100.0)
 
-	var cap := lerp(min_cap, max_cap, traction / 100.0)
-	var implied_valuation := _implied_valuation()
+	var cap: float = lerp(min_cap, max_cap, traction / 100.0)
+	var implied_valuation: float = _implied_valuation()
 	# Keep early rounds painful; later rounds can stretch a bit more.
 	var pct := 0.12
 	if key.begins_with("series "):

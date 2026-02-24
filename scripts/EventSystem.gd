@@ -56,7 +56,7 @@ func _catalog() -> Array[Dictionary]:
 			"condition": func() -> bool:
 				return GameState.team["engineer"] >= 4 and GameState.week >= 6 and not GameState.upgrade_competitor_immune,
 			"apply": func() -> void:
-				var engineers := GameState.team["engineer"]
+				var engineers: int = int(GameState.team["engineer"])
 				var loss := int(ceil(engineers * 0.5))
 				if _has_hr() and _has_legal():
 					loss = int(ceil(engineers * 0.35))
@@ -128,11 +128,11 @@ func _catalog() -> Array[Dictionary]:
 			"condition": func() -> bool:
 				return GameState.week >= 4 and GameState.office_rent >= 800.0 and GameState.reputation >= 0.45,
 			"apply": func() -> void:
-				var baseline := SimEngine._office_cost(GameState.office_tier)
+				var baseline: float = float(SimEngine._office_cost(GameState.office_tier))
 				if baseline < 0.0:
 					baseline = 300.0
-				var old_rent := GameState.office_rent
-				var new_rent := max(baseline, old_rent * 0.80)
+				var old_rent: float = float(GameState.office_rent)
+				var new_rent: float = max(baseline, old_rent * 0.80)
 				GameState.office_rent = new_rent
 				GameState.burn_per_week -= (old_rent - new_rent)
 				GameState.burn_per_week = max(0.0, GameState.burn_per_week)
