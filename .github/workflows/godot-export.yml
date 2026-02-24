@@ -1,0 +1,36 @@
+name: Export
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - preset: "Linux/X11"
+            path: "build/linux/StartUpWorld.x86_64"
+          - preset: "Windows Desktop"
+            path: "build/windows/StartUpWorld.exe"
+          - preset: "macOS"
+            path: "build/macos/StartUpWorld.zip"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Export project
+        uses: firebelley/godot-export@v5
+        with:
+          godot_version: "4.2.2"
+          export_preset: "${{ matrix.preset }}"
+          export_path: "${{ matrix.path }}"
+          cache: true
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: "${{ matrix.preset }}"
+          path: "${{ matrix.path }}"
