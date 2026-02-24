@@ -39,6 +39,9 @@ func _ready() -> void:
 	_write_prompt("Build your AI startup from garage to IPO.")
 	_write_prompt("")
 	_write_prompt("What's your name, founder?")
+	# On web, the canvas/layout can report a width of 0 during _ready(), which makes
+	# the Label minimum size compute as 0 and the log area appear blank.
+	call_deferred("_refresh_log_layout")
 	_sync_pause_ui(true)
 	_update_status_bar()
 
@@ -126,6 +129,12 @@ func _apply_responsive_layout() -> void:
 
 func _on_viewport_resized() -> void:
 	_apply_responsive_layout()
+	_refresh_log_layout()
+
+func _refresh_log_layout() -> void:
+	await get_tree().process_frame
+	_update_log_size()
+	_scroll_to_bottom()
 
 func _on_input_focus_changed() -> void:
 	if input.has_focus():
