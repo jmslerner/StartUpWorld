@@ -7,7 +7,10 @@ func _ready() -> void:
 	input.text_submitted.connect(_on_submit)
 	CommandRouter.output.connect(_on_output)
 	input.grab_focus()
-	_on_output("Type 'help' to see commands.")
+	_on_output("=== STARTUP WORLD ===")
+	_on_output("Build your AI startup from garage to IPO.")
+	_on_output("")
+	_on_output("What's your name, founder?")
 
 func _on_submit(text: String) -> void:
 	var trimmed := text.strip_edges()
