@@ -48,9 +48,12 @@ func _ready() -> void:
 
 func _process(_delta: float) -> void:
 	_sync_pause_ui(false)
-	# Keep typing focus in the terminal input.
-	if not input.has_focus():
-		input.grab_focus()
+	# Keep typing focus in the terminal input on non-touch platforms.
+	# On touch/mobile devices let the OS manage input focus naturally so we
+	# don't interfere with scrolling or trigger unexpected keyboard pop-ups.
+	if not DisplayServer.is_touchscreen_available():
+		if not input.has_focus():
+			input.grab_focus()
 	_update_status_bar()
 
 func _notification(what: int) -> void:
