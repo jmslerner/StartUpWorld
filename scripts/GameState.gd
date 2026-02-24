@@ -259,6 +259,30 @@ func stats_text() -> String:
 	lines.append("Reputation: %.2f" % reputation)
 	return "\n".join(lines)
 
+func end_summary_text(outcome: String) -> String:
+	var ratio := 0.0
+	if cac > 0.0:
+		ratio = ltv / cac
+	var lines: Array[String] = []
+	lines.append("=".repeat(50))
+	lines.append("RUN SUMMARY")
+	lines.append("Outcome: %s" % outcome)
+	lines.append("Week: %d" % week)
+	lines.append("Cash: $%.0f | Burn: $%.0f/week | Runway: %d weeks" % [cash, burn_per_week, runway_weeks()])
+	lines.append("Users: %d | MRR: $%.0f" % [users, mrr])
+	lines.append("Product: %.1f | Churn: %.2f | LTV/CAC: %.2f" % [product_progress, churn, ratio])
+	lines.append("Team: eng %d | gtm %d | hr %d | legal %d" % [team["engineer"], team["gtm"], team["hr"], team["legal"]])
+	lines.append("Office: %s" % office_tier)
+	lines.append("Features shipped: %d" % features_shipped.size())
+	lines.append("Upgrades: %d" % active_upgrades.size())
+	if debt > 0.0:
+		lines.append("Debt: $%.0f (%.0f%% weekly interest)" % [debt, debt_interest_rate * 100])
+	if dilution > 0.0:
+		lines.append("Dilution: %.1f%%" % dilution)
+	lines.append("Win targets: product>=80, LTV/CAC>=3, churn<=0.05")
+	lines.append("=".repeat(50))
+	return "\n".join(lines)
+
 func list_hires_text() -> String:
 	var rep_mod := _reputation_cost_modifier()
 	var mod_label := ""

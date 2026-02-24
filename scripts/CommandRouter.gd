@@ -220,6 +220,8 @@ func _check_win_loss() -> void:
 			_emit("...and you lost your house too.")
 		if GameState.friends_borrowed:
 			_emit("...and you still owe your friends money.")
+		_emit("")
+		_emit(GameState.end_summary_text("GAME OVER"))
 		_emit("Type 'restart' to play again.")
 		return
 	var ratio := 0.0
@@ -228,6 +230,8 @@ func _check_win_loss() -> void:
 	if GameState.product_progress >= 80.0 and ratio >= 3.0 and GameState.churn <= 0.05:
 		GameState.game_won = true
 		_emit("YOU WIN: Product-market fit achieved.")
+		_emit("")
+		_emit(GameState.end_summary_text("YOU WIN"))
 		_emit("Type 'restart' to play again.")
 
 func _tokenize(text: String) -> Array:
