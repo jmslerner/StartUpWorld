@@ -33,6 +33,8 @@ var friends_borrowed: bool = false
 var active_offer: Dictionary = {}
 var milestones: Array[String] = []
 var fired_recently: bool = false
+var game_won: bool = false
+
 var team := {
 	"engineer": 0,
 	"gtm": 0,
@@ -43,6 +45,77 @@ var office_tier: String = "garage"
 var office_rent: float = 300.0
 var features_shipped: Array[String] = []
 var campaigns: Array[String] = []
+
+func reset() -> void:
+	# Onboarding
+	founder_name = ""
+	company_name = ""
+	archetype = ""
+	cofounder = ""
+	setup_complete = false
+	game_over = false
+	game_won = false
+
+	# Core state
+	week = 1
+	action_points = 2
+	cash = 20000.0
+	burn_per_week = 2500.0
+	users = 50
+	mrr = 500.0
+	cac = 120.0
+	ltv = 600.0
+	churn = 0.08
+	product_progress = 5.0
+	tech_debt = 0.0
+	morale = 0.6
+	brand = 0.2
+	risk = 0.2
+	reputation = 0.5
+	valuation = 0.0
+	debt = 0.0
+	debt_interest_rate = 0.05
+	dilution = 0.0
+	house_mortgaged = false
+	friends_borrowed = false
+	active_offer = {}
+	milestones.clear()
+	fired_recently = false
+	team["engineer"] = 0
+	team["gtm"] = 0
+	team["hr"] = 0
+	team["legal"] = 0
+	office_tier = "garage"
+	office_rent = 300.0
+	features_shipped.clear()
+	campaigns.clear()
+
+	# Archetype defaults
+	arpu_base = 8.0
+	arpu_brand_bonus = 4.0
+	organic_growth_base = 5
+	organic_brand_mult = 20.0
+	campaign_user_bonus = 25
+	enterprise_mrr_bonus = 400.0
+	feature_mrr_bonus = 250.0
+	cac_base = 120.0
+
+	# Upgrades / modifiers
+	pending_upgrade = []
+	active_upgrades.clear()
+	upgrade_fundraise_bonus = 0.0
+	upgrade_feature_progress_mult = 1.0
+	upgrade_feature_debt_mult = 1.0
+	upgrade_campaign_user_mult = 1.0
+	upgrade_legal_cost_mult = 1.0
+	upgrade_risk_decay = 0.0
+	upgrade_guaranteed_mrr = 0.0
+	upgrade_enterprise_mrr_mult = 1.0
+	upgrade_competitor_immune = false
+	upgrade_extra_ap = 0
+	upgrade_burn_mult = 1.0
+	upgrade_organic_mult = 1.0
+	upgrade_borrow_mult = 1.0
 
 # Archetype modifiers (set during setup)
 var arpu_base: float = 8.0

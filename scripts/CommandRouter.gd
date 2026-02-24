@@ -8,11 +8,23 @@ func run(text: String) -> void:
 	var input := text.strip_edges()
 	if input.is_empty():
 		return
-	if not GameState.setup_complete:
-		_handle_onboarding(input)
+	var lower := input.to_lower()
+	if lower == "restart" or lower == "new":
+		GameState.reset()
+		_onboarding_step = 0
+		_emit("=== STARTUP WORLD ===")
+		_emit("Build your AI startup from garage to IPO.")
+		_emit("")
+		_emit("What's your name, founder?")
 		return
-	if GameState.game_over:
-		_emit("Game is over. Restart to play again.")
+	if (GameState.game_over or GameState.game_won) and lower != "help":
+		_emit("Session ended. Type 'restart' to play again.")
+		return
+	if not GameState.setup_complete:
+		if lower == "help":
+			_emit(_help_text())
+			return
+		_handle_onboarding(input)
 		return
 	if not GameState.pending_upgrade.is_empty():
 		_handle_upgrade_choice(input)
@@ -33,21 +45,21 @@ func run(text: String) -> void:
 		"inspect":
 			_emit(GameState.inspect_text(_rest(tokens, 1)))
 		"hire":
-			_emit(SimEngine.hire_role(_canonical(tokens, 1)))
+			_emit_with_ap(SimEngine.hire_role(_canonical(tokens, 1)))
 		"fire":
-			_emit(SimEngine.fire_target(_canonical(tokens, 1)))
+			_emit_with_ap(SimEngine.fire_target(_canonical(tokens, 1)))
 		"rent":
-			_emit(SimEngine.rent_office(_canonical(tokens, 2)))
+			_emit_with_ap(SimEngine.rent_office(_canonical(tokens, 2)))
 		"ship":
-			_emit(SimEngine.ship_feature(_rest(tokens, 2)))
+			_emit_with_ap(SimEngine.ship_feature(_rest(tokens, 2)))
 		"refactor":
-			_emit(SimEngine.refactor())
+			_emit_with_ap(SimEngine.refactor())
 		"launch":
-			_emit(SimEngine.launch_campaign(_rest(tokens, 2)))
+			_emit_with_ap(SimEngine.launch_campaign(_rest(tokens, 2)))
 		"outreach":
-			_emit(SimEngine.enterprise_outreach())
+			_emit_with_ap(SimEngine.enterprise_outreach())
 		"pitch":
-			_emit(SimEngine.pitch_investors())
+			_emit_with_ap(SimEngine.pitch_investors())
 		"raise":
 			_handle_raise(tokens)
 		"borrow":
@@ -55,15 +67,15 @@ func run(text: String) -> void:
 		"safe":
 			_handle_safe(tokens)
 		"mortgage":
-			_emit(SimEngine.mortgage_house())
+			_emit_with_ap(SimEngine.mortgage_house())
 		"friends":
 			_handle_friends(tokens)
 		"sell":
-			_emit(SimEngine.sell_company())
+			_emit_with_ap(SimEngine.sell_company())
 		"ipo":
-			_emit(SimEngine.ipo())
+			_emit_with_ap(SimEngine.ipo())
 		"cut":
-			_emit(SimEngine.cut_costs())
+			_emit_with_ap(SimEngine.cut_costs())
 		"end":
 			_emit(SimEngine.end_week())
 			_check_win_loss()
@@ -146,28 +158,28 @@ func _handle_raise(tokens: Array) -> void:
 		return
 	var round_name: String = tokens[1]
 	var amount: float = _parse_amount(tokens[2])
-	_emit(SimEngine.raise_round(round_name, amount))
+	_emit_with_ap(SimEngine.raise_round(round_name, amount))
 
 func _handle_borrow(tokens: Array) -> void:
 	if tokens.size() < 2:
 		_emit("Usage: borrow 50k")
 		return
 	var amount := _parse_amount(tokens[1])
-	_emit(SimEngine.borrow(amount))
+	_emit_with_ap(SimEngine.borrow(amount))
 
 func _handle_safe(tokens: Array) -> void:
 	if tokens.size() < 2:
 		_emit("Usage: safe 100k")
 		return
 	var amount := _parse_amount(tokens[1])
-	_emit(SimEngine.raise_safe(amount))
+	_emit_with_ap(SimEngine.raise_safe(amount))
 
 func _handle_friends(tokens: Array) -> void:
 	if tokens.size() < 2:
 		_emit("Usage: friends 10k")
 		return
 	var amount := _parse_amount(tokens[1])
-	_emit(SimEngine.borrow_friends(amount))
+	_emit_with_ap(SimEngine.borrow_friends(amount))
 
 func _check_win_loss() -> void:
 	if GameState.cash <= 0.0:
@@ -177,6 +189,15 @@ func _check_win_loss() -> void:
 			_emit("...and you lost your house too.")
 		if GameState.friends_borrowed:
 			_emit("...and you still owe your friends money.")
+		_emit("Type 'restart' to play again.")
+		return
+	var ratio := 0.0
+	if GameState.cac > 0.0:
+		ratio = GameState.ltv / GameState.cac
+	if GameState.product_progress >= 80.0 and ratio >= 3.0 and GameState.churn <= 0.05:
+		GameState.game_won = true
+		_emit("YOU WIN: Product-market fit achieved.")
+		_emit("Type 'restart' to play again.")
 
 func _tokenize(text: String) -> Array:
 	var parts := text.to_lower().split(" ", false)
@@ -232,6 +253,9 @@ func _help_text() -> String:
 	var lines: Array[String] = []
 	lines.append("=== Commands ===")
 	lines.append("")
+	lines.append("META")
+	lines.append("  restart (or: new)")
+	lines.append("")
 	lines.append("INFO")
 	lines.append("  help, status, stats")
 	lines.append("  list hires|offices|features|upgrades")
@@ -269,3 +293,6 @@ func _help_text() -> String:
 
 func _emit(text: String) -> void:
 	emit_signal("output", text)
+
+func _emit_with_ap(text: String) -> void:
+	emit_signal("output", text + " (AP left: %d)" % GameState.action_points)
