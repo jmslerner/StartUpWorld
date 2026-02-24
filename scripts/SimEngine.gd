@@ -215,6 +215,28 @@ func _office_debt_mult() -> float:
 		_:
 			return 1.00
 
+func _coordination_mult() -> float:
+	var hc := GameState.headcount()
+	if hc <= 15:
+		return 1.0
+	if hc <= 50:
+		return lerp(1.0, 0.88, float(hc - 15) / 35.0)
+	if hc <= 120:
+		return lerp(0.88, 0.70, float(hc - 50) / 70.0)
+	return 0.70
+
+func _operational_overhead_cost() -> float:
+	var hc := GameState.headcount()
+	if hc <= 25:
+		return 0.0
+	var overhead := float(hc - 25) * 15.0
+	if hc > 80:
+		overhead += float(hc - 80) * 10.0
+	# Without HR, people/process overhead is brutal.
+	if GameState.team["hr"] <= 0 and hc >= 40:
+		overhead *= 1.35
+	return overhead
+
 # ---- Actions ----
 
 func hire_role(role: String) -> String:
@@ -288,8 +310,13 @@ func ship_feature(name: String) -> String:
 	if not _consume_action():
 		return "No action points left this week."
 	GameState.features_shipped.append(feature.to_lower())
-	var progress: float = (12.0 + GameState.team["engineer"] * 2.0) * GameState.upgrade_feature_progress_mult * _office_productivity_mult()
-	var debt: float = 2.5 * max(0.1, GameState.upgrade_feature_debt_mult) * _office_debt_mult()
+	var coord := _coordination_mult()
+	var progress: float = (12.0 + GameState.team["engineer"] * 2.0) * GameState.upgrade_feature_progress_mult * _office_productivity_mult() * coord
+	var debt_mult := _office_debt_mult()
+	# As teams grow, coordination drag increases thrash and integration debt.
+	var drag := (1.0 - coord) * 0.9
+	debt_mult *= (1.0 + drag)
+	var debt: float = 2.5 * max(0.1, GameState.upgrade_feature_debt_mult) * debt_mult
 	GameState.product_progress = clamp(GameState.product_progress + progress, 0.0, 100.0)
 	GameState.tech_debt = clamp(GameState.tech_debt + debt, 0.0, 100.0)
 	GameState.churn = clamp(GameState.churn - 0.01, 0.01, 0.2)
@@ -300,8 +327,9 @@ func ship_feature(name: String) -> String:
 func refactor() -> String:
 	if not _consume_action():
 		return "No action points left this week."
-	GameState.tech_debt = clamp(GameState.tech_debt - 6.0, 0.0, 100.0)
-	GameState.product_progress = clamp(GameState.product_progress + 3.0, 0.0, 100.0)
+	var coord := _coordination_mult()
+	GameState.tech_debt = clamp(GameState.tech_debt - (6.0 * coord), 0.0, 100.0)
+	GameState.product_progress = clamp(GameState.product_progress + (3.0 * coord), 0.0, 100.0)
 	GameState.morale = clamp(GameState.morale + 0.03, 0.0, 1.0)
 	return "Refactor complete."
 
@@ -596,8 +624,9 @@ func end_week() -> String:
 		var interest := GameState.debt * GameState.debt_interest_rate
 		GameState.cash -= interest
 		GameState.debt += interest
-	# Weekly burn (with frugal founder upgrade)
-	var effective_burn := GameState.burn_per_week * GameState.upgrade_burn_mult
+	# Weekly burn (with frugal founder upgrade) + late-game overhead
+	var overhead := _operational_overhead_cost()
+	var effective_burn := GameState.burn_per_week * GameState.upgrade_burn_mult + overhead
 	GameState.cash -= effective_burn
 	# User churn and growth
 	var churned := int(GameState.users * GameState.churn)
@@ -628,6 +657,8 @@ func end_week() -> String:
 	GameState.fired_recently = false
 	# Build summary
 	var summary := "Week %d complete. Burned $%.0f, users %d, MRR $%.0f, valuation %s." % [GameState.week, effective_burn, GameState.users, GameState.mrr, GameState._format_money(GameState.valuation)]
+	if overhead > 0.0:
+		summary += "\nOperational overhead: $%.0f (coordination + process costs)." % overhead
 	if GameState.debt > 0.0:
 		summary += "\nDebt interest: $%.0f. Total debt: $%.0f." % [GameState.debt * GameState.debt_interest_rate / (1.0 + GameState.debt_interest_rate), GameState.debt]
 	# Milestone checks
