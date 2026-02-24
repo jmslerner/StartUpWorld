@@ -35,7 +35,7 @@ size_flags_vertical = 3
 [node name="Log" type="TextEdit" parent="Layout/LogPanel"]
 size_flags_horizontal = 3
 size_flags_vertical = 3
-editable = false
+editable = true
 context_menu_enabled = false
 selecting_enabled = true
 focus_mode = 0
