@@ -32,11 +32,13 @@ text = ""
 size_flags_horizontal = 3
 size_flags_vertical = 3
 
-[node name="Log" type="RichTextLabel" parent="Layout/LogPanel"]
+[node name="Log" type="TextEdit" parent="Layout/LogPanel"]
 size_flags_horizontal = 3
 size_flags_vertical = 3
-scroll_active = true
-bbcode_enabled = false
+editable = false
+context_menu_enabled = false
+selecting_enabled = true
+focus_mode = 0
 
 [node name="InputPanel" type="PanelContainer" parent="Layout"]
 size_flags_horizontal = 3

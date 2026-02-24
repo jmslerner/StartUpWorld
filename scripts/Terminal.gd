@@ -1,7 +1,7 @@
 extends Control
 
 @onready var status_label: Label = $Layout/StatusPanel/Status
-@onready var log: RichTextLabel = $Layout/LogPanel/Log
+@onready var log: TextEdit = $Layout/LogPanel/Log
 @onready var input: LineEdit = $Layout/InputPanel/Input
 @onready var pause_menu: Control = $PauseMenu
 @onready var resume_button: Button = $PauseMenu/Panel/VBox/ResumeButton
@@ -18,7 +18,7 @@ func _ready() -> void:
 	restart_button.pressed.connect(_on_restart_pressed)
 	help_button.pressed.connect(_on_help_pressed)
 	# Ensure terminal text is visible across platforms (HTML5 can differ in theme defaults).
-	log.add_theme_color_override("default_color", prompt_color)
+	log.add_theme_color_override("font_color", prompt_color)
 	input.grab_focus()
 	_write_prompt("=== STARTUP WORLD ===")
 	_write_prompt("Build your AI startup from garage to IPO.")
@@ -62,7 +62,7 @@ func _write_user(text: String) -> void:
 	log.text += text + "\n"
 
 func _scroll_to_bottom() -> void:
-	log.scroll_to_line(max(0, log.get_line_count() - 1))
+	log.scroll_vertical = max(0, log.get_line_count() - 1)
 
 func _sync_pause_ui(force: bool) -> void:
 	var should_show := GameState.paused
