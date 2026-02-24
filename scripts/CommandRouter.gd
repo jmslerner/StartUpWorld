@@ -20,7 +20,7 @@ func run(text: String) -> void:
 	var tokens := _tokenize(input)
 	if tokens.is_empty():
 		return
-	var command := tokens[0]
+	var command: String = tokens[0]
 	match command:
 		"help":
 			_emit(_help_text())
@@ -144,8 +144,8 @@ func _handle_raise(tokens: Array) -> void:
 	if tokens.size() < 3:
 		_emit("Usage: raise seed 500k")
 		return
-	var round_name := tokens[1]
-	var amount := _parse_amount(tokens[2])
+	var round_name: String = tokens[1]
+	var amount: float = _parse_amount(tokens[2])
 	_emit(SimEngine.raise_round(round_name, amount))
 
 func _handle_borrow(tokens: Array) -> void:

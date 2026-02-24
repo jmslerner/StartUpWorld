@@ -188,8 +188,8 @@ func ship_feature(name: String) -> String:
 	if not _consume_action():
 		return "No action points left this week."
 	GameState.features_shipped.append(feature.to_lower())
-	var progress := (12.0 + GameState.team["engineer"] * 2.0) * GameState.upgrade_feature_progress_mult
-	var debt := 2.5 * max(0.1, GameState.upgrade_feature_debt_mult)
+	var progress: float = (12.0 + GameState.team["engineer"] * 2.0) * GameState.upgrade_feature_progress_mult
+	var debt: float = 2.5 * max(0.1, GameState.upgrade_feature_debt_mult)
 	GameState.product_progress = clamp(GameState.product_progress + progress, 0.0, 100.0)
 	GameState.tech_debt = clamp(GameState.tech_debt + debt, 0.0, 100.0)
 	GameState.churn = clamp(GameState.churn - 0.01, 0.01, 0.2)
@@ -356,7 +356,7 @@ func end_week() -> String:
 	GameState.tech_debt = clamp(GameState.tech_debt + 0.5, 0.0, 100.0)
 	GameState.churn = clamp(GameState.churn + GameState.tech_debt * 0.002 - GameState.product_progress * 0.0005 - GameState.brand * 0.002, 0.01, 0.2)
 	GameState.cac = clamp(GameState.cac_base - GameState.brand * 40.0 - GameState.team["gtm"] * 5.0 + GameState.risk * 10.0, 30.0, 200.0)
-	var arpu := GameState.mrr / max(1, GameState.users)
+	var arpu: float = GameState.mrr / max(1, GameState.users)
 	GameState.ltv = arpu / max(0.01, GameState.churn)
 	# Passive risk decay from upgrades
 	if GameState.upgrade_risk_decay > 0.0:
