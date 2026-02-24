@@ -25,3 +25,34 @@ offset_left = 16.0
 offset_top = -40.0
 offset_right = -16.0
 offset_bottom = -16.0
+
+[node name="PauseMenu" type="Control" parent="."]
+visible = false
+anchor_right = 1.0
+anchor_bottom = 1.0
+
+[node name="Panel" type="PanelContainer" parent="PauseMenu"]
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -160.0
+offset_top = -90.0
+offset_right = 160.0
+offset_bottom = 90.0
+
+[node name="VBox" type="VBoxContainer" parent="PauseMenu/Panel"]
+theme_override_constants/separation = 10
+
+[node name="Title" type="Label" parent="PauseMenu/Panel/VBox"]
+text = "Paused"
+horizontal_alignment = 1
+
+[node name="ResumeButton" type="Button" parent="PauseMenu/Panel/VBox"]
+text = "Resume"
+
+[node name="RestartButton" type="Button" parent="PauseMenu/Panel/VBox"]
+text = "Restart"
+
+[node name="HelpButton" type="Button" parent="PauseMenu/Panel/VBox"]
+text = "Help"
