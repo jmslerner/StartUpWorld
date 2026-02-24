@@ -11,11 +11,26 @@ func run(text: String) -> void:
 	var lower := input.to_lower()
 	if lower == "pause":
 		GameState.paused = true
-		_emit("PAUSED. Type 'resume' to continue.")
+		_emit("PAUSED. Type 'resume' (or 1) to continue.")
 		return
 	if lower == "resume":
 		GameState.paused = false
 		_emit("Resumed.")
+		return
+	if GameState.paused and lower in ["1", "2", "3"]:
+		match lower:
+			"1":
+				GameState.paused = false
+				_emit("Resumed.")
+			"2":
+				GameState.reset()
+				_onboarding_step = 0
+				_emit("=== STARTUP WORLD ===")
+				_emit("Build your AI startup from garage to IPO.")
+				_emit("")
+				_emit("What's your name, founder?")
+			"3":
+				_emit(_help_text())
 		return
 	if lower == "restart" or lower == "new":
 		GameState.reset()

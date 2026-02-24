@@ -1,18 +1,15 @@
 extends Control
 
-@onready var log: RichTextLabel = $Log
-@onready var input: LineEdit = $Input
-@onready var input_glow: ColorRect = $InputGlow
+@onready var status_label: Label = $Layout/StatusPanel/Status
+@onready var log: RichTextLabel = $Layout/LogPanel/Log
+@onready var input: LineEdit = $Layout/InputPanel/Input
 @onready var pause_menu: Control = $PauseMenu
 @onready var resume_button: Button = $PauseMenu/Panel/VBox/ResumeButton
 @onready var restart_button: Button = $PauseMenu/Panel/VBox/RestartButton
 @onready var help_button: Button = $PauseMenu/Panel/VBox/HelpButton
 
 var prompt_color := Color(0.85, 0.85, 0.85)
-var user_color := Color(0.45, 0.90, 0.65)
-
-var _glow_base := Color(0.2, 1.0, 0.6, 0.10)
-var _glow_pulse_alpha := 0.14
+var user_color := Color(1.0, 1.0, 1.0)
 
 func _ready() -> void:
 	input.text_submitted.connect(_on_submit)
@@ -26,10 +23,11 @@ func _ready() -> void:
 	_write_prompt("")
 	_write_prompt("What's your name, founder?")
 	_sync_pause_ui(true)
+	_update_status_bar()
 
 func _process(_delta: float) -> void:
 	_sync_pause_ui(false)
-	_update_glow()
+	_update_status_bar()
 
 func _on_submit(text: String) -> void:
 	var trimmed := text.strip_edges()
@@ -43,6 +41,7 @@ func _on_submit(text: String) -> void:
 func _on_output(text: String) -> void:
 	_write_prompt(text)
 	_scroll_to_bottom()
+	_update_status_bar()
 
 func _write_prompt(text: String) -> void:
 	log.push_color(prompt_color)
@@ -68,13 +67,31 @@ func _sync_pause_ui(force: bool) -> void:
 		if not input.has_focus():
 			input.grab_focus()
 
-func _update_glow() -> void:
-	var t := float(Time.get_ticks_msec()) / 1000.0
-	var pulse := 0.5 + 0.5 * sin(t * 3.0)
-	var alpha := _glow_base.a + _glow_pulse_alpha * pulse
+func _update_status_bar() -> void:
+	var title := ""
+	if not GameState.company_name.is_empty():
+		title = GameState.company_name
+	elif not GameState.founder_name.is_empty():
+		title = "%s's startup" % GameState.founder_name
+	else:
+		title = "StartUpWorld"
+
+	var cash_text := "$%.0f" % GameState.cash
+	var base := "%s | Week %d | AP %d | Cash %s | Users %d | MRR $%.0f" % [
+		title,
+		GameState.week,
+		GameState.action_points,
+		cash_text,
+		GameState.users,
+		GameState.mrr
+	]
 	if GameState.paused:
-		alpha *= 0.35
-	input_glow.color = Color(_glow_base.r, _glow_base.g, _glow_base.b, alpha)
+		base += " | PAUSED"
+	if GameState.game_over:
+		base += " | GAME OVER"
+	if GameState.game_won:
+		base += " | YOU WIN"
+	status_label.text = base
 
 func _on_resume_pressed() -> void:
 	CommandRouter.run("resume")
