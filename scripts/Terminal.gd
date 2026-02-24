@@ -29,6 +29,8 @@ func _ready() -> void:
 	input.focus_exited.connect(_on_input_focus_changed)
 	# Ensure terminal text is visible across platforms (HTML5 can differ in theme defaults).
 	log.add_theme_color_override("font_color", prompt_color)
+	# Prevent the log label from ever collapsing to 0 height (can happen inside ScrollContainer on some platforms).
+	log.custom_minimum_size = Vector2(0, 1)
 	_apply_theme_overrides()
 	_apply_responsive_layout()
 	get_viewport().size_changed.connect(_on_viewport_resized)
@@ -162,7 +164,8 @@ func _scroll_to_bottom() -> void:
 
 func _update_log_size() -> void:
 	# Ensure the label grows to fit content so the ScrollContainer can scroll.
-	log.custom_minimum_size = log.get_minimum_size()
+	var min_size := log.get_combined_minimum_size()
+	log.custom_minimum_size = Vector2(min_size.x, maxf(min_size.y, 1.0))
 
 func _sync_pause_ui(force: bool) -> void:
 	var should_show := GameState.paused
