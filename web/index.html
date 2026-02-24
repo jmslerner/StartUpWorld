@@ -103,6 +103,26 @@ html, body, #canvas {
 	height: 100%;
 }
 </style>
+<script>
+// Cleanup legacy PWA service worker/caches from earlier exports.
+// Without this, older cached builds can keep loading forever on the same origin.
+(function () {
+	try {
+		if ('serviceWorker' in navigator) {
+			navigator.serviceWorker.getRegistrations().then(function (regs) {
+				regs.forEach(function (reg) {
+					reg.unregister();
+				});
+			});
+		}
+		if (window.caches && caches.keys) {
+			caches.keys().then(function (keys) {
+				keys.forEach(function (k) { caches.delete(k); });
+			});
+		}
+	} catch (e) {}
+})();
+</script>
 
 	</head>
 	<body>
@@ -122,7 +142,7 @@ html, body, #canvas {
 
 		<script src="index.js"></script>
 		<script>
-const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":false,"executable":"index","experimentalVK":true,"fileSizes":{"index.pck":224004,"index.wasm":37685705},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
+const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":false,"executable":"index","experimentalVK":true,"fileSizes":{"index.pck":224100,"index.wasm":37685705},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
 const GODOT_THREADS_ENABLED = false;
 const engine = new Engine(GODOT_CONFIG);
 

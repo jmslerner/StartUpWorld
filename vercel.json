@@ -5,6 +5,10 @@
   ],
   "headers": [
     {
+      "source": "/",
+      "headers": [{ "key": "Cache-Control", "value": "no-store" }]
+    },
+    {
       "source": "/web/index.html",
       "headers": [{ "key": "Cache-Control", "value": "no-store" }]
     },
