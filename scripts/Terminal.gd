@@ -63,10 +63,9 @@ func _sync_pause_ui(force: bool) -> void:
 	var should_show := GameState.paused
 	if force or pause_menu.visible != should_show:
 		pause_menu.visible = should_show
-		input.editable = not should_show
-		if should_show:
-			resume_button.grab_focus()
-		else:
+		# Keep the user's terminal usable/visible at all times.
+		# The pause menu is a separate interaction layer.
+		if not input.has_focus():
 			input.grab_focus()
 
 func _update_glow() -> void:
@@ -80,11 +79,14 @@ func _update_glow() -> void:
 func _on_resume_pressed() -> void:
 	CommandRouter.run("resume")
 	_scroll_to_bottom()
+	input.grab_focus()
 
 func _on_restart_pressed() -> void:
 	CommandRouter.run("restart")
 	_scroll_to_bottom()
+	input.grab_focus()
 
 func _on_help_pressed() -> void:
 	CommandRouter.run("help")
 	_scroll_to_bottom()
+	input.grab_focus()
