@@ -79,6 +79,8 @@ func run(text: String) -> void:
 		"end":
 			_emit(SimEngine.end_week())
 			_check_win_loss()
+			if not GameState.game_over and not GameState.game_won:
+				_emit(GameState.status_text())
 		_:
 			_emit("Unknown command. Type 'help'.")
 
