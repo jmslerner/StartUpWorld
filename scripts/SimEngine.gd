@@ -284,6 +284,9 @@ func raise_round(round_name: String, amount: float) -> String:
 		return "Raise amount must be positive."
 	if GameState.investor_interest_weeks <= 0:
 		return "No investors ready to wire money. Use 'pitch investors' first."
+	var required_strength := _required_interest_strength(round_name)
+	if GameState.investor_interest_strength < required_strength:
+		return "Your pitch wasn't strong enough for %s. Build more traction and pitch again." % round_name
 	var cap := _raise_cap(round_name) * clamp(GameState.investor_interest_strength, 0.3, 1.0)
 	if amount > cap:
 		return "Investors will only commit up to %s right now." % GameState._format_money(cap)
@@ -313,15 +316,15 @@ func _raise_cap(round_name: String) -> float:
 	if key.begins_with("series "):
 		key = "series " + key.substr(7, key.length() - 7).strip_edges()
 
-	var min_cap := 50000.0
-	var max_cap := 400000.0
+	var min_cap := 40000.0
+	var max_cap := 250000.0
 	match key:
 		"pre-seed", "preseed":
-			min_cap = 25000.0
-			max_cap = 150000.0
+			min_cap = 15000.0
+			max_cap = 75000.0
 		"seed":
-			min_cap = 50000.0
-			max_cap = 400000.0
+			min_cap = 40000.0
+			max_cap = 250000.0
 		"series a":
 			min_cap = 250000.0
 			max_cap = 2500000.0
@@ -347,9 +350,32 @@ func _raise_cap(round_name: String) -> float:
 
 	var cap := lerp(min_cap, max_cap, traction / 100.0)
 	var implied_valuation := _implied_valuation()
-	cap = min(cap, implied_valuation * 0.18)
+	# Keep early rounds painful; later rounds can stretch a bit more.
+	var pct := 0.12
+	if key.begins_with("series "):
+		pct = 0.18
+	cap = min(cap, implied_valuation * pct)
 	cap = max(cap, 10000.0)
 	return cap
+
+func _required_interest_strength(round_name: String) -> float:
+	var key := round_name.strip_edges().to_lower()
+	if key in ["pre-seed", "preseed", "seed"]:
+		return 0.30
+	if key.begins_with("series "):
+		var s := key.substr(7, key.length() - 7).strip_edges()
+		match s:
+			"a":
+				return 0.55
+			"b":
+				return 0.65
+			"c":
+				return 0.75
+			"d":
+				return 0.85
+			_:
+				return 0.70
+	return 0.30
 
 func borrow(amount: float) -> String:
 	if amount <= 0.0:

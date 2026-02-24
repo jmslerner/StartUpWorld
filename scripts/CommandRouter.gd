@@ -337,7 +337,7 @@ func _help_text() -> String:
 	lines.append("FUNDING")
 	lines.append("  pitch investors")
 	lines.append("  raise seed <amount>    — requires investors (pitch first)")
-	lines.append("  raise a <amount>       — Series A (requires pitch; also: 'raise series a <amount>')")
+	lines.append("  raise a <amount>       — Series A (requires strong pitch; also: 'raise series a <amount>')")
 	lines.append("  raise b <amount>       — Series B")
 	lines.append("  raise c <amount>       — Series C")
 	lines.append("  raise d <amount>       — Series D")
