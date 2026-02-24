@@ -52,16 +52,12 @@ func _on_output(text: String) -> void:
 	_update_status_bar()
 
 func _write_prompt(text: String) -> void:
-	log.push_color(prompt_color)
-	log.add_text(text)
-	log.add_text("\n")
-	log.pop()
+	# HTML5 exports can be picky about RichTextLabel tag stack APIs.
+	# Appending plain text is the most robust path across platforms.
+	log.text += text + "\n"
 
 func _write_user(text: String) -> void:
-	log.push_color(user_color)
-	log.add_text(text)
-	log.add_text("\n")
-	log.pop()
+	log.text += text + "\n"
 
 func _scroll_to_bottom() -> void:
 	log.scroll_to_line(max(0, log.get_line_count() - 1))
