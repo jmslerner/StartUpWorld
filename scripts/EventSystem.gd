@@ -31,6 +31,32 @@ func _catalog() -> Array[Dictionary]:
 	return [
 		# ===== TEAM EVENTS =====
 		{
+			"id": "mass_poaching_event",
+			"headline": "Competitor tries to poach your engineering team",
+			"description": func() -> String:
+				if _has_hr() and _has_legal():
+					return "A competitor made aggressive offers, but HR and legal moved fast. You still lose a chunk of engineers."
+				if _has_hr() or _has_legal():
+					return "A competitor started a poaching spree. You manage some retention, but you lose engineers."
+				return "A competitor made offers to half your engineering team. You have no HR/legal muscle to counter. It's a bloodbath.",
+			"condition": func() -> bool:
+				return GameState.team["engineer"] >= 4 and GameState.week >= 6 and not GameState.upgrade_competitor_immune,
+			"apply": func() -> void:
+				var engineers := GameState.team["engineer"]
+				var loss := int(ceil(engineers * 0.5))
+				if _has_hr() and _has_legal():
+					loss = int(ceil(engineers * 0.35))
+				elif _has_hr() or _has_legal():
+					loss = int(ceil(engineers * 0.45))
+				loss = clamp(loss, 1, engineers)
+				GameState.team["engineer"] -= loss
+				GameState.burn_per_week -= SimEngine._role_cost("engineer") * loss
+				GameState.burn_per_week = max(0.0, GameState.burn_per_week)
+				GameState.morale = clamp(GameState.morale - 0.10, 0.0, 1.0)
+				GameState.reputation = clamp(GameState.reputation - 0.04, 0.0, 1.0)
+				GameState.risk = clamp(GameState.risk + 0.06, 0.0, 1.0),
+		},
+		{
 			"id": "engineer_poached",
 			"headline": "Lead engineer poached by Google",
 			"description": "Your best engineer just accepted an offer from Google. Team morale takes a hit.",
@@ -81,6 +107,21 @@ func _catalog() -> Array[Dictionary]:
 				GameState.users += 15,
 		},
 		# ===== MARKET EVENTS =====
+		{
+			"id": "rent_doubles",
+			"headline": "Rent spike — your landlord doubles the price",
+			"description": "Your landlord " + '"' + "re-prices the market" + '"' + ". Office costs double overnight.",
+			"condition": func() -> bool:
+				return GameState.week >= 4 and GameState.office_rent >= 800.0,
+			"apply": func() -> void:
+				var old_rent := GameState.office_rent
+				var new_rent := old_rent * 2.0
+				GameState.office_rent = new_rent
+				# burn_per_week already includes office_rent; apply the delta.
+				GameState.burn_per_week += (new_rent - old_rent)
+				GameState.morale = clamp(GameState.morale - 0.03, 0.0, 1.0)
+				GameState.risk = clamp(GameState.risk + 0.03, 0.0, 1.0),
+		},
 		{
 			"id": "gpu_price_spike",
 			"headline": "GPU prices spike — compute costs surge",
@@ -158,6 +199,22 @@ func _catalog() -> Array[Dictionary]:
 				GameState.morale = clamp(GameState.morale - 0.04, 0.0, 1.0),
 		},
 		# ===== FINANCIAL EVENTS =====
+		{
+			"id": "h1b_fee_hike",
+			"headline": "H-1B compliance fees jump — international hiring gets expensive",
+			"description": func() -> String:
+				if _has_legal():
+					return "Visa and compliance fees rise, but legal keeps the damage contained. Your burn still increases."
+				return "Visa and compliance fees rise. International hiring gets expensive and your burn increases.",
+			"condition": func() -> bool:
+				return GameState.week >= 5 and GameState.team["engineer"] >= 2,
+			"apply": func() -> void:
+				var per_engineer := 120.0
+				if _has_legal():
+					per_engineer = 70.0
+				GameState.burn_per_week += per_engineer * float(GameState.team["engineer"])
+				GameState.risk = clamp(GameState.risk + 0.03, 0.0, 1.0),
+		},
 		{
 			"id": "tax_audit",
 			"headline": "Surprise tax audit",
@@ -308,6 +365,32 @@ func _catalog() -> Array[Dictionary]:
 					GameState.reputation = clamp(GameState.reputation - 0.08, 0.0, 1.0),
 		},
 		# ===== VC ANTAGONIST EVENTS =====
+		{
+			"id": "cofounder_twitter_fight",
+			"headline": "Cofounder starts a social media fight",
+			"description": func() -> String:
+				if GameState.cofounder == "operator":
+					return "Your operator cofounder picks a public fight with another founder. Screenshots spread."
+				return "Your technical cofounder rage-posts a thread about " + '"' + "vibes" + '"' + " and " + '"' + "fraud" + '"' + ". It doesn't land.",
+			"condition": func() -> bool:
+				return GameState.week >= 4 and GameState.setup_complete and GameState.brand >= 0.15,
+			"apply": func() -> void:
+				var rep_hit := 0.06
+				var brand_hit := 0.05
+				var cash_hit := 0.0
+				if _has_hr():
+					rep_hit *= 0.75
+					brand_hit *= 0.85
+				if _has_legal():
+					rep_hit *= 0.85
+					cash_hit = 1500.0 * GameState.upgrade_legal_cost_mult
+				GameState.reputation = clamp(GameState.reputation - rep_hit, 0.0, 1.0)
+				GameState.brand = clamp(GameState.brand - brand_hit, 0.0, 1.0)
+				GameState.morale = clamp(GameState.morale - 0.05, 0.0, 1.0)
+				GameState.risk = clamp(GameState.risk + 0.05, 0.0, 1.0)
+				if cash_hit > 0.0:
+					GameState.cash -= cash_hit,
+		},
 		{
 			"id": "vc_board_seat",
 			"headline": "VC demands a board seat",
