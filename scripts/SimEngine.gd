@@ -182,7 +182,7 @@ func hire_role(role: String) -> String:
 	var cost := _role_cost(role)
 	GameState.burn_per_week += cost
 	GameState.morale = clamp(GameState.morale + 0.02, 0.0, 1.0)
-	return "Hired %s ($%.0f/week)." % [role, cost]
+	return _with_runway_warning("Hired %s ($%.0f/week)." % [role, cost])
 
 func fire_target(target: String) -> String:
 	if not GameState.team.has(target):
@@ -209,7 +209,13 @@ func rent_office(tier: String) -> String:
 	GameState.office_rent = cost
 	GameState.office_tier = tier
 	GameState.morale = clamp(GameState.morale + 0.05, 0.0, 1.0)
-	return "Moved to %s." % tier
+	return _with_runway_warning("Moved to %s." % tier)
+
+func _with_runway_warning(message: String) -> String:
+	var runway := GameState.runway_weeks()
+	if runway <= 3:
+		return message + "\nWARNING: runway is %d weeks." % runway
+	return message
 
 func ship_feature(name: String) -> String:
 	var feature := name.strip_edges()
