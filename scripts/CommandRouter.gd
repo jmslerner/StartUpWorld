@@ -185,11 +185,35 @@ func _handle_list(tokens: Array) -> void:
 
 func _handle_raise(tokens: Array) -> void:
 	if tokens.size() < 3:
-		_emit("Usage: raise seed 500k")
+		_emit("Usage: raise seed 500k | raise a 5m | raise series b 12m")
 		return
-	var round_name: String = tokens[1]
-	var amount: float = _parse_amount(tokens[2])
+	var round_name := ""
+	var amount_text := ""
+	if tokens[1] == "series" and tokens.size() >= 4:
+		round_name = "series %s" % str(tokens[2])
+		amount_text = str(tokens[3])
+	else:
+		round_name = str(tokens[1])
+		amount_text = str(tokens[2])
+
+	round_name = _format_round_name(round_name)
+	var amount: float = _parse_amount(amount_text)
 	_emit_with_ap(SimEngine.raise_round(round_name, amount))
+
+func _format_round_name(name: String) -> String:
+	var n := name.strip_edges().to_lower()
+	if n in ["a", "b", "c", "d", "e"]:
+		return "Series %s" % n.to_upper()
+	if n.begins_with("series "):
+		var rest := n.substr(7, n.length() - 7).strip_edges()
+		if rest in ["a", "b", "c", "d", "e"]:
+			return "Series %s" % rest.to_upper()
+		return "Series %s" % rest
+	if n == "seed":
+		return "Seed"
+	if n == "preseed" or n == "pre-seed":
+		return "Pre-seed"
+	return name
 
 func _handle_borrow(tokens: Array) -> void:
 	if tokens.size() < 2:
@@ -313,6 +337,10 @@ func _help_text() -> String:
 	lines.append("FUNDING")
 	lines.append("  pitch investors")
 	lines.append("  raise seed <amount>")
+	lines.append("  raise a <amount>       — Series A (also: 'raise series a <amount>')")
+	lines.append("  raise b <amount>       — Series B")
+	lines.append("  raise c <amount>       — Series C")
+	lines.append("  raise d <amount>       — Series D")
 	lines.append("  borrow <amount>        — bank loan (5% weekly interest)")
 	lines.append("  safe <amount>          — SAFE note (dilutes equity)")
 	lines.append("  mortgage house         — $50k one-time (personal risk)")
