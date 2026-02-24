@@ -149,7 +149,7 @@ func _refresh_log_layout() -> void:
 	await get_tree().process_frame
 	await get_tree().process_frame
 	_update_log_size()
-	_scroll_to_bottom()
+	log_scroll.scroll_vertical = 0
 
 func _on_input_focus_changed() -> void:
 	if input.has_focus():
