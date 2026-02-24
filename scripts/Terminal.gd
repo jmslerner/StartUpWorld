@@ -1,7 +1,8 @@
 extends Control
 
 @onready var status_label: Label = $Layout/StatusPanel/Status
-@onready var log: TextEdit = $Layout/LogPanel/Log
+@onready var log_scroll: ScrollContainer = $Layout/LogPanel/Scroll
+@onready var log: Label = $Layout/LogPanel/Scroll/Log
 @onready var input: LineEdit = $Layout/InputPanel/Input
 @onready var pause_menu: Control = $PauseMenu
 @onready var resume_button: Button = $PauseMenu/Panel/VBox/ResumeButton
@@ -54,15 +55,17 @@ func _on_output(text: String) -> void:
 	_update_status_bar()
 
 func _write_prompt(text: String) -> void:
-	# HTML5 exports can be picky about RichTextLabel tag stack APIs.
-	# Appending plain text is the most robust path across platforms.
 	log.text += text + "\n"
 
 func _write_user(text: String) -> void:
 	log.text += text + "\n"
 
 func _scroll_to_bottom() -> void:
-	log.scroll_vertical = max(0, log.get_line_count() - 1)
+	# Defer until layout updates so the scrollbar max is correct.
+	await get_tree().process_frame
+	var bar := log_scroll.get_v_scroll_bar()
+	if is_instance_valid(bar):
+		log_scroll.scroll_vertical = int(bar.max_value)
 
 func _sync_pause_ui(force: bool) -> void:
 	var should_show := GameState.paused

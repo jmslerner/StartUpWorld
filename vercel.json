@@ -5,12 +5,26 @@
   ],
   "headers": [
     {
+      "source": "/web/index.html",
+      "headers": [{ "key": "Cache-Control", "value": "no-store" }]
+    },
+    {
+      "source": "/web/index.js",
+      "headers": [{ "key": "Cache-Control", "value": "no-store" }]
+    },
+    {
       "source": "/(.*)\\.wasm",
-      "headers": [{ "key": "Content-Type", "value": "application/wasm" }]
+      "headers": [
+        { "key": "Content-Type", "value": "application/wasm" },
+        { "key": "Cache-Control", "value": "no-store" }
+      ]
     },
     {
       "source": "/(.*)\\.pck",
-      "headers": [{ "key": "Content-Type", "value": "application/octet-stream" }]
+      "headers": [
+        { "key": "Content-Type", "value": "application/octet-stream" },
+        { "key": "Cache-Control", "value": "no-store" }
+      ]
     },
     {
       "source": "/(.*)",
