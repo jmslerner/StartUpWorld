@@ -9,6 +9,14 @@ func run(text: String) -> void:
 	if input.is_empty():
 		return
 	var lower := input.to_lower()
+	if lower == "pause":
+		GameState.paused = true
+		_emit("PAUSED. Type 'resume' to continue.")
+		return
+	if lower == "resume":
+		GameState.paused = false
+		_emit("Resumed.")
+		return
 	if lower == "restart" or lower == "new":
 		GameState.reset()
 		_onboarding_step = 0
@@ -16,6 +24,9 @@ func run(text: String) -> void:
 		_emit("Build your AI startup from garage to IPO.")
 		_emit("")
 		_emit("What's your name, founder?")
+		return
+	if GameState.paused and lower != "help":
+		_emit("Game is paused. Type 'resume'.")
 		return
 	if (GameState.game_over or GameState.game_won) and lower != "help":
 		_emit("Session ended. Type 'restart' to play again.")
@@ -259,6 +270,7 @@ func _help_text() -> String:
 	lines.append("")
 	lines.append("META")
 	lines.append("  restart (or: new)")
+	lines.append("  pause / resume")
 	lines.append("")
 	lines.append("INFO")
 	lines.append("  help, status, stats")

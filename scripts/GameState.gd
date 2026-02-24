@@ -7,6 +7,7 @@ var archetype: String = ""  # "b2b" or "b2c"
 var cofounder: String = ""  # "technical" or "operator"
 var setup_complete: bool = false
 var game_over: bool = false
+var paused: bool = false
 
 # Core state
 var week: int = 1
@@ -55,6 +56,7 @@ func reset() -> void:
 	setup_complete = false
 	game_over = false
 	game_won = false
+	paused = false
 
 	# Core state
 	week = 1
