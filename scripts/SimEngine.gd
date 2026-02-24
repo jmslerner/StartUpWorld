@@ -240,10 +240,22 @@ func _operational_overhead_cost() -> float:
 # ---- Actions ----
 
 func hire_role(role: String) -> String:
+	return hire_roles(role, 1)
+
+func _role_label(role: String, count: int) -> String:
+	if count == 1:
+		return role
+	return role + "s"
+
+func hire_roles(role: String, count: int) -> String:
 	if not GameState.team.has(role):
 		return "Unknown role."
+	if count <= 0:
+		return "Hire count must be positive."
+	count = clamp(count, 1, 10)
 	if not _consume_action():
 		return "No action points left this week."
+
 	var chance := 0.55
 	chance += (GameState.reputation - 0.5) * 0.8
 	chance += (GameState.brand - 0.2) * 0.4
@@ -251,16 +263,51 @@ func hire_role(role: String) -> String:
 	if GameState.fired_recently:
 		chance -= 0.10
 	chance = clamp(chance, 0.15, 0.95)
-	var roll := rng.randf()
-	if roll > chance:
-		GameState.morale = clamp(GameState.morale - 0.02, 0.0, 1.0)
-		GameState.reputation = clamp(GameState.reputation - 0.01, 0.0, 1.0)
-		return "Hiring stalled. Candidates ghosted after the onsite."
-	GameState.team[role] += 1
-	var cost := _role_cost(role)
-	GameState.burn_per_week += cost
-	GameState.morale = clamp(GameState.morale + 0.02, 0.0, 1.0)
-	return _with_runway_warning("Hired %s ($%.0f/week)." % [role, cost])
+
+	var hired := 0
+	var attempts := 0
+	var burn_added := 0.0
+	var stop_reason := ""
+
+	# Guard rails: don't let bulk hire instantly soft-lock the run.
+	var min_runway := 4
+	var max_burn_supported := max(GameState.mrr * 4.0, 5000.0)
+
+	while attempts < count:
+		# Check affordability assuming the hire succeeds.
+		var cost := _role_cost(role)
+		var projected_burn := GameState.burn_per_week + cost
+		if projected_burn > max_burn_supported:
+			stop_reason = "Burn would outrun revenue."
+			break
+		var projected_runway := 999
+		if projected_burn > 0.0:
+			projected_runway = int(floor(GameState.cash / projected_burn))
+		if projected_runway < min_runway:
+			stop_reason = "Runway would be too low."
+			break
+
+		attempts += 1
+		if rng.randf() > chance:
+			GameState.morale = clamp(GameState.morale - 0.02, 0.0, 1.0)
+			GameState.reputation = clamp(GameState.reputation - 0.005, 0.0, 1.0)
+			continue
+		GameState.team[role] += 1
+		GameState.burn_per_week += cost
+		burn_added += cost
+		hired += 1
+		GameState.morale = clamp(GameState.morale + 0.02, 0.0, 1.0)
+
+	# Bulk hiring is chaotic.
+	GameState.risk = clamp(GameState.risk + min(0.12, 0.01 * float(attempts)), 0.0, 1.0)
+
+	if hired <= 0:
+		return "Hiring sprint failed. No hires landed this week."
+
+	var result := "Hiring sprint: hired %d/%d %s. Burn +$%.0f/week." % [hired, count, _role_label(role, hired), burn_added]
+	if not stop_reason.is_empty() and hired < count:
+		result += " Stopped early: %s" % stop_reason
+	return _with_runway_warning(result)
 
 func fire_target(target: String) -> String:
 	if not GameState.team.has(target):

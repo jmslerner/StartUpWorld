@@ -71,7 +71,7 @@ func run(text: String) -> void:
 		"inspect":
 			_emit(GameState.inspect_text(_rest(tokens, 1)))
 		"hire":
-			_emit_with_ap(SimEngine.hire_role(_canonical(tokens, 1)))
+			_handle_hire(tokens)
 		"fire":
 			_emit_with_ap(SimEngine.fire_target(_canonical(tokens, 1)))
 		"rent":
@@ -117,6 +117,26 @@ func run(text: String) -> void:
 				_emit(GameState.status_text())
 		_:
 			_emit("Unknown command. Type 'help'.")
+
+func _handle_hire(tokens: Array) -> void:
+	if tokens.size() < 2:
+		_emit("Usage: hire engineer [count] | hire 10 engineer")
+		return
+	var count := 1
+	var role := ""
+	if tokens.size() >= 3 and _is_int(str(tokens[1])):
+		count = int(tokens[1])
+		role = _canonical(tokens, 2)
+	elif tokens.size() >= 3 and _is_int(str(tokens[2])):
+		role = _canonical(tokens, 1)
+		count = int(tokens[2])
+	else:
+		role = _canonical(tokens, 1)
+		count = 1
+	_emit_with_ap(SimEngine.hire_roles(role, count))
+
+func _is_int(s: String) -> bool:
+	return s.strip_edges().is_valid_int()
 
 func _handle_onboarding(input: String) -> void:
 	match _onboarding_step:
@@ -327,7 +347,8 @@ func _help_text() -> String:
 	lines.append("  inspect <thing>")
 	lines.append("")
 	lines.append("TEAM")
-	lines.append("  hire engineer|gtm|hr|legal")
+	lines.append("  hire engineer|gtm|hr|legal [count]")
+	lines.append("  hire 10 engineer        — bulk hire (auto-stops if not affordable)")
 	lines.append("  fire <role>")
 	lines.append("")
 	lines.append("PRODUCT")
