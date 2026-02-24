@@ -97,6 +97,7 @@ func _apply_theme_overrides() -> void:
 
 func _apply_responsive_layout() -> void:
 	var width := get_viewport_rect().size.x
+	var height := get_viewport_rect().size.y
 	var margin := 16.0
 	var log_font_size := 16
 	var status_font_size := 16
@@ -127,6 +128,10 @@ func _apply_responsive_layout() -> void:
 	status_label.add_theme_font_size_override("font_size", status_font_size)
 	input.add_theme_font_size_override("font_size", input_font_size)
 	status_panel.custom_minimum_size = Vector2(0, status_height)
+	var input_height := input.get_combined_minimum_size().y + 12.0
+	input_panel.custom_minimum_size = Vector2(0, input_height)
+	var usable_height := height - (margin * 2.0) - status_height - input_height - 20.0
+	log_panel.custom_minimum_size = Vector2(0, maxf(usable_height, 120.0))
 
 func _on_viewport_resized() -> void:
 	_apply_responsive_layout()
