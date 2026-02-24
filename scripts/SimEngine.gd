@@ -132,7 +132,11 @@ func end_week() -> String:
 	GameState.cac = clamp(120.0 - GameState.brand * 40.0 - GameState.team["gtm"] * 5.0 + GameState.risk * 10.0, 30.0, 200.0)
 	var arpu := GameState.mrr / max(1, GameState.users)
 	GameState.ltv = arpu / max(0.01, GameState.churn)
-	return "Week %d complete. Burned $%.0f, users %d, MRR $%.0f." % [GameState.week, GameState.burn_per_week, GameState.users, GameState.mrr]
+	var summary := "Week %d complete. Burned $%.0f, users %d, MRR $%.0f." % [GameState.week, GameState.burn_per_week, GameState.users, GameState.mrr]
+	var event_text := EventSystem.roll_event()
+	if not event_text.is_empty():
+		summary += event_text
+	return summary
 
 func _consume_action(cost: int = 1) -> bool:
 	if GameState.action_points < cost:
