@@ -8,6 +8,8 @@ on:
 
 permissions:
   contents: write
+  pages: write
+  id-token: write
 
 jobs:
   export:
@@ -22,6 +24,8 @@ jobs:
             path: "build/windows/StartUpWorld.exe"
           - preset: "macOS"
             path: "build/macos/StartUpWorld.zip"
+          - preset: "Web"
+            path: "build/web/"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -29,7 +33,7 @@ jobs:
       - name: Export project
         uses: firebelley/godot-export@v5
         with:
-          godot_version: "4.2.2"
+          godot_version: "4.6"
           export_preset: "${{ matrix.preset }}"
           export_path: "${{ matrix.path }}"
           cache: true
@@ -55,3 +59,28 @@ jobs:
           generate_release_notes: true
           files: |
             dist/**
+
+  deploy-web:
+    needs: export
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Download Web artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: Web
+          path: web
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: web
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

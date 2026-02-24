@@ -17,6 +17,8 @@ jobs:
             path: "build/windows/StartUpWorld.exe"
           - preset: "macOS"
             path: "build/macos/StartUpWorld.zip"
+          - preset: "Web"
+            path: "build/web/"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -24,7 +26,7 @@ jobs:
       - name: Export project
         uses: firebelley/godot-export@v5
         with:
-          godot_version: "4.2.2"
+          godot_version: "4.6"
           export_preset: "${{ matrix.preset }}"
           export_path: "${{ matrix.path }}"
           cache: true

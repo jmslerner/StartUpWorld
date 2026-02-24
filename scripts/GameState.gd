@@ -6,6 +6,7 @@ var company_name: String = ""
 var archetype: String = ""  # "b2b" or "b2c"
 var cofounder: String = ""  # "technical" or "operator"
 var setup_complete: bool = false
+var game_over: bool = false
 
 # Core state
 var week: int = 1
@@ -51,6 +52,24 @@ var organic_brand_mult: float = 20.0
 var campaign_user_bonus: int = 25
 var enterprise_mrr_bonus: float = 400.0
 var feature_mrr_bonus: float = 250.0
+var cac_base: float = 120.0
+
+# Roguelike upgrades
+var pending_upgrade: Array = []
+var active_upgrades: Array[String] = []
+var upgrade_fundraise_bonus: float = 0.0
+var upgrade_feature_progress_mult: float = 1.0
+var upgrade_feature_debt_mult: float = 1.0
+var upgrade_campaign_user_mult: float = 1.0
+var upgrade_legal_cost_mult: float = 1.0
+var upgrade_risk_decay: float = 0.0
+var upgrade_guaranteed_mrr: float = 0.0
+var upgrade_enterprise_mrr_mult: float = 1.0
+var upgrade_competitor_immune: bool = false
+var upgrade_extra_ap: int = 0
+var upgrade_burn_mult: float = 1.0
+var upgrade_organic_mult: float = 1.0
+var upgrade_borrow_mult: float = 1.0
 
 func apply_setup() -> String:
 	# Archetype effects
@@ -66,6 +85,7 @@ func apply_setup() -> String:
 		enterprise_mrr_bonus = 800.0
 		feature_mrr_bonus = 500.0
 		cac = 150.0
+		cac_base = 150.0
 	else:  # b2c
 		users = 100
 		mrr = 400.0
@@ -78,6 +98,7 @@ func apply_setup() -> String:
 		enterprise_mrr_bonus = 200.0
 		feature_mrr_bonus = 150.0
 		cac = 80.0
+		cac_base = 80.0
 
 	# Cofounder effects
 	if cofounder == "technical":
@@ -194,6 +215,15 @@ func list_features_text() -> String:
 	lines.append("Shipped Features")
 	for f in features_shipped:
 		lines.append("- %s" % f)
+	return "\n".join(lines)
+
+func list_upgrades_text() -> String:
+	if active_upgrades.is_empty():
+		return "No upgrades yet. You'll be offered upgrades every 5 weeks."
+	var lines: Array[String] = []
+	lines.append("Active Upgrades")
+	for u in active_upgrades:
+		lines.append("- %s" % u)
 	return "\n".join(lines)
 
 func inspect_text(thing: String) -> String:

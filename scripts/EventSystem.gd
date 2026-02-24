@@ -103,7 +103,7 @@ func _catalog() -> Array[Dictionary]:
 			"id": "competitor_launches",
 			"headline": "Competitor launches similar product",
 			"description": "A well-funded competitor just shipped a clone of your core feature. Churn ticks up.",
-			"condition": func() -> bool: return GameState.product_progress >= 20.0,
+			"condition": func() -> bool: return GameState.product_progress >= 20.0 and not GameState.upgrade_competitor_immune,
 			"apply": func() -> void:
 				GameState.churn = clamp(GameState.churn + 0.02, 0.01, 0.2)
 				GameState.brand = clamp(GameState.brand - 0.05, 0.0, 1.0),
@@ -167,7 +167,7 @@ func _catalog() -> Array[Dictionary]:
 				var cost := 2000.0
 				if _has_legal():
 					cost = 800.0
-				GameState.cash -= cost,
+				GameState.cash -= cost * GameState.upgrade_legal_cost_mult,
 		},
 		{
 			"id": "innovation_award",
@@ -203,14 +203,14 @@ func _catalog() -> Array[Dictionary]:
 					GameState.reputation = clamp(GameState.reputation - 0.06, 0.0, 1.0)
 					GameState.morale = clamp(GameState.morale - 0.04, 0.0, 1.0)
 					if not _has_legal():
-						GameState.cash -= 2500.0
+						GameState.cash -= 2500.0 * GameState.upgrade_legal_cost_mult
 				else:
 					GameState.reputation = clamp(GameState.reputation - 0.12, 0.0, 1.0)
 					GameState.morale = clamp(GameState.morale - 0.08, 0.0, 1.0)
 					var cost := 5000.0
 					if _has_legal():
 						cost = 2500.0
-					GameState.cash -= cost,
+					GameState.cash -= cost * GameState.upgrade_legal_cost_mult,
 		},
 		{
 			"id": "workplace_bullying",
@@ -249,19 +249,20 @@ func _catalog() -> Array[Dictionary]:
 				return "No HR, no legal. This is going to hurt. A lot.",
 			"condition": func() -> bool: return GameState.headcount() >= 10 and GameState.week >= 8,
 			"apply": func() -> void:
+				var mult := GameState.upgrade_legal_cost_mult
 				if _has_hr() and _has_legal():
-					GameState.cash -= 1500.0
+					GameState.cash -= 1500.0 * mult
 					GameState.reputation = clamp(GameState.reputation - 0.03, 0.0, 1.0)
 				elif _has_legal():
-					GameState.cash -= 4000.0
+					GameState.cash -= 4000.0 * mult
 					GameState.reputation = clamp(GameState.reputation - 0.06, 0.0, 1.0)
 					GameState.brand = clamp(GameState.brand - 0.03, 0.0, 1.0)
 				elif _has_hr():
-					GameState.cash -= 6000.0
+					GameState.cash -= 6000.0 * mult
 					GameState.reputation = clamp(GameState.reputation - 0.07, 0.0, 1.0)
 					GameState.brand = clamp(GameState.brand - 0.04, 0.0, 1.0)
 				else:
-					GameState.cash -= 10000.0
+					GameState.cash -= 10000.0 * mult
 					GameState.reputation = clamp(GameState.reputation - 0.10, 0.0, 1.0)
 					GameState.brand = clamp(GameState.brand - 0.05, 0.0, 1.0),
 		},
@@ -292,17 +293,18 @@ func _catalog() -> Array[Dictionary]:
 				return "Without legal counsel, this drags on and costs you dearly.",
 			"condition": func() -> bool: return GameState.headcount() >= 8 and GameState.fired_recently,
 			"apply": func() -> void:
+				var mult := GameState.upgrade_legal_cost_mult
 				if _has_hr() and _has_legal():
-					GameState.cash -= 1000.0
+					GameState.cash -= 1000.0 * mult
 					GameState.reputation = clamp(GameState.reputation - 0.02, 0.0, 1.0)
 				elif _has_legal():
-					GameState.cash -= 2000.0
+					GameState.cash -= 2000.0 * mult
 					GameState.reputation = clamp(GameState.reputation - 0.03, 0.0, 1.0)
 				elif _has_hr():
-					GameState.cash -= 5000.0
+					GameState.cash -= 5000.0 * mult
 					GameState.reputation = clamp(GameState.reputation - 0.06, 0.0, 1.0)
 				else:
-					GameState.cash -= 8000.0
+					GameState.cash -= 8000.0 * mult
 					GameState.reputation = clamp(GameState.reputation - 0.08, 0.0, 1.0),
 		},
 		# ===== VC ANTAGONIST EVENTS =====

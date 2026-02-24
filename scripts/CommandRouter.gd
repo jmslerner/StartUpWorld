@@ -11,6 +11,12 @@ func run(text: String) -> void:
 	if not GameState.setup_complete:
 		_handle_onboarding(input)
 		return
+	if GameState.game_over:
+		_emit("Game is over. Restart to play again.")
+		return
+	if not GameState.pending_upgrade.is_empty():
+		_handle_upgrade_choice(input)
+		return
 	var tokens := _tokenize(input)
 	if tokens.is_empty():
 		return
@@ -111,9 +117,16 @@ func _handle_onboarding(input: String) -> void:
 				return
 			_emit(GameState.apply_setup())
 
+func _handle_upgrade_choice(input: String) -> void:
+	var choice := input.strip_edges()
+	if choice in ["1", "2", "3"]:
+		_emit(SimEngine.apply_upgrade(int(choice) - 1))
+	else:
+		_emit("Choose an upgrade. Type 1, 2, or 3:")
+
 func _handle_list(tokens: Array) -> void:
 	if tokens.size() < 2:
-		_emit("List what? hires, offices, features")
+		_emit("List what? hires, offices, features, upgrades")
 		return
 	match tokens[1]:
 		"hires":
@@ -122,6 +135,8 @@ func _handle_list(tokens: Array) -> void:
 			_emit(GameState.list_offices_text())
 		"features":
 			_emit(GameState.list_features_text())
+		"upgrades":
+			_emit(GameState.list_upgrades_text())
 		_:
 			_emit("Unknown list category.")
 
@@ -156,6 +171,7 @@ func _handle_friends(tokens: Array) -> void:
 
 func _check_win_loss() -> void:
 	if GameState.cash <= 0.0:
+		GameState.game_over = true
 		_emit("GAME OVER: You ran out of cash.")
 		if GameState.house_mortgaged:
 			_emit("...and you lost your house too.")
@@ -218,7 +234,7 @@ func _help_text() -> String:
 	lines.append("")
 	lines.append("INFO")
 	lines.append("  help, status, stats")
-	lines.append("  list hires|offices|features")
+	lines.append("  list hires|offices|features|upgrades")
 	lines.append("  inspect <thing>")
 	lines.append("")
 	lines.append("TEAM")
