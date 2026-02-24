@@ -17,6 +17,7 @@ var prompt_color := Color(0.85, 0.85, 0.85)
 var user_color := Color(1.0, 1.0, 1.0)
 var _input_box_normal: StyleBoxFlat
 var _input_box_focus: StyleBoxFlat
+var _status_box: StyleBoxFlat
 
 func _ready() -> void:
 	input.text_submitted.connect(_on_submit)
@@ -52,6 +53,17 @@ func _notification(what: int) -> void:
 			input.grab_focus()
 
 func _apply_theme_overrides() -> void:
+	_status_box = StyleBoxFlat.new()
+	_status_box.bg_color = Color(0.18, 0.18, 0.18, 1)
+	_status_box.border_color = Color(0.35, 0.35, 0.35, 1)
+	_status_box.border_width_all = 1
+	_status_box.corner_radius_top_left = 6
+	_status_box.corner_radius_top_right = 6
+	_status_box.corner_radius_bottom_left = 6
+	_status_box.corner_radius_bottom_right = 6
+	status_panel.add_theme_stylebox_override("panel", _status_box)
+	status_label.add_theme_color_override("font_color", Color(0.95, 0.95, 0.95, 1))
+
 	var log_box := StyleBoxFlat.new()
 	log_box.bg_color = Color(0.12, 0.12, 0.12, 1)
 	log_box.border_color = Color(0.35, 0.35, 0.35, 1)
@@ -84,18 +96,21 @@ func _apply_responsive_layout() -> void:
 	var status_font_size := 16
 	var input_font_size := 16
 	var line_spacing := 4
+	var status_height := 36.0
 	if width < 720.0:
 		margin = 12.0
 		log_font_size = 15
 		status_font_size = 14
 		input_font_size = 15
 		line_spacing = 3
+		status_height = 32.0
 	if width < 480.0:
 		margin = 10.0
 		log_font_size = 14
 		status_font_size = 13
 		input_font_size = 14
 		line_spacing = 2
+		status_height = 30.0
 
 	layout.offset_left = margin
 	layout.offset_top = margin
@@ -105,6 +120,7 @@ func _apply_responsive_layout() -> void:
 	log.add_theme_constant_override("line_spacing", line_spacing)
 	status_label.add_theme_font_size_override("font_size", status_font_size)
 	input.add_theme_font_size_override("font_size", input_font_size)
+	status_panel.custom_minimum_size = Vector2(0, status_height)
 
 func _on_viewport_resized() -> void:
 	_apply_responsive_layout()
