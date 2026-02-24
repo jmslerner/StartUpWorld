@@ -18,6 +18,7 @@ var user_color := Color(1.0, 1.0, 1.0)
 var _input_box_normal: StyleBoxFlat
 var _input_box_focus: StyleBoxFlat
 var _status_box: StyleBoxFlat
+var _log_refresh_queued := false
 
 func _ready() -> void:
 	input.text_submitted.connect(_on_submit)
@@ -34,14 +35,14 @@ func _ready() -> void:
 	_apply_theme_overrides()
 	_apply_responsive_layout()
 	get_viewport().size_changed.connect(_on_viewport_resized)
+	log_scroll.resized.connect(_queue_refresh_log_layout)
 	input.grab_focus()
 	_write_prompt("=== STARTUP WORLD ===")
 	_write_prompt("Build your AI startup from garage to IPO.")
 	_write_prompt("")
 	_write_prompt("What's your name, founder?")
-	# On web, the canvas/layout can report a width of 0 during _ready(), which makes
-	# the Label minimum size compute as 0 and the log area appear blank.
-	call_deferred("_refresh_log_layout")
+	# On web, the canvas/layout can report 0 sizes during _ready(); refresh after layout settles.
+	_queue_refresh_log_layout()
 	_sync_pause_ui(true)
 	_update_status_bar()
 
@@ -129,9 +130,18 @@ func _apply_responsive_layout() -> void:
 
 func _on_viewport_resized() -> void:
 	_apply_responsive_layout()
-	_refresh_log_layout()
+	_queue_refresh_log_layout()
+
+func _queue_refresh_log_layout() -> void:
+	if _log_refresh_queued:
+		return
+	_log_refresh_queued = true
+	call_deferred("_refresh_log_layout")
 
 func _refresh_log_layout() -> void:
+	_log_refresh_queued = false
+	# Give containers time to settle (especially on web).
+	await get_tree().process_frame
 	await get_tree().process_frame
 	_update_log_size()
 	_scroll_to_bottom()
@@ -174,7 +184,8 @@ func _scroll_to_bottom() -> void:
 func _update_log_size() -> void:
 	# Ensure the label grows to fit content so the ScrollContainer can scroll.
 	var min_size := log.get_combined_minimum_size()
-	log.custom_minimum_size = Vector2(min_size.x, maxf(min_size.y, 1.0))
+	var viewport_h := log_scroll.size.y
+	log.custom_minimum_size = Vector2(min_size.x, maxf(maxf(min_size.y, viewport_h), 1.0))
 
 func _sync_pause_ui(force: bool) -> void:
 	var should_show := GameState.paused
