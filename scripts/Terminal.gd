@@ -4,7 +4,8 @@ extends Control
 @onready var status_panel: PanelContainer = $Layout/StatusPanel
 @onready var status_label: Label = $Layout/StatusPanel/Status
 @onready var log_panel: PanelContainer = $Layout/LogPanel
-@onready var log: Label = $Layout/LogPanel/Log
+@onready var log_scroll: ScrollContainer = $Layout/LogPanel/Scroll
+@onready var log: Label = $Layout/LogPanel/Scroll/Log
 @onready var input_panel: PanelContainer = $Layout/InputPanel
 @onready var input: LineEdit = $Layout/InputPanel/Input
 @onready var pause_menu: Control = $PauseMenu
@@ -130,13 +131,22 @@ func _on_output(text: String) -> void:
 
 func _write_prompt(text: String) -> void:
 	log.text += text + "\n"
+	_update_log_size()
 
 func _write_user(text: String) -> void:
 	log.text += text + "\n"
+	_update_log_size()
 
 func _scroll_to_bottom() -> void:
-	# No-op: Label has no scroll, but keep function for call sites.
-	return
+	# Defer until layout updates so the scrollbar max is correct.
+	await get_tree().process_frame
+	var bar := log_scroll.get_v_scroll_bar()
+	if is_instance_valid(bar):
+		log_scroll.scroll_vertical = int(bar.max_value)
+
+func _update_log_size() -> void:
+	# Ensure the label grows to fit content so the ScrollContainer can scroll.
+	log.custom_minimum_size = log.get_minimum_size()
 
 func _sync_pause_ui(force: bool) -> void:
 	var should_show := GameState.paused
