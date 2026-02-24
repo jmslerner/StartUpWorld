@@ -1,8 +1,7 @@
 extends Control
 
 @onready var status_label: Label = $Layout/StatusPanel/Status
-@onready var log_scroll: ScrollContainer = $Layout/LogPanel/Scroll
-@onready var log: Label = $Layout/LogPanel/Scroll/Log
+@onready var log: Label = $Layout/LogPanel/Log
 @onready var input: LineEdit = $Layout/InputPanel/Input
 @onready var pause_menu: Control = $PauseMenu
 @onready var resume_button: Button = $PauseMenu/Panel/VBox/ResumeButton
@@ -61,11 +60,8 @@ func _write_user(text: String) -> void:
 	log.text += text + "\n"
 
 func _scroll_to_bottom() -> void:
-	# Defer until layout updates so the scrollbar max is correct.
-	await get_tree().process_frame
-	var bar := log_scroll.get_v_scroll_bar()
-	if is_instance_valid(bar):
-		log_scroll.scroll_vertical = int(bar.max_value)
+	# No-op: Label has no scroll, but keep function for call sites.
+	return
 
 func _sync_pause_ui(force: bool) -> void:
 	var should_show := GameState.paused

@@ -32,11 +32,7 @@ text = ""
 size_flags_horizontal = 3
 size_flags_vertical = 3
 
-[node name="Scroll" type="ScrollContainer" parent="Layout/LogPanel"]
-size_flags_horizontal = 3
-size_flags_vertical = 3
-
-[node name="Log" type="Label" parent="Layout/LogPanel/Scroll"]
+[node name="Log" type="Label" parent="Layout/LogPanel"]
 size_flags_horizontal = 3
 size_flags_vertical = 3
 autowrap_mode = 3
