@@ -16,10 +16,13 @@ This repo is set up to deploy a Godot HTML5 export via Vercel.
 5. In Vercel Project Settings:
 	- **Framework Preset**: `Other`
 	- **Build Command**: leave empty
-	- **Output Directory**: `web`
+	- **Output Directory**: leave empty (default)
 
 Notes:
 - `vercel.json` sets headers to ensure `.wasm` and `.pck` load correctly.
+- `vercel.json` also rewrites `/` and `/index*` requests to the exported files under `web/`.
+
+If you previously set **Output Directory** to `web`, clear it and redeploy (otherwise the `/web/...` rewrite destinations won’t exist).
 
 ## Project structure
 - `scenes/` for scenes
