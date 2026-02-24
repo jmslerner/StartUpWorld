@@ -24,3 +24,7 @@ GameState="*res://scripts/GameState.gd"
 SimEngine="*res://scripts/SimEngine.gd"
 CommandRouter="*res://scripts/CommandRouter.gd"
 EventSystem="*res://scripts/EventSystem.gd"
+
+[rendering]
+
+textures/vram_compression/import_etc2_astc=true
