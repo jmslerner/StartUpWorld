@@ -17,6 +17,8 @@ func _ready() -> void:
 	resume_button.pressed.connect(_on_resume_pressed)
 	restart_button.pressed.connect(_on_restart_pressed)
 	help_button.pressed.connect(_on_help_pressed)
+	# Ensure terminal text is visible across platforms (HTML5 can differ in theme defaults).
+	log.add_theme_color_override("default_color", prompt_color)
 	input.grab_focus()
 	_write_prompt("=== STARTUP WORLD ===")
 	_write_prompt("Build your AI startup from garage to IPO.")
