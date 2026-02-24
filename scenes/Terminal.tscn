@@ -17,6 +17,17 @@ offset_bottom = -56.0
 scroll_active = true
 bbcode_enabled = false
 
+[node name="InputGlow" type="ColorRect" parent="."]
+anchor_left = 0.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 12.0
+offset_top = -44.0
+offset_right = -12.0
+offset_bottom = -12.0
+color = Color(0.2, 1, 0.6, 0.18)
+mouse_filter = 2
+
 [node name="Input" type="LineEdit" parent="."]
 anchor_left = 0.0
 anchor_right = 1.0

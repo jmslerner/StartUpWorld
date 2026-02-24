@@ -2,6 +2,7 @@ extends Control
 
 @onready var log: RichTextLabel = $Log
 @onready var input: LineEdit = $Input
+@onready var input_glow: ColorRect = $InputGlow
 @onready var pause_menu: Control = $PauseMenu
 @onready var resume_button: Button = $PauseMenu/Panel/VBox/ResumeButton
 @onready var restart_button: Button = $PauseMenu/Panel/VBox/RestartButton
@@ -9,6 +10,9 @@ extends Control
 
 var prompt_color := Color(0.85, 0.85, 0.85)
 var user_color := Color(0.45, 0.90, 0.65)
+
+var _glow_base := Color(0.2, 1.0, 0.6, 0.10)
+var _glow_pulse_alpha := 0.14
 
 func _ready() -> void:
 	input.text_submitted.connect(_on_submit)
@@ -25,6 +29,7 @@ func _ready() -> void:
 
 func _process(_delta: float) -> void:
 	_sync_pause_ui(false)
+	_update_glow()
 
 func _on_submit(text: String) -> void:
 	var trimmed := text.strip_edges()
@@ -63,6 +68,14 @@ func _sync_pause_ui(force: bool) -> void:
 			resume_button.grab_focus()
 		else:
 			input.grab_focus()
+
+func _update_glow() -> void:
+	var t := float(Time.get_ticks_msec()) / 1000.0
+	var pulse := 0.5 + 0.5 * sin(t * 3.0)
+	var alpha := _glow_base.a + _glow_pulse_alpha * pulse
+	if GameState.paused:
+		alpha *= 0.35
+	input_glow.color = Color(_glow_base.r, _glow_base.g, _glow_base.b, alpha)
 
 func _on_resume_pressed() -> void:
 	CommandRouter.run("resume")
