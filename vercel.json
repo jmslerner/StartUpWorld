@@ -1,4 +1,8 @@
 {
+  "rewrites": [
+    { "source": "/", "destination": "/web/index.html" },
+    { "source": "/index(.*)", "destination": "/web/index$1" }
+  ],
   "headers": [
     {
       "source": "/(.*)\\.wasm",
