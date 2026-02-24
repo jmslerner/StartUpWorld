@@ -77,6 +77,8 @@ func run(text: String) -> void:
 		"cut":
 			_emit_with_ap(SimEngine.cut_costs())
 		"end":
+			_emit("")
+			_emit("--- Week %d → %d ---" % [GameState.week, GameState.week + 1])
 			_emit(SimEngine.end_week())
 			_check_win_loss()
 			if not GameState.game_over and not GameState.game_won:
