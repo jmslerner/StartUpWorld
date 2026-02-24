@@ -1,9 +1,39 @@
 extends Node
 
 var rng := RandomNumberGenerator.new()
+var quote_rng := RandomNumberGenerator.new()
 
 func _ready() -> void:
 	rng.seed = 1337
+	quote_rng.seed = 424242
+
+func founder_quote() -> String:
+	var quotes: Array[String] = [
+		"We don't have a roadmap, we have a vibes map.",
+		"Revenue is just user growth that went to business school.",
+		"If it's not on fire, are you even iterating?",
+		"We pivoted so hard we invented a new direction: diagonally up.",
+		"Our biggest competitor is gravity — it keeps pulling the burn rate down on us.",
+		"We shipped an MVP. It stands for Mostly Vague Promise.",
+		"The secret to founder mental health is pretending churn is 'engagement'.",
+		"We have unlimited upside and a very limited bank account.",
+		"We don't have bugs. We have surprise features with commitment issues.",
+		"If you can't measure it, put it in a dashboard anyway.",
+		"The product isn't done until the slide deck says it is.",
+		"We didn't miss payroll. We launched a compensation delay experiment.",
+		"My work-life balance is 70/30: 70% work, 30% anxiety.",
+		"Our culture is transparency — you can see the panic in everyone's eyes.",
+		"We have strong fundamentals: a weak moat and a powerful belief system.",
+		"Shipping fast is easy. Shipping good is a premium tier.",
+		"We reduced costs by turning off morale.",
+		"The runway is long if you stop looking at it.",
+		"I love entrepreneurship: it's like speedrunning personal development.",
+		"Our business model is simple: scale first, details later."
+	]
+	if quotes.is_empty():
+		return ""
+	var idx := quote_rng.randi_range(0, quotes.size() - 1)
+	return "\"%s\" — Anonymous founder" % quotes[idx]
 
 # ---- Upgrade Catalog ----
 

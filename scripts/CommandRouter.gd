@@ -106,6 +106,7 @@ func run(text: String) -> void:
 			_emit("")
 			_emit("--- Week %d → %d ---" % [GameState.week, GameState.week + 1])
 			_emit(SimEngine.end_week())
+			_emit(SimEngine.founder_quote())
 			_check_win_loss()
 			if not GameState.game_over and not GameState.game_won:
 				_emit(GameState.status_text())
