@@ -309,9 +309,9 @@ func list_hires_text() -> String:
 func list_offices_text() -> String:
 	var lines: Array[String] = []
 	lines.append("Offices")
-	lines.append("garage - $300/week")
-	lines.append("coworking - $1200/week")
-	lines.append("office - $3500/week")
+	lines.append("garage - $300/week (harder hiring, lower productivity)")
+	lines.append("coworking - $1200/week (balanced; networking helps hiring)")
+	lines.append("office - $3500/week (best productivity + hiring, highest overhead)")
 	lines.append("Current: %s" % office_tier)
 	return "\n".join(lines)
 

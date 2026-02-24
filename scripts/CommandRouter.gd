@@ -81,7 +81,12 @@ func run(text: String) -> void:
 		"refactor":
 			_emit_with_ap(SimEngine.refactor())
 		"launch":
-			_emit_with_ap(SimEngine.launch_campaign(_rest(tokens, 2)))
+			if tokens.size() >= 2 and tokens[1] == "conference":
+				_emit_with_ap(SimEngine.launch_conference())
+			else:
+				_emit_with_ap(SimEngine.launch_campaign(_rest(tokens, 2)))
+		"conference":
+			_emit_with_ap(SimEngine.launch_conference())
 		"outreach":
 			_emit_with_ap(SimEngine.enterprise_outreach())
 		"pitch":
@@ -332,6 +337,7 @@ func _help_text() -> String:
 	lines.append("")
 	lines.append("GROWTH")
 	lines.append("  launch campaign <name>")
+	lines.append("  conference             — big bet (unlocks at 100+ headcount and $20k+ MRR)")
 	lines.append("  outreach")
 	lines.append("")
 	lines.append("FUNDING")

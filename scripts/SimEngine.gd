@@ -169,7 +169,51 @@ func _role_cost(role: String) -> float:
 			base = 600.0
 		"legal":
 			base = 900.0
-	return base * GameState._reputation_cost_modifier()
+	return base * GameState._reputation_cost_modifier() * _office_hiring_cost_mult()
+
+func _office_hiring_cost_mult() -> float:
+	match GameState.office_tier:
+		"garage":
+			return 1.10
+		"coworking":
+			return 1.00
+		"office":
+			return 0.95
+		_:
+			return 1.00
+
+func _office_hiring_bonus() -> float:
+	match GameState.office_tier:
+		"garage":
+			return -0.10
+		"coworking":
+			return 0.05
+		"office":
+			return 0.12
+		_:
+			return 0.0
+
+func _office_productivity_mult() -> float:
+	match GameState.office_tier:
+		"garage":
+			return 0.90
+		"coworking":
+			return 1.00
+		"office":
+			return 1.15
+		_:
+			return 1.00
+
+func _office_debt_mult() -> float:
+	match GameState.office_tier:
+		"garage":
+			return 1.10
+		"coworking":
+			return 1.00
+		"office":
+			return 0.92
+		_:
+			return 1.00
 
 # ---- Actions ----
 
@@ -178,6 +222,18 @@ func hire_role(role: String) -> String:
 		return "Unknown role."
 	if not _consume_action():
 		return "No action points left this week."
+	var chance := 0.55
+	chance += (GameState.reputation - 0.5) * 0.8
+	chance += (GameState.brand - 0.2) * 0.4
+	chance += _office_hiring_bonus()
+	if GameState.fired_recently:
+		chance -= 0.10
+	chance = clamp(chance, 0.15, 0.95)
+	var roll := rng.randf()
+	if roll > chance:
+		GameState.morale = clamp(GameState.morale - 0.02, 0.0, 1.0)
+		GameState.reputation = clamp(GameState.reputation - 0.01, 0.0, 1.0)
+		return "Hiring stalled. Candidates ghosted after the onsite."
 	GameState.team[role] += 1
 	var cost := _role_cost(role)
 	GameState.burn_per_week += cost
@@ -209,7 +265,15 @@ func rent_office(tier: String) -> String:
 	GameState.office_rent = cost
 	GameState.office_tier = tier
 	GameState.morale = clamp(GameState.morale + 0.05, 0.0, 1.0)
-	return _with_runway_warning("Moved to %s." % tier)
+	match tier:
+		"garage":
+			return _with_runway_warning("Moved to garage. Low overhead, but hiring gets harder.")
+		"coworking":
+			return _with_runway_warning("Moved to coworking. Better networking and steady productivity.")
+		"office":
+			return _with_runway_warning("Moved to an office. Best productivity and hiring — and the rent hits." )
+		_:
+			return _with_runway_warning("Moved to %s." % tier)
 
 func _with_runway_warning(message: String) -> String:
 	var runway := GameState.runway_weeks()
@@ -224,8 +288,8 @@ func ship_feature(name: String) -> String:
 	if not _consume_action():
 		return "No action points left this week."
 	GameState.features_shipped.append(feature.to_lower())
-	var progress: float = (12.0 + GameState.team["engineer"] * 2.0) * GameState.upgrade_feature_progress_mult
-	var debt: float = 2.5 * max(0.1, GameState.upgrade_feature_debt_mult)
+	var progress: float = (12.0 + GameState.team["engineer"] * 2.0) * GameState.upgrade_feature_progress_mult * _office_productivity_mult()
+	var debt: float = 2.5 * max(0.1, GameState.upgrade_feature_debt_mult) * _office_debt_mult()
 	GameState.product_progress = clamp(GameState.product_progress + progress, 0.0, 100.0)
 	GameState.tech_debt = clamp(GameState.tech_debt + debt, 0.0, 100.0)
 	GameState.churn = clamp(GameState.churn - 0.01, 0.01, 0.2)
@@ -262,6 +326,50 @@ func enterprise_outreach() -> String:
 	GameState.mrr += mrr_gain
 	GameState.risk = clamp(GameState.risk + 0.05, 0.0, 1.0)
 	return "Enterprise outreach underway. +$%.0f MRR." % mrr_gain
+
+func launch_conference() -> String:
+	if GameState.headcount() < 100:
+		return "You're not big enough to justify a product conference yet (need 100+ headcount)."
+	if GameState.mrr < 20000.0:
+		return "MRR isn't strong enough to bankroll a conference yet (need $20k+ MRR)."
+	if not _consume_action():
+		return "No action points left this week."
+	var base_cost := 200000.0
+	var cost := max(base_cost, GameState.burn_per_week * 3.0)
+	if GameState.cash < cost:
+		return "A conference would cost %s. You only have %s." % [GameState._format_money(cost), GameState._format_money(GameState.cash)]
+	GameState.cash -= cost
+
+	var score := 0.0
+	score += GameState.brand * 45.0
+	score += GameState.reputation * 35.0
+	score += clamp(GameState.product_progress, 0.0, 100.0) * 0.25
+	score -= GameState.risk * 25.0
+	# Scale down a bit so even great companies can still flop.
+	score = clamp(score, 5.0, 85.0)
+	var roll := float(rng.randi_range(0, 100))
+
+	if roll < score * 0.55:
+		var user_gain := int(4000 + GameState.brand * 6000 + GameState.mrr / 10.0)
+		GameState.users += user_gain
+		GameState.brand = clamp(GameState.brand + 0.10, 0.0, 1.0)
+		GameState.reputation = clamp(GameState.reputation + 0.06, 0.0, 1.0)
+		GameState.risk = clamp(GameState.risk - 0.03, 0.0, 1.0)
+		GameState.morale = clamp(GameState.morale + 0.04, 0.0, 1.0)
+		return _with_runway_warning("Conference was a HIT. Spent %s and gained +%d users." % [GameState._format_money(cost), user_gain])
+	elif roll < score:
+		var user_gain_ok := int(1200 + GameState.brand * 2000)
+		GameState.users += user_gain_ok
+		GameState.brand = clamp(GameState.brand + 0.03, 0.0, 1.0)
+		GameState.reputation = clamp(GameState.reputation + 0.02, 0.0, 1.0)
+		GameState.risk = clamp(GameState.risk + 0.01, 0.0, 1.0)
+		return _with_runway_warning("Conference was okay. Spent %s and gained +%d users." % [GameState._format_money(cost), user_gain_ok])
+	else:
+		GameState.brand = clamp(GameState.brand - 0.05, 0.0, 1.0)
+		GameState.reputation = clamp(GameState.reputation - 0.03, 0.0, 1.0)
+		GameState.risk = clamp(GameState.risk + 0.06, 0.0, 1.0)
+		GameState.morale = clamp(GameState.morale - 0.05, 0.0, 1.0)
+		return _with_runway_warning("Conference flopped. Spent %s and got mostly noise." % GameState._format_money(cost))
 
 func pitch_investors() -> String:
 	if not _consume_action():
@@ -471,6 +579,18 @@ func end_week() -> String:
 		GameState.investor_interest_weeks -= 1
 		if GameState.investor_interest_weeks <= 0:
 			GameState.investor_interest_strength = 0.0
+	# Office effects (small but persistent)
+	match GameState.office_tier:
+		"garage":
+			GameState.reputation = clamp(GameState.reputation - 0.005, 0.0, 1.0)
+			GameState.brand = clamp(GameState.brand - 0.003, 0.0, 1.0)
+		"coworking":
+			GameState.brand = clamp(GameState.brand + 0.006, 0.0, 1.0)
+			GameState.risk = clamp(GameState.risk + 0.004, 0.0, 1.0)
+		"office":
+			GameState.morale = clamp(GameState.morale + 0.004, 0.0, 1.0)
+			GameState.reputation = clamp(GameState.reputation + 0.006, 0.0, 1.0)
+			GameState.risk = clamp(GameState.risk - 0.004, 0.0, 1.0)
 	# Debt interest
 	if GameState.debt > 0.0:
 		var interest := GameState.debt * GameState.debt_interest_rate
