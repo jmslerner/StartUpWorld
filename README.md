@@ -38,6 +38,14 @@ Use a dedicated testing hostname so production service workers cannot affect tes
 
 This works because service workers are scoped by origin, so a stale worker on `startupworld.app` cannot control `test.startupworld.app`.
 
+### Quick deployment check endpoint
+Use `/api/healthz` to verify exactly which deployment and host you are hitting:
+
+- Production: `https://startupworld.app/api/healthz`
+- Test: `https://test.startupworld.app/api/healthz`
+
+The endpoint returns host + Vercel deployment metadata (`VERCEL_URL`, commit SHA/ref, env) with `Cache-Control: no-store`.
+
 ## Project structure
 - `scenes/` for scenes
 - `scripts/` for GDScript files
