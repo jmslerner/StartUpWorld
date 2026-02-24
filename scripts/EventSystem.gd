@@ -31,6 +31,20 @@ func _catalog() -> Array[Dictionary]:
 	return [
 		# ===== TEAM EVENTS =====
 		{
+			"id": "retention_story",
+			"headline": "Retention win — engineers turn down competitor offers",
+			"description": func() -> String:
+				if _has_hr():
+					return "HR runs a retention push and career ladder refresh. People stay. Morale and reputation climb."
+				return "Your mission resonates. Engineers turn down competitor offers. The team feels unstoppable.",
+			"condition": func() -> bool:
+				return GameState.team["engineer"] >= 3 and GameState.morale >= 0.45 and GameState.week >= 5,
+			"apply": func() -> void:
+				GameState.morale = clamp(GameState.morale + 0.06, 0.0, 1.0)
+				GameState.reputation = clamp(GameState.reputation + 0.04, 0.0, 1.0)
+				GameState.risk = clamp(GameState.risk - 0.03, 0.0, 1.0),
+		},
+		{
 			"id": "mass_poaching_event",
 			"headline": "Competitor tries to poach your engineering team",
 			"description": func() -> String:
@@ -107,6 +121,24 @@ func _catalog() -> Array[Dictionary]:
 				GameState.users += 15,
 		},
 		# ===== MARKET EVENTS =====
+		{
+			"id": "rent_renegotiated",
+			"headline": "Lease renegotiated — rent increase avoided",
+			"description": "You renegotiated the lease before the market spike hits. Rent drops and burn improves.",
+			"condition": func() -> bool:
+				return GameState.week >= 4 and GameState.office_rent >= 800.0 and GameState.reputation >= 0.45,
+			"apply": func() -> void:
+				var baseline := SimEngine._office_cost(GameState.office_tier)
+				if baseline < 0.0:
+					baseline = 300.0
+				var old_rent := GameState.office_rent
+				var new_rent := max(baseline, old_rent * 0.80)
+				GameState.office_rent = new_rent
+				GameState.burn_per_week -= (old_rent - new_rent)
+				GameState.burn_per_week = max(0.0, GameState.burn_per_week)
+				GameState.morale = clamp(GameState.morale + 0.02, 0.0, 1.0)
+				GameState.risk = clamp(GameState.risk - 0.02, 0.0, 1.0),
+		},
 		{
 			"id": "rent_doubles",
 			"headline": "Rent spike — your landlord doubles the price",
@@ -199,6 +231,24 @@ func _catalog() -> Array[Dictionary]:
 				GameState.morale = clamp(GameState.morale - 0.04, 0.0, 1.0),
 		},
 		# ===== FINANCIAL EVENTS =====
+		{
+			"id": "visa_relief",
+			"headline": "Work authorization relief — hiring pipeline improves",
+			"description": func() -> String:
+				if _has_legal():
+					return "Processing speeds up and compliance costs drop. Legal keeps things smooth. Your burn decreases slightly."
+				return "Processing speeds up and compliance costs drop. Your burn decreases slightly.",
+			"condition": func() -> bool:
+				return GameState.week >= 6 and GameState.team["engineer"] >= 2 and GameState.risk <= 0.55,
+			"apply": func() -> void:
+				var per_engineer := 60.0
+				if _has_legal():
+					per_engineer = 80.0
+				GameState.burn_per_week -= per_engineer * float(GameState.team["engineer"])
+				GameState.burn_per_week = max(0.0, GameState.burn_per_week)
+				GameState.reputation = clamp(GameState.reputation + 0.01, 0.0, 1.0)
+				GameState.risk = clamp(GameState.risk - 0.02, 0.0, 1.0),
+		},
 		{
 			"id": "h1b_fee_hike",
 			"headline": "H-1B compliance fees jump — international hiring gets expensive",
@@ -365,6 +415,19 @@ func _catalog() -> Array[Dictionary]:
 					GameState.reputation = clamp(GameState.reputation - 0.08, 0.0, 1.0),
 		},
 		# ===== VC ANTAGONIST EVENTS =====
+		{
+			"id": "cofounder_pr_recovery",
+			"headline": "Cofounder PR recovery — the apology thread lands",
+			"description": "Your cofounder posts a sincere apology and a product update. Somehow it turns into a brand win.",
+			"condition": func() -> bool:
+				return GameState.week >= 5 and GameState.setup_complete and GameState.brand >= 0.15 and GameState.reputation <= 0.75,
+			"apply": func() -> void:
+				GameState.brand = clamp(GameState.brand + 0.06, 0.0, 1.0)
+				GameState.reputation = clamp(GameState.reputation + 0.05, 0.0, 1.0)
+				GameState.morale = clamp(GameState.morale + 0.03, 0.0, 1.0)
+				GameState.risk = clamp(GameState.risk - 0.03, 0.0, 1.0)
+				GameState.users += int(10 + GameState.brand * 30.0),
+		},
 		{
 			"id": "cofounder_twitter_fight",
 			"headline": "Cofounder starts a social media fight",
