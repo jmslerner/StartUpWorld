@@ -269,20 +269,87 @@ func pitch_investors() -> String:
 	var score := GameState.product_progress + GameState.brand * 40.0 - GameState.risk * 20.0 + GameState.upgrade_fundraise_bonus
 	var roll := rng.randi_range(0, 100)
 	if roll < int(score):
+		var margin := float(int(score) - roll)
+		GameState.investor_interest_strength = clamp(0.3 + margin / 100.0, 0.3, 1.0)
+		GameState.investor_interest_weeks = 2
 		GameState.cash += 10000.0
 		GameState.morale = clamp(GameState.morale + 0.05, 0.0, 1.0)
-		return "Pitch went well. Investors are interested."
+		return "Pitch went well. Investors are interested (term sheet: 2 weeks)."
+	GameState.investor_interest_weeks = 0
+	GameState.investor_interest_strength = 0.0
 	return "Pitch fizzled. Come back with more traction."
 
 func raise_round(round_name: String, amount: float) -> String:
 	if amount <= 0.0:
 		return "Raise amount must be positive."
+	if GameState.investor_interest_weeks <= 0:
+		return "No investors ready to wire money. Use 'pitch investors' first."
+	var cap := _raise_cap(round_name) * clamp(GameState.investor_interest_strength, 0.3, 1.0)
+	if amount > cap:
+		return "Investors will only commit up to %s right now." % GameState._format_money(cap)
 	if not _consume_action():
 		return "No action points left this week."
+	var implied_valuation := _implied_valuation()
+	var new_dilution := (amount / implied_valuation) * 100.0
 	GameState.cash += amount
-	GameState.risk = clamp(GameState.risk - 0.05, 0.0, 1.0)
+	GameState.dilution += new_dilution
+	GameState.risk = clamp(GameState.risk - 0.03, 0.0, 1.0)
 	GameState.morale = clamp(GameState.morale + 0.04, 0.0, 1.0)
-	return "Raised %s $%.0f." % [round_name, amount]
+	# A term sheet is a short window; assume it's consumed once you close a round.
+	GameState.investor_interest_weeks = 0
+	GameState.investor_interest_strength = 0.0
+	return "Raised %s %s. Dilution +%.1f%% (total: %.1f%%)." % [round_name, GameState._format_money(amount), new_dilution, GameState.dilution]
+
+func _implied_valuation() -> float:
+	if GameState.valuation > 0.0:
+		return GameState.valuation
+	# Early game: make fundraising painful without a priced market valuation.
+	var baseline := max(250000.0, GameState.mrr * 12.0 * 10.0)
+	return baseline
+
+func _raise_cap(round_name: String) -> float:
+	var key := round_name.strip_edges().to_lower()
+	# Normalize "Series X" inputs.
+	if key.begins_with("series "):
+		key = "series " + key.substr(7, key.length() - 7).strip_edges()
+
+	var min_cap := 50000.0
+	var max_cap := 400000.0
+	match key:
+		"pre-seed", "preseed":
+			min_cap = 25000.0
+			max_cap = 150000.0
+		"seed":
+			min_cap = 50000.0
+			max_cap = 400000.0
+		"series a":
+			min_cap = 250000.0
+			max_cap = 2500000.0
+		"series b":
+			min_cap = 500000.0
+			max_cap = 6000000.0
+		"series c":
+			min_cap = 1000000.0
+			max_cap = 15000000.0
+		"series d":
+			min_cap = 2000000.0
+			max_cap = 30000000.0
+
+	var traction := 0.0
+	traction += GameState.product_progress
+	traction += GameState.brand * 30.0
+	traction += GameState.reputation * 20.0
+	traction += float(GameState.users) / 200.0
+	traction += (GameState.mrr / 5000.0) * 10.0
+	traction -= GameState.risk * 25.0
+	traction += GameState.upgrade_fundraise_bonus * 0.5
+	traction = clamp(traction, 0.0, 100.0)
+
+	var cap := lerp(min_cap, max_cap, traction / 100.0)
+	var implied_valuation := _implied_valuation()
+	cap = min(cap, implied_valuation * 0.18)
+	cap = max(cap, 10000.0)
+	return cap
 
 func borrow(amount: float) -> String:
 	if amount <= 0.0:
@@ -373,6 +440,11 @@ func cut_costs() -> String:
 func end_week() -> String:
 	GameState.week += 1
 	GameState.action_points = 2 + GameState.upgrade_extra_ap
+	# Investor interest expires quickly if you don't close.
+	if GameState.investor_interest_weeks > 0:
+		GameState.investor_interest_weeks -= 1
+		if GameState.investor_interest_weeks <= 0:
+			GameState.investor_interest_strength = 0.0
 	# Debt interest
 	if GameState.debt > 0.0:
 		var interest := GameState.debt * GameState.debt_interest_rate

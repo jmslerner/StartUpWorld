@@ -36,6 +36,10 @@ var milestones: Array[String] = []
 var fired_recently: bool = false
 var game_won: bool = false
 
+# Fundraising state
+var investor_interest_weeks: int = 0
+var investor_interest_strength: float = 0.0
+
 var team := {
 	"engineer": 0,
 	"gtm": 0,
@@ -83,6 +87,8 @@ func reset() -> void:
 	active_offer = {}
 	milestones.clear()
 	fired_recently = false
+	investor_interest_weeks = 0
+	investor_interest_strength = 0.0
 	team["engineer"] = 0
 	team["gtm"] = 0
 	team["hr"] = 0
@@ -240,6 +246,8 @@ func status_text() -> String:
 	lines.append("Cash: $%.0f | Burn: $%.0f/week | Runway: %d weeks" % [cash, burn_per_week, runway_weeks()])
 	lines.append("Users: %d | MRR: $%.0f" % [users, mrr])
 	lines.append("Valuation: %s | Reputation: %.2f" % [_format_money(valuation), reputation])
+	if investor_interest_weeks > 0:
+		lines.append("Investors: interested (%dw left)" % investor_interest_weeks)
 	if debt > 0.0:
 		lines.append("Debt: $%.0f (%.0f%% weekly interest)" % [debt, debt_interest_rate * 100])
 	if dilution > 0.0:
