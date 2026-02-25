@@ -2,6 +2,7 @@ import { create } from "zustand";
 import type { GameState, LogEntry } from "../types/game";
 import { createInitialState, executeCommand } from "../engine";
 import { toLog } from "../engine/utils";
+import { pickWeeklyQuote } from "../ui/quotes";
 
 interface GameStore {
   state: GameState;
@@ -28,9 +29,20 @@ export const useGameStore = create<GameStore>((set) => ({
       const userLog = trimmed ? [toLog(`> ${trimmed}`, "user")] : [];
       const result = executeCommand(current.state, trimmed);
       const advancedWeek = result.state.week > prevWeek;
+
+      const quoteLog = advancedWeek
+        ? (() => {
+            const q = pickWeeklyQuote(result.state.week);
+            const suffix = q.note ? ` (${q.note})` : "";
+            return [toLog(`Founder quote${suffix}: ${q.text} — ${q.by}`, "system")];
+          })()
+        : [];
+
       return {
         state: result.state,
-        log: advancedWeek ? [...userLog, ...result.logs] : [...current.log, ...userLog, ...result.logs],
+        log: advancedWeek
+          ? [...userLog, ...quoteLog, ...result.logs]
+          : [...current.log, ...userLog, ...result.logs],
       };
     }),
 }));
