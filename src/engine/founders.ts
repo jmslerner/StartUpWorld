@@ -60,7 +60,7 @@ export const isFounderChosen = (state: GameState): boolean => state.founder.arch
 
 export const setFounder = (state: GameState, archetype: FounderArchetype): GameState => ({
   ...state,
-  founder: { archetype },
+  founder: { ...state.founder, archetype },
 });
 
 export const applyCofounderWeeklyDrift = (state: GameState, opts: { hit: number; win: number }): GameState => {

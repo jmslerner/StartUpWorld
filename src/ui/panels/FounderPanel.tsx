@@ -14,6 +14,10 @@ export const FounderPanel = ({ state }: FounderPanelProps) => {
       {archetype ? (
         <>
           <div className="flex items-center justify-between">
+            <span className="text-mist/60" title="That’s you.">Name</span>
+            <span>{state.founder.name}</span>
+          </div>
+          <div className="flex items-center justify-between">
             <span className="text-mist/60" title="Your founder style. It tweaks success odds and how the company behaves.">Archetype</span>
             <span className="text-neon">{archetype}</span>
           </div>

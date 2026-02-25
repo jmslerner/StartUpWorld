@@ -7,7 +7,9 @@ import {
   launchCampaign,
   pitchInvestors,
   raiseSeed,
+  setCompanyName,
   setFounderArchetype,
+  setPlayerName,
   shipFeature,
   status,
 } from "./actions";
@@ -25,11 +27,13 @@ const roleMap: Record<string, TeamRole> = {
 const founderOptions = ["visionary", "hacker", "sales-animal", "philosopher"] as const;
 type FounderToken = (typeof founderOptions)[number];
 
-const allowDuringPending = new Set(["choose", "status", "help"]);
-const allowBeforeFounder = new Set(["founder", "status", "help"]);
+const allowDuringPending = new Set(["choose", "status", "help", "name", "company"]);
+const allowBeforeFounder = new Set(["founder", "status", "help", "name", "company"]);
 
 const helpText: LogEntry[] = [
   toLog("Commands:"),
+  toLog("name <your name> - set your name"),
+  toLog("company <name> - set company name"),
   toLog("founder <visionary|hacker|sales-animal|philosopher> - pick your founder (required)"),
   toLog("help - show commands"),
   toLog("status - show current stats"),
@@ -65,6 +69,10 @@ export const executeCommand = (state: GameState, input: string): ActionResult =>
   switch (command) {
     case "help":
       return { state, logs: helpText };
+    case "name":
+      return setPlayerName(state, rest.join(" "));
+    case "company":
+      return setCompanyName(state, rest.join(" "));
     case "founder": {
       const token = (rest[0] ?? "").toLowerCase();
       if (!founderOptions.includes(token as FounderToken)) {

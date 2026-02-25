@@ -56,6 +56,7 @@ export interface GameOverState {
 }
 
 export interface GameState {
+  companyName: string;
   week: number;
   ap: number;
   cash: number;
@@ -72,6 +73,7 @@ export interface GameState {
 
   companyPhase: CompanyPhase;
   founder: {
+    name: string;
     archetype: FounderArchetype | null;
   };
   cofounder: CofounderDynamics;

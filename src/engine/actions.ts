@@ -23,9 +23,40 @@ const withLogLines = (state: GameState, lines: Array<{ text: string; kind?: LogE
 
 const err = (state: GameState, message: string): ActionResult => withLogLines(state, [{ text: message, kind: "error" }]);
 
+const normalizeName = (input: string, maxLen: number): string => {
+  const trimmed = input.replace(/\s+/g, " ").trim();
+  if (!trimmed) return "";
+  return trimmed.length > maxLen ? trimmed.slice(0, maxLen).trim() : trimmed;
+};
+
+export const setPlayerName = (state: GameState, name: string): ActionResult => {
+  if (state.gameOver) {
+    return err(state, "Game over.");
+  }
+  const normalized = normalizeName(name, 32);
+  if (!normalized) {
+    return err(state, "Usage: name <your name>");
+  }
+  const updated: GameState = { ...state, founder: { ...state.founder, name: normalized } };
+  return withLogLines(updated, [{ text: `You are now: ${normalized}.`, kind: "system" }]);
+};
+
+export const setCompanyName = (state: GameState, name: string): ActionResult => {
+  if (state.gameOver) {
+    return err(state, "Game over.");
+  }
+  const normalized = normalizeName(name, 40);
+  if (!normalized) {
+    return err(state, "Usage: company <company name>");
+  }
+  const updated: GameState = { ...state, companyName: normalized };
+  return withLogLines(updated, [{ text: `Company set: ${normalized}.`, kind: "system" }]);
+};
+
 export const createInitialState = (): GameState => {
   const seed = (Date.now() >>> 0) || 1;
   const base: GameState = {
+    companyName: "Stealth Startup",
     week: 1,
     ap: BASE_AP,
     cash: 20_000,
@@ -39,7 +70,7 @@ export const createInitialState = (): GameState => {
     stage: "garage",
     thesis: "ai",
     companyPhase: "garage",
-    founder: { archetype: null },
+    founder: { name: "Founder", archetype: null },
     cofounder: { trust: 72, ego: 55, ambition: 76 },
     culture: { cohesion: 78, morale: 72 },
     stress: 18,
@@ -323,7 +354,8 @@ export const status = (state: GameState): ActionResult => {
   const pipeline = state.investors.pipeline.length;
 
   const line =
-    `Week ${state.week} | Cash $${state.cash.toLocaleString()} | Burn $${state.burn.toLocaleString()} | Runway ${runway}w` +
+    `${state.companyName} | ${state.founder.name}` +
+    `\nWeek ${state.week} | Cash $${state.cash.toLocaleString()} | Burn $${state.burn.toLocaleString()} | Runway ${runway}w` +
     `\nMRR $${state.mrr.toLocaleString()} | Users ${state.users.toLocaleString()} | ARPU $${state.arpu}` +
     `\nStage ${state.stage} | Phase ${state.companyPhase} | Founder ${founder} | Thesis ${state.thesis}` +
     `\nAP ${state.ap} | Rep ${state.reputation}/100 | VC ${state.vcReputation}/100 | Stress ${state.stress}/100 | Vol ${state.volatility}/100` +
