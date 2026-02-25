@@ -2,7 +2,8 @@ import { HudBar } from "./ui/components/HudBar";
 import { EventCard } from "./ui/components/EventCard";
 import { TerminalInput, TerminalLog } from "./ui/terminal";
 import { useGameStore } from "./state/useGameStore";
-import { MetricsPanel, TeamPanel, HealthPanel, FounderPanel } from "./ui/panels";
+import { GrowthPanel, TeamPanel, RiskProfilePanel } from "./ui/panels";
+import { MobilePanelsSheet } from "./ui/components/MobilePanelsSheet";
 import { useEffect, useRef } from "react";
 
 const App = () => {
@@ -37,16 +38,18 @@ const App = () => {
 
   return (
     <div
-      className="min-h-screen px-3 py-4 text-slate-100 md:px-6"
+      className="min-h-screen px-3 py-4 pb-[18vh] text-slate-100 md:px-6 md:pb-4"
     >
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-3">
-        <HudBar state={state} />
+        <div className="sticky top-3 z-20 md:static">
+          <HudBar state={state} />
+        </div>
 
         {state.pendingEvent && <EventCard event={state.pendingEvent} />}
 
-        <div className="grid gap-3 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
+        <div className="grid gap-3 md:grid-cols-12">
           <div
-            className="flex min-h-[60vh] flex-col"
+            className="flex min-h-[60vh] flex-col md:col-span-7 lg:col-span-8"
             onMouseDownCapture={(event) => {
               const target = event.target as HTMLElement | null;
               if (target?.closest?.("[data-terminal-log]")) return;
@@ -57,12 +60,15 @@ const App = () => {
             <TerminalLog log={log} />
           </div>
 
-          <div className="grid max-h-[70vh] gap-3 overflow-y-auto pr-1 sm:grid-cols-2 lg:max-h-[60vh] lg:grid-cols-1">
-            <MetricsPanel state={state} />
+          <div className="hidden gap-3 md:col-span-5 md:grid md:max-h-[70vh] md:overflow-y-auto md:pr-1 lg:col-span-4 lg:max-h-[60vh]">
+            <GrowthPanel state={state} />
             <TeamPanel state={state} />
-            <HealthPanel state={state} />
-            <FounderPanel state={state} />
+            <RiskProfilePanel state={state} />
           </div>
+        </div>
+
+        <div className="md:hidden">
+          <MobilePanelsSheet state={state} />
         </div>
       </div>
     </div>

@@ -56,9 +56,12 @@ export const HudBar = ({ state }: HudBarProps) => {
       <span className="font-semibold text-white" title="Estimated valuation derived from ARR, growth, and market mood.">
         Valuation {fmtCompactUsd(state.valuation)}
       </span>
-      <span className="text-mist/60">|</span>
-      <span title="Monthly Recurring Revenue.">MRR {fmt(state.mrr)}</span>
-      <span title="Active users.">Users {state.users.toLocaleString()}</span>
+      <span
+        className="rounded bg-steel/60 px-1.5 py-0.5"
+        title="Company phase is driven by traction and valuation thresholds."
+      >
+        Phase {state.companyPhase}
+      </span>
     </div>
   );
 };

@@ -35,7 +35,7 @@ export const TerminalLog = ({ log }: TerminalLogProps) => {
     <div
       ref={containerRef}
       data-terminal-log
-      className="terminal-scrollbar panel-surface min-h-0 flex-1 overflow-y-auto rounded-b-xl rounded-t-none border-t-0 p-3 text-base leading-relaxed text-slate-100/90"
+      className="terminal-scrollbar terminal-scanlines panel-surface min-h-0 flex-1 overflow-y-auto rounded-b-xl rounded-t-none border-t-0 p-3 text-base leading-relaxed text-slate-100/90"
       onScroll={updateStickiness}
     >
       {log.map((entry) => (

@@ -33,13 +33,18 @@ export const TerminalInput = forwardRef<HTMLInputElement, TerminalInputProps>(({
   };
 
   return (
-    <form onSubmit={handleSubmit} className="panel-surface rounded-t-xl rounded-b-none border-b-0 px-3 py-2.5">
+    <form onSubmit={handleSubmit} className="panel-surface flex items-center gap-2 rounded-t-xl rounded-b-none border-b-0 px-3 py-2.5">
+      <span className="select-none text-neon" aria-hidden>
+        &gt;
+      </span>
       <input
         ref={setRefs}
         value={value}
         onChange={(event) => setValue(event.target.value)}
-        className="w-full bg-transparent text-base text-slate-100/90 outline-none placeholder:text-mist/60"
-        placeholder="Type a command and hit Enter…"
+        className="w-full bg-transparent text-base text-slate-100/90 outline-none caret-neon"
+        autoCapitalize="off"
+        autoCorrect="off"
+        spellCheck={false}
         autoFocus
       />
     </form>
