@@ -4,8 +4,8 @@ let logCounter = 0;
 
 export const nextLogId = () => `log-${Date.now()}-${logCounter++}`;
 
-export const toLog = (text: string, kind: LogEntry["kind"] = "system"): LogEntry => ({
-  id: nextLogId(),
+export const toLog = (text: string, kind: LogEntry["kind"] = "system", id?: string): LogEntry => ({
+  id: id ?? nextLogId(),
   text,
   kind,
 });

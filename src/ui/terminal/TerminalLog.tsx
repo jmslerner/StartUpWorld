@@ -24,7 +24,7 @@ export const TerminalLog = ({ log }: TerminalLogProps) => {
   return (
     <div
       ref={containerRef}
-      className="terminal-scrollbar panel-surface h-full overflow-y-auto rounded-xl p-4 text-sm leading-relaxed text-slate-100/90"
+      className="terminal-scrollbar panel-surface h-full overflow-y-auto rounded-xl p-3 text-sm leading-relaxed text-slate-100/90"
     >
       {log.map((entry) => (
         <div key={entry.id} className={entryClass(entry.kind)}>

@@ -6,8 +6,8 @@ interface PanelCardProps {
 }
 
 export const PanelCard = ({ title, children }: PanelCardProps) => (
-  <section className="panel-surface rounded-xl p-4 text-sm text-mist">
-    <h3 className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-neon/80">{title}</h3>
-    <div className="space-y-2 text-sm text-slate-100/90">{children}</div>
+  <section className="panel-surface rounded-xl p-3 text-xs text-mist">
+    <h3 className="mb-2 text-[0.65rem] font-semibold uppercase tracking-[0.22em] text-neon/80">{title}</h3>
+    <div className="space-y-1.5 text-xs text-slate-100/90">{children}</div>
   </section>
 );

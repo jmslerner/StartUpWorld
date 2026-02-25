@@ -17,7 +17,7 @@ export const TerminalInput = ({ onSubmit }: TerminalInputProps) => {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="panel-surface rounded-xl px-4 py-3">
+    <form onSubmit={handleSubmit} className="panel-surface rounded-xl px-3 py-2">
       <input
         value={value}
         onChange={(event) => setValue(event.target.value)}
