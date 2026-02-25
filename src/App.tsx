@@ -1,4 +1,4 @@
-import { HudBar } from "./ui/components/HudBar";
+import { FundingStrip, HudBar } from "./ui/components/HudBar";
 import { TerminalInput, TerminalLog } from "./ui/terminal";
 import { useGameStore } from "./state/useGameStore";
 import { CompanyPanel, FundingPanel, GrowthPanel, ProductPanel, TeamPanel } from "./ui/panels";
@@ -11,6 +11,7 @@ const App = () => {
   return (
     <div className="min-h-screen px-3 py-4 text-slate-100 md:px-6">
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-4">
+        <FundingStrip state={state} />
         <HudBar state={state} />
 
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">

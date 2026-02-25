@@ -323,10 +323,10 @@ export const status = (state: GameState): ActionResult => {
   const pipeline = state.investors.pipeline.length;
 
   const line =
-    `Week ${state.week} | AP ${state.ap} | Cash $${state.cash.toLocaleString()} | Burn $${state.burn.toLocaleString()} | Runway ${runway}w` +
-    `\nUsers ${state.users.toLocaleString()} | ARPU $${state.arpu} | MRR $${state.mrr.toLocaleString()}` +
+    `Week ${state.week} | Cash $${state.cash.toLocaleString()} | Burn $${state.burn.toLocaleString()} | Runway ${runway}w` +
+    `\nMRR $${state.mrr.toLocaleString()} | Users ${state.users.toLocaleString()} | ARPU $${state.arpu}` +
     `\nStage ${state.stage} | Phase ${state.companyPhase} | Founder ${founder} | Thesis ${state.thesis}` +
-    `\nRep ${state.reputation}/100 | VC ${state.vcReputation}/100 | Stress ${state.stress}/100 | Vol ${state.volatility}/100` +
+    `\nAP ${state.ap} | Rep ${state.reputation}/100 | VC ${state.vcReputation}/100 | Stress ${state.stress}/100 | Vol ${state.volatility}/100` +
     `\nTrust ${state.cofounder.trust}/100 | Ego ${state.cofounder.ego}/100 | Cohesion ${state.culture.cohesion}/100 | Morale ${state.culture.morale}/100` +
     `\nInvestor leads: ${pipeline}`;
 
