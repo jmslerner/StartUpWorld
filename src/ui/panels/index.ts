@@ -1,5 +1,4 @@
-export { CompanyPanel } from "./CompanyPanel";
+export { MetricsPanel } from "./MetricsPanel";
 export { TeamPanel } from "./TeamPanel";
-export { ProductPanel } from "./ProductPanel";
-export { GrowthPanel } from "./GrowthPanel";
-export { FundingPanel } from "./FundingPanel";
+export { HealthPanel } from "./HealthPanel";
+export { FounderPanel } from "./FounderPanel";

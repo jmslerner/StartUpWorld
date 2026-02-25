@@ -5,21 +5,30 @@ interface TeamPanelProps {
   state: GameState;
 }
 
-const roleLabel: Record<TeamRole, string> = {
-  engineering: "Engineering",
-  design: "Design",
-  marketing: "Marketing",
-  sales: "Sales",
-  ops: "Ops",
-};
+const roles: { key: TeamRole; label: string }[] = [
+  { key: "engineering", label: "Eng" },
+  { key: "design", label: "Design" },
+  { key: "marketing", label: "Mkt" },
+  { key: "sales", label: "Sales" },
+  { key: "ops", label: "Ops" },
+];
 
-export const TeamPanel = ({ state }: TeamPanelProps) => (
-  <PanelCard title="Team">
-    {Object.entries(state.team).map(([role, count]) => (
-      <div key={role} className="flex items-center justify-between">
-        <span>{roleLabel[role as TeamRole]}</span>
-        <span>{count}</span>
+export const TeamPanel = ({ state }: TeamPanelProps) => {
+  const total = Object.values(state.team).reduce((a, b) => a + b, 0);
+
+  return (
+    <PanelCard title="Team">
+      <div className="flex flex-wrap gap-x-3 gap-y-1">
+        {roles.map(({ key, label }) => (
+          <span key={key} className={state.team[key] > 0 ? "text-slate-100/90" : "text-mist/40"}>
+            {label} {state.team[key]}
+          </span>
+        ))}
       </div>
-    ))}
-  </PanelCard>
-);
+      <div className="mt-1 flex items-center justify-between border-t border-white/5 pt-1">
+        <span className="text-mist/60">Headcount</span>
+        <span>{total}</span>
+      </div>
+    </PanelCard>
+  );
+};
