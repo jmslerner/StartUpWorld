@@ -17,6 +17,8 @@ const introLogs: LogEntry[] = [
   toLog("Try: name Ada | company Stealth Tiger", "system", "intro-3c"),
   toLog("First: pick your founder archetype.", "system", "intro-4"),
   toLog("Try: founder visionary | hacker | sales-animal | philosopher", "system", "intro-5"),
+  toLog("Next: pick your cofounder.", "system", "intro-5b"),
+  toLog("Try: cofounder operator | builder | rainmaker | powderkeg", "system", "intro-5c"),
   toLog("Then: type 'help' to see available commands.", "system", "intro-6"),
 ];
 

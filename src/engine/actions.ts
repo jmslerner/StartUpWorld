@@ -1,10 +1,10 @@
-import type { ActionResult, FounderArchetype, GameState, LogEntry, TeamRole } from "../types/game";
+import type { ActionResult, CofounderArchetype, FounderArchetype, GameState, LogEntry, TeamRole } from "../types/game";
 import { appendLog } from "./logging";
 import { clamp } from "./utils";
 import { BASE_AP, calcBurn, calcRunwayWeeks, roleComp } from "./economy";
 import { applyHiringCohesionHit } from "./culture";
-import { isFounderChosen, setFounder, founderMods } from "./founders";
-import { chance, signedUnit } from "./rng";
+import { isCofounderChosen, isFounderChosen, setFounder, founderMods } from "./founders";
+import { chance, nextIntInclusive, signedUnit } from "./rng";
 import { successPenaltyFromStress } from "./stress";
 import { endWeekTick } from "./tick";
 import { applyPendingEventChoice } from "./events/applyChoice";
@@ -53,6 +53,63 @@ export const setCompanyName = (state: GameState, name: string): ActionResult => 
   return withLogLines(updated, [{ text: `Company set: ${normalized}.`, kind: "system" }]);
 };
 
+export const setCofounderArchetype = (state: GameState, archetype: CofounderArchetype): ActionResult => {
+  if (state.gameOver) {
+    return err(state, "Game over.");
+  }
+  if (state.cofounder.archetype) {
+    return err(state, "Cofounder already locked for this run.");
+  }
+
+  const profiles: Record<
+    CofounderArchetype,
+    { base: { trust: number; ego: number; ambition: number }; names: string[]; tagline: string }
+  > = {
+    operator: {
+      base: { trust: 78, ego: 48, ambition: 68 },
+      names: ["Alex", "Morgan", "Sam", "Jordan", "Casey", "Taylor"],
+      tagline: "Adult supervision. Process. Calm under fire.",
+    },
+    builder: {
+      base: { trust: 72, ego: 52, ambition: 72 },
+      names: ["Riley", "Avery", "Quinn", "Jamie", "Reese", "Drew"],
+      tagline: "Craft obsession. Product instincts. Quiet intensity.",
+    },
+    rainmaker: {
+      base: { trust: 64, ego: 66, ambition: 82 },
+      names: ["Blake", "Cameron", "Parker", "Rowan", "Hayden", "Emerson"],
+      tagline: "Network heat. Deals. Confidence that borders on delusion.",
+    },
+    powderkeg: {
+      base: { trust: 56, ego: 80, ambition: 88 },
+      names: ["Logan", "Sydney", "Harper", "Kai", "Sasha", "Noah"],
+      tagline: "Brilliant. Volatile. Will either save the company or burn it down.",
+    },
+  };
+
+  const profile = profiles[archetype];
+  const pick = nextIntInclusive(state.rng, 0, profile.names.length - 1);
+  const name = profile.names[pick.value] ?? "Cofounder";
+
+  const updated: GameState = {
+    ...state,
+    rng: pick.rng,
+    cofounder: {
+      ...state.cofounder,
+      name,
+      archetype,
+      trust: profile.base.trust,
+      ego: profile.base.ego,
+      ambition: profile.base.ambition,
+    },
+  };
+
+  return withLogLines(updated, [
+    { text: `Cofounder locked: ${name} (${archetype}).`, kind: "system" },
+    { text: profile.tagline, kind: "system" },
+  ]);
+};
+
 export const createInitialState = (): GameState => {
   const seed = (Date.now() >>> 0) || 1;
   const base: GameState = {
@@ -71,7 +128,7 @@ export const createInitialState = (): GameState => {
     thesis: "ai",
     companyPhase: "garage",
     founder: { name: "Founder", archetype: null },
-    cofounder: { trust: 72, ego: 55, ambition: 76 },
+    cofounder: { name: "Cofounder", archetype: null, trust: 72, ego: 55, ambition: 76 },
     culture: { cohesion: 78, morale: 72 },
     stress: 18,
     volatility: 22,
@@ -101,6 +158,9 @@ const ensurePlayable = (state: GameState): ActionResult | null => {
   }
   if (!isFounderChosen(state)) {
     return err(state, "Choose your founder first: `founder visionary|hacker|sales-animal|philosopher`.");
+  }
+  if (!isCofounderChosen(state)) {
+    return err(state, "Choose your cofounder first: `cofounder operator|builder|rainmaker|powderkeg`.");
   }
   return null;
 };
@@ -351,6 +411,7 @@ export const endWeek = (state: GameState): ActionResult => {
 export const status = (state: GameState): ActionResult => {
   const runway = calcRunwayWeeks(state);
   const founder = state.founder.archetype ?? "(unpicked)";
+  const cofounder = state.cofounder.archetype ?? "(unpicked)";
   const pipeline = state.investors.pipeline.length;
 
   const line =
@@ -359,7 +420,8 @@ export const status = (state: GameState): ActionResult => {
     `\nMRR $${state.mrr.toLocaleString()} | Users ${state.users.toLocaleString()} | ARPU $${state.arpu}` +
     `\nStage ${state.stage} | Phase ${state.companyPhase} | Founder ${founder} | Thesis ${state.thesis}` +
     `\nAP ${state.ap} | Rep ${state.reputation}/100 | VC ${state.vcReputation}/100 | Stress ${state.stress}/100 | Vol ${state.volatility}/100` +
-    `\nTrust ${state.cofounder.trust}/100 | Ego ${state.cofounder.ego}/100 | Cohesion ${state.culture.cohesion}/100 | Morale ${state.culture.morale}/100` +
+    `\nCofounder ${state.cofounder.name} (${cofounder}) | Trust ${state.cofounder.trust}/100 | Ego ${state.cofounder.ego}/100` +
+    `\nCohesion ${state.culture.cohesion}/100 | Morale ${state.culture.morale}/100` +
     `\nInvestor leads: ${pipeline}`;
 
   return withLogLines(state, [{ text: line, kind: "system" }]);

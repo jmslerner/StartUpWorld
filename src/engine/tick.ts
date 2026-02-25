@@ -4,7 +4,7 @@ import { BASE_AP, calcBurn, calcRunwayWeeks } from "./economy";
 import { signedUnit } from "./rng";
 import { computeContext, computeTeamSize } from "./context";
 import { applyWeeklyCulture } from "./culture";
-import { applyCofounderWeeklyDrift, founderMods, isFounderChosen } from "./founders";
+import { applyCofounderWeeklyDrift, founderMods, isCofounderChosen, isFounderChosen } from "./founders";
 import { calcVolatility, fatTailSigned, impactMultiplier } from "./volatility";
 import { calcStress } from "./stress";
 import { maybeSelectEvent } from "./events/select";
@@ -41,6 +41,9 @@ export const endWeekTick = (state: GameState): { state: GameState; logs: string[
   }
   if (!isFounderChosen(state)) {
     return { state, logs: ["Choose your founder archetype first: `founder visionary|hacker|sales-animal|philosopher`."] };
+  }
+  if (!isCofounderChosen(state)) {
+    return { state, logs: ["Choose your cofounder first: `cofounder operator|builder|rainmaker|powderkeg`."] };
   }
 
   const logs: string[] = [];

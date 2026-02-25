@@ -4,11 +4,15 @@ export type CompanyPhase = "garage" | "coworking" | "office" | "unicorn" | "publ
 
 export type FounderArchetype = "visionary" | "hacker" | "sales-animal" | "philosopher";
 
+export type CofounderArchetype = "operator" | "builder" | "rainmaker" | "powderkeg";
+
 export type TeamRole = "engineering" | "design" | "marketing" | "sales" | "ops";
 
 export type TeamRoster = Record<TeamRole, number>;
 
 export interface CofounderDynamics {
+  name: string;
+  archetype: CofounderArchetype | null;
   trust: number; // 0-100
   ego: number; // 0-100
   ambition: number; // 0-100

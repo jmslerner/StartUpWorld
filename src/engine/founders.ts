@@ -1,4 +1,4 @@
-import type { FounderArchetype, GameState } from "../types/game";
+import type { CofounderArchetype, FounderArchetype, GameState } from "../types/game";
 import { clamp } from "./utils";
 
 export interface FounderMods {
@@ -58,6 +58,8 @@ export const founderMods: Record<FounderArchetype, FounderMods> = {
 
 export const isFounderChosen = (state: GameState): boolean => state.founder.archetype !== null;
 
+export const isCofounderChosen = (state: GameState): boolean => state.cofounder.archetype !== null;
+
 export const setFounder = (state: GameState, archetype: FounderArchetype): GameState => ({
   ...state,
   founder: { ...state.founder, archetype },
@@ -67,15 +69,30 @@ export const applyCofounderWeeklyDrift = (state: GameState, opts: { hit: number;
   // hit: negative week magnitude 0..1, win: positive week magnitude 0..1
   const ambitionPull = (state.cofounder.ambition - 50) / 50; // -1..1
 
-  const trustDelta = Math.round(opts.win * 6 - opts.hit * 10 - Math.max(0, ambitionPull) * 1);
-  const egoDelta = Math.round(opts.win * 2 + opts.hit * 5 + Math.max(0, ambitionPull) * 2);
+  const trustBase = Math.round(opts.win * 6 - opts.hit * 10 - Math.max(0, ambitionPull) * 1);
+  const egoBase = Math.round(opts.win * 2 + opts.hit * 5 + Math.max(0, ambitionPull) * 2);
+
+  const arch = state.cofounder.archetype;
+  const archBias: Record<CofounderArchetype, { trust: number; ego: number; ambition: number }> = {
+    operator: { trust: 1, ego: -1, ambition: 0 },
+    builder: { trust: 0, ego: -1, ambition: 1 },
+    rainmaker: { trust: 0, ego: 1, ambition: 1 },
+    powderkeg: { trust: -1, ego: 2, ambition: 2 },
+  };
+
+  const bias = arch ? archBias[arch] : { trust: 0, ego: 0, ambition: 0 };
+  const trustDelta = trustBase + bias.trust;
+  const egoDelta = egoBase + bias.ego;
+  const ambitionDelta = Math.round(opts.win * 2 - opts.hit * 1) + bias.ambition;
 
   return {
     ...state,
     cofounder: {
       trust: clamp(state.cofounder.trust + trustDelta, 0, 100),
       ego: clamp(state.cofounder.ego + egoDelta, 0, 100),
-      ambition: clamp(state.cofounder.ambition + Math.round(opts.win * 2 - opts.hit * 1), 0, 100),
+      ambition: clamp(state.cofounder.ambition + ambitionDelta, 0, 100),
+      archetype: state.cofounder.archetype,
+      name: state.cofounder.name,
     },
   };
 };
