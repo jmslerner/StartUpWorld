@@ -4,6 +4,7 @@ interface GaugeProps {
   max?: number;
   color?: "neon" | "ember" | "red" | "green";
   showValue?: boolean;
+  description?: string;
 }
 
 const colorMap = {
@@ -13,13 +14,15 @@ const colorMap = {
   green: { bar: "bg-emerald-400/70", track: "bg-emerald-400/10" },
 };
 
-export const Gauge = ({ label, value, max = 100, color = "neon", showValue = true }: GaugeProps) => {
+export const Gauge = ({ label, value, max = 100, color = "neon", showValue = true, description }: GaugeProps) => {
   const pct = Math.min(100, Math.max(0, (value / max) * 100));
   const c = colorMap[color];
 
   return (
     <div className="flex items-center gap-2">
-      <span className="w-[4.5rem] shrink-0 text-mist/80">{label}</span>
+      <span className="w-[4.5rem] shrink-0 text-mist/80" title={description}>
+        {label}
+      </span>
       <div className={`h-1.5 flex-1 rounded-full ${c.track}`}>
         <div
           className={`h-full rounded-full transition-all duration-300 ${c.bar}`}
