@@ -12,14 +12,10 @@ interface GameStore {
 const introLogs: LogEntry[] = [
   toLog("=== STARTUP WORLD ===", "system", "intro-1"),
   toLog("Build your AI startup from garage to IPO.", "system", "intro-2"),
-  toLog("", "system", "intro-3"),
-  toLog("Optional: name yourself and your company.", "system", "intro-3b"),
-  toLog("Try: name Ada | company Stealth Tiger", "system", "intro-3c"),
-  toLog("First: pick your founder archetype.", "system", "intro-4"),
-  toLog("Try: founder visionary | hacker | sales-animal | philosopher", "system", "intro-5"),
-  toLog("Next: pick your cofounder.", "system", "intro-5b"),
-  toLog("Try: cofounder operator | builder | rainmaker | powderkeg", "system", "intro-5c"),
-  toLog("Then: type 'help' to see available commands.", "system", "intro-6"),
+  toLog("Start: founder visionary|hacker|sales-animal|philosopher", "system", "intro-3"),
+  toLog("Then: cofounder operator|builder|rainmaker|powderkeg", "system", "intro-4"),
+  toLog("Optional: name Ada | company Stealth Tiger", "system", "intro-5"),
+  toLog("Type 'help' for commands.", "system", "intro-6"),
 ];
 
 export const useGameStore = create<GameStore>((set) => ({
