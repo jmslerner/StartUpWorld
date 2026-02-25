@@ -1,6 +1,7 @@
 import type { GameState } from "../../types/game";
 import type { EngineContext } from "../context";
 import { eventPool } from "./pool";
+import { impactMultiplier } from "../volatility";
 
 export const applyPendingEventChoice = (
   state: GameState,
@@ -25,6 +26,15 @@ export const applyPendingEventChoice = (
     return { state, logs: [`Invalid choice. Pick 1-${def.choices.length}.`] };
   }
 
+  const volMult = impactMultiplier(state.volatility);
   const result = choice.apply({ ...state, pendingEvent: null }, ctx);
+
+  if (volMult >= 1.15) {
+    return {
+      state: result.state,
+      logs: [...result.logs, `(Volatility x${volMult.toFixed(2)} amplified the fallout.)`],
+    };
+  }
+
   return result;
 };

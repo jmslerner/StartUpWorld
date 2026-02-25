@@ -5,7 +5,7 @@ import { signedUnit } from "./rng";
 import { computeContext, computeTeamSize } from "./context";
 import { applyWeeklyCulture } from "./culture";
 import { applyCofounderWeeklyDrift, founderMods, isFounderChosen } from "./founders";
-import { calcVolatility } from "./volatility";
+import { calcVolatility, fatTailSigned, impactMultiplier } from "./volatility";
 import { calcStress } from "./stress";
 import { maybeSelectEvent } from "./events/select";
 import { toPendingEvent } from "./events/types";
@@ -58,8 +58,15 @@ export const endWeekTick = (state: GameState): { state: GameState; logs: string[
   const swing = signedUnit(s.rng);
   s = { ...s, rng: swing.rng };
 
-  const growth = rates.growth * (1 + swing.value * vol * 1.6);
-  const churnRate = rates.churn * (1 + (-swing.value) * vol * 0.9);
+  // Make volatility actually dangerous: fatten tails + amplify the swing.
+  const swingFat = fatTailSigned(swing.value, s.volatility);
+  const volImpact = impactMultiplier(s.volatility);
+
+  // Amplification factor: modest when vol is low, explosive when vol is high.
+  const swingAmp = (0.9 + vol * 1.1) * (1 + (volImpact - 1) * 0.85);
+
+  const growth = clamp(rates.growth * (1 + swingFat * vol * 1.9 * swingAmp), -0.12, 0.8);
+  const churnRate = clamp(rates.churn * (1 + (-swingFat) * vol * 1.15 * swingAmp), 0.006, 0.35);
 
   const grossAdds = Math.round(s.users * Math.max(0, growth));
   const churn = Math.round(s.users * churnRate);

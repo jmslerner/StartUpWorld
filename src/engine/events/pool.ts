@@ -1,27 +1,39 @@
 import type { GameState } from "../../types/game";
 import { clamp } from "../utils";
+import { impactMultiplier } from "../volatility";
 import type { EventDef } from "./types";
 
-const addCash = (s: GameState, delta: number): GameState => ({ ...s, cash: s.cash + delta });
-const addUsers = (s: GameState, delta: number): GameState => ({ ...s, users: Math.max(0, s.users + delta) });
-const addRep = (s: GameState, delta: number): GameState => ({ ...s, reputation: clamp(s.reputation + delta, 0, 100) });
-const addVcRep = (s: GameState, delta: number): GameState => ({ ...s, vcReputation: clamp(s.vcReputation + delta, 0, 100) });
+const scaleEventDelta = (s: GameState, delta: number): number => {
+  const m = impactMultiplier(s.volatility);
+  return Math.round(delta * m);
+};
+
+const addCash = (s: GameState, delta: number): GameState => ({ ...s, cash: Math.max(0, s.cash + scaleEventDelta(s, delta)) });
+const addUsers = (s: GameState, delta: number): GameState => ({ ...s, users: Math.max(0, s.users + scaleEventDelta(s, delta)) });
+const addRep = (s: GameState, delta: number): GameState => ({
+  ...s,
+  reputation: clamp(s.reputation + scaleEventDelta(s, delta), 0, 100),
+});
+const addVcRep = (s: GameState, delta: number): GameState => ({
+  ...s,
+  vcReputation: clamp(s.vcReputation + scaleEventDelta(s, delta), 0, 100),
+});
 
 const addTrust = (s: GameState, delta: number): GameState => ({
   ...s,
-  cofounder: { ...s.cofounder, trust: clamp(s.cofounder.trust + delta, 0, 100) },
+  cofounder: { ...s.cofounder, trust: clamp(s.cofounder.trust + scaleEventDelta(s, delta), 0, 100) },
 });
 const addEgo = (s: GameState, delta: number): GameState => ({
   ...s,
-  cofounder: { ...s.cofounder, ego: clamp(s.cofounder.ego + delta, 0, 100) },
+  cofounder: { ...s.cofounder, ego: clamp(s.cofounder.ego + scaleEventDelta(s, delta), 0, 100) },
 });
 const addCohesion = (s: GameState, delta: number): GameState => ({
   ...s,
-  culture: { ...s.culture, cohesion: clamp(s.culture.cohesion + delta, 0, 100) },
+  culture: { ...s.culture, cohesion: clamp(s.culture.cohesion + scaleEventDelta(s, delta), 0, 100) },
 });
 const addMorale = (s: GameState, delta: number): GameState => ({
   ...s,
-  culture: { ...s.culture, morale: clamp(s.culture.morale + delta, 0, 100) },
+  culture: { ...s.culture, morale: clamp(s.culture.morale + scaleEventDelta(s, delta), 0, 100) },
 });
 
 const gameOver = (s: GameState, ending: GameState["gameOver"]): GameState => ({ ...s, gameOver: ending });
