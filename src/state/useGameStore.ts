@@ -24,11 +24,13 @@ export const useGameStore = create<GameStore>((set) => ({
   runCommand: (input: string) =>
     set((current) => {
       const trimmed = input.trim();
+      const prevWeek = current.state.week;
       const userLog = trimmed ? [toLog(`> ${trimmed}`, "user")] : [];
       const result = executeCommand(current.state, trimmed);
+      const advancedWeek = result.state.week > prevWeek;
       return {
         state: result.state,
-        log: [...current.log, ...userLog, ...result.logs],
+        log: advancedWeek ? [...userLog, ...result.logs] : [...current.log, ...userLog, ...result.logs],
       };
     }),
 }));

@@ -4,6 +4,7 @@ import { chance, nextFloat01, nextIntInclusive, signedUnit } from "./rng";
 import { successPenaltyFromStress } from "./stress";
 import { calcRunwayWeeks } from "./economy";
 import { founderMods } from "./founders";
+import { STAGE_VALUATION_FLOOR } from "./valuation";
 
 const investorNames = [
   "Redwood Capital",
@@ -134,11 +135,17 @@ const alignmentScore = (state: GameState, lead: InvestorLead): number => {
   return 0.75;
 };
 
-const stageFromAmount = (stage: Stage, amount: number): Stage => {
-  if (stage === "garage" && amount >= 500_000) return "seed";
-  if (stage === "seed" && amount >= 5_000_000) return "series-a";
-  if (stage === "series-a" && amount >= 25_000_000) return "growth";
-  return stage;
+const stageFromAmount = (state: GameState, amount: number): Stage => {
+  const v = Math.max(state.valuation, STAGE_VALUATION_FLOOR[state.stage]);
+
+  if (state.stage === "garage" && amount >= 500_000 && v >= 5_000_000) return "seed";
+  if (state.stage === "seed" && amount >= 5_000_000 && v >= 25_000_000 && state.companyPhase !== "garage" && state.companyPhase !== "coworking") {
+    return "series-a";
+  }
+  if (state.stage === "series-a" && amount >= 25_000_000 && v >= 150_000_000 && (state.companyPhase === "unicorn" || state.companyPhase === "public")) {
+    return "growth";
+  }
+  return state.stage;
 };
 
 export const raise = (state: GameState, amount: number): { state: GameState; logs: string[] } => {
@@ -156,6 +163,27 @@ export const raise = (state: GameState, amount: number): { state: GameState; log
     return { state: s, logs };
   }
 
+  // If your valuation hasn't caught up, the market won't price you into a new stage.
+  // Also penalize extreme asks relative to implied value.
+  const impliedValuation = Math.max(s.valuation, STAGE_VALUATION_FLOOR[s.stage]);
+  const askAsPctOfValue = impliedValuation > 0 ? amount / impliedValuation : 1;
+  if (askAsPctOfValue >= 0.6) {
+    const best = [...s.investors.pipeline].sort((a, b) => b.relationship - a.relationship)[0];
+    s = {
+      ...s,
+      investors: {
+        pipeline: s.investors.pipeline.map((l) =>
+          l.id === best.id ? { ...l, relationship: clamp(l.relationship - 8, 0, 100) } : l
+        ),
+      },
+      vcReputation: clamp(s.vcReputation - 3, 0, 100),
+    };
+    logs.push(`You push a $${amount.toLocaleString()} ask.`);
+    logs.push(`They do the math. That's ~${Math.round(askAsPctOfValue * 100)}% of your implied value.`);
+    logs.push("They pass instantly. \"Come back when the numbers are real.\"");
+    return { state: s, logs };
+  }
+
   let r = s.rng;
   const best = [...s.investors.pipeline].sort((a, b) => b.relationship - a.relationship)[0];
 
@@ -166,10 +194,11 @@ export const raise = (state: GameState, amount: number): { state: GameState; log
   const align = alignmentScore(s, best);
 
   const askPressure = amount <= caps.softCap ? 0 : clamp((amount - caps.softCap) / (caps.hardCap - caps.softCap), 0, 1);
+  const valuationAskPenalty = clamp((askAsPctOfValue - 0.18) / 0.32, 0, 1); // starts biting above ~18% of implied value
 
   // Core probability: dramatic but not coin-flippy.
   const base = 0.12 + traction * 0.45 + rep * 0.15 + rel * 0.25;
-  const p = clamp(base * align - stressPenalty - askPressure * 0.25, 0.02, 0.8);
+  const p = clamp(base * align - stressPenalty - askPressure * 0.25 - valuationAskPenalty * 0.22, 0.02, 0.8);
 
   // Volatility can both help and hurt.
   const swing = signedUnit(r);
@@ -195,7 +224,7 @@ export const raise = (state: GameState, amount: number): { state: GameState; log
     return { state: s, logs };
   }
 
-  const nextStage = stageFromAmount(s.stage, amount);
+  const nextStage = stageFromAmount(s, amount);
   const dilution = clamp(Math.round(amount / 400_000), 1, 18);
 
   s = {
@@ -210,7 +239,12 @@ export const raise = (state: GameState, amount: number): { state: GameState; log
   };
 
   logs.push(`Term sheet signed with ${best.name}.`);
-  logs.push(`Cash +$${amount.toLocaleString()}. Stage: ${state.stage} → ${nextStage}.`);
+  if (nextStage !== state.stage) {
+    logs.push(`Cash +$${amount.toLocaleString()}. Stage: ${state.stage} → ${nextStage}.`);
+  } else {
+    logs.push(`Cash +$${amount.toLocaleString()}. Stage holds at ${state.stage}.`);
+    logs.push("The money buys you time, not a new label.");
+  }
 
   return { state: s, logs };
 };

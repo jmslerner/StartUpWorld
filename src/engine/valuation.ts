@@ -12,7 +12,7 @@ const stageMultipleBase: Record<Stage, number> = {
 };
 
 // Narrative + market floor so early-stage companies can still feel "valuable".
-const stageValuationFloor: Record<Stage, number> = {
+export const STAGE_VALUATION_FLOOR: Record<Stage, number> = {
   garage: 2_000_000,
   seed: 12_000_000,
   "series-a": 60_000_000,
@@ -35,7 +35,7 @@ export const calcValuation = (state: GameState, ctx: EngineContext): number => {
   const multiple = clamp(base + growthBoost + vc + rep + hype - stressPenalty, 2.5, 32);
 
   const fromArr = arr * multiple;
-  const floored = Math.max(stageValuationFloor[state.stage], fromArr);
+  const floored = Math.max(STAGE_VALUATION_FLOOR[state.stage], fromArr);
 
   // Keep numbers stable/readable.
   return Math.round(floored / 1000) * 1000;
