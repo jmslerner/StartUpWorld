@@ -10,6 +10,10 @@ export type TeamRole = "engineering" | "design" | "marketing" | "sales" | "ops";
 
 export type TeamRoster = Record<TeamRole, number>;
 
+export type BootstrapFundingSource = "friends" | "mortgage" | "preseed" | "personal-loan" | "credit-cards";
+
+export type BootstrapFundingUses = Record<BootstrapFundingSource, number>;
+
 export interface CofounderDynamics {
   name: string;
   archetype: CofounderArchetype | null;
@@ -64,6 +68,8 @@ export interface GameState {
   week: number;
   ap: number;
   cash: number;
+  debtOutstanding: number; // principal; repaid automatically on successful investor raises
+  debtService: number; // weekly burn add-on from debt
   valuation: number;
   users: number;
   arpu: number;
@@ -89,6 +95,8 @@ export interface GameState {
   investors: {
     pipeline: InvestorLead[];
   };
+
+  bootstrapFunding: BootstrapFundingUses;
 
   pendingEvent: PendingEvent | null;
   gameOver: GameOverState | null;

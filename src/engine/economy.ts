@@ -32,7 +32,7 @@ export const calcBurn = (state: GameState): number => {
   const archetype = state.founder.archetype;
   const efficiency = archetype ? founderMods[archetype].burnEfficiency : 1;
 
-  return Math.round((teamBurn + overhead) * chaosTax * efficiency);
+  return Math.round((teamBurn + overhead) * chaosTax * efficiency) + Math.max(0, state.debtService);
 };
 
 export const calcRunwayWeeks = (state: GameState): number => {

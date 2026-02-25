@@ -227,9 +227,19 @@ export const raise = (state: GameState, amount: number): { state: GameState; log
   const nextStage = stageFromAmount(s, amount);
   const dilution = clamp(Math.round(amount / 400_000), 1, 18);
 
+  // Auto-repay debt from any successful investor raise.
+  const debtBefore = Math.max(0, s.debtOutstanding);
+  const debtServiceBefore = Math.max(0, s.debtService);
+  const repaid = Math.min(amount, debtBefore);
+  const debtAfter = Math.max(0, debtBefore - repaid);
+  const debtServiceAfter = debtBefore > 0 ? Math.round(debtServiceBefore * (debtAfter / debtBefore)) : 0;
+  const netCash = amount - repaid;
+
   s = {
     ...s,
-    cash: s.cash + amount,
+    cash: s.cash + netCash,
+    debtOutstanding: debtAfter,
+    debtService: debtServiceAfter,
     stage: nextStage,
     vcReputation: clamp(s.vcReputation + 4 - dilution, 0, 100),
     reputation: clamp(s.reputation + 2, 0, 100),
@@ -239,10 +249,14 @@ export const raise = (state: GameState, amount: number): { state: GameState; log
   };
 
   logs.push(`Term sheet signed with ${best.name}.`);
+  if (repaid > 0) {
+    logs.push(`Debt repaid: -$${repaid.toLocaleString()}. Debt left: $${debtAfter.toLocaleString()}.`);
+    logs.push(`Debt service now: $${debtServiceAfter.toLocaleString()}/wk.`);
+  }
   if (nextStage !== state.stage) {
-    logs.push(`Cash +$${amount.toLocaleString()}. Stage: ${state.stage} → ${nextStage}.`);
+    logs.push(`Cash +$${netCash.toLocaleString()}. Stage: ${state.stage} → ${nextStage}.`);
   } else {
-    logs.push(`Cash +$${amount.toLocaleString()}. Stage holds at ${state.stage}.`);
+    logs.push(`Cash +$${netCash.toLocaleString()}. Stage holds at ${state.stage}.`);
     logs.push("The money buys you time, not a new label.");
   }
 

@@ -1,4 +1,12 @@
-import type { ActionResult, CofounderArchetype, FounderArchetype, GameState, LogEntry, TeamRole } from "../types/game";
+import type {
+  ActionResult,
+  BootstrapFundingSource,
+  CofounderArchetype,
+  FounderArchetype,
+  GameState,
+  LogEntry,
+  TeamRole,
+} from "../types/game";
 import { appendLog } from "./logging";
 import { clamp } from "./utils";
 import { BASE_AP, calcBurn, calcRunwayWeeks, roleComp } from "./economy";
@@ -118,6 +126,8 @@ export const createInitialState = (): GameState => {
     week: 1,
     ap: BASE_AP,
     cash: 20_000,
+    debtOutstanding: 0,
+    debtService: 0,
     valuation: 0,
     users: 50,
     arpu: 10,
@@ -135,6 +145,7 @@ export const createInitialState = (): GameState => {
     stress: 18,
     volatility: 22,
     investors: { pipeline: [] },
+    bootstrapFunding: { friends: 0, "credit-cards": 0, "personal-loan": 0, preseed: 0, mortgage: 0 },
     pendingEvent: null,
     gameOver: null,
     seed,
@@ -149,6 +160,54 @@ export const createInitialState = (): GameState => {
 export const canSpendAp = (state: GameState, cost = 1): boolean => state.ap >= cost;
 
 export const spendAp = (state: GameState, cost = 1): GameState => ({ ...state, ap: Math.max(0, state.ap - cost) });
+
+export const raiseBootstrap = (state: GameState, source: BootstrapFundingSource): ActionResult => {
+  const gate = ensurePlayable(state);
+  if (gate) return gate;
+
+  if (!canSpendAp(state)) {
+    return err(state, "No AP left. End the week to refresh.");
+  }
+
+  const uses = state.bootstrapFunding[source] ?? 0;
+
+  const profile: Record<
+    BootstrapFundingSource,
+    { label: string; cash: number; debt: number; debtService: number; stress: number; vcRepDelta: number }
+  > = {
+    friends: { label: "Borrow from friends", cash: 15_000, debt: 15_000, debtService: 0, stress: 6, vcRepDelta: 0 },
+    "credit-cards": { label: "Max credit cards", cash: 15_000, debt: 15_000, debtService: 450, stress: 9, vcRepDelta: -1 },
+    "personal-loan": { label: "Personal loan", cash: 25_000, debt: 25_000, debtService: 650, stress: 11, vcRepDelta: -1 },
+    preseed: { label: "Raise pre-seed", cash: 50_000, debt: 0, debtService: 0, stress: 5, vcRepDelta: 1 },
+    mortgage: { label: "Mortgage your house", cash: 250_000, debt: 250_000, debtService: 1_400, stress: 18, vcRepDelta: -2 },
+  };
+
+  const p = profile[source];
+  const stressDelta = p.stress; // reusable: same amount each time; pressure stacks via debt service
+
+  const updated: GameState = spendAp({
+    ...state,
+    cash: state.cash + p.cash,
+    debtOutstanding: state.debtOutstanding + p.debt,
+    debtService: state.debtService + p.debtService,
+    stress: clamp(state.stress + stressDelta, 0, 100),
+    vcReputation: clamp(state.vcReputation + p.vcRepDelta, 0, 100),
+    bootstrapFunding: { ...state.bootstrapFunding, [source]: uses + 1 },
+  });
+
+  const lines: Array<{ text: string; kind?: LogEntry["kind"] }> = [
+    { text: `${p.label}: +$${p.cash.toLocaleString()}.`, kind: "event" },
+  ];
+  if (p.debt > 0) {
+    lines.push({ text: `Debt +$${p.debt.toLocaleString()}.`, kind: "event" });
+  }
+  if (p.debtService > 0) {
+    lines.push({ text: `Debt service +$${p.debtService.toLocaleString()}/wk.`, kind: "event" });
+  }
+  lines.push({ text: `Stress +${stressDelta}.`, kind: "event" });
+
+  return withLogLines(updated, lines);
+};
 
 const ensurePlayable = (state: GameState): ActionResult | null => {
   if (state.gameOver) {
@@ -418,6 +477,7 @@ export const status = (state: GameState): ActionResult => {
   const line =
     `${state.companyName} | ${state.founder.name}` +
     `\nWeek ${state.week} | Cash $${state.cash.toLocaleString()} | Burn $${state.burn.toLocaleString()} | Runway ${runway}w` +
+    `\nDebt $${state.debtOutstanding.toLocaleString()} | DebtSvc $${state.debtService.toLocaleString()}/wk` +
     `\nValuation ~$${state.valuation.toLocaleString()}` +
     `\nMRR $${state.mrr.toLocaleString()} | Users ${state.users.toLocaleString()} | ARPU $${state.arpu}` +
     `\nStage ${state.stage} | Phase ${state.companyPhase} | Founder ${founder} | Thesis ${state.thesis}` +
