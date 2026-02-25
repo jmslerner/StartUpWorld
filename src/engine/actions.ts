@@ -127,7 +127,7 @@ export const hire = (state: GameState, role: TeamRole, count: number): ActionRes
   updated = { ...updated, burn: calcBurn(updated) };
   updated = spendAp(updated);
 
-  const lines = [
+  const lines: Array<{ text: string; kind?: LogEntry["kind"] }> = [
     { text: `Hired ${count} ${role} ${count === 1 ? "hire" : "hires"}.` },
     { text: `Cash -$${totalHireCost.toLocaleString()}. Burn now $${updated.burn.toLocaleString()}/wk.` },
   ];
