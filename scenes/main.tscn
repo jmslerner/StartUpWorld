@@ -1,9 +1,0 @@
-[gd_scene load_steps=2 format=3]
-
-[ext_resource type="PackedScene" path="res://scenes/Terminal.tscn" id="1"]
-
-[node name="Main" type="Control"]
-anchor_right = 1.0
-anchor_bottom = 1.0
-
-[node name="Terminal" parent="." instance=ExtResource("1")]
