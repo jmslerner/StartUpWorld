@@ -24,6 +24,9 @@ const roleMap: Record<string, TeamRole> = {
   sales: "sales",
   ops: "ops",
   operations: "ops",
+  hr: "hr",
+  legal: "legal",
+  lawyer: "legal",
 };
 
 const founderOptions = ["visionary", "hacker", "sales-animal", "philosopher"] as const;
@@ -43,7 +46,7 @@ const helpText: LogEntry[] = [
   toLog("cofounder <operator|builder|rainmaker|powderkeg> - pick your cofounder (required)"),
   toLog("help - show commands"),
   toLog("status - show current stats"),
-  toLog("hire <role> <count> - hire teammates"),
+  toLog("hire <role> <count> - hire teammates (engineering|design|marketing|sales|ops|hr|legal)"),
   toLog("ship <feature> - ship a feature"),
   toLog("launch <campaign> - run a growth campaign"),
   toLog("pitch - pitch investors"),
@@ -120,7 +123,7 @@ export const executeCommand = (state: GameState, input: string): ActionResult =>
       const roleToken = rest[0]?.toLowerCase();
       const role = roleToken ? roleMap[roleToken] : undefined;
       if (!role) {
-        return { state, logs: [toLog("Unknown role. Try engineering, design, marketing, sales, ops.", "error")] };
+        return { state, logs: [toLog("Unknown role. Try engineering, design, marketing, sales, ops, hr, legal.", "error")] };
       }
       const count = Number(rest[1] ?? "1");
       return hire(state, role, Number.isNaN(count) ? 1 : count);

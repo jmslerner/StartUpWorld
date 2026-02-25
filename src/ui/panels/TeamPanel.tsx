@@ -12,6 +12,8 @@ const roles: { key: TeamRole; label: string }[] = [
   { key: "marketing", label: "Mkt" },
   { key: "sales", label: "Sales" },
   { key: "ops", label: "Ops" },
+  { key: "hr", label: "HR" },
+  { key: "legal", label: "Legal" },
 ];
 
 export const TeamPanel = ({ state }: TeamPanelProps) => {

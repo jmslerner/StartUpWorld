@@ -40,6 +40,140 @@ const gameOver = (s: GameState, ending: GameState["gameOver"]): GameState => ({ 
 
 export const eventPool: EventDef[] = [
   {
+    id: "employee-complaint",
+    title: "Employee Complaint",
+    prompt: () =>
+      "An anonymous report alleges abusive behavior inside the team. People are shaken. A screenshot is one step from becoming a headline.",
+    when: (s, ctx) => ctx.teamSize >= 6 && (s.stress >= 55 || s.culture.cohesion <= 62),
+    weight: (s, ctx) => {
+      const hr = s.team.hr;
+      const pressure = (s.stress - 50) / 10 + (65 - s.culture.cohesion) / 10 + (65 - s.culture.morale) / 12;
+      const hiringChaos = ctx.hiresThisWeek >= 2 ? 2 : 0;
+      const noHrPenalty = hr > 0 ? 0 : 3;
+      return 3 + pressure + hiringChaos + noHrPenalty;
+    },
+    choices: [
+      {
+        id: "investigate",
+        text: "Run a real investigation. Reset expectations. Protect the team.",
+        apply: (s) => {
+          const hasHr = s.team.hr > 0;
+          if (hasHr) {
+            const state = addCash(
+              addCohesion(addMorale(addRep({ ...s, stress: clamp(s.stress - 4, 0, 100) }, 1), 4), 3),
+              -1800
+            );
+            return {
+              state,
+              logs: [
+                "HR runs the process. It’s uncomfortable. It’s clean.",
+                "Cash -$1,800. Morale +4. Cohesion +3. Stress -4. Reputation +1.",
+              ],
+            };
+          }
+
+          const state = addCohesion(
+            addMorale(addRep({ ...s, stress: clamp(s.stress + 3, 0, 100) }, -1), -4),
+            -3
+          );
+          return {
+            state,
+            logs: [
+              "You try to DIY the process. It’s messy and everyone notices.",
+              "Morale -4. Cohesion -3. Stress +3. Reputation -1.",
+            ],
+          };
+        },
+      },
+      {
+        id: "ignore",
+        text: "Ignore it. Velocity > feelings.",
+        apply: (s) => ({
+          state: addCohesion(addMorale(addRep({ ...s, stress: clamp(s.stress + 6, 0, 100) }, -3), -7), -6),
+          logs: [
+            "People stop talking in public. They start talking in DMs.",
+            "Morale -7. Cohesion -6. Stress +6. Reputation -3.",
+          ],
+        }),
+      },
+      {
+        id: "statement",
+        text: "Make a public statement. Suspend someone. Take the hit now.",
+        apply: (s) => ({
+          state: addCash(addMorale(addRep({ ...s, stress: clamp(s.stress - 1, 0, 100) }, 1), -1), -4500),
+          logs: [
+            "You move fast and loudly. Half the internet applauds. Half remembers.",
+            "Cash -$4,500. Morale -1. Stress -1. Reputation +1.",
+          ],
+        }),
+      },
+    ],
+  },
+
+  {
+    id: "cease-and-desist",
+    title: "Cease & Desist",
+    prompt: () =>
+      "A law firm sends a letter: they claim you’re infringing on their client. They want you to rebrand or pay. Your inbox is suddenly very quiet.",
+    when: (s) => s.week >= 3 && s.users >= 80 && s.reputation >= 18,
+    weight: (s) => {
+      const legal = s.team.legal;
+      const risk = 2 + s.reputation / 18 + s.volatility / 22;
+      return risk + (legal > 0 ? 0.8 : 3.2);
+    },
+    choices: [
+      {
+        id: "lawyer-up",
+        text: "Respond properly. Don’t wing it.",
+        apply: (s) => {
+          const hasLegal = s.team.legal > 0;
+          if (hasLegal) {
+            const state = addCash(addRep({ ...s, stress: clamp(s.stress + 1, 0, 100) }, 1), -1200);
+            return {
+              state,
+              logs: [
+                "Your legal hire drafts a clean response and buys you breathing room.",
+                "Cash -$1,200. Reputation +1. Stress +1.",
+              ],
+            };
+          }
+
+          const state = addCash(addRep({ ...s, stress: clamp(s.stress + 5, 0, 100) }, -2), -6500);
+          return {
+            state,
+            logs: [
+              "You hire outside counsel under pressure. The meter runs like a slot machine.",
+              "Cash -$6,500. Reputation -2. Stress +5.",
+            ],
+          };
+        },
+      },
+      {
+        id: "settle",
+        text: "Settle and move on.",
+        apply: (s) => ({
+          state: addCash(addRep({ ...s, stress: clamp(s.stress + 2, 0, 100) }, -1), -9000),
+          logs: [
+            "You pay to make it go away. The product keeps shipping. Your pride doesn’t.",
+            "Cash -$9,000. Reputation -1. Stress +2.",
+          ],
+        }),
+      },
+      {
+        id: "fight",
+        text: "Fight publicly. Turn it into marketing.",
+        apply: (s) => ({
+          state: addRep({ ...s, volatility: clamp(s.volatility + 6, 0, 100), stress: clamp(s.stress + 4, 0, 100) }, 2),
+          logs: [
+            "You go loud. Attention spikes. So does risk.",
+            "Reputation +2. Volatility +6. Stress +4.",
+          ],
+        }),
+      },
+    ],
+  },
+
+  {
     id: "influencer-driveby",
     title: "Influencer Drive-By",
     prompt: () => "A founder-influencer tweets your product with a half-true story. Traffic is about to hit like a truck.",

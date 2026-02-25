@@ -10,6 +10,8 @@ export const roleComp: Record<TeamRole, { salary: number; hireCost: number }> = 
   marketing: { salary: 2600, hireCost: 2200 },
   sales: { salary: 3000, hireCost: 2500 },
   ops: { salary: 2400, hireCost: 2000 },
+  hr: { salary: 2600, hireCost: 2200 },
+  legal: { salary: 4200, hireCost: 5000 },
 };
 
 export const stageOverhead: Record<Stage, number> = {

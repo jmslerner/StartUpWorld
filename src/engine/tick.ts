@@ -17,6 +17,8 @@ const growthRates = (state: GameState) => {
   const eng = state.team.engineering;
   const mkt = state.team.marketing;
   const sales = state.team.sales;
+  const hr = state.team.hr;
+  const legal = state.team.legal;
 
   const rep = clamp(state.reputation / 100, 0, 1);
   const morale = clamp(state.culture.morale / 100, 0, 1);
@@ -24,8 +26,17 @@ const growthRates = (state: GameState) => {
   const stress = clamp(state.stress / 100, 0, 1);
 
   // Baseline growth and churn; dramatic but bounded.
-  const baseGrowth = 0.015 + rep * 0.06 + eng * 0.002 + mkt * 0.004 + sales * 0.004 + morale * 0.01;
-  const baseChurn = 0.02 + (1 - rep) * 0.02 + (1 - morale) * 0.03 + stress * 0.015;
+  const baseGrowth =
+    0.015 +
+    rep * 0.06 +
+    eng * 0.002 +
+    mkt * 0.004 +
+    sales * 0.004 +
+    morale * 0.01 +
+    legal * 0.0015 -
+    hr * 0.001;
+
+  const baseChurn = 0.02 + (1 - rep) * 0.02 + (1 - morale) * 0.03 + stress * 0.015 - legal * 0.0007;
 
   return {
     growth: clamp(baseGrowth - stress * 0.02, -0.05, 0.22),

@@ -6,7 +6,7 @@ export type FounderArchetype = "visionary" | "hacker" | "sales-animal" | "philos
 
 export type CofounderArchetype = "operator" | "builder" | "rainmaker" | "powderkeg";
 
-export type TeamRole = "engineering" | "design" | "marketing" | "sales" | "ops";
+export type TeamRole = "engineering" | "design" | "marketing" | "sales" | "ops" | "hr" | "legal";
 
 export type TeamRoster = Record<TeamRole, number>;
 

@@ -133,7 +133,7 @@ export const createInitialState = (): GameState => {
     arpu: 10,
     mrr: 50 * 10,
     burn: 0,
-    team: { engineering: 1, design: 0, marketing: 0, sales: 0, ops: 0 },
+    team: { engineering: 1, design: 0, marketing: 0, sales: 0, ops: 0, hr: 0, legal: 0 },
     reputation: 10,
     vcReputation: 8,
     stage: "garage",
@@ -304,8 +304,13 @@ export const shipFeature = (state: GameState, name: string): ActionResult => {
   const stressPenalty = successPenaltyFromStress(state);
 
   const eng = state.team.engineering;
+  const hr = state.team.hr;
+  const legal = state.team.legal;
   const cohesion = clamp(state.culture.cohesion / 100, 0, 1);
-  const base = 0.68 + eng * 0.03 + cohesion * 0.08 + mods.shipSuccess - stressPenalty;
+  // HR adds process overhead (slower shipping); Legal adds operational efficiency.
+  const processDrag = hr * 0.015;
+  const efficiencyBoost = legal * 0.01;
+  const base = 0.68 + eng * 0.03 + cohesion * 0.08 + mods.shipSuccess - stressPenalty - processDrag + efficiencyBoost;
   const p = clamp(base, 0.05, 0.92);
 
   let s = state;
@@ -371,8 +376,12 @@ export const launchCampaign = (state: GameState, name: string): ActionResult => 
 
   const mkt = state.team.marketing;
   const sales = state.team.sales;
+  const hr = state.team.hr;
+  const legal = state.team.legal;
   const rep = clamp(state.reputation / 100, 0, 1);
-  const base = 0.55 + mkt * 0.05 + sales * 0.03 + rep * 0.08 + mods.launchSuccess - stressPenalty;
+  const processDrag = hr * 0.006;
+  const efficiencyBoost = legal * 0.008;
+  const base = 0.55 + mkt * 0.05 + sales * 0.03 + rep * 0.08 + mods.launchSuccess - stressPenalty - processDrag + efficiencyBoost;
   const p = clamp(base, 0.04, 0.9);
 
   let s = { ...state, cash: state.cash - spend };
