@@ -66,10 +66,10 @@ const ensurePlayable = (state: GameState): ActionResult | null => {
     return err(state, "Game over. (Restart command coming soon.)");
   }
   if (state.pendingEvent) {
-    return err(state, "Resolve the pending event first with `choose <n>`." );
+    return err(state, "Resolve the pending event first with `choose <n>`.");
   }
   if (!isFounderChosen(state)) {
-    return err(state, "Choose your founder first: `founder visionary|hacker|sales-animal|philosopher`." );
+    return err(state, "Choose your founder first: `founder visionary|hacker|sales-animal|philosopher`.");
   }
   return null;
 };
@@ -127,11 +127,15 @@ export const hire = (state: GameState, role: TeamRole, count: number): ActionRes
   updated = { ...updated, burn: calcBurn(updated) };
   updated = spendAp(updated);
 
-  return withLogLines(updated, [
+  const lines = [
     { text: `Hired ${count} ${role} ${count === 1 ? "hire" : "hires"}.` },
     { text: `Cash -$${totalHireCost.toLocaleString()}. Burn now $${updated.burn.toLocaleString()}/wk.` },
-    count >= 3 ? { text: "Rapid hiring strains cohesion.", kind: "event" } : { text: "" },
-  ]);
+  ];
+  if (count >= 3) {
+    lines.push({ text: "Rapid hiring strains cohesion.", kind: "event" });
+  }
+
+  return withLogLines(updated, lines);
 };
 
 export const shipFeature = (state: GameState, name: string): ActionResult => {
@@ -302,12 +306,13 @@ export const choose = (state: GameState, choiceIndex: number): ActionResult => {
 export const endWeek = (state: GameState): ActionResult => {
   const tick = endWeekTick(state);
 
+  const eventPrefixes = ["EVENT:", "1)", "2)", "3)", "Type `choose"];
+  const isEventLine = (text: string): boolean => eventPrefixes.some((prefix) => text.startsWith(prefix));
+
   // Heuristically mark EVENT block as event-kind.
   const lines: Array<{ text: string; kind?: LogEntry["kind"] }> = tick.logs.map((t) => ({
     text: t,
-    kind: t.startsWith("EVENT:") || t.startsWith("1)") || t.startsWith("2)") || t.startsWith("3)") || t.startsWith("Type `choose")
-      ? "event"
-      : "system",
+    kind: isEventLine(t) ? "event" : "system",
   }));
   return withLogLines(tick.state, lines);
 };

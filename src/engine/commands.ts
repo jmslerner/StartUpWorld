@@ -22,6 +22,12 @@ const roleMap: Record<string, TeamRole> = {
   operations: "ops",
 };
 
+const founderOptions = ["visionary", "hacker", "sales-animal", "philosopher"] as const;
+type FounderToken = (typeof founderOptions)[number];
+
+const allowDuringPending = new Set(["choose", "status", "help"]);
+const allowBeforeFounder = new Set(["founder", "status", "help"]);
+
 const helpText: LogEntry[] = [
   toLog("Commands:"),
   toLog("founder <visionary|hacker|sales-animal|philosopher> - pick your founder (required)"),
@@ -44,82 +50,65 @@ export const executeCommand = (state: GameState, input: string): ActionResult =>
   }
 
   // Pending events block normal gameplay commands.
-  if (state.pendingEvent && command !== "choose" && command !== "status" && command !== "help") {
+  if (state.pendingEvent && !allowDuringPending.has(command)) {
     return { state, logs: [toLog("Resolve the pending event first with `choose <n>`.", "error")] };
   }
 
   // Founder must be chosen before Week 1 begins.
-  if (!state.founder.archetype && command !== "founder" && command !== "status" && command !== "help") {
+  if (!state.founder.archetype && !allowBeforeFounder.has(command)) {
     return {
       state,
       logs: [toLog("Pick your founder archetype first: `founder visionary|hacker|sales-animal|philosopher`.", "error")],
     };
   }
 
-  if (command === "help") {
-    return { state, logs: helpText };
-  }
-
-  if (command === "founder") {
-    const token = (rest[0] ?? "").toLowerCase();
-    const valid = ["visionary", "hacker", "sales-animal", "philosopher"] as const;
-    if (!valid.includes(token as (typeof valid)[number])) {
-      return {
-        state,
-        logs: [toLog("Usage: founder visionary|hacker|sales-animal|philosopher", "error")],
-      };
+  switch (command) {
+    case "help":
+      return { state, logs: helpText };
+    case "founder": {
+      const token = (rest[0] ?? "").toLowerCase();
+      if (!founderOptions.includes(token as FounderToken)) {
+        return {
+          state,
+          logs: [toLog("Usage: founder visionary|hacker|sales-animal|philosopher", "error")],
+        };
+      }
+      return setFounderArchetype(state, token as FounderToken);
     }
-    return setFounderArchetype(state, token as (typeof valid)[number]);
-  }
-
-  if (command === "choose") {
-    const n = Number(rest[0] ?? "");
-    if (!Number.isFinite(n) || n <= 0) {
-      return { state, logs: [toLog("Usage: choose <n>", "error")] };
+    case "choose": {
+      const n = Number(rest[0] ?? "");
+      if (!Number.isFinite(n) || n <= 0) {
+        return { state, logs: [toLog("Usage: choose <n>", "error")] };
+      }
+      return choose(state, Math.floor(n));
     }
-    return choose(state, Math.floor(n));
-  }
-
-  if (command === "status") {
-    return status(state);
-  }
-
-  if (command === "hire") {
-    const roleToken = rest[0]?.toLowerCase();
-    const countToken = rest[1] ?? "1";
-    const role = roleToken ? roleMap[roleToken] : undefined;
-    if (!role) {
-      return { state, logs: [toLog("Unknown role. Try engineering, design, marketing, sales, ops.", "error")] };
+    case "status":
+      return status(state);
+    case "hire": {
+      const roleToken = rest[0]?.toLowerCase();
+      const role = roleToken ? roleMap[roleToken] : undefined;
+      if (!role) {
+        return { state, logs: [toLog("Unknown role. Try engineering, design, marketing, sales, ops.", "error")] };
+      }
+      const count = Number(rest[1] ?? "1");
+      return hire(state, role, Number.isNaN(count) ? 1 : count);
     }
-    const count = Number(countToken);
-    return hire(state, role, Number.isNaN(count) ? 1 : count);
-  }
-
-  if (command === "ship") {
-    const name = rest.join(" ").trim();
-    return shipFeature(state, name);
-  }
-
-  if (command === "launch") {
-    const name = rest.join(" ").trim();
-    return launchCampaign(state, name);
-  }
-
-  if (command === "pitch") {
-    return pitchInvestors(state);
-  }
-
-  if (command === "raise") {
-    const amount = parseAmount(rest[0] ?? "");
-    if (!amount) {
-      return { state, logs: [toLog("Provide an amount. Example: raise 25000 or raise 50k.", "error")] };
+    case "ship":
+      return shipFeature(state, rest.join(" ").trim());
+    case "launch":
+      return launchCampaign(state, rest.join(" ").trim());
+    case "pitch":
+      return pitchInvestors(state);
+    case "raise": {
+      const amount = parseAmount(rest[0] ?? "");
+      if (!amount) {
+        return { state, logs: [toLog("Provide an amount. Example: raise 25000 or raise 50k.", "error")] };
+      }
+      return raiseSeed(state, Math.round(amount));
     }
-    return raiseSeed(state, Math.round(amount));
+    case "end":
+      return endWeek(state);
+    default:
+      return { state, logs: [toLog(`Unknown command: ${command}`, "error")] };
   }
-
-  if (command === "end") {
-    return endWeek(state);
-  }
-
-  return { state, logs: [toLog(`Unknown command: ${command}`, "error")] };
 };
