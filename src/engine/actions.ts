@@ -11,6 +11,7 @@ import { applyPendingEventChoice } from "./events/applyChoice";
 import { computeContext } from "./context";
 import { pitch, raise } from "./investors";
 import { evaluateEndings } from "./endings";
+import { refreshDerivedNoLog } from "./derived";
 
 const withLogLines = (state: GameState, lines: Array<{ text: string; kind?: LogEntry["kind"] }>): ActionResult => {
   const logs: LogEntry[] = [];
@@ -18,7 +19,7 @@ const withLogLines = (state: GameState, lines: Array<{ text: string; kind?: LogE
   for (const line of lines) {
     s = appendLog(s, logs, line.text, line.kind ?? "system");
   }
-  return { state: s, logs };
+  return { state: refreshDerivedNoLog(s), logs };
 };
 
 const err = (state: GameState, message: string): ActionResult => withLogLines(state, [{ text: message, kind: "error" }]);
@@ -117,6 +118,7 @@ export const createInitialState = (): GameState => {
     week: 1,
     ap: BASE_AP,
     cash: 20_000,
+    valuation: 0,
     users: 50,
     arpu: 10,
     mrr: 50 * 10,
@@ -141,8 +143,7 @@ export const createInitialState = (): GameState => {
     lastWeek: { users: 50, mrr: 50 * 10, cash: 20_000, teamSize: 1 },
   };
 
-  const burn = calcBurn(base);
-  return { ...base, burn };
+  return refreshDerivedNoLog(base);
 };
 
 export const canSpendAp = (state: GameState, cost = 1): boolean => state.ap >= cost;
@@ -417,6 +418,7 @@ export const status = (state: GameState): ActionResult => {
   const line =
     `${state.companyName} | ${state.founder.name}` +
     `\nWeek ${state.week} | Cash $${state.cash.toLocaleString()} | Burn $${state.burn.toLocaleString()} | Runway ${runway}w` +
+    `\nValuation ~$${state.valuation.toLocaleString()}` +
     `\nMRR $${state.mrr.toLocaleString()} | Users ${state.users.toLocaleString()} | ARPU $${state.arpu}` +
     `\nStage ${state.stage} | Phase ${state.companyPhase} | Founder ${founder} | Thesis ${state.thesis}` +
     `\nAP ${state.ap} | Rep ${state.reputation}/100 | VC ${state.vcReputation}/100 | Stress ${state.stress}/100 | Vol ${state.volatility}/100` +

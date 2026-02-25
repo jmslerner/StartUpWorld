@@ -64,6 +64,7 @@ export interface GameState {
   week: number;
   ap: number;
   cash: number;
+  valuation: number;
   users: number;
   arpu: number;
   mrr: number;

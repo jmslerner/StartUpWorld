@@ -11,6 +11,7 @@ import { maybeSelectEvent } from "./events/select";
 import { toPendingEvent } from "./events/types";
 import { applyProgression } from "./progression";
 import { evaluateEndings } from "./endings";
+import { calcValuation } from "./valuation";
 
 const growthRates = (state: GameState) => {
   const eng = state.team.engineering;
@@ -93,10 +94,10 @@ export const endWeekTick = (state: GameState): { state: GameState; logs: string[
   };
 
   // Compute context based on new state vs lastWeek.
-  const ctx = computeContext(next);
+  const ctx0 = computeContext(next);
 
   // Volatility responds to growth and burn intensity.
-  const nextVolBase = calcVolatility(next, { growthRate: ctx.usersGrowthRate, burnIntensity: ctx.burnIntensity });
+  const nextVolBase = calcVolatility(next, { growthRate: ctx0.usersGrowthRate, burnIntensity: ctx0.burnIntensity });
   const nextVol = clamp(
     Math.round(pre.volatility + (nextVolBase - pre.volatility) * mods.volatilitySensitivity),
     0,
@@ -112,14 +113,18 @@ export const endWeekTick = (state: GameState): { state: GameState; logs: string[
 
   // Week "hit" and "win" signals drive culture + cofounder drift.
   const runway = calcRunwayWeeks(s2);
-  const winBase = clamp(Math.max(0, ctx.mrrGrowthRate) * 3 + Math.max(0, ctx.usersGrowthRate) * 2, 0, 1);
-  const hitBase = clamp((runway <= 3 ? 0.8 : 0) + (ctx.usersGrowthRate < 0 ? 0.3 : 0) + (s2.stress >= 70 ? 0.4 : 0), 0, 1);
+  const winBase = clamp(Math.max(0, ctx0.mrrGrowthRate) * 3 + Math.max(0, ctx0.usersGrowthRate) * 2, 0, 1);
+  const hitBase = clamp((runway <= 3 ? 0.8 : 0) + (ctx0.usersGrowthRate < 0 ? 0.3 : 0) + (s2.stress >= 70 ? 0.4 : 0), 0, 1);
 
   const win = clamp(winBase * mods.cultureWinMult, 0, 1);
   const hit = clamp(hitBase * mods.cultureHitMult, 0, 1);
 
   s2 = applyWeeklyCulture(s2, { weekHit: hit, weekWin: win });
   s2 = applyCofounderWeeklyDrift(s2, { hit, win });
+
+  // Refresh derived metrics that depend on this week's results.
+  const ctx = computeContext(s2);
+  s2 = { ...s2, valuation: calcValuation(s2, ctx) };
 
   // Phase progression logs
   const prog = applyProgression(s2, ctx);
