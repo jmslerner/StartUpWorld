@@ -38,6 +38,81 @@ const normalizeName = (input: string, maxLen: number): string => {
   return trimmed.length > maxLen ? trimmed.slice(0, maxLen).trim() : trimmed;
 };
 
+type ArchetypeBlurb = {
+  title: string;
+  desc: string;
+  edge: string;
+  risk: string;
+};
+
+const FOUNDER_ARCHETYPE_BLURB: Record<FounderArchetype, ArchetypeBlurb> = {
+  visionary: {
+    title: "Visionary",
+    desc: "You sell a future that doesn’t exist yet—and somehow people believe you.",
+    edge: "Edge: narrative gravity, talent magnet, big swings upward.",
+    risk: "Risk: hype debt, expectation whiplash, volatility spikes when you miss.",
+  },
+  hacker: {
+    title: "Hacker",
+    desc: "You ship. You iterate. You treat reality like a bug report.",
+    edge: "Edge: execution velocity, technical leverage, calmer ops under pressure.",
+    risk: "Risk: product tunnel vision, weaker narrative, harder fundraising when stressed.",
+  },
+  "sales-animal": {
+    title: "Sales Animal",
+    desc: "You can turn a cold stare into a signed contract and a referral.",
+    edge: "Edge: deals, distribution, momentum—your numbers can jump fast.",
+    risk: "Risk: burn appetite, overpromising, chaos follows the quota.",
+  },
+  philosopher: {
+    title: "Philosopher",
+    desc: "You build a company with principles. Sometimes that’s the moat.",
+    edge: "Edge: culture resilience, long-term compounding, cleaner decisions.",
+    risk: "Risk: slower aggression, missed windows, death by “thoughtful.”",
+  },
+};
+
+const COFOUNDER_ARCHETYPE_BLURB: Record<CofounderArchetype, ArchetypeBlurb> = {
+  operator: {
+    title: "Operator",
+    desc: "They turn chaos into checklists and feelings into processes. [[beat]] Annoying. Necessary.",
+    edge: "Edge: stabilizes execution and reduces self-inflicted wounds.",
+    risk: "Risk: slows speed, creates friction when you want to 'just ship it'.",
+  },
+  builder: {
+    title: "Builder",
+    desc: "They quietly make the impossible… boring. [[beat]] Which is the highest compliment.",
+    edge: "Edge: execution reliability and higher odds your plans become real.",
+    risk: "Risk: can check out if credit gets weird; resentment is silent.",
+  },
+  rainmaker: {
+    title: "Rainmaker",
+    desc: "They can walk into a room with nothing and walk out with a yes. [[beat]] Sometimes they also walk out with a problem.",
+    edge: "Edge: intros, deals, fundraising momentum when it matters.",
+    risk: "Risk: promises outpace reality; volatility follows the story.",
+  },
+  powderkeg: {
+    title: "Powderkeg",
+    desc: "Brilliant, intense, and one Slack message away from a full-length workplace drama. [[beat]] Good luck.",
+    edge: "Edge: breakout creativity and unexpected upside in desperate weeks.",
+    risk: "Risk: trust collapses fast; drama becomes a core mechanic.",
+  },
+};
+
+const stripPrefix = (s: string, prefix: string) => (s.toLowerCase().startsWith(prefix.toLowerCase()) ? s.slice(prefix.length).trim() : s);
+
+const founderTldr = (a: FounderArchetype | null): string | null => {
+  if (!a) return null;
+  const b = FOUNDER_ARCHETYPE_BLURB[a];
+  return `${b.title} — ${stripPrefix(b.edge, "Edge:")} / ${stripPrefix(b.risk, "Risk:")}`;
+};
+
+const cofounderTldr = (a: CofounderArchetype | null): string | null => {
+  if (!a) return null;
+  const b = COFOUNDER_ARCHETYPE_BLURB[a];
+  return `${b.title} — ${stripPrefix(b.edge, "Edge:")} / ${stripPrefix(b.risk, "Risk:")}`;
+};
+
 export const setPlayerName = (state: GameState, name: string): ActionResult => {
   if (state.gameOver) {
     return err(state, "Game over.");
@@ -119,9 +194,14 @@ export const setCofounderArchetype = (state: GameState, archetype: CofounderArch
     },
   };
 
+  const b = COFOUNDER_ARCHETYPE_BLURB[archetype];
+
   return withLogLines(updated, [
-    { text: `Cofounder locked: ${name} (${archetype}).`, kind: "system" },
+    { text: `Cofounder locked: ${name} (${b.title}). [[beat]]`, kind: "system" },
     { text: profile.tagline, kind: "system" },
+    { text: b.desc, kind: "system" },
+    { text: b.edge, kind: "system" },
+    { text: b.risk, kind: "system" },
   ]);
 };
 
@@ -250,8 +330,13 @@ export const setFounderArchetype = (state: GameState, archetype: FounderArchetyp
 
   const updated = { ...setFounder(state, archetype), thesis, vcReputation: clamp(state.vcReputation + 2, 0, 100) };
 
+  const b = FOUNDER_ARCHETYPE_BLURB[archetype];
+
   return withLogLines(updated, [
-    { text: `Founder locked: ${archetype}.`, kind: "system" },
+    { text: `Founder locked: ${b.title}. [[beat]]`, kind: "system" },
+    { text: b.desc, kind: "system" },
+    { text: b.edge, kind: "system" },
+    { text: b.risk, kind: "system" },
     { text: `Thesis: ${thesis}.`, kind: "system" },
     { text: "Now build something people want. Or at least something investors want.", kind: "system" },
   ]);
@@ -489,6 +574,12 @@ export const status = (state: GameState): ActionResult => {
   const cofounder = state.cofounder.archetype ?? "(unpicked)";
   const pipeline = state.investors.pipeline.length;
 
+  const fTldr = founderTldr(state.founder.archetype);
+  const cTldr = cofounderTldr(state.cofounder.archetype);
+  const tldrBlock =
+    (fTldr ? `\nFounder TL;DR: ${fTldr}` : "") +
+    (cTldr ? `\nCofounder TL;DR: ${cTldr}` : "");
+
   const line =
     `${state.companyName} | ${state.founder.name}` +
     `\nWeek ${state.week} | Cash $${state.cash.toLocaleString()} | Burn $${state.burn.toLocaleString()} | Runway ${runway}w` +
@@ -499,7 +590,8 @@ export const status = (state: GameState): ActionResult => {
     `\nAP ${state.ap} | Rep ${state.reputation}/100 | VC ${state.vcReputation}/100 | Stress ${state.stress}/100 | Vol ${state.volatility}/100` +
     `\nCofounder ${state.cofounder.name} (${cofounder}) | Trust ${state.cofounder.trust}/100 | Ego ${state.cofounder.ego}/100` +
     `\nCohesion ${state.culture.cohesion}/100 | Morale ${state.culture.morale}/100` +
-    `\nInvestor leads: ${pipeline}`;
+    `\nInvestor leads: ${pipeline}` +
+    tldrBlock;
 
   return withLogLines(state, [{ text: line, kind: "system" }]);
 };
