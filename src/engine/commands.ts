@@ -40,8 +40,8 @@ const allowBeforeSetup = new Set(["founder", "cofounder", "status", "help", "nam
 
 const helpText: LogEntry[] = [
   toLog("Commands:"),
-  toLog("name <your name> - set your name"),
-  toLog("company <name> - set company name"),
+  toLog("name <your name> - set your name (locked after set)"),
+  toLog("company <name> - set company name (locked after set)"),
   toLog("founder <visionary|hacker|sales-animal|philosopher> - pick your founder (required)"),
   toLog("cofounder <operator|builder|rainmaker|powderkeg> - pick your cofounder (required)"),
   toLog("help - show commands"),
@@ -68,6 +68,14 @@ export const executeCommand = (state: GameState, input: string): ActionResult =>
   // Pending events block normal gameplay commands.
   if (state.pendingEvent && !allowDuringPending.has(command)) {
     return { state, logs: [toLog("Resolve the pending event first with `choose <n>`.", "error")] };
+  }
+
+  // Player + company name must be set before normal gameplay begins.
+  if ((!state.founder.name.trim() || !state.companyName.trim()) && !allowBeforeSetup.has(command)) {
+    if (!state.founder.name.trim()) {
+      return { state, logs: [toLog("Set your name first: `name <your name>`.", "error")] };
+    }
+    return { state, logs: [toLog("Set your company name next: `company <company name>`.", "error")] };
   }
 
   // Founder + cofounder must be chosen before normal gameplay begins.

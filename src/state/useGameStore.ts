@@ -15,7 +15,7 @@ const introLogs: LogEntry[] = [
   toLog("Build your AI startup from garage to IPO.", "system", "intro-2"),
   toLog("Start: founder visionary|hacker|sales-animal|philosopher", "system", "intro-3"),
   toLog("Then: cofounder operator|builder|rainmaker|powderkeg", "system", "intro-4"),
-  toLog("Optional: name Ada | company Stealth Tiger", "system", "intro-5"),
+  toLog("Required: name Ada | company Stealth Tiger", "system", "intro-5"),
   toLog("Type 'help' for commands.", "system", "intro-6"),
 ];
 

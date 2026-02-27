@@ -42,6 +42,9 @@ export const setPlayerName = (state: GameState, name: string): ActionResult => {
   if (state.gameOver) {
     return err(state, "Game over.");
   }
+  if (state.founder.name.trim()) {
+    return err(state, "Name already locked for this run.");
+  }
   const normalized = normalizeName(name, 32);
   if (!normalized) {
     return err(state, "Usage: name <your name>");
@@ -53,6 +56,9 @@ export const setPlayerName = (state: GameState, name: string): ActionResult => {
 export const setCompanyName = (state: GameState, name: string): ActionResult => {
   if (state.gameOver) {
     return err(state, "Game over.");
+  }
+  if (state.companyName.trim()) {
+    return err(state, "Company name already locked for this run.");
   }
   const normalized = normalizeName(name, 40);
   if (!normalized) {
@@ -122,7 +128,7 @@ export const setCofounderArchetype = (state: GameState, archetype: CofounderArch
 export const createInitialState = (): GameState => {
   const seed = (Date.now() >>> 0) || 1;
   const base: GameState = {
-    companyName: "Stealth Startup",
+    companyName: "",
     week: 1,
     ap: BASE_AP,
     cash: 20_000,
@@ -139,7 +145,7 @@ export const createInitialState = (): GameState => {
     stage: "garage",
     thesis: "ai",
     companyPhase: "garage",
-    founder: { name: "Founder", archetype: null },
+    founder: { name: "", archetype: null },
     cofounder: { name: "Cofounder", archetype: null, trust: 72, ego: 55, ambition: 76 },
     culture: { cohesion: 78, morale: 72 },
     stress: 18,
