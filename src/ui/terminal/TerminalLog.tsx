@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from "react";
+import { useLayoutEffect, useRef } from "react";
 import type { LogEntry } from "../../types/game";
 
 interface TerminalLogProps {
@@ -10,7 +10,6 @@ export const TerminalLog = ({ log, isTyping = false }: TerminalLogProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const stickToTopRef = useRef(true);
   const pausedFollowRef = useRef(false);
-  const [hasNew, setHasNew] = useState(false);
   const prevScrollHeightRef = useRef<number | null>(null);
 
   const entryClass = (kind?: LogEntry["kind"]) => {
@@ -35,7 +34,6 @@ export const TerminalLog = ({ log, isTyping = false }: TerminalLogProps) => {
     // If the user scrolls back to the top (latest output), resume follow.
     if (atTop) {
       pausedFollowRef.current = false;
-      setHasNew(false);
     }
   };
 
@@ -48,7 +46,6 @@ export const TerminalLog = ({ log, isTyping = false }: TerminalLogProps) => {
     if (!el) return;
     if (pausedFollowRef.current && isAtTop(el)) {
       pausedFollowRef.current = false;
-      setHasNew(false);
     }
   };
 
@@ -67,38 +64,16 @@ export const TerminalLog = ({ log, isTyping = false }: TerminalLogProps) => {
         el.scrollTop += deltaHeight;
       }
       prevScrollHeightRef.current = nextScrollHeight;
-      queueMicrotask(() => setHasNew(true));
       return;
     }
 
     // Follow latest output at the top.
     el.scrollTop = 0;
     prevScrollHeightRef.current = nextScrollHeight;
-    queueMicrotask(() => setHasNew(false));
   }, [log, isTyping]);
-
-  const jumpToTop = () => {
-    const el = containerRef.current;
-    if (!el) return;
-    el.scrollTop = 0;
-    stickToTopRef.current = true;
-    pausedFollowRef.current = false;
-    setHasNew(false);
-  };
 
   return (
     <div className="relative min-h-0 flex-1">
-      {hasNew && (
-        <button
-          type="button"
-          onClick={jumpToTop}
-          className="absolute right-3 top-3 z-10 rounded-lg bg-neon/10 px-2 py-1 text-xs font-semibold text-neon"
-          title="Jump to latest output"
-        >
-          New messages
-        </button>
-      )}
-
       <div
         ref={containerRef}
         data-terminal-log
