@@ -130,12 +130,19 @@ export const TerminalInput = forwardRef<HTMLInputElement, TerminalInputProps>(
 
   const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault();
+    const trimmed = value.trim();
+    const lower = trimmed.toLowerCase();
+    const isClear = lower === "clear" || lower === "cls";
+
     if (isTyping) {
-      fastForward?.();
-      queueMicrotask(() => inputRef.current?.focus());
-      return;
+      // Normally, Enter fast-forwards typing. But `clear` should work immediately.
+      if (!isClear) {
+        fastForward?.();
+        queueMicrotask(() => inputRef.current?.focus());
+        return;
+      }
     }
-    if (!value.trim()) {
+    if (!trimmed) {
       return;
     }
     onSubmit(value);
@@ -153,11 +160,16 @@ export const TerminalInput = forwardRef<HTMLInputElement, TerminalInputProps>(
       <input
         ref={setRefs}
         value={value}
+        placeholder="help or clear"
         onKeyDown={(event) => {
           if (event.key === "Enter" && isTyping) {
-            event.preventDefault();
-            fastForward?.();
-            return;
+            const lower = value.trim().toLowerCase();
+            const isClear = lower === "clear" || lower === "cls";
+            if (!isClear) {
+              event.preventDefault();
+              fastForward?.();
+              return;
+            }
           }
           if (!shouldSoundForKey(event)) return;
           if (!sfxEnabled) return;
@@ -176,7 +188,6 @@ export const TerminalInput = forwardRef<HTMLInputElement, TerminalInputProps>(
         autoCapitalize="off"
         autoCorrect="off"
         spellCheck={false}
-        autoFocus
       />
       <button
         type="button"

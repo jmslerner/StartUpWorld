@@ -16,6 +16,8 @@ const App = () => {
   const terminalInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
+    const isCoarsePointer = typeof window !== "undefined" && window.matchMedia?.("(pointer: coarse)").matches;
+    if (isCoarsePointer) return;
     terminalInputRef.current?.focus();
   }, []);
 

@@ -19,12 +19,23 @@ const introLogs: LogEntry[] = [
   toLog("Type 'help' for commands.", "system", "intro-6"),
 ];
 
+const clearedLogs: LogEntry[] = [introLogs[0]!, introLogs[introLogs.length - 1]!];
+
 export const useGameStore = create<GameStore>((set) => ({
   state: createInitialState(),
   log: introLogs,
   runCommand: (input: string) =>
     set((current) => {
       const trimmed = input.trim();
+
+      const lower = trimmed.toLowerCase();
+      if (lower === "clear" || lower === "cls") {
+        return {
+          state: current.state,
+          log: clearedLogs,
+        };
+      }
+
       const prevWeek = current.state.week;
       const userLog = trimmed ? [toLog(`> ${trimmed}`, "user")] : [];
       const result = executeCommand(current.state, trimmed);

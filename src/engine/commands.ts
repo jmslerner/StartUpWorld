@@ -45,6 +45,7 @@ const helpText: LogEntry[] = [
   toLog("founder <visionary|hacker|sales-animal|philosopher> - pick your founder (required)"),
   toLog("cofounder <operator|builder|rainmaker|powderkeg> - pick your cofounder (required)"),
   toLog("help - show commands"),
+  toLog("clear / cls - reset the log output"),
   toLog("status - show current stats"),
   toLog("hire <role> <count> - hire teammates (engineering|design|marketing|sales|ops|hr|legal)"),
   toLog("ship <feature> - ship a feature"),

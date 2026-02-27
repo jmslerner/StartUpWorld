@@ -90,8 +90,8 @@ export const TerminalLog = ({ log, isTyping = false }: TerminalLogProps) => {
       <div
         ref={containerRef}
         data-terminal-log
-        className="terminal-scrollbar terminal-scanlines panel-surface h-full overscroll-contain overflow-y-auto rounded-b-xl rounded-t-none border-t-0 p-3 text-base leading-relaxed text-slate-100/90"
-        style={{ overscrollBehavior: "contain" }}
+        className="terminal-scrollbar terminal-scanlines panel-surface h-full touch-pan-y overscroll-contain overflow-y-auto rounded-b-xl rounded-t-none border-t-0 p-3 text-base leading-relaxed text-slate-100/90"
+        style={{ overscrollBehavior: "contain", WebkitOverflowScrolling: "touch" }}
         onScroll={updateStickiness}
         onWheel={(event) => {
           // If the user scrolls up (toward older output), pause auto-follow immediately.
