@@ -71,6 +71,21 @@ export interface GameState {
   debtOutstanding: number; // principal; repaid automatically on successful investor raises
   debtService: number; // weekly burn add-on from debt
   valuation: number;
+
+  capTable: {
+    founderPct: number; // 0..1
+    investorPct: number; // 0..1
+  };
+  lastRound: {
+    week: number;
+    stage: Stage;
+    investorName: string;
+    amount: number;
+    preMoney: number;
+    postMoney: number;
+    dilutionPct: number; // 0..1 (new investor ownership in this round)
+  } | null;
+
   users: number;
   arpu: number;
   mrr: number;

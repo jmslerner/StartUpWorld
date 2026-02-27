@@ -15,8 +15,10 @@ import { calcValuation } from "./valuation";
 
 const growthRates = (state: GameState) => {
   const eng = state.team.engineering;
+  const design = state.team.design;
   const mkt = state.team.marketing;
   const sales = state.team.sales;
+  const ops = state.team.ops;
   const hr = state.team.hr;
   const legal = state.team.legal;
 
@@ -25,18 +27,34 @@ const growthRates = (state: GameState) => {
 
   const stress = clamp(state.stress / 100, 0, 1);
 
+  // If GTM outpaces execution, you leak churn and miss growth.
+  const execCapacity = eng + design + ops;
+  const gtm = mkt + sales;
+  const execGap = Math.max(0, gtm - execCapacity);
+  const imbalanceGrowthPenalty = Math.min(0.05, execGap * 0.0025);
+  const imbalanceChurnPenalty = Math.min(0.06, execGap * 0.002);
+
   // Baseline growth and churn; dramatic but bounded.
   const baseGrowth =
     0.015 +
     rep * 0.06 +
-    eng * 0.002 +
-    mkt * 0.004 +
-    sales * 0.004 +
+    eng * 0.0035 +
+    ops * 0.002 +
+    mkt * 0.006 +
+    sales * 0.006 +
     morale * 0.01 +
     legal * 0.0015 -
-    hr * 0.001;
+    hr * 0.0015 -
+    imbalanceGrowthPenalty;
 
-  const baseChurn = 0.02 + (1 - rep) * 0.02 + (1 - morale) * 0.03 + stress * 0.015 - legal * 0.0007;
+  const baseChurn =
+    0.02 +
+    (1 - rep) * 0.02 +
+    (1 - morale) * 0.03 +
+    stress * 0.015 -
+    legal * 0.0007 -
+    ops * 0.0015 +
+    imbalanceChurnPenalty;
 
   return {
     growth: clamp(baseGrowth - stress * 0.02, -0.05, 0.22),

@@ -37,6 +37,10 @@ export const calcValuation = (state: GameState, ctx: EngineContext): number => {
   const fromArr = arr * multiple;
   const floored = Math.max(STAGE_VALUATION_FLOOR[state.stage], fromArr);
 
+  // If you just priced a round, the market narrative doesn't instantly un-price it.
+  const postMoneyFloor = state.lastRound?.postMoney ?? 0;
+  const withRound = Math.max(floored, postMoneyFloor);
+
   // Keep numbers stable/readable.
-  return Math.round(floored / 1000) * 1000;
+  return Math.round(withRound / 1000) * 1000;
 };

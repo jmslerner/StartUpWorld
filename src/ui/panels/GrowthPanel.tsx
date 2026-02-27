@@ -9,6 +9,8 @@ interface GrowthPanelProps {
 
 const fmtUsd = (v: number) => `$${v.toLocaleString()}`;
 
+const fmtPct01 = (v: number) => `${Math.round(v * 100)}%`;
+
 const fmtPct = (v: number) => {
   const sign = v > 0 ? "+" : "";
   return `${sign}${v.toFixed(1)}%`;
@@ -47,6 +49,21 @@ export const GrowthPanel = ({ state }: GrowthPanelProps) => {
             <GrowthChip label="Users" pct={usersWeeklyPct} />
           </span>
         </Row>
+      </div>
+
+      <div className="mt-2 border-t border-white/5 pt-2">
+        <Row label="Ownership" description="Founder ownership after priced rounds.">
+          <span className="tabular-nums">{fmtPct01(state.capTable.founderPct)}</span>
+        </Row>
+        {state.lastRound ? (
+          <div className="mt-1 text-[0.7rem] text-mist/70">
+            Last round: +{fmtUsd(state.lastRound.amount)} @ {fmtUsd(state.lastRound.preMoney)} pre ({fmtUsd(
+              state.lastRound.postMoney
+            )} post), dilution {fmtPct01(state.lastRound.dilutionPct)}.
+          </div>
+        ) : (
+          <div className="mt-1 text-[0.7rem] text-mist/70">No priced rounds yet.</div>
+        )}
       </div>
     </PanelCard>
   );

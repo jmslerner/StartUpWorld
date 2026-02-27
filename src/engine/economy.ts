@@ -28,13 +28,19 @@ export const calcBurn = (state: GameState): number => {
   );
   const overhead = stageOverhead[state.stage];
 
+  // Org imbalance: too much go-to-market without enough operators makes everything more expensive.
+  const gtm = state.team.sales + state.team.marketing;
+  const ops = state.team.ops;
+  const gtmOpsGap = Math.max(0, gtm - ops);
+  const orgInefficiency = 1 + Math.min(0.18, gtmOpsGap * 0.03);
+
   // Chaos tax: high volatility + low cohesion makes everything cost more.
   const chaosTax = 1 + (state.volatility / 100) * 0.12 + (1 - state.culture.cohesion / 100) * 0.08;
 
   const archetype = state.founder.archetype;
   const efficiency = archetype ? founderMods[archetype].burnEfficiency : 1;
 
-  return Math.round((teamBurn + overhead) * chaosTax * efficiency) + Math.max(0, state.debtService);
+  return Math.round((teamBurn + overhead) * chaosTax * efficiency * orgInefficiency) + Math.max(0, state.debtService);
 };
 
 export const calcRunwayWeeks = (state: GameState): number => {

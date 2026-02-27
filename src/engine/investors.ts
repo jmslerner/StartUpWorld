@@ -225,7 +225,16 @@ export const raise = (state: GameState, amount: number): { state: GameState; log
   }
 
   const nextStage = stageFromAmount(s, amount);
-  const dilution = clamp(Math.round(amount / 400_000), 1, 18);
+
+  // Price the round at impliedValuation as pre-money.
+  // Post-money jumps immediately: this makes raises feel like real market repricing.
+  const preMoney = impliedValuation;
+  const postMoney = preMoney + amount;
+  const dilutionPct = postMoney > 0 ? clamp(amount / postMoney, 0.01, 0.6) : 0.15;
+
+  // Old "dilution" was a narrative proxy used to punish VC rep; keep a mild effect but
+  // make it scale with actual dilution.
+  const dilutionRepHit = clamp(Math.round(dilutionPct * 14), 1, 10);
 
   // Auto-repay debt from any successful investor raise.
   const debtBefore = Math.max(0, s.debtOutstanding);
@@ -241,14 +250,33 @@ export const raise = (state: GameState, amount: number): { state: GameState; log
     debtOutstanding: debtAfter,
     debtService: debtServiceAfter,
     stage: nextStage,
-    vcReputation: clamp(s.vcReputation + 4 - dilution, 0, 100),
+    vcReputation: clamp(s.vcReputation + 6 - dilutionRepHit, 0, 100),
     reputation: clamp(s.reputation + 2, 0, 100),
     investors: {
       pipeline: s.investors.pipeline.filter((l) => l.id !== best.id),
     },
+    capTable: {
+      founderPct: clamp(s.capTable.founderPct * (1 - dilutionPct), 0, 1),
+      investorPct: clamp(s.capTable.investorPct * (1 - dilutionPct) + dilutionPct, 0, 1),
+    },
+    lastRound: {
+      week: s.week,
+      stage: s.stage,
+      investorName: best.name,
+      amount,
+      preMoney,
+      postMoney,
+      dilutionPct,
+    },
   };
 
   logs.push(`Term sheet signed with ${best.name}.`);
+  logs.push(
+    `Round priced: $${preMoney.toLocaleString()} pre / $${postMoney.toLocaleString()} post. Dilution: ${Math.round(
+      dilutionPct * 100
+    )}%.`
+  );
+  logs.push(`Founder ownership: ${Math.round(s.capTable.founderPct * 100)}%.`);
   if (repaid > 0) {
     logs.push(`Debt repaid: -$${repaid.toLocaleString()}. Debt left: $${debtAfter.toLocaleString()}.`);
     logs.push(`Debt service now: $${debtServiceAfter.toLocaleString()}/wk.`);

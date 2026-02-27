@@ -215,6 +215,10 @@ export const createInitialState = (): GameState => {
     debtOutstanding: 0,
     debtService: 0,
     valuation: 0,
+
+    capTable: { founderPct: 1, investorPct: 0 },
+    lastRound: null,
+
     users: 50,
     arpu: 10,
     mrr: 50 * 10,
@@ -395,13 +399,32 @@ export const shipFeature = (state: GameState, name: string): ActionResult => {
   const stressPenalty = successPenaltyFromStress(state);
 
   const eng = state.team.engineering;
+  const design = state.team.design;
+  const ops = state.team.ops;
+  const sales = state.team.sales;
+  const mkt = state.team.marketing;
   const hr = state.team.hr;
   const legal = state.team.legal;
   const cohesion = clamp(state.culture.cohesion / 100, 0, 1);
+
+  // If go-to-market outpaces execution capacity, delivery suffers.
+  const execCapacity = eng + design + ops;
+  const gtm = sales + mkt;
+  const execGap = Math.max(0, gtm - execCapacity);
+  const imbalancePenalty = Math.min(0.18, execGap * 0.025);
+
   // HR adds process overhead (slower shipping); Legal adds operational efficiency.
   const processDrag = hr * 0.015;
   const efficiencyBoost = legal * 0.01;
-  const base = 0.68 + eng * 0.03 + cohesion * 0.08 + mods.shipSuccess - stressPenalty - processDrag + efficiencyBoost;
+  const base =
+    0.68 +
+    eng * 0.03 +
+    cohesion * 0.08 +
+    mods.shipSuccess -
+    stressPenalty -
+    processDrag +
+    efficiencyBoost -
+    imbalancePenalty;
   const p = clamp(base, 0.05, 0.92);
 
   let s = state;
@@ -424,6 +447,9 @@ export const shipFeature = (state: GameState, name: string): ActionResult => {
     });
     return withLogLines(updated, [
       { text: `Tried to ship: ${name}.` },
+      ...(imbalancePenalty > 0
+        ? ([{ text: "Execution is slipping: too much GTM, not enough operators/builders.", kind: "event" }] as const)
+        : []),
       { text: "It’s not ready. You ship anyway. It’s a mess.", kind: "event" },
       { text: `Reputation -${repLoss}. Morale -4. Cohesion -2.`, kind: "event" },
     ]);
@@ -442,6 +468,9 @@ export const shipFeature = (state: GameState, name: string): ActionResult => {
   });
   return withLogLines(updated, [
     { text: `Shipped feature: ${name}.` },
+    ...(imbalancePenalty > 0
+      ? ([{ text: "You barely shipped it. The org is skewed toward GTM.", kind: "event" }] as const)
+      : []),
     { text: `Reputation +${repGain}. ${arpuBump ? `ARPU +${arpuBump}.` : ""}` },
   ]);
 };
@@ -574,6 +603,11 @@ export const status = (state: GameState): ActionResult => {
   const cofounder = state.cofounder.archetype ?? "(unpicked)";
   const pipeline = state.investors.pipeline.length;
 
+  const founderOwnershipPct = Math.round(state.capTable.founderPct * 100);
+  const lastRoundSummary = state.lastRound
+    ? `Last +$${state.lastRound.amount.toLocaleString()} @ $${state.lastRound.preMoney.toLocaleString()} pre (dilution ${Math.round(state.lastRound.dilutionPct * 100)}%)`
+    : "No priced rounds";
+
   const fTldr = founderTldr(state.founder.archetype);
   const cTldr = cofounderTldr(state.cofounder.archetype);
   const tldrBlock =
@@ -585,6 +619,7 @@ export const status = (state: GameState): ActionResult => {
     `\nWeek ${state.week} | Cash $${state.cash.toLocaleString()} | Burn $${state.burn.toLocaleString()} | Runway ${runway}w` +
     `\nDebt $${state.debtOutstanding.toLocaleString()} | DebtSvc $${state.debtService.toLocaleString()}/wk` +
     `\nValuation ~$${state.valuation.toLocaleString()}` +
+    `\nOwnership Founder ${founderOwnershipPct}% | ${lastRoundSummary}` +
     `\nMRR $${state.mrr.toLocaleString()} | Users ${state.users.toLocaleString()} | ARPU $${state.arpu}` +
     `\nStage ${state.stage} | Phase ${state.companyPhase} | Founder ${founder} | Thesis ${state.thesis}` +
     `\nAP ${state.ap} | Rep ${state.reputation}/100 | VC ${state.vcReputation}/100 | Stress ${state.stress}/100 | Vol ${state.volatility}/100` +
