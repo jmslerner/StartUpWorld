@@ -38,7 +38,7 @@ type CofounderToken = (typeof cofounderOptions)[number];
 const allowDuringPending = new Set(["choose", "status", "help", "name", "company", "cofounder"]);
 const allowBeforeSetup = new Set(["founder", "cofounder", "status", "help", "name", "company"]);
 
-const helpText: LogEntry[] = [
+const setupHelpText: LogEntry[] = [
   toLog("Commands:"),
   toLog("name <your name> - set your name (locked after set)"),
   toLog("company <name> - set company name (locked after set)"),
@@ -57,6 +57,25 @@ const helpText: LogEntry[] = [
   toLog("end - end the week"),
   toLog("choose <n> - resolve a pending event choice"),
 ];
+
+const mainHelpText: LogEntry[] = [
+  toLog("Commands:"),
+  toLog("help - show commands"),
+  toLog("clear / cls - reset the log output"),
+  toLog("status - show current stats"),
+  toLog("hire <role> <count> - hire teammates (engineering|design|marketing|sales|ops|hr|legal)"),
+  toLog("ship <feature> - ship a feature"),
+  toLog("launch <campaign> - run a growth campaign"),
+  toLog("pitch - pitch investors"),
+  toLog("raise - show funding options"),
+  toLog("raise friends|cards|loan|preseed|mortgage - bootstrap funding"),
+  toLog("raise <amount> - raise from investors (VC)"),
+  toLog("end - end the week"),
+  toLog("choose <n> - resolve a pending event choice"),
+];
+
+const isSetupComplete = (state: GameState) =>
+  Boolean(state.founder.name.trim() && state.companyName.trim() && state.founder.archetype && state.cofounder.archetype);
 
 export const executeCommand = (state: GameState, input: string): ActionResult => {
   const [rawCommand, ...rest] = input.trim().split(/\s+/);
@@ -94,7 +113,7 @@ export const executeCommand = (state: GameState, input: string): ActionResult =>
 
   switch (command) {
     case "help":
-      return { state, logs: helpText };
+      return { state, logs: isSetupComplete(state) ? mainHelpText : setupHelpText };
     case "name":
       return setPlayerName(state, rest.join(" "));
     case "company":
