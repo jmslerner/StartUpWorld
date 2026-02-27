@@ -81,9 +81,12 @@ const useTypingSound = () => {
 
 interface TerminalInputProps {
   onSubmit: (value: string) => void;
+  isTyping?: boolean;
+  fastForward?: () => void;
 }
 
-export const TerminalInput = forwardRef<HTMLInputElement, TerminalInputProps>(({ onSubmit }, forwardedRef) => {
+export const TerminalInput = forwardRef<HTMLInputElement, TerminalInputProps>(
+  ({ onSubmit, isTyping = false, fastForward }, forwardedRef) => {
   const [value, setValue] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
   const lastValueRef = useRef("");
@@ -127,6 +130,11 @@ export const TerminalInput = forwardRef<HTMLInputElement, TerminalInputProps>(({
 
   const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault();
+    if (isTyping) {
+      fastForward?.();
+      queueMicrotask(() => inputRef.current?.focus());
+      return;
+    }
     if (!value.trim()) {
       return;
     }
@@ -146,6 +154,11 @@ export const TerminalInput = forwardRef<HTMLInputElement, TerminalInputProps>(({
         ref={setRefs}
         value={value}
         onKeyDown={(event) => {
+          if (event.key === "Enter" && isTyping) {
+            event.preventDefault();
+            fastForward?.();
+            return;
+          }
           if (!shouldSoundForKey(event)) return;
           if (!sfxEnabled) return;
           void play();

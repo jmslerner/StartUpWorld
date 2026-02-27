@@ -1,6 +1,6 @@
 import { HudBar } from "./ui/components/HudBar";
 import { EventCard } from "./ui/components/EventCard";
-import { TerminalInput, TerminalLog } from "./ui/terminal";
+import { TerminalInput, TerminalLog, useTypewriterQueue } from "./ui/terminal";
 import { useGameStore } from "./state/useGameStore";
 import { GrowthPanel, TeamPanel, RiskProfilePanel } from "./ui/panels";
 import { MobilePanelsSheet } from "./ui/components/MobilePanelsSheet";
@@ -10,6 +10,8 @@ const App = () => {
   const state = useGameStore((store) => store.state);
   const log = useGameStore((store) => store.log);
   const runCommand = useGameStore((store) => store.runCommand);
+
+  const { rendered: typedLog, isTyping, fastForward } = useTypewriterQueue(log);
 
   const terminalInputRef = useRef<HTMLInputElement>(null);
 
@@ -56,8 +58,8 @@ const App = () => {
               terminalInputRef.current?.focus();
             }}
           >
-            <TerminalInput ref={terminalInputRef} onSubmit={runCommand} />
-            <TerminalLog log={log} />
+            <TerminalInput ref={terminalInputRef} onSubmit={runCommand} isTyping={isTyping} fastForward={fastForward} />
+            <TerminalLog log={typedLog} isTyping={isTyping} />
           </div>
 
           <div className="hidden gap-3 md:col-span-5 md:grid md:max-h-[70vh] md:overflow-y-auto md:pr-1 lg:col-span-4 lg:max-h-[60vh]">
