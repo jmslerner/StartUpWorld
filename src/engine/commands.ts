@@ -21,8 +21,11 @@ const roleMap: Record<string, TeamRole> = {
   engineering: "engineering",
   eng: "engineering",
   design: "design",
+  ux: "design",
   marketing: "marketing",
+  gtm: "marketing",
   sales: "sales",
+  ae: "sales",
   ops: "ops",
   operations: "ops",
   hr: "hr",
@@ -50,7 +53,9 @@ const setupHelpText: LogEntry[] = [
   toLog("help - show commands"),
   toLog("clear / cls - reset the log output"),
   toLog("status - show current stats"),
-  toLog("hire <role> <count> - hire teammates (engineering|design|marketing|sales|ops|hr|legal)"),
+  toLog("hire <role> <count> - hire teammates"),
+  toLog("  roles: engineering, design, marketing, sales, ops, hr, legal"),
+  toLog("  aliases: eng=engineering, ux=design, gtm=marketing, ae=sales"),
   toLog("ship <feature> - ship a feature"),
   toLog("launch <campaign> - run a growth campaign"),
   toLog("pitch - pitch investors"),
@@ -67,7 +72,9 @@ const mainHelpText: LogEntry[] = [
   toLog("clear / cls - reset the log output"),
   toLog("seed - show current seed"),
   toLog("status - show current stats"),
-  toLog("hire <role> <count> - hire teammates (engineering|design|marketing|sales|ops|hr|legal)"),
+  toLog("hire <role> <count> - hire teammates"),
+  toLog("  roles: engineering, design, marketing, sales, ops, hr, legal"),
+  toLog("  aliases: eng=engineering, ux=design, gtm=marketing, ae=sales"),
   toLog("ship <feature> - ship a feature"),
   toLog("launch <campaign> - run a growth campaign"),
   toLog("pitch - pitch investors"),
@@ -163,7 +170,10 @@ export const executeCommand = (state: GameState, input: string): ActionResult =>
       const roleToken = rest[0]?.toLowerCase();
       const role = roleToken ? roleMap[roleToken] : undefined;
       if (!role) {
-        return { state, logs: [toLog("Unknown role. Try engineering, design, marketing, sales, ops, hr, legal.", "error")] };
+        return {
+          state,
+          logs: [toLog("Unknown role. Try engineering/design/marketing/sales/ops/hr/legal (aliases: eng, ux, gtm, ae).", "error")],
+        };
       }
       const count = Number(rest[1] ?? "1");
       return hire(state, role, Number.isNaN(count) ? 1 : count);

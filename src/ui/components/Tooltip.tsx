@@ -5,13 +5,14 @@ interface TooltipProps {
   children: ReactNode;
   align?: "left" | "right";
   widthClassName?: string;
+  className?: string;
 }
 
-export const Tooltip = ({ content, children, align = "left", widthClassName = "w-72" }: TooltipProps) => {
+export const Tooltip = ({ content, children, align = "left", widthClassName = "w-72", className }: TooltipProps) => {
   const alignClass = align === "right" ? "right-0" : "left-0";
 
   return (
-    <span className="group relative inline-flex">
+    <span className={"group relative inline-flex " + (className ?? "")}>
       {children}
       <span
         className={
