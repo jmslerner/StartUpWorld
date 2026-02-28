@@ -231,7 +231,72 @@ export const executeCommand = (state: GameState, input: string): ActionResult =>
     }
     case "end":
       return endWeek(state);
-    default:
-      return { state, logs: [toLog(`Unknown command: ${command}`, "error")] };
+
+    // ── Easter eggs ──
+    case "sudo":
+      return { state, logs: [toLog("Nice try. Sudo doesn't work on capitalism.", "system")] };
+    case "exit":
+    case "quit":
+      return { state, logs: [toLog("There is no exit. There is only pivot.", "system")] };
+    case "coffee":
+      return { state, logs: [toLog("You drink the coffee. [[beat]] It's cold. It's always cold.", "system")] };
+    case "panic":
+      return { state, logs: [toLog("Panic acknowledged. [[beat]] Routing to /dev/null.", "system")] };
+    case "blame":
+      return { state, logs: [toLog("Blame is not a command. It is, however, a management strategy.", "system")] };
+    case "pivot":
+      return { state, logs: [toLog("You can't just type 'pivot.' You have to actually do something different. [[beat]] That's the joke.", "system")] };
+    case "pray":
+      return { state, logs: [toLog("Prayer received. [[beat]] Routing to /dev/null.", "system")] };
+    case "fire":
+      return { state, logs: [toLog("HR says you need to file a PIP first. [[beat]] You don't have HR.", "system")] };
+    case "sleep":
+      return { state, logs: [toLog("Sleep is a feature your body keeps requesting. You keep deferring it.", "system")] };
+
+    default: {
+      const suggestion = findClosestCommand(command);
+      const msg = suggestion
+        ? `Unknown command: ${command}. Did you mean \`${suggestion}\`?`
+        : `Unknown command: ${command}. Type \`help\` to see commands.`;
+      return { state, logs: [toLog(msg, "error")] };
+    }
   }
+};
+
+// ── Fuzzy matching for unknown commands ──
+
+const knownCommands = [
+  "help", "clear", "cls", "status", "seed", "name", "company",
+  "founder", "cofounder", "choose", "hire", "ship", "launch",
+  "pitch", "raise", "end",
+];
+
+const levenshtein = (a: string, b: string): number => {
+  const m = a.length;
+  const n = b.length;
+  const dp: number[][] = Array.from({ length: m + 1 }, () => Array(n + 1).fill(0));
+  for (let i = 0; i <= m; i++) dp[i][0] = i;
+  for (let j = 0; j <= n; j++) dp[0][j] = j;
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      dp[i][j] = a[i - 1] === b[j - 1]
+        ? dp[i - 1][j - 1]
+        : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
+    }
+  }
+  return dp[m][n];
+};
+
+const findClosestCommand = (input: string): string | null => {
+  const lower = input.toLowerCase();
+  let best: string | null = null;
+  let bestDist = Infinity;
+  for (const cmd of knownCommands) {
+    const d = levenshtein(lower, cmd);
+    if (d < bestDist && d <= 2) {
+      best = cmd;
+      bestDist = d;
+    }
+  }
+  return best;
 };

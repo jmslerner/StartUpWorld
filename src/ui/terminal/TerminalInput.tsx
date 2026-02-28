@@ -44,13 +44,13 @@ const commandsWithArgs = new Set([
 ]);
 
 const hireRoleOptions: Array<{ token: string; label: string; tooltip: string }> = [
-  { token: "eng", label: "eng", tooltip: "Engineering. Builds product faster; increases burn." },
-  { token: "ux", label: "ux", tooltip: "Design/UX. Improves quality; increases burn." },
-  { token: "marketing", label: "marketing", tooltip: "Marketing. Drives demand; increases burn." },
-  { token: "sales", label: "sales", tooltip: "Sales. Converts demand into revenue; increases burn." },
-  { token: "ops", label: "ops", tooltip: "Ops. Reduces churn/drag; increases burn." },
-  { token: "hr", label: "hr", tooltip: "HR. Helps hiring + people issues; increases burn." },
-  { token: "legal", label: "legal", tooltip: "Legal. Reduces legal risk + friction; increases burn." },
+  { token: "eng", label: "eng", tooltip: "Engineering. Builds product faster; increases burn. (1 AP)" },
+  { token: "ux", label: "ux", tooltip: "Design/UX. Improves quality; increases burn. (1 AP)" },
+  { token: "marketing", label: "marketing", tooltip: "Marketing. Drives demand; increases burn. (1 AP)" },
+  { token: "sales", label: "sales", tooltip: "Sales. Converts demand into revenue; increases burn. (1 AP)" },
+  { token: "ops", label: "ops", tooltip: "Ops. Reduces churn/drag; increases burn. (1 AP)" },
+  { token: "hr", label: "hr", tooltip: "HR. Helps hiring + people issues; increases burn. (1 AP)" },
+  { token: "legal", label: "legal", tooltip: "Legal. Reduces legal risk + friction; increases burn. (1 AP)" },
 ] as const;
 
 const founderOptions = [
@@ -68,6 +68,18 @@ const cofounderOptions = [
 ] as const;
 
 const raiseOptions = ["vc", "friends", "cards", "loan", "preseed", "mortgage"] as const;
+
+const commandTooltips: Record<string, string> = {
+  hire: "Hire a team member (1 AP)",
+  ship: "Ship a feature (1 AP; free once/wk for Hacker)",
+  launch: "Run a growth campaign (1 AP; free once/wk for Visionary)",
+  pitch: "Pitch investors (1 AP; free once/wk for Sales Animal)",
+  raise: "Funding options (1 AP bootstrap, 2 AP for VC)",
+  end: "End the week (refreshes AP)",
+  status: "Show current stats",
+  help: "Show available commands",
+  choose: "Resolve a pending event choice",
+};
 
 const canUseAudio = () => typeof window !== "undefined" && ("AudioContext" in window || "webkitAudioContext" in window);
 
@@ -262,9 +274,10 @@ export const TerminalInput = forwardRef<HTMLInputElement, TerminalInputProps>(
         .filter((c) => c.startsWith(prefix) && c !== prefix)
         .slice(0, 8)
         .map((c) => ({
-          kind: "command",
+          kind: "command" as SuggestionKind,
           label: c,
           nextValue: commandsWithArgs.has(c) ? `${c} ` : c,
+          tooltip: commandTooltips[c],
         }));
     }
 
@@ -312,10 +325,10 @@ export const TerminalInput = forwardRef<HTMLInputElement, TerminalInputProps>(
         .filter((r) => r.startsWith(prefix) && r !== prefix)
         .slice(0, 8)
         .map((r) => ({
-          kind: "raise",
+          kind: "raise" as SuggestionKind,
           label: r,
           nextValue: r === "vc" ? "raise vc " : `raise ${r}`,
-          tooltip: r === "vc" ? "Raise from investors (then type an amount)." : "Bootstrap option.",
+          tooltip: r === "vc" ? "Raise from investors (2 AP; then type an amount)." : "Bootstrap option (1 AP).",
         }));
     }
 

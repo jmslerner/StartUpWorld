@@ -1,5 +1,6 @@
 import { HudBar } from "./ui/components/HudBar";
 import { EventCard } from "./ui/components/EventCard";
+import { GameOverCard } from "./ui/components/GameOverCard";
 import { TerminalInput, TerminalLog, useTypewriterQueue } from "./ui/terminal";
 import { useGameStore } from "./state/useGameStore";
 import { MobilePanelsSheet } from "./ui/components/MobilePanelsSheet";
@@ -12,6 +13,7 @@ const App = () => {
   const state = useGameStore((store) => store.state);
   const log = useGameStore((store) => store.log);
   const runCommand = useGameStore((store) => store.runCommand);
+  const resetGame = useGameStore((store) => store.resetGame);
 
   const [statsOpen, setStatsOpen] = useState(false);
   const [statsActive, setStatsActive] = useState<StatsPanelKey>("growth");
@@ -106,6 +108,8 @@ const App = () => {
             </div>
           ) : null}
         </div>
+
+        {state.gameOver && <GameOverCard state={state} onPlayAgain={resetGame} />}
 
         <div className="md:hidden">
           <MobilePanelsSheet

@@ -22,6 +22,20 @@ const QUOTES: FounderQuote[] = [
   { text: "When growth stalls, go back to fundamentals: value and retention.", by: "Marc Benioff", note: "paraphrase" },
   { text: "Risk is reduced by learning faster than everyone else.", by: "Eric Ries", note: "paraphrase" },
   { text: "Treat constraints as fuel for creativity.", by: "Sara Blakely", note: "paraphrase" },
+
+  // Satirical / fictional
+  { text: "Pivoting is just failing with better marketing.", by: "Anonymous VC", note: "satirical" },
+  { text: "We're not losing money, we're investing in growth.", by: "Every Series A Founder", note: "satirical" },
+  { text: "Culture is what happens when the CEO leaves the room. Chaos. Chaos is what happens.", by: "Startup Proverb", note: "satirical" },
+  { text: "The burn rate is fine. Everything is fine.", by: "Founders, Historically", note: "satirical" },
+  { text: "Move fast and break things. Then hire someone to fix the things.", by: "Revised Facebook Motto", note: "satirical" },
+  { text: "Product-market fit is when customers pay you instead of you paying customers.", by: "Obvious in Hindsight", note: "satirical" },
+  { text: "We're pre-revenue but post-narrative.", by: "Every AI Startup Pitch Deck", note: "satirical" },
+  { text: "Technical debt is just regular debt with better PR.", by: "Engineering Folklore", note: "satirical" },
+  { text: "Your runway is a suggestion, not a promise.", by: "Gravity", note: "satirical" },
+  { text: "The best time to raise was six months ago. The second best time is before you need to.", by: "Startup Wisdom", note: "paraphrase" },
+  { text: "If your cofounder and your cap table both look healthy, one of them is lying.", by: "Sand Hill Road Proverb", note: "satirical" },
+  { text: "Valuation is a story told to people who want to believe it.", by: "Late-Stage Realism", note: "satirical" },
 ];
 
 export const pickWeeklyQuote = (week: number): FounderQuote => {

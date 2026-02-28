@@ -9,7 +9,7 @@ import type {
 } from "../types/game";
 import { appendLog } from "./logging";
 import { clamp } from "./utils";
-import { BASE_AP, calcBurn, calcRunwayWeeks, roleComp } from "./economy";
+import { BASE_AP, calcBurn, calcRunwayWeeks, roleComp, getApCost, markFreeActionUsed } from "./economy";
 import { applyHiringCohesionHit } from "./culture";
 import { isCofounderChosen, isFounderChosen, setFounder, founderMods } from "./founders";
 import { chance, nextIntInclusive, signedUnit } from "./rng";
@@ -119,6 +119,29 @@ const COFOUNDER_ARCHETYPE_BLURB: Record<CofounderArchetype, ArchetypeBlurb> = {
 };
 
 const stripPrefix = (s: string, prefix: string) => (s.toLowerCase().startsWith(prefix.toLowerCase()) ? s.slice(prefix.length).trim() : s);
+
+// ── Randomized flavor messages ──
+
+const shipFailMessages = [
+  "It's not ready. You ship anyway. It's a mess.",
+  "The deploy succeeds. The product does not.",
+  "You push to prod at 11pm. [[beat]] Prod pushes back.",
+  "It ships. [[beat]] It sinks.",
+  "Congratulations: you've automated disappointment.",
+  "The feature works on your laptop. Your laptop is not production.",
+];
+
+const launchFailMessages = [
+  "It flops in public. Private, too.",
+  "Your campaign reaches millions. [[beat]] Of bots.",
+  "The landing page loads. Nobody lands.",
+  "Marketing spent. Awareness achieved. Revenue: unchanged.",
+];
+
+const pickMsg = (rng: number, msgs: string[]): { rng: number; msg: string } => {
+  const pick = nextIntInclusive(rng, 0, msgs.length - 1);
+  return { rng: pick.rng, msg: msgs[pick.value] };
+};
 
 const founderTldr = (a: FounderArchetype | null): string | null => {
   if (!a) return null;
@@ -256,6 +279,9 @@ export const createInitialState = (): GameState => {
     volatility: 22,
     investors: { pipeline: [] },
     bootstrapFunding: { friends: 0, "credit-cards": 0, "personal-loan": 0, preseed: 0, mortgage: 0 },
+    peakValuation: 0,
+    totalRaised: 0,
+    freeActionUsed: {},
     pendingEvent: null,
     eventHistory: [],
     gameOver: null,
@@ -334,6 +360,7 @@ export const raiseBootstrap = (state: GameState, source: BootstrapFundingSource)
     stress: clamp(state.stress + stressDelta, 0, 100),
     vcReputation: clamp(state.vcReputation + p.vcRepDelta, 0, 100),
     bootstrapFunding: { ...state.bootstrapFunding, [source]: uses + 1 },
+    totalRaised: state.totalRaised + p.cash,
   });
 
   const lines: Array<{ text: string; kind?: LogEntry["kind"] }> = [
@@ -352,7 +379,7 @@ export const raiseBootstrap = (state: GameState, source: BootstrapFundingSource)
 
 const ensurePlayable = (state: GameState): ActionResult | null => {
   if (state.gameOver) {
-    return err(state, "Game over. (Restart command coming soon.)");
+    return err(state, "Game over. Click 'Play Again' or refresh to start a new run.");
   }
   if (state.pendingEvent) {
     return err(state, "Resolve the pending event first with `choose <n>`.");
@@ -438,7 +465,8 @@ export const hire = (state: GameState, role: TeamRole, count: number): ActionRes
 export const shipFeature = (state: GameState, name: string): ActionResult => {
   const gate = ensurePlayable(state);
   if (gate) return gate;
-  if (!canSpendAp(state)) {
+  const shipCost = getApCost(state, "ship");
+  if (!canSpendAp(state, shipCost)) {
     return err(state, "No AP left. End the week to refresh.");
   }
   if (!name.trim()) {
@@ -486,29 +514,34 @@ export const shipFeature = (state: GameState, name: string): ActionResult => {
   const swing = signedUnit(s.rng);
   s = { ...s, rng: swing.rng };
 
+  const freeShipLog = shipCost === 0 ? [{ text: "Hacker perk: first ship of the week is free.", kind: "event" as const }] : [];
+
   if (!roll.value) {
     const repLoss = Math.max(1, Math.round((2 + vol * 3) * (0.7 + Math.max(0, -swing.value))));
-    const updated: GameState = spendAp({
+    const failPick = pickMsg(s.rng, shipFailMessages);
+    s = { ...s, rng: failPick.rng };
+    const updated: GameState = markFreeActionUsed(spendAp({
       ...s,
       reputation: clamp(s.reputation - repLoss, 0, 100),
       culture: {
         cohesion: clamp(s.culture.cohesion - 2, 0, 100),
         morale: clamp(s.culture.morale - 4, 0, 100),
       },
-    });
+    }, shipCost), "ship");
     return withLogLines(updated, [
       { text: `Tried to ship: ${name}.` },
+      ...freeShipLog,
       ...(imbalancePenalty > 0
         ? ([{ text: "Execution is slipping: too much GTM, not enough operators/builders.", kind: "event" }] as const)
         : []),
-      { text: "It’s not ready. You ship anyway. It’s a mess.", kind: "event" },
+      { text: failPick.msg, kind: "event" },
       { text: `Reputation -${repLoss}. Morale -4. Cohesion -2.`, kind: "event" },
     ]);
   }
 
   const repGain = Math.max(1, Math.round((2 + eng) * (0.55 + vol * 0.9 + Math.max(0, swing.value) * 0.6)));
   const arpuBump = Math.max(0, Math.round((Math.max(0, swing.value) * vol) * 2));
-  const updated: GameState = spendAp({
+  const updated: GameState = markFreeActionUsed(spendAp({
     ...s,
     reputation: clamp(s.reputation + repGain, 0, 100),
     arpu: clamp(s.arpu + arpuBump, 2, 99),
@@ -516,9 +549,10 @@ export const shipFeature = (state: GameState, name: string): ActionResult => {
       cohesion: clamp(s.culture.cohesion + 1, 0, 100),
       morale: clamp(s.culture.morale + 2, 0, 100),
     },
-  });
+  }, shipCost), "ship");
   return withLogLines(updated, [
     { text: `Shipped feature: ${name}.` },
+    ...freeShipLog,
     ...(imbalancePenalty > 0
       ? ([{ text: "You barely shipped it. The org is skewed toward GTM.", kind: "event" }] as const)
       : []),
@@ -529,7 +563,8 @@ export const shipFeature = (state: GameState, name: string): ActionResult => {
 export const launchCampaign = (state: GameState, name: string): ActionResult => {
   const gate = ensurePlayable(state);
   if (gate) return gate;
-  if (!canSpendAp(state)) {
+  const launchCost = getApCost(state, "launch");
+  if (!canSpendAp(state, launchCost)) {
     return err(state, "No AP left. End the week to refresh.");
   }
   if (!name.trim()) {
@@ -566,30 +601,36 @@ export const launchCampaign = (state: GameState, name: string): ActionResult => 
   const magnitude = 1 + vol * 1.2;
   const userDelta = Math.round((40 + mkt * 35 + sales * 20) * magnitude * (0.6 + Math.max(0, swing.value)));
 
+  const freeLaunchLog = launchCost === 0 ? [{ text: "Visionary perk: first launch of the week is free.", kind: "event" as const }] : [];
+
   if (!ok.value) {
     const repLoss = 1 + Math.floor((1 + vol) * (0.3 + Math.max(0, -swing.value)) * 3);
-    const updated = spendAp({
+    const failPick = pickMsg(s.rng, launchFailMessages);
+    s = { ...s, rng: failPick.rng };
+    const updated = markFreeActionUsed(spendAp({
       ...s,
       reputation: clamp(s.reputation - repLoss, 0, 100),
       users: Math.max(0, s.users + Math.round(userDelta * 0.2)),
       burn: calcBurn(s),
-    });
+    }, launchCost), "launch");
     return withLogLines(updated, [
       { text: `Campaign "${name}" launched.` },
-      { text: "It flops in public. Private, too.", kind: "event" },
+      ...freeLaunchLog,
+      { text: failPick.msg, kind: "event" },
       { text: `Cash -$${spend.toLocaleString()}. Users +${Math.round(userDelta * 0.2)}. Reputation -${repLoss}.`, kind: "event" },
     ]);
   }
 
-  const updated = spendAp({
+  const updated = markFreeActionUsed(spendAp({
     ...s,
     users: Math.max(0, s.users + userDelta),
     reputation: clamp(s.reputation + 1, 0, 100),
     burn: calcBurn(s),
-  });
+  }, launchCost), "launch");
 
   return withLogLines(updated, [
     { text: `Campaign "${name}" launched.` },
+    ...freeLaunchLog,
     { text: `Cash -$${spend.toLocaleString()}. Users +${userDelta}.`, kind: "system" },
   ]);
 };
@@ -597,24 +638,30 @@ export const launchCampaign = (state: GameState, name: string): ActionResult => 
 export const pitchInvestors = (state: GameState): ActionResult => {
   const gate = ensurePlayable(state);
   if (gate) return gate;
-  if (!canSpendAp(state)) {
+  const pitchCost = getApCost(state, "pitch");
+  if (!canSpendAp(state, pitchCost)) {
     return err(state, "No AP left. End the week to refresh.");
   }
 
   const p = pitch(state);
-  const updated = spendAp(p.state);
-  return withLogLines(updated, p.logs.map((t) => ({ text: t, kind: "system" })));
+  const updated = markFreeActionUsed(spendAp(p.state, pitchCost), "pitch");
+  const freePitchLog = pitchCost === 0 ? [{ text: "Sales Animal perk: first pitch of the week is free.", kind: "system" as const }] : [];
+  return withLogLines(updated, [...freePitchLog, ...p.logs.map((t) => ({ text: t, kind: "system" as const }))]);
 };
 
 export const raiseSeed = (state: GameState, amount: number): ActionResult => {
   const gate = ensurePlayable(state);
   if (gate) return gate;
+  const vcCost = getApCost(state, "raise-vc");
+  if (!canSpendAp(state, vcCost)) {
+    return err(state, `Not enough AP. raise vc costs ${vcCost} AP.`);
+  }
   if (amount <= 0) {
     return err(state, "Raise amount must be positive.");
   }
 
   const r = raise(state, amount);
-  const updated = { ...r.state, burn: calcBurn(r.state) };
+  const updated = spendAp({ ...r.state, burn: calcBurn(r.state) }, vcCost);
   return withLogLines(updated, r.logs.map((t) => ({ text: t, kind: "event" })));
 };
 

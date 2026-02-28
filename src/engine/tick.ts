@@ -1,6 +1,6 @@
 import type { GameState } from "../types/game";
 import { clamp } from "./utils";
-import { BASE_AP, calcBurn, calcRunwayWeeks } from "./economy";
+import { calcBurn, calcRunwayWeeks, getEffectiveMaxAp } from "./economy";
 import { signedUnit } from "./rng";
 import { computeContext, computeTeamSize } from "./context";
 import { applyWeeklyCulture } from "./culture";
@@ -12,6 +12,7 @@ import { toPendingEvent } from "./events/types";
 import { applyProgression } from "./progression";
 import { evaluateEndings } from "./endings";
 import { calcValuation } from "./valuation";
+import { generateHints } from "./hints";
 
 const growthRates = (state: GameState) => {
   const eng = state.team.engineering;
@@ -64,7 +65,7 @@ const growthRates = (state: GameState) => {
 
 export const endWeekTick = (state: GameState): { state: GameState; logs: string[] } => {
   if (state.gameOver) {
-    return { state, logs: ["Game over. Refresh to start a new run (restart command coming soon)."] };
+    return { state, logs: ["Game over. Click 'Play Again' or refresh to start a new run."] };
   }
   if (state.pendingEvent) {
     return { state, logs: ["Resolve the pending event first with `choose <n>`." ] };
@@ -114,7 +115,8 @@ export const endWeekTick = (state: GameState): { state: GameState; logs: string[
   const next: GameState = {
     ...s,
     week: s.week + 1,
-    ap: BASE_AP,
+    ap: getEffectiveMaxAp(s),
+    freeActionUsed: {},
     cash: cashAfterBurn,
     users: nextUsers,
     mrr: nextMrr,
@@ -158,7 +160,7 @@ export const endWeekTick = (state: GameState): { state: GameState; logs: string[
   // Refresh derived metrics that depend on this week's results.
   // Override hiresThisWeek so events can react to hiring activity this week.
   const ctx = { ...computeContext(s2), hiresThisWeek };
-  s2 = { ...s2, valuation: calcValuation(s2, ctx) };
+  s2 = { ...s2, valuation: calcValuation(s2, ctx), peakValuation: Math.max(s2.peakValuation, calcValuation(s2, ctx)) };
 
   // Phase progression logs
   const prog = applyProgression(s2, ctx);
@@ -194,6 +196,14 @@ export const endWeekTick = (state: GameState): { state: GameState; logs: string[
   const end = evaluateEndings(s2, computeContext(s2));
   s2 = end.state;
   logs.push(...end.logs);
+
+  // Contextual hint (1 per week, only if game continues)
+  if (!s2.gameOver) {
+    const hints = generateHints(s2, computeContext(s2));
+    if (hints.length > 0) {
+      logs.push(hints[0].text);
+    }
+  }
 
   return { state: s2, logs };
 };

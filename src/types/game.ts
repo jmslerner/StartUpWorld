@@ -118,6 +118,11 @@ export interface GameState {
 
   bootstrapFunding: BootstrapFundingUses;
 
+  // Tracking fields for endings & AP
+  peakValuation: number;
+  totalRaised: number;
+  freeActionUsed: Record<string, boolean>; // tracks per-week archetype free actions
+
   pendingEvent: PendingEvent | null;
   // Recent event history (most recent first). Used to reduce repeats.
   eventHistory: EventHistoryEntry[];

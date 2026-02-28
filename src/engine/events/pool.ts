@@ -37,6 +37,11 @@ const addMorale = (s: GameState, delta: number): GameState => ({
 });
 
 const gameOver = (s: GameState, ending: GameState["gameOver"]): GameState => ({ ...s, gameOver: ending });
+const addStress = (s: GameState, delta: number): GameState => ({ ...s, stress: clamp(s.stress + delta, 0, 100) });
+const addVolatility = (s: GameState, delta: number): GameState => ({ ...s, volatility: clamp(s.volatility + delta, 0, 100) });
+const addAp = (s: GameState, delta: number): GameState => ({ ...s, ap: clamp(s.ap + delta, 0, 6) });
+
+const ts = (s: GameState): number => Object.values(s.team).reduce((a, n) => a + n, 0);
 
 export const eventPool: EventDef[] = [
   {
@@ -1291,6 +1296,639 @@ export const eventPool: EventDef[] = [
         apply: (s) => ({
           state: addVcRep(addRep(s, 1), -2),
           logs: ["You wait. Sometimes waiting is courage. Sometimes it’s procrastination.", "Reputation +1. VC rep -2."],
+        }),
+      },
+    ],
+  },
+
+  // ───── NEW EVENTS: Real-world inspired ─────
+
+  {
+    id: "consciousness-retreat",
+    title: "The Consciousness Retreat",
+    prompt: (s) =>
+      `Your cofounder ${s.cofounder.name} proposes a ‘consciousness-raising retreat’ for the leadership team. It involves crystals, a shaman, and a $14,000 invoice. [[beat]] The deck has mantras.`,
+    when: (s) => s.week >= 6 && s.cash >= 20_000 && s.cofounder.ego >= 60,
+    weight: (s) => 2 + s.cofounder.ego / 30,
+    choices: [
+      {
+        id: "approve",
+        text: "Approve it. Who are you to judge?",
+        apply: (s) => ({
+          state: addEgo(addVolatility(addCohesion(addMorale(addCash(s, -14_000), 3), -2), 4), 3),
+          logs: ["The team comes back ‘aligned.’ [[beat]] The invoice comes back real.", "Cash -$14,000. Morale +3. Cohesion -2. Ego +3."],
+        }),
+      },
+      {
+        id: "refuse",
+        text: "Absolutely not. We’re a company, not a cult.",
+        apply: (s) => ({
+          state: addMorale(addEgo(addTrust(s, -4), 5), -1),
+          logs: [`${s.cofounder.name} takes it personally. [[beat]] The crystals go in a drawer.`, "Trust -4. Ego +5. Morale -1."],
+        }),
+      },
+      {
+        id: "counter",
+        text: "Counter-offer: team dinner. $200 max.",
+        apply: (s) => ({
+          state: addEgo(addTrust(addMorale(addCash(s, -200), 1), 2), -2),
+          logs: ["You buy tacos instead of transcendence. It works.", "Cash -$200. Morale +1. Trust +2. Ego -2."],
+        }),
+      },
+    ],
+  },
+
+  {
+    id: "private-jet-question",
+    title: "The Private Jet Question",
+    prompt: () =>
+      "A board member asks why there’s a $22,000 line item for ‘executive travel.’ You were at a conference. [[beat]] In Ibiza.",
+    when: (s) => s.stage !== "garage" && s.cash >= 50_000 && s.vcReputation >= 30,
+    weight: (s) => 2 + s.vcReputation / 30 + s.volatility / 25,
+    choices: [
+      {
+        id: "deflect",
+        text: "It was a business trip. Next question.",
+        apply: (s) => ({
+          state: addStress(addTrust(addVcRep(s, -4), -3), 3),
+          logs: ["They don’t believe you. [[beat]] Neither does LinkedIn.", "VC rep -4. Trust -3. Stress +3."],
+        }),
+      },
+      {
+        id: "coach",
+        text: "You’re right. I’ll fly coach. I’ll also hate it.",
+        apply: (s) => ({
+          state: addStress(addMorale(addVcRep(s, 1), -1), 2),
+          logs: ["You downgrade. Your knees will never forgive you.", "VC rep +1. Morale -1. Stress +2."],
+        }),
+      },
+      {
+        id: "reimburse",
+        text: "Reimburse it personally. Apologize.",
+        apply: (s) => ({
+          state: addStress(addTrust(addVcRep(s, 2), 2), 1),
+          logs: ["You eat the cost. The board nods. [[beat]] Respect is expensive.", "VC rep +2. Trust +2. Stress +1."],
+        }),
+      },
+    ],
+  },
+
+  {
+    id: "faked-demo",
+    title: "The Faked Demo",
+    prompt: () =>
+      "The demo doesn’t work. The investor meeting is in two hours. Your engineer whispers: ‘I can make it look like it works.’ [[beat]] The silence in the room is deafening.",
+    when: (s) => s.stage !== "garage" && s.vcReputation >= 15 && s.stress >= 40,
+    weight: (s) => 2 + s.stress / 25 + s.vcReputation / 30,
+    choices: [
+      {
+        id: "fake-it",
+        text: "Do it. Ship the illusion.",
+        apply: (s) => ({
+          state: addVolatility(addRep(addTrust(addVcRep(s, 5), -8), -3), 8),
+          logs: ["The demo lands. [[beat]] The truth doesn’t.", "VC rep +5. Trust -8. Reputation -3. Volatility +8."],
+        }),
+      },
+      {
+        id: "show-broken",
+        text: "Show them the broken version. Explain the vision.",
+        apply: (s) => ({
+          state: addRep(addTrust(addVcRep(s, -1), 4), 2),
+          logs: ["They respect the honesty. [[beat]] Some of them.", "VC rep -1. Trust +4. Reputation +2."],
+        }),
+      },
+      {
+        id: "cancel",
+        text: "Cancel the meeting. Reschedule when it’s real.",
+        apply: (s) => ({
+          state: addStress(addVcRep(s, -3), 3),
+          logs: ["You lose momentum. You keep your soul. [[beat]] Unclear which matters more.", "VC rep -3. Stress +3."],
+        }),
+      },
+    ],
+  },
+
+  {
+    id: "inflated-metrics",
+    title: "Inflated Metrics",
+    prompt: () =>
+      "Someone on the team has been counting ‘active users’ creatively. By their math, a bot that pinged your API once is a ‘daily active user.’ [[beat]] Your dashboard has never looked better.",
+    when: (s) => s.users >= 200 && s.vcReputation >= 20,
+    weight: (s) => 2 + s.vcReputation / 25,
+    choices: [
+      {
+        id: "fix",
+        text: "Fix the dashboard. Report real numbers.",
+        apply: (s) => ({
+          state: addRep(addTrust(addVcRep(addUsers(s, -Math.round(s.users * 0.3)), -2), 5), 3),
+          logs: ["The real number is 30% lower. [[beat]] The real trust is 100% higher.", `Users adjusted. VC rep -2. Trust +5. Rep +3.`],
+        }),
+      },
+      {
+        id: "keep-both",
+        text: "Keep both numbers. Show investors the big one.",
+        apply: (s) => ({
+          state: addVolatility(addRep(addTrust(addVcRep(s, 3), -6), -4), 6),
+          logs: ["You choose the number that tells the better story. [[beat]] Stories have endings.", "VC rep +3. Trust -6. Rep -4. Volatility +6."],
+        }),
+      },
+      {
+        id: "fire",
+        text: "Fire the person who did it. Make an example.",
+        apply: (s) => ({
+          state: addRep(addMorale(addCohesion(s, -5), -4), 1),
+          logs: ["They’re gone by lunch. [[beat]] The office is very quiet that afternoon.", "Cohesion -5. Morale -4. Rep +1."],
+        }),
+      },
+    ],
+  },
+
+  {
+    id: "hockey-stick-morning",
+    title: "Hockey Stick Morning",
+    prompt: () =>
+      "You check the dashboard before coffee. The graph is vertical. Users are flooding in. This is not a bug. [[beat]] This might be real.",
+    when: (s, ctx) => s.week >= 4 && s.users >= 200 && ctx.usersGrowthRate > 0.15,
+    weight: (_s, ctx) => 1 + ctx.usersGrowthRate * 8,
+    choices: [
+      {
+        id: "scale",
+        text: "Drop everything. Scale infrastructure. Ride the wave.",
+        apply: (s) => ({
+          state: addRep(addStress(addCash(addUsers(s, 400), -3500), 4), 3),
+          logs: ["You throw money at servers and pray. [[beat]] The servers hold. You don’t sleep for three days.", "Users +400. Cash -$3,500. Stress +4. Rep +3."],
+        }),
+      },
+      {
+        id: "stay-calm",
+        text: "Stay calm. Keep shipping. Let organic growth compound.",
+        apply: (s) => ({
+          state: addRep(addTrust(addUsers(s, 200), 2), 2),
+          logs: ["You resist the temptation to panic-scale. Growth stays real.", "Users +200. Trust +2. Rep +2."],
+        }),
+      },
+      {
+        id: "call-investors",
+        text: "Call every investor you know. This is the moment.",
+        apply: (s) => ({
+          state: addVolatility(addVcRep(addUsers(s, 250), 4), 5),
+          logs: ["You turn the chart into a pitch deck slide. [[beat]] The phone starts ringing.", "Users +250. VC rep +4. Volatility +5."],
+        }),
+      },
+    ],
+  },
+
+  {
+    id: "move-fast-break-things",
+    title: "Move Fast and Break Things",
+    prompt: () =>
+      "A new hire pins a note to the #general channel: ‘We should move fast and break things.’ [[beat]] They are not being ironic.",
+    when: (s) => ts(s) >= 4 && s.week >= 3,
+    weight: (s) => 4 + ts(s) / 5,
+    choices: [
+      {
+        id: "embrace",
+        text: "Embrace it. Speed is the only moat.",
+        apply: (s) => ({
+          state: addMorale(addVolatility(addCohesion(addRep(s, 2), -3), 5), 2),
+          logs: ["The team ships three things before lunch. [[beat]] Two of them work.", "Rep +2. Cohesion -3. Volatility +5. Morale +2."],
+        }),
+      },
+      {
+        id: "responsibly",
+        text: "Move fast and break things... responsibly.",
+        apply: (s) => ({
+          state: addCohesion(addRep(s, 1), 1),
+          logs: ["You add a footnote: ‘with tests.’ [[beat]] Nobody reads the footnote.", "Rep +1. Cohesion +1."],
+        }),
+      },
+      {
+        id: "remove",
+        text: "Remove the post. We move deliberately.",
+        apply: (s) => ({
+          state: addRep(addMorale(addCohesion(s, 2), -2), -1),
+          logs: ["You delete the message. The new hire learns something about the culture. [[beat]] Or the lack of one.", "Cohesion +2. Morale -2. Rep -1."],
+        }),
+      },
+    ],
+  },
+
+  {
+    id: "bro-culture-incident",
+    title: "Bro Culture Incident",
+    prompt: () =>
+      "Someone posts a screenshot of a Slack DM. It’s bad. The kind of bad that gets its own hashtag. [[beat]] HR’s inbox is already full.",
+    when: (s) => ts(s) >= 6 && s.culture.cohesion <= 60 && s.stress >= 45,
+    weight: (s) => 3 + (65 - s.culture.cohesion) / 10 + (s.team.hr === 0 ? 3 : 0),
+    choices: [
+      {
+        id: "investigate",
+        text: "Investigate properly. Consequences for real.",
+        apply: (s) => {
+          const hasHr = s.team.hr > 0;
+          return {
+            state: hasHr
+              ? addTrust(addRep(addMorale(addCohesion(addCash(s, -2500), 5), 3), 2), 2)
+              : addRep(addMorale(addCohesion(addCash(s, -5000), 2), 1), 1),
+            logs: hasHr
+              ? ["HR handles it. The process is painful but real. [[beat]] People exhale.", "Cash -$2,500. Cohesion +5. Morale +3. Rep +2. Trust +2."]
+              : ["Without HR, you fumble through it yourself. It costs more. [[beat]] Everything costs more without process.", "Cash -$5,000. Cohesion +2. Morale +1. Rep +1."],
+          };
+        },
+      },
+      {
+        id: "minimize",
+        text: "Minimize. It’s ‘taken out of context.’",
+        apply: (s) => ({
+          state: addVolatility(addMorale(addCohesion(addRep(s, -6), -5), -4), 6),
+          logs: ["The screenshot spreads. Context doesn’t help. [[beat]] It never does.", "Rep -6. Cohesion -5. Morale -4. Volatility +6."],
+        }),
+      },
+      {
+        id: "hire-hr",
+        text: "Hire a head of HR immediately.",
+        apply: (s) => ({
+          state: addStress(addCohesion({ ...s, cash: s.cash - 5000, team: { ...s.team, hr: s.team.hr + 1 } }, 2), 2),
+          logs: ["You hire HR retroactively. Better late than never. [[beat]] That’s literally the tagline for HR.", "Cash -$5,000. +1 HR. Cohesion +2. Stress +2."],
+        }),
+      },
+    ],
+  },
+
+  {
+    id: "token-pivot",
+    title: "Token Pivot Proposal",
+    prompt: (s) =>
+      `${s.cofounder.name} sends a deck at 2am: ‘What if we launched a token?’ The deck has 47 slides. [[beat]] All of them say ‘web3.’`,
+    when: (s) => s.week >= 5 && s.cofounder.ego >= 55,
+    weight: (s) => 2 + s.cofounder.ego / 25 + s.volatility / 20,
+    choices: [
+      {
+        id: "do-it",
+        text: "Do it. Pivot to crypto. WAGMI.",
+        apply: (s) => ({
+          state: addTrust(addRep(addVcRep(addVolatility(addCash(s, 30_000), 12), -4), -3), 2),
+          logs: ["The token launches. It pumps. [[beat]] You learn what ‘rug pull anxiety’ feels like.", "Cash +$30,000. Volatility +12. VC rep -4. Rep -3. Trust +2."],
+        }),
+      },
+      {
+        id: "refuse",
+        text: "No. We’re building a real company.",
+        apply: (s) => ({
+          state: addVcRep(addEgo(addTrust(s, -3), 4), 1),
+          logs: [`${s.cofounder.name} sulks for a week. The deck goes in the archive folder. [[beat]] It stays there. Mostly.`, "Trust -3. Ego +4. VC rep +1."],
+        }),
+      },
+      {
+        id: "explore",
+        text: "Let’s ‘explore’ it. Buy time.",
+        apply: (s) => ({
+          state: addStress(addEgo(s, -1), 2),
+          logs: ["You agree to a ‘research sprint.’ [[beat]] Research sprints are where ideas go to die politely.", "Ego -1. Stress +2."],
+        }),
+      },
+    ],
+  },
+
+  {
+    id: "cereal-box-hustle",
+    title: "Cereal Box Hustle",
+    prompt: (s) =>
+      `You’re broke. Really broke. ${s.cofounder.name} suggests selling custom cereal boxes to fund the next sprint. [[beat]] It’s either genius or a cry for help.`,
+    when: (_s, ctx) => ctx.nearBankruptcy,
+    weight: (_s, ctx) => 8 + (ctx.nearBankruptcy ? 3 : 0),
+    choices: [
+      {
+        id: "hustle",
+        text: "Do it. Hustle is hustle.",
+        apply: (s) => ({
+          state: addStress(addMorale(addRep(addCash(s, 5000), 2), 3), -2),
+          logs: ["You sell 500 boxes. The story becomes legend. [[beat]] The cereal is terrible.", "Cash +$5,000. Rep +2. Morale +3. Stress -2."],
+        }),
+      },
+      {
+        id: "dignity",
+        text: "No. We need real funding, not cereal.",
+        apply: (s) => ({
+          state: addStress(s, 3),
+          logs: ["Dignity preserved. Runway unchanged. [[beat]] The two are increasingly in tension.", "Stress +3."],
+        }),
+      },
+    ],
+  },
+
+  {
+    id: "sleeping-in-office",
+    title: "Sleeping in the Office",
+    prompt: (s) =>
+      `You wake up on the office couch. You’ve been here three days. ${s.cofounder.name} left a sticky note: ‘Go home.’ [[beat]] The sticky note is from yesterday.`,
+    when: (s) => s.stress >= 65 && s.week >= 4,
+    weight: (s) => 3 + (s.stress - 60) / 8,
+    choices: [
+      {
+        id: "go-home",
+        text: "Go home. Sleep. Come back human.",
+        apply: (s) => ({
+          state: addTrust(addMorale(addStress(s, -8), 2), 3),
+          logs: ["You sleep for 14 hours. [[beat]] You dream about burn rate. But still -- progress.", "Stress -8. Morale +2. Trust +3."],
+        }),
+      },
+      {
+        id: "one-more",
+        text: "One more all-nighter. Ship the feature.",
+        apply: (s) => ({
+          state: addMorale(addCohesion(addRep(addStress(s, 5), 1), -1), -2),
+          logs: ["You ship at 4am. It works. [[beat]] You can’t remember if you ate today.", "Stress +5. Rep +1. Cohesion -1. Morale -2."],
+        }),
+      },
+      {
+        id: "cot",
+        text: "Set up a proper cot. This is the life now.",
+        apply: (s) => ({
+          state: addVolatility(addMorale(addStress(s, 2), -3), 3),
+          logs: ["You optimize the couch situation. [[beat]] This is not the optimization your investors meant.", "Stress +2. Morale -3. Volatility +3."],
+        }),
+      },
+    ],
+  },
+
+  {
+    id: "ted-talk-invite",
+    title: "TED Talk Invitation",
+    prompt: (s) =>
+      `You’re invited to give a TED talk. The topic: ‘The Future of ${s.thesis}.’ The audience: people who fund futures. [[beat]] The timer says 18 minutes. You have 12 minutes of material.`,
+    when: (s) => s.week >= 6 && s.reputation >= 25 && s.vcReputation >= 20,
+    weight: (s) => 2 + s.reputation / 25 + s.vcReputation / 25,
+    choices: [
+      {
+        id: "rehearse",
+        text: "Accept. Rehearse obsessively. Nail it.",
+        apply: (s) => ({
+          state: addStress(addCash(addUsers(addVcRep(addRep(s, 6), 4), 150), -1500), 4),
+          logs: ["You rehearse 40 times. The talk lands. [[beat]] Your inbox becomes a different animal.", "Rep +6. VC rep +4. Users +150. Cash -$1,500. Stress +4."],
+        }),
+      },
+      {
+        id: "wing-it",
+        text: "Accept. Wing it. Authenticity > preparation.",
+        apply: (s) => ({
+          state: addStress(addVolatility(addVcRep(addRep(s, 2), 1), 5), 2),
+          logs: ["You go off-script at minute 6. [[beat]] The audience can’t tell if it’s genius or a meltdown.", "Rep +2. VC rep +1. Volatility +5. Stress +2."],
+        }),
+      },
+      {
+        id: "decline",
+        text: "Decline. The product speaks louder than a stage.",
+        apply: (s) => ({
+          state: addRep(addTrust(s, 2), -1),
+          logs: ["You pass. The slot goes to someone with less product and more LinkedIn followers.", "Trust +2. Rep -1."],
+        }),
+      },
+    ],
+  },
+
+  {
+    id: "magazine-cover",
+    title: "Magazine Cover",
+    prompt: (s) =>
+      `A business magazine wants ${s.founder.name} on the cover. The headline: ‘${s.companyName}: The Next Big Thing?’ [[beat]] The question mark is doing a lot of work.`,
+    when: (s) => s.week >= 8 && s.reputation >= 30 && s.valuation >= 10_000_000,
+    weight: (s) => 1.5 + s.reputation / 30,
+    choices: [
+      {
+        id: "do-it",
+        text: "Do it. Narrative is a weapon.",
+        apply: (s) => ({
+          state: addEgo(addVolatility(addVcRep(addRep(s, 5), 3), 6), 5),
+          logs: ["The cover comes out. You look confident. [[beat]] Your cofounder looks at the masthead and sighs.", "Rep +5. VC rep +3. Volatility +6. Ego +5."],
+        }),
+      },
+      {
+        id: "decline",
+        text: "Decline. Stay in the shadows.",
+        apply: (s) => ({
+          state: addVolatility(addTrust(addRep(s, -1), 2), -2),
+          logs: ["You pass. The reporter writes about your competitor instead. [[beat]] They look great.", "Rep -1. Trust +2. Volatility -2."],
+        }),
+      },
+      {
+        id: "team-feature",
+        text: "Only if the team is featured too.",
+        apply: (s) => ({
+          state: addEgo(addMorale(addCohesion(addRep(s, 3), 4), 3), -2),
+          logs: ["The team photo runs. Everyone looks slightly uncomfortable. [[beat]] Morale has never been higher.", "Rep +3. Cohesion +4. Morale +3. Ego -2."],
+        }),
+      },
+    ],
+  },
+
+  {
+    id: "vision-fund-call",
+    title: "Vision Fund Call",
+    prompt: () =>
+      "An investor calls. They manage ‘a hundred billion in dry powder.’ They say your valuation is ‘not thinking big enough.’ [[beat]] They want to invest 10x what you asked for.",
+    when: (s) => s.stage !== "garage" && s.vcReputation >= 25 && s.valuation >= 5_000_000,
+    weight: (s) => 1.5 + s.vcReputation / 20,
+    choices: [
+      {
+        id: "mega-check",
+        text: "Take the mega-check. Think bigger.",
+        apply: (s) => ({
+          state: addStress(addVcRep(addVolatility(addCash(s, 200_000), 10), 5), 5),
+          logs: ["The wire hits. The zeros are real. [[beat]] So are the expectations.", "Cash +$200,000. Volatility +10. VC rep +5. Stress +5."],
+        }),
+      },
+      {
+        id: "smaller",
+        text: "Take a smaller amount. Stay disciplined.",
+        apply: (s) => ({
+          state: addTrust(addVcRep(addCash(s, 50_000), 2), 2),
+          logs: ["You take less. They’re confused. [[beat]] Discipline is confusing to people with unlimited capital.", "Cash +$50,000. VC rep +2. Trust +2."],
+        }),
+      },
+      {
+        id: "walk-away",
+        text: "Walk away. That money comes with strings.",
+        apply: (s) => ({
+          state: addCohesion(addTrust(addVcRep(s, -3), 3), 2),
+          logs: ["You decline a hundred billion dollars of opinions. [[beat]] Your cofounder buys you a beer.", "VC rep -3. Trust +3. Cohesion +2."],
+        }),
+      },
+    ],
+  },
+
+  {
+    id: "founder-twitter-meltdown",
+    title: "Founder Twitter Meltdown",
+    prompt: () =>
+      "It’s 11pm. You’ve had two glasses of wine. Your phone is in your hand. The tweet writes itself. [[beat]] The draft is... honest.",
+    when: (s) => s.stress >= 60 && s.week >= 4,
+    weight: (s) => 3 + s.stress / 20 + s.volatility / 25,
+    choices: [
+      {
+        id: "post",
+        text: "Post it. Let them see the real you.",
+        apply: (s) => ({
+          state: addMorale(addVcRep(addVolatility(addUsers(addRep(s, -5), 80), 8), -3), -2),
+          logs: ["It goes viral. [[beat]] For all the wrong reasons. And some of the right ones.", "Rep -5. Users +80. Volatility +8. VC rep -3. Morale -2."],
+        }),
+      },
+      {
+        id: "delete",
+        text: "Delete draft. Go to bed.",
+        apply: (s) => ({
+          state: addTrust(addStress(s, -3), 1),
+          logs: ["You put the phone down. [[beat]] The hardest ship of the day.", "Stress -3. Trust +1."],
+        }),
+      },
+      {
+        id: "show-cofounder",
+        text: "Show it to your cofounder first.",
+        apply: (s) => {
+          const trusty = s.cofounder.trust > 40;
+          return trusty
+            ? { state: addStress(addTrust(s, 4), -1), logs: ["They talk you off the ledge. [[beat]] That’s what cofounders are for.", "Trust +4. Stress -1."] }
+            : { state: addRep(addTrust(s, -5), -3), logs: [`They screenshot it. [[beat]] ${s.cofounder.name} has a different definition of ‘trust.’`, "Trust -5. Rep -3."] };
+        },
+      },
+    ],
+  },
+
+  {
+    id: "pivot-ultimatum",
+    title: "The Pivot Ultimatum",
+    prompt: () =>
+      "Your biggest investor sends a one-line email: ‘Pivot or we pull support.’ [[beat]] The product is working. The numbers aren’t.",
+    when: (s, ctx) => s.stage !== "garage" && ctx.mrrGrowthRate < 0.02 && s.week >= 8 && s.investors.pipeline.length > 0,
+    weight: (_s, ctx) => 3 + (0.05 - ctx.mrrGrowthRate) * 20,
+    choices: [
+      {
+        id: "pivot",
+        text: "Pivot. They’re right. The market has spoken.",
+        apply: (s) => ({
+          state: addMorale(addCohesion(addVcRep(addVolatility(s, 8), 2), -5), -4),
+          logs: ["You change everything. [[beat]] The product team stares at blank Figma files.", "Volatility +8. VC rep +2. Cohesion -5. Morale -4."],
+        }),
+      },
+      {
+        id: "refuse",
+        text: "Refuse. Double down on the current path.",
+        apply: (s) => ({
+          state: addMorale(addTrust(addVcRep(s, -4), 3), 2),
+          logs: ["You tell a billionaire ‘no.’ [[beat]] It’s the most expensive syllable of your life.", "VC rep -4. Trust +3. Morale +2."],
+        }),
+      },
+      {
+        id: "narrative-pivot",
+        text: "Pivot the narrative, not the product.",
+        apply: (s) => ({
+          state: addVolatility(addRep(addVcRep(s, 1), 1), 3),
+          logs: ["Same product. New deck. Different adjectives. [[beat]] Welcome to startup storytelling.", "VC rep +1. Rep +1. Volatility +3."],
+        }),
+      },
+    ],
+  },
+
+  {
+    id: "glassdoor-review",
+    title: "The Glassdoor Review",
+    prompt: () =>
+      "A one-star review appears: ‘Leadership has no idea what they’re doing. The free snacks are fine.’ [[beat]] It has 47 ‘helpful’ votes.",
+    when: (s) => ts(s) >= 5 && s.culture.morale <= 65,
+    weight: (s) => 3 + (70 - s.culture.morale) / 12,
+    choices: [
+      {
+        id: "address",
+        text: "Address it publicly. Own the feedback.",
+        apply: (s) => ({
+          state: addStress(addCohesion(addMorale(addRep(s, 2), 3), 2), 2),
+          logs: ["You write a response. It’s honest and slightly painful. [[beat]] People notice.", "Rep +2. Morale +3. Cohesion +2. Stress +2."],
+        }),
+      },
+      {
+        id: "ignore",
+        text: "Ignore it. Focus on the people who stayed.",
+        apply: (s) => ({
+          state: addMorale(addRep(s, -2), -1),
+          logs: ["The review sits there. Glowing. [[beat]] Candidates check Glassdoor before they check your product.", "Rep -2. Morale -1."],
+        }),
+      },
+      {
+        id: "investigate",
+        text: "Figure out who wrote it.",
+        apply: (s) => ({
+          state: addTrust(addMorale(addCohesion(s, -6), -4), -3),
+          logs: ["You find them. You also become the villain. [[beat]] The next review is worse.", "Cohesion -6. Morale -4. Trust -3."],
+        }),
+      },
+    ],
+  },
+
+  {
+    id: "all-hands-meltdown",
+    title: "The All-Hands Meltdown",
+    prompt: () =>
+      "During the weekly all-hands, someone asks: ‘Are we going to make it?’ [[beat]] The room goes silent. Everyone is looking at you.",
+    when: (s, ctx) => ctx.nearBankruptcy || (s.stress >= 65 && s.culture.morale <= 50),
+    weight: (_s, ctx) => 5 + (ctx.nearBankruptcy ? 5 : 0),
+    choices: [
+      {
+        id: "honest",
+        text: "Be honest. Share the numbers. Ask for their best.",
+        apply: (s) => ({
+          state: addStress(addTrust(addCohesion(addMorale(s, 5), 4), 3), 2),
+          logs: ["You show the real numbers. Someone cries. [[beat]] Then someone says: ‘Let’s fix it.’", "Morale +5. Cohesion +4. Trust +3. Stress +2."],
+        }),
+      },
+      {
+        id: "reassure",
+        text: "Reassure them. ‘We’re fine.’ Smile.",
+        apply: (s) => ({
+          state: addStress(addMorale(addTrust(s, -4), 1), 1),
+          logs: ["They want to believe you. [[beat]] The Slack DMs afterward suggest otherwise.", "Trust -4. Morale +1. Stress +1."],
+        }),
+      },
+      {
+        id: "cancel",
+        text: "Cancel the all-hands. Email instead.",
+        apply: (s) => ({
+          state: addMorale(addCohesion(s, -4), -3),
+          logs: ["You send a Notion doc titled ‘Update.’ [[beat]] Nobody reads past the subject line.", "Cohesion -4. Morale -3."],
+        }),
+      },
+    ],
+  },
+
+  {
+    id: "customer-zero",
+    title: "Customer Zero",
+    prompt: () =>
+      "A stranger emails: ‘I found your product. I love it. I want to pay.’ [[beat]] No one told them about it. They just... found it.",
+    when: (s) => s.week >= 3 && s.users >= 50 && s.users <= 500,
+    weight: (s) => 3 + s.reputation / 20,
+    choices: [
+      {
+        id: "call",
+        text: "Get on a call. Learn everything.",
+        apply: (s) => ({
+          state: addAp(addTrust(addMorale(addRep(addUsers(s, 30), 2), 4), 2), 1),
+          logs: ["You talk for an hour. They describe a use case you never imagined. [[beat]] This is the moment.", "Users +30. Rep +2. Morale +4. Trust +2. AP +1."],
+        }),
+      },
+      {
+        id: "premium",
+        text: "Send them to the premium tier.",
+        apply: (s) => ({
+          state: addRep(addCash(s, 500), 1),
+          logs: ["They upgrade without hesitation. [[beat]] First paying customer who wasn’t your mom.", "Cash +$500. Rep +1."],
+        }),
+      },
+      {
+        id: "testimonial",
+        text: "Ask them to write a testimonial.",
+        apply: (s) => ({
+          state: addVcRep(addRep(addUsers(s, 50), 3), 1),
+          logs: ["They write a glowing review. [[beat]] It’s better copy than anything your marketing team produced.", "Users +50. Rep +3. VC rep +1."],
         }),
       },
     ],

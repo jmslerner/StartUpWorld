@@ -8,6 +8,7 @@ interface GameStore {
   state: GameState;
   log: LogEntry[];
   runCommand: (input: string) => void;
+  resetGame: () => void;
 }
 
 const seedLabel = (state: GameState): string => {
@@ -66,5 +67,10 @@ export const useGameStore = create<GameStore>((set) => ({
           ? [...userLog, ...quoteLog, ...result.logs]
           : [...current.log, ...userLog, ...result.logs],
       };
+    }),
+  resetGame: () =>
+    set(() => {
+      const fresh = createInitialState();
+      return { state: fresh, log: makeIntroLogs(fresh) };
     }),
 }));

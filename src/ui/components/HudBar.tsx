@@ -1,4 +1,5 @@
 import type { GameState } from "../../types/game";
+import { getEffectiveMaxAp } from "../../engine/economy";
 
 interface HudBarProps {
   state: GameState;
@@ -51,8 +52,13 @@ export const HudBar = ({ state, onToggleStats, statsOpen = false }: HudBarProps)
           {founder}
         </span>
       )}
-      <span className="rounded bg-steel/60 px-1.5 py-0.5" title="Action Points. Spend these on commands; refresh each week.">
-        AP {state.ap}
+      <span
+        className={`rounded px-1.5 py-0.5 font-mono tabular-nums ${
+          state.ap === 0 ? "bg-red-500/20 text-red-400" : "bg-neon/10 text-neon"
+        }`}
+        title="Action Points. Spend on commands; refresh each week."
+      >
+        AP {state.ap}/{getEffectiveMaxAp(state)}
       </span>
       <span className="text-mist/60">|</span>
       <span className="font-semibold text-white" title="Cash in the bank. When it hits zero, the run ends.">

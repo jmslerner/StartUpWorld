@@ -6,6 +6,19 @@ import { calcRunwayWeeks } from "./economy";
 import { founderMods } from "./founders";
 import { STAGE_VALUATION_FLOOR } from "./valuation";
 
+const pitchFailMessages = [
+  "They pass for now. \"Come back with cleaner growth.\"",
+  "They say 'interesting.' [[beat]] In VC, 'interesting' means no.",
+  "The partner checks their phone during your demo. Twice.",
+  "They loved the vision. They hated the numbers. [[beat]] The numbers win.",
+  "'We're not investing right now.' (They invested in your competitor yesterday.)",
+];
+
+const pickPitchFail = (rng: number): { rng: number; msg: string } => {
+  const pick = nextIntInclusive(rng, 0, pitchFailMessages.length - 1);
+  return { rng: pick.rng, msg: pitchFailMessages[pick.value] };
+};
+
 const investorNames = [
   "Redwood Capital",
   "Halo Ventures",
@@ -121,8 +134,9 @@ export const pitch = (state: GameState): { state: GameState; logs: string[] } =>
       logs.push(`An angel wires a SAFE: +$${size.value.toLocaleString()}.`);
     }
   } else {
-    s = { ...s, vcReputation: clamp(s.vcReputation - 1, 0, 100) };
-    logs.push("They pass for now. \"Come back with cleaner growth.\"");
+    const fail = pickPitchFail(s.rng);
+    s = { ...s, rng: fail.rng, vcReputation: clamp(s.vcReputation - 1, 0, 100) };
+    logs.push(fail.msg);
   }
 
   return { state: s, logs };
@@ -259,6 +273,7 @@ export const raise = (state: GameState, amount: number): { state: GameState; log
       founderPct: clamp(s.capTable.founderPct * (1 - dilutionPct), 0, 1),
       investorPct: clamp(s.capTable.investorPct * (1 - dilutionPct) + dilutionPct, 0, 1),
     },
+    totalRaised: s.totalRaised + amount,
     lastRound: {
       week: s.week,
       stage: s.stage,
