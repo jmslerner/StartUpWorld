@@ -7,11 +7,17 @@ type PanelKey = "growth" | "team" | "risk";
 
 interface MobilePanelsSheetProps {
   state: GameState;
+  snap?: SheetSnap;
+  onSnapChange?: (snap: SheetSnap) => void;
+  collapsedVh?: number;
 }
 
-export const MobilePanelsSheet = ({ state }: MobilePanelsSheetProps) => {
-  const [snap, setSnap] = useState<SheetSnap>("collapsed");
+export const MobilePanelsSheet = ({ state, snap: controlledSnap, onSnapChange: controlledOnSnapChange, collapsedVh }: MobilePanelsSheetProps) => {
+  const [uncontrolledSnap, setUncontrolledSnap] = useState<SheetSnap>("collapsed");
   const [active, setActive] = useState<PanelKey>("growth");
+
+  const snap = controlledSnap ?? uncontrolledSnap;
+  const onSnapChange = controlledOnSnapChange ?? setUncontrolledSnap;
 
   const content = useMemo(() => {
     if (active === "team") return <TeamPanel state={state} />;
@@ -22,7 +28,8 @@ export const MobilePanelsSheet = ({ state }: MobilePanelsSheetProps) => {
   return (
     <BottomSheet
       snap={snap}
-      onSnapChange={setSnap}
+      onSnapChange={onSnapChange}
+      collapsedVh={collapsedVh}
       header={
         <div className="grid grid-cols-3 gap-2">
           <Tab label="Growth" active={active === "growth"} onClick={() => setActive("growth")} />

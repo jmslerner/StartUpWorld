@@ -2,8 +2,9 @@ import { HudBar } from "./ui/components/HudBar";
 import { EventCard } from "./ui/components/EventCard";
 import { TerminalInput, TerminalLog, useTypewriterQueue } from "./ui/terminal";
 import { useGameStore } from "./state/useGameStore";
-import { GrowthPanel, TeamPanel, RiskProfilePanel } from "./ui/panels";
 import { MobilePanelsSheet } from "./ui/components/MobilePanelsSheet";
+import { StatsDrawer, type StatsPanelKey } from "./ui/components/StatsDrawer";
+import type { SheetSnap } from "./ui/components/BottomSheet";
 import { useEffect, useRef, useState } from "react";
 
 const App = () => {
@@ -12,6 +13,9 @@ const App = () => {
   const runCommand = useGameStore((store) => store.runCommand);
 
   const [seedDraft, setSeedDraft] = useState("");
+  const [statsOpen, setStatsOpen] = useState(false);
+  const [statsActive, setStatsActive] = useState<StatsPanelKey>("growth");
+  const [mobileStatsSnap, setMobileStatsSnap] = useState<SheetSnap>("collapsed");
 
   const { rendered: typedLog, isTyping, fastForward } = useTypewriterQueue(log);
 
@@ -22,6 +26,13 @@ const App = () => {
     if (isCoarsePointer) return;
     terminalInputRef.current?.focus();
   }, []);
+
+  const effectiveStatsOpen = statsOpen || mobileStatsSnap !== "collapsed";
+
+  const toggleStats = () => {
+    setStatsOpen((prev) => !prev);
+    setMobileStatsSnap((prev) => (prev === "collapsed" ? "mid" : "collapsed"));
+  };
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -44,18 +55,22 @@ const App = () => {
 
   return (
     <div
-      className="min-h-screen px-3 py-4 pb-[18vh] text-slate-100 md:px-6 md:pb-4"
+      className="min-h-screen px-3 py-4 pb-4 text-slate-100 md:px-6"
     >
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-3">
         <div className="sticky top-3 z-20 md:static">
-          <HudBar state={state} />
+          <HudBar state={state} onToggleStats={toggleStats} statsOpen={effectiveStatsOpen} />
         </div>
 
         {state.pendingEvent && <EventCard event={state.pendingEvent} />}
 
         <div className="grid gap-3 md:grid-cols-12">
           <div
-            className="flex min-h-[60vh] flex-col md:col-span-7 lg:col-span-8"
+            className={
+              statsOpen
+                ? "flex min-h-[60vh] flex-col md:col-span-8 lg:col-span-9"
+                : "flex min-h-[60vh] flex-col md:col-span-12"
+            }
             onMouseDownCapture={(event) => {
               const target = event.target as HTMLElement | null;
               if (target?.closest?.("[data-terminal-log]")) return;
@@ -97,15 +112,25 @@ const App = () => {
             <TerminalLog log={typedLog} isTyping={isTyping} />
           </div>
 
-          <div className="hidden gap-3 md:col-span-5 md:grid md:max-h-[70vh] md:overflow-y-auto md:pr-1 lg:col-span-4 lg:max-h-[60vh]">
-            <GrowthPanel state={state} />
-            <TeamPanel state={state} />
-            <RiskProfilePanel state={state} />
-          </div>
+          {statsOpen ? (
+            <div className="hidden md:col-span-4 md:block lg:col-span-3">
+              <div className="sticky top-3">
+                <StatsDrawer state={state} active={statsActive} onActiveChange={setStatsActive} />
+              </div>
+            </div>
+          ) : null}
         </div>
 
         <div className="md:hidden">
-          <MobilePanelsSheet state={state} />
+          <MobilePanelsSheet
+            state={state}
+            snap={mobileStatsSnap}
+            collapsedVh={0}
+            onSnapChange={(next) => {
+              setMobileStatsSnap(next);
+              setStatsOpen(next !== "collapsed");
+            }}
+          />
         </div>
       </div>
     </div>

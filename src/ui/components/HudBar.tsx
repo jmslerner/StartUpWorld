@@ -2,6 +2,8 @@ import type { GameState } from "../../types/game";
 
 interface HudBarProps {
   state: GameState;
+  onToggleStats?: () => void;
+  statsOpen?: boolean;
 }
 
 const fmt = (v: number) => `$${v.toLocaleString()}`;
@@ -16,7 +18,7 @@ const fmtCompactUsd = (v: number) => {
   return `${sign}$${abs.toLocaleString()}`;
 };
 
-export const HudBar = ({ state }: HudBarProps) => {
+export const HudBar = ({ state, onToggleStats, statsOpen = false }: HudBarProps) => {
   const runway = state.burn > 0 ? Math.max(0, Math.floor(state.cash / state.burn)) : 0;
   const runwayUrgent = runway <= 4;
   const founder = state.founder.archetype;
@@ -69,6 +71,21 @@ export const HudBar = ({ state }: HudBarProps) => {
       >
         Phase {state.companyPhase}
       </span>
+
+      {onToggleStats ? (
+        <button
+          type="button"
+          onClick={onToggleStats}
+          className={
+            statsOpen
+              ? "ml-auto rounded-lg bg-neon/10 px-2 py-1 text-[0.65rem] font-semibold text-neon"
+              : "ml-auto rounded-lg bg-steel/30 px-2 py-1 text-[0.65rem] text-mist/80"
+          }
+          title="Toggle stats"
+        >
+          Stats
+        </button>
+      ) : null}
     </div>
   );
 };

@@ -208,8 +208,8 @@ export const TerminalInput = forwardRef<HTMLInputElement, TerminalInputProps>(
 
   const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault();
-    const trimmed = value.trim();
-    const lower = trimmed.toLowerCase();
+    const normalized = value.trim().replace(/\s+/g, " ");
+    const lower = normalized.toLowerCase();
     const isClear = lower === "clear" || lower === "cls";
 
     if (isTyping) {
@@ -220,26 +220,26 @@ export const TerminalInput = forwardRef<HTMLInputElement, TerminalInputProps>(
         return;
       }
     }
-    if (!trimmed) {
+    if (!normalized) {
       return;
     }
 
     // Record ship/launch names for optional autocomplete later.
     // This does not change gameplay requirements: players can always type new names.
     if (lower.startsWith("ship ")) {
-      const name = trimmed.slice(5).trim();
+      const name = normalized.slice(5).trim();
       if (name) {
         setShipHistory((prev) => [name, ...prev.filter((x) => x !== name)].slice(0, 12));
       }
     }
     if (lower.startsWith("launch ")) {
-      const name = trimmed.slice(7).trim();
+      const name = normalized.slice(7).trim();
       if (name) {
         setLaunchHistory((prev) => [name, ...prev.filter((x) => x !== name)].slice(0, 12));
       }
     }
 
-    onSubmit(value);
+    onSubmit(normalized);
     setValue("");
     lastValueRef.current = "";
     // Keep the terminal input "always first" even after state updates.
@@ -417,6 +417,18 @@ export const TerminalInput = forwardRef<HTMLInputElement, TerminalInputProps>(
                 event.preventDefault();
                 const picked = suggestions[activeSuggestionIndex];
                 if (picked) applySuggestion(picked);
+                return;
+              }
+            }
+
+            const isSpaceKey = event.key === " " || event.code === "Space";
+            if (isSpaceKey && /\s$/.test(value)) {
+              const el = event.currentTarget;
+              const start = el.selectionStart;
+              const end = el.selectionEnd;
+              const atEnd = start !== null && end !== null && start === end && end === value.length;
+              if (atEnd) {
+                event.preventDefault();
                 return;
               }
             }
