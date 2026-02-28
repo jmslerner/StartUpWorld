@@ -15,7 +15,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     if (req.method === "GET") {
       const raw = await redis.lRange(GRAVEYARD_KEY, 0, RETURN_LIMIT - 1);
-      const entries = raw.map((e) => JSON.parse(e));
+      const entries = raw.map((e) => JSON.parse(String(e)));
       return res.json({ entries });
     }
 

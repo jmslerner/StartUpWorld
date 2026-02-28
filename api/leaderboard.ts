@@ -16,7 +16,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (req.method === "GET") {
       // ZRANGE with REV returns highest scores first
       const raw = await redis.zRange(LEADERBOARD_KEY, 0, MAX_ENTRIES - 1, { REV: true });
-      const entries = raw.map((e) => JSON.parse(e));
+      const entries = raw.map((e) => JSON.parse(String(e)));
       return res.json({ entries });
     }
 
@@ -51,7 +51,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       await redis.zAdd(LEADERBOARD_KEY, { score: entry.score, value: member });
 
       // Trim to top N: remove entries with lowest scores
-      const count = await redis.zCard(LEADERBOARD_KEY);
+      const count = Number(await redis.zCard(LEADERBOARD_KEY));
       if (count > MAX_ENTRIES) {
         await redis.zRemRangeByRank(LEADERBOARD_KEY, 0, count - MAX_ENTRIES - 1);
       }
@@ -60,9 +60,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       await redis.set(seedKey, "1", { EX: 86400 });
 
       // Get rank (0-indexed from the top)
-      const rank = await redis.zRevRank(LEADERBOARD_KEY, member);
+      const rawRank = await redis.zRevRank(LEADERBOARD_KEY, member);
+      const rank = rawRank !== null && rawRank !== undefined ? Number(rawRank) + 1 : null;
 
-      return res.json({ rank: rank !== null ? rank + 1 : null, entry });
+      return res.json({ rank, entry });
     }
 
     return res.status(405).json({ error: "Method not allowed" });
