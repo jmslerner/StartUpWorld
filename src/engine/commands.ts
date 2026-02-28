@@ -59,9 +59,7 @@ const setupHelpText: LogEntry[] = [
   toLog("ship <feature> - ship a feature"),
   toLog("launch <campaign> - run a growth campaign"),
   toLog("pitch - pitch investors"),
-  toLog("raise - show funding options"),
-  toLog("raise friends|cards|loan|preseed|mortgage - bootstrap funding"),
-  toLog("raise <amount> - raise from investors (VC)"),
+  toLog("raise [vc <amount>|friends|cards|loan|preseed|mortgage] - funding (run `raise` for options)"),
   toLog("end - end the week"),
   toLog("choose <n> - resolve a pending event choice"),
 ];
@@ -78,9 +76,7 @@ const mainHelpText: LogEntry[] = [
   toLog("ship <feature> - ship a feature"),
   toLog("launch <campaign> - run a growth campaign"),
   toLog("pitch - pitch investors"),
-  toLog("raise - show funding options"),
-  toLog("raise friends|cards|loan|preseed|mortgage - bootstrap funding"),
-  toLog("raise <amount> - raise from investors (VC)"),
+  toLog("raise [vc <amount>|friends|cards|loan|preseed|mortgage] - funding (run `raise` for options)"),
   toLog("end - end the week"),
   toLog("choose <n> - resolve a pending event choice"),
 ];
@@ -189,18 +185,28 @@ export const executeCommand = (state: GameState, input: string): ActionResult =>
         return {
           state,
           logs: [
-            toLog("Funding options:"),
+            toLog("Funding:"),
+            toLog("Investors: raise vc <amount> (e.g. raise vc 500k, raise vc 2.5m)"),
+            toLog("Bootstrap: raise friends|cards|loan|preseed|mortgage"),
             toLog("raise friends   (+$15k)"),
             toLog("raise cards     (+$15k)"),
             toLog("raise loan      (+$25k)"),
             toLog("raise preseed   (+$50k)"),
             toLog("raise mortgage  (+$250k)"),
-            toLog("Or: raise <amount> to raise from investors (e.g. raise 500k, raise 2.5m)."),
           ],
         };
       }
 
       const token = (rest[0] ?? "").toLowerCase();
+
+      if (token === "vc" || token === "vs") {
+        const amount = parseAmount(rest[1] ?? "");
+        if (!amount) {
+          return { state, logs: [toLog("Usage: raise vc <amount>", "error")] };
+        }
+        return raiseSeed(state, Math.round(amount));
+      }
+
       const source =
         token === "friends"
           ? ("friends" as const)
@@ -218,11 +224,7 @@ export const executeCommand = (state: GameState, input: string): ActionResult =>
         return raiseBootstrap(state, source);
       }
 
-      const amount = parseAmount(rest[0] ?? "");
-      if (!amount) {
-        return { state, logs: [toLog("Usage: raise <amount> OR raise friends|cards|loan|preseed|mortgage", "error")] };
-      }
-      return raiseSeed(state, Math.round(amount));
+      return { state, logs: [toLog("Usage: raise vc <amount> OR raise friends|cards|loan|preseed|mortgage", "error")] };
     }
     case "end":
       return endWeek(state);

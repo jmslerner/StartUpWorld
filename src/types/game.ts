@@ -49,6 +49,11 @@ export interface PendingEvent {
   choices: EventChoiceView[];
 }
 
+export interface EventHistoryEntry {
+  id: string;
+  week: number;
+}
+
 export type EndingType =
   | "ipo"
   | "acquisition"
@@ -114,6 +119,8 @@ export interface GameState {
   bootstrapFunding: BootstrapFundingUses;
 
   pendingEvent: PendingEvent | null;
+  // Recent event history (most recent first). Used to reduce repeats.
+  eventHistory: EventHistoryEntry[];
   gameOver: GameOverState | null;
 
   // Deterministic run support

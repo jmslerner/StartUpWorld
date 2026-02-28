@@ -71,7 +71,7 @@ const cofounderOptions = [
   { token: "powderkeg", tooltip: "High-intensity swings. Big weeks, risky weeks." },
 ] as const;
 
-const raiseOptions = ["friends", "cards", "loan", "preseed", "mortgage"] as const;
+const raiseOptions = ["vc", "friends", "cards", "loan", "preseed", "mortgage"] as const;
 
 const canUseAudio = () => typeof window !== "undefined" && ("AudioContext" in window || "webkitAudioContext" in window);
 
@@ -318,8 +318,8 @@ export const TerminalInput = forwardRef<HTMLInputElement, TerminalInputProps>(
         .map((r) => ({
           kind: "raise",
           label: r,
-          nextValue: `raise ${r}`,
-          tooltip: "Bootstrap funding source.",
+          nextValue: r === "vc" ? "raise vc " : `raise ${r}`,
+          tooltip: r === "vc" ? "Raise from investors (then type an amount)." : "Bootstrap option.",
         }));
     }
 

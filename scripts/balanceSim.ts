@@ -107,7 +107,7 @@ const playWeek = (state: GameState): GameState => {
         continue;
       }
       const amt = desiredRaiseAmount(s);
-      s = safeCmd(s, `raise ${amt}`);
+      s = safeCmd(s, `raise vc ${amt}`);
       continue;
     }
 
