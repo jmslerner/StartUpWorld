@@ -19,9 +19,8 @@ const makeIntroLogs = (state: GameState): LogEntry[] => [
   toLog("=== STARTUP WORLD ===", "system", "intro-1"),
   toLog(`Seed: ${seedLabel(state)}`, "system", "intro-seed"),
   toLog("Build your AI startup from garage to IPO.", "system", "intro-2"),
-  toLog("Start: founder visionary|hacker|sales-animal|philosopher", "system", "intro-3"),
-  toLog("Then: cofounder operator|builder|rainmaker|powderkeg", "system", "intro-4"),
-  toLog("Required: name Ada | company Stealth Tiger", "system", "intro-5"),
+  toLog("Set up: name → company → founder → cofounder", "system", "intro-3"),
+  toLog("(You can still type commands anytime.)", "system", "intro-4"),
   toLog("Type 'help' for commands.", "system", "intro-6"),
 ];
 

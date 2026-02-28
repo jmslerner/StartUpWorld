@@ -40,7 +40,11 @@ const cofounderOptions = ["operator", "builder", "rainmaker", "powderkeg"] as co
 type CofounderToken = (typeof cofounderOptions)[number];
 
 const allowDuringPending = new Set(["choose", "status", "help", "seed", "name", "company", "cofounder"]);
-const allowBeforeSetup = new Set(["founder", "cofounder", "status", "help", "seed", "name", "company"]);
+
+const allowBeforeName = new Set(["status", "help", "seed", "name"]);
+const allowBeforeCompany = new Set(["status", "help", "seed", "name", "company"]);
+const allowBeforeFounder = new Set(["status", "help", "seed", "name", "company", "founder"]);
+const allowBeforeCofounder = new Set(["status", "help", "seed", "name", "company", "founder", "cofounder"]);
 
 const setupHelpText: LogEntry[] = [
   toLog("Commands:"),
@@ -94,22 +98,23 @@ export const executeCommand = (state: GameState, input: string): ActionResult =>
     return { state, logs: [toLog("Resolve the pending event first with `choose <n>`.", "error")] };
   }
 
-  // Player + company name must be set before normal gameplay begins.
-  if ((!state.founder.name.trim() || !state.companyName.trim()) && !allowBeforeSetup.has(command)) {
-    if (!state.founder.name.trim()) {
-      return { state, logs: [toLog("Set your name first: `name <your name>`.", "error")] };
-    }
+  // Setup order: name -> company -> founder -> cofounder.
+  if (!state.founder.name.trim() && !allowBeforeName.has(command)) {
+    return { state, logs: [toLog("Set your name first: `name <your name>`.", "error")] };
+  }
+
+  if (state.founder.name.trim() && !state.companyName.trim() && !allowBeforeCompany.has(command)) {
     return { state, logs: [toLog("Set your company name next: `company <company name>`.", "error")] };
   }
 
-  // Founder + cofounder must be chosen before normal gameplay begins.
-  if ((!state.founder.archetype || !state.cofounder.archetype) && !allowBeforeSetup.has(command)) {
-    if (!state.founder.archetype) {
-      return {
-        state,
-        logs: [toLog("Pick your founder archetype first: `founder visionary|hacker|sales-animal|philosopher`.", "error")],
-      };
-    }
+  if (state.companyName.trim() && !state.founder.archetype && !allowBeforeFounder.has(command)) {
+    return {
+      state,
+      logs: [toLog("Pick your founder archetype next: `founder visionary|hacker|sales-animal|philosopher`.", "error")],
+    };
+  }
+
+  if (state.founder.archetype && !state.cofounder.archetype && !allowBeforeCofounder.has(command)) {
     return {
       state,
       logs: [toLog("Pick your cofounder next: `cofounder operator|builder|rainmaker|powderkeg`.", "error")],

@@ -5,6 +5,7 @@ import { useGameStore } from "./state/useGameStore";
 import { MobilePanelsSheet } from "./ui/components/MobilePanelsSheet";
 import { StatsDrawer, type StatsPanelKey } from "./ui/components/StatsDrawer";
 import type { SheetSnap } from "./ui/components/BottomSheet";
+import { OnboardingCard } from "./ui/components/OnboardingCard";
 import { useEffect, useRef, useState } from "react";
 
 const App = () => {
@@ -12,7 +13,6 @@ const App = () => {
   const log = useGameStore((store) => store.log);
   const runCommand = useGameStore((store) => store.runCommand);
 
-  const [seedDraft, setSeedDraft] = useState("");
   const [statsOpen, setStatsOpen] = useState(false);
   const [statsActive, setStatsActive] = useState<StatsPanelKey>("growth");
   const [mobileStatsSnap, setMobileStatsSnap] = useState<SheetSnap>("collapsed");
@@ -20,12 +20,21 @@ const App = () => {
   const { rendered: typedLog, isTyping, fastForward } = useTypewriterQueue(log);
 
   const terminalInputRef = useRef<HTMLInputElement>(null);
+  const onboardingInputRef = useRef<HTMLInputElement>(null);
+
+  const onboardingComplete = Boolean(
+    state.founder.name.trim() && state.companyName.trim() && state.founder.archetype && state.cofounder.archetype
+  );
 
   useEffect(() => {
     const isCoarsePointer = typeof window !== "undefined" && window.matchMedia?.("(pointer: coarse)").matches;
     if (isCoarsePointer) return;
+    if (!onboardingComplete) {
+      onboardingInputRef.current?.focus();
+      return;
+    }
     terminalInputRef.current?.focus();
-  }, []);
+  }, [onboardingComplete]);
 
   const effectiveStatsOpen = statsOpen || mobileStatsSnap !== "collapsed";
 
@@ -46,12 +55,16 @@ const App = () => {
       const shouldFocus = event.key === "Escape" || event.key === "Enter" || event.key === "Backspace" || event.key.length === 1;
       if (!shouldFocus) return;
 
+      if (!onboardingComplete) {
+        onboardingInputRef.current?.focus();
+        return;
+      }
       terminalInputRef.current?.focus();
     };
 
     window.addEventListener("keydown", onKeyDown, true);
     return () => window.removeEventListener("keydown", onKeyDown, true);
-  }, []);
+  }, [onboardingComplete]);
 
   return (
     <div
@@ -74,40 +87,13 @@ const App = () => {
             onMouseDownCapture={(event) => {
               const target = event.target as HTMLElement | null;
               if (target?.closest?.("[data-terminal-log]")) return;
+              if (target?.closest?.("[data-onboarding]")) return;
               terminalInputRef.current?.focus();
             }}
           >
-            {!state.seedLocked && state.week === 1 && !state.cofounder.archetype && (
-              <form
-                className="panel-surface flex items-center gap-2 rounded-xl px-3 py-2.5"
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  const trimmed = seedDraft.trim();
-                  if (!trimmed) return;
-                  runCommand(`seed ${trimmed}`);
-                  setSeedDraft("");
-                  queueMicrotask(() => terminalInputRef.current?.focus());
-                }}
-              >
-                <span className="select-none text-mist/70">Seed</span>
-                <input
-                  value={seedDraft}
-                  onChange={(e) => setSeedDraft(e.target.value)}
-                  placeholder="optional (numbers or text)"
-                  className="w-full bg-transparent text-base text-slate-100/90 outline-none caret-neon"
-                  autoCapitalize="off"
-                  autoCorrect="off"
-                  spellCheck={false}
-                />
-                <button
-                  type="submit"
-                  className="shrink-0 rounded-lg bg-steel/30 px-2 py-1 text-[0.65rem] text-mist/80"
-                  title="Set a deterministic seed for this run"
-                >
-                  Set
-                </button>
-              </form>
-            )}
+            {!onboardingComplete ? (
+              <OnboardingCard state={state} runCommand={runCommand} inputRef={onboardingInputRef} />
+            ) : null}
             <TerminalInput ref={terminalInputRef} onSubmit={runCommand} isTyping={isTyping} fastForward={fastForward} />
             <TerminalLog log={typedLog} isTyping={isTyping} />
           </div>
