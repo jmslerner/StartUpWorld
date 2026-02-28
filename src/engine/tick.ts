@@ -80,6 +80,10 @@ export const endWeekTick = (state: GameState): { state: GameState; logs: string[
   const pre = state;
   const mods = founderMods[pre.founder.archetype!];
 
+  // Capture hires made during the week that’s ending.
+  // Note: `pre.lastWeek.teamSize` still refers to the previous week at this point.
+  const hiresThisWeek = Math.max(0, computeTeamSize(pre) - pre.lastWeek.teamSize);
+
   // Recompute burn from current org + stage.
   let s: GameState = { ...pre, burn: calcBurn(pre) };
 
@@ -152,7 +156,8 @@ export const endWeekTick = (state: GameState): { state: GameState; logs: string[
   s2 = applyCofounderWeeklyDrift(s2, { hit, win });
 
   // Refresh derived metrics that depend on this week's results.
-  const ctx = computeContext(s2);
+  // Override hiresThisWeek so events can react to hiring activity this week.
+  const ctx = { ...computeContext(s2), hiresThisWeek };
   s2 = { ...s2, valuation: calcValuation(s2, ctx) };
 
   // Phase progression logs

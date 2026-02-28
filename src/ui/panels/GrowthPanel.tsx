@@ -29,26 +29,26 @@ export const GrowthPanel = ({ state }: GrowthPanelProps) => {
   return (
     <PanelCard title="Growth">
       <div className="grid grid-cols-2 gap-x-4 gap-y-2">
-        <Metric label="Users" description="Active users. Momentum compounds." align="left">
+        <Metric label="Users" description="Active users. Momentum compounds.">
           <span className="tabular-nums">
             {state.users.toLocaleString()}
             <Delta current={state.users} previous={state.lastWeek.users} />
           </span>
         </Metric>
 
-        <Metric label="MRR" description="Monthly Recurring Revenue." align="right">
+        <Metric label="MRR" description="Monthly Recurring Revenue.">
           <span className="tabular-nums">
             {fmtUsd(state.mrr)}
             <Delta current={state.mrr} previous={state.lastWeek.mrr} format={(v) => fmtUsd(v)} />
           </span>
         </Metric>
 
-        <Metric label="ARPU" description="Average revenue per user per month." align="left">
+        <Metric label="ARPU" description="Average revenue per user per month.">
           <span className="tabular-nums">${state.arpu}</span>
         </Metric>
 
-        <Metric label="Weekly" description="Week-over-week growth snapshot." align="right">
-          <span className="flex flex-wrap justify-end gap-2 tabular-nums">
+        <Metric label="Weekly" description="Week-over-week growth snapshot.">
+          <span className="flex flex-wrap justify-center gap-2 tabular-nums">
             <GrowthChip label="MRR" pct={mrrWeeklyPct} />
             <GrowthChip label="Users" pct={usersWeeklyPct} />
           </span>
@@ -73,32 +73,18 @@ export const GrowthPanel = ({ state }: GrowthPanelProps) => {
   );
 };
 
-const Metric = ({
-  label,
-  description,
-  align,
-  children,
-}: {
-  label: string;
-  description: string;
-  align: "left" | "right";
-  children: ReactNode;
-}) => {
-  const labelEl = (
-    <span className="text-mist/80" aria-label={label}>
-      {label}
-    </span>
-  );
-
+const Metric = ({ label, description, children }: { label: string; description: string; children: ReactNode }) => {
   return (
-    <div className={align === "right" ? "text-right" : "text-left"}>
-      <div className={align === "right" ? "flex justify-end" : "flex justify-start"}>
-        <Tooltip content={description} align={align} widthClassName="w-72" className="cursor-help">
-          {labelEl}
-        </Tooltip>
+    <Tooltip content={description} align="left" widthClassName="w-72" className="w-full cursor-help">
+      <div className="w-full text-center">
+        <div className="flex justify-center">
+          <span className="text-mist/80" aria-label={label}>
+            {label}
+          </span>
+        </div>
+        <div className="mt-0.5 flex justify-center">{children}</div>
       </div>
-      <div className={align === "right" ? "mt-0.5 flex justify-end" : "mt-0.5"}>{children}</div>
-    </div>
+    </Tooltip>
   );
 };
 
@@ -125,13 +111,9 @@ const Row = ({
   children: ReactNode;
 }) => (
   <div className="flex items-center justify-between">
-    {description ? (
-      <Tooltip content={description} align="left" widthClassName="w-72" className="cursor-help">
-        <span className="text-mist/80">{label}</span>
-      </Tooltip>
-    ) : (
-      <span className="text-mist/80">{label}</span>
-    )}
+    <span className="text-mist/80" title={description}>
+      {label}
+    </span>
     {children}
   </div>
 );

@@ -707,6 +707,570 @@ export const eventPool: EventDef[] = [
   },
 
   {
+    id: "wellness-stipend-arms-race",
+    title: "Wellness Stipend Arms Race",
+    prompt: () => "Someone proposes a ‘wellness stipend.’ The first link is a $2,000 chair.",
+    when: (s, ctx) => ctx.teamSize >= 5 && s.cash >= 6000 && (s.culture.morale <= 82 || s.stress >= 55),
+    weight: (s, ctx) => 3 + (85 - s.culture.morale) / 12 + (s.stress - 45) / 18 + ctx.burnIntensity * 2,
+    choices: [
+      {
+        id: "approve",
+        text: "Approve it. Happiness-as-a-line-item.",
+        apply: (s) => ({
+          state: addCash(addMorale(addCohesion(s, 1), 2), -2200),
+          logs: ["The team gets shinier gear. You get a shinier burn chart.", "Cash -$2,200. Morale +2. Cohesion +1."],
+        }),
+      },
+      {
+        id: "cap",
+        text: "Cap it hard. Receipts required.",
+        apply: (s) => ({
+          state: addMorale(addRep(s, 1), -1),
+          logs: ["You turn wellness into paperwork. Extremely calming.", "Morale -1. Reputation +1 (adulting)."],
+        }),
+      },
+      {
+        id: "no",
+        text: "No. We have ‘mission’ at home.",
+        apply: (s) => ({
+          state: addMorale(addTrust({ ...s, stress: clamp(s.stress + 2, 0, 100) }, -2), -3),
+          logs: ["You say no. Everyone updates their LinkedIn quietly.", "Morale -3. Trust -2. Stress +2."],
+        }),
+      },
+    ],
+  },
+
+  {
+    id: "swag-palooza",
+    title: "Swag Palooza",
+    prompt: () => "A pallet of branded hoodies arrives. There are… so many hoodies.",
+    when: (s, ctx) => s.week >= 2 && s.cash >= 4500 && ctx.hiresThisWeek >= 1,
+    weight: (_s, ctx) => 4 + ctx.teamSize / 6 + ctx.hiresThisWeek * 2,
+    choices: [
+      {
+        id: "hand-out",
+        text: "Hand it out. Turn employees into billboards.",
+        apply: (s) => ({
+          state: addCash(addMorale(addRep(s, 1), 2), -1400),
+          logs: ["The office looks like a merch table. Vibes improve.", "Cash -$1,400. Morale +2. Reputation +1."],
+        }),
+      },
+      {
+        id: "donate",
+        text: "Donate it quietly. Pretend it was intentional.",
+        apply: (s) => ({
+          state: addCash(addRep(addTrust(s, 1), 2), -700),
+          logs: ["You do a good deed and a good PR seed.", "Cash -$700. Reputation +2. Trust +1."],
+        }),
+      },
+      {
+        id: "save-for-investors",
+        text: "Save it for investors. Nothing says ‘moat’ like fleece.",
+        apply: (s) => ({
+          state: addCash(addVcRep(s, 1), -900),
+          logs: ["You stockpile swag for a future that may never happen.", "Cash -$900. VC rep +1."],
+        }),
+      },
+    ],
+  },
+
+  {
+    id: "offsite-vineyard",
+    title: "Offsite: Vineyard Edition",
+    prompt: () => "Someone books an ‘alignment offsite.’ It appears to be mostly wine and slides.",
+    when: (s, ctx) => ctx.teamSize >= 6 && s.cash >= 10_000,
+    weight: (s, ctx) => 2 + (70 - s.culture.cohesion) / 10 + ctx.burnIntensity * 2,
+    choices: [
+      {
+        id: "go-big",
+        text: "Go big. Heal through catered carbs.",
+        apply: (s) => ({
+          state: addCash(addCohesion(addMorale({ ...s, stress: clamp(s.stress - 3, 0, 100) }, 2), 6), -5200),
+          logs: ["You buy alignment in bulk. It works… for a week.", "Cash -$5,200. Cohesion +6. Morale +2. Stress -3."],
+        }),
+      },
+      {
+        id: "cheap",
+        text: "Do a cheap offsite. Walks and honesty.",
+        apply: (s) => ({
+          state: addCash(addCohesion(addMorale(s, 1), 3), -900),
+          logs: ["You talk like humans. Nobody posts about it, but it helps.", "Cash -$900. Cohesion +3. Morale +1."],
+        }),
+      },
+      {
+        id: "cancel",
+        text: "Cancel it. Ship instead.",
+        apply: (s) => ({
+          state: addMorale(addCohesion({ ...s, stress: clamp(s.stress + 2, 0, 100) }, -2), -2),
+          logs: ["You pick output over feelings. Feelings notice.", "Morale -2. Cohesion -2. Stress +2."],
+        }),
+      },
+    ],
+  },
+
+  {
+    id: "reorg-without-headcount",
+    title: "Reorg Without Headcount",
+    prompt: () => "A calendar invite appears: ‘Org Design Working Session.’ You have eight people and three layers.",
+    when: (s, ctx) => ctx.teamSize >= 5 && s.week >= 3,
+    weight: (s, ctx) => 3 + (100 - s.culture.cohesion) / 25 + (ctx.hiresThisWeek >= 2 ? 2 : 0),
+    choices: [
+      {
+        id: "titles",
+        text: "Hand out titles. Create ‘leverage’.",
+        apply: (s) => ({
+          state: addCohesion(addEgo(addTrust(s, -3), 4), -4),
+          logs: ["Everyone gets a new title. Nobody gets new clarity.", "Cohesion -4. Trust -3. Cofounder ego +4."],
+        }),
+      },
+      {
+        id: "roles",
+        text: "Define roles and decision rights. Boring, effective.",
+        apply: (s) => ({
+          state: addCohesion(addTrust(addRep(s, 1), 2), 5),
+          logs: ["You write it down. You enforce it. People exhale.", "Cohesion +5. Trust +2. Reputation +1."],
+        }),
+      },
+      {
+        id: "ignore",
+        text: "Ignore it. Everyone can do everything.",
+        apply: (s) => ({
+          state: addCohesion(addMorale({ ...s, stress: clamp(s.stress + 4, 0, 100) }, -2), -3),
+          logs: ["You keep it ‘flat.’ It becomes ‘chaotic.’", "Cohesion -3. Morale -2. Stress +4."],
+        }),
+      },
+    ],
+  },
+
+  {
+    id: "founder-podcast-canceled",
+    title: "Founder Podcast ‘Hot Take’",
+    prompt: () => "You say one spicy sentence on a podcast. A clip goes viral. Context does not.",
+    when: (s) => s.week >= 4 && s.reputation >= 10,
+    weight: (s) => 2 + s.reputation / 25 + s.volatility / 20,
+    choices: [
+      {
+        id: "apologize",
+        text: "Apologize clearly. Own it.",
+        apply: (s) => ({
+          state: addRep(addTrust({ ...s, stress: clamp(s.stress + 1, 0, 100) }, 1), 1),
+          logs: ["You eat crow with a knife and fork. Some people respect it.", "Reputation +1. Trust +1. Stress +1."],
+        }),
+      },
+      {
+        id: "double-down",
+        text: "Double down. Engagement is engagement.",
+        apply: (s) => ({
+          state: addUsers(addRep({ ...s, volatility: clamp(s.volatility + 8, 0, 100) }, -6), 60),
+          logs: ["Your mentions explode. So does the damage.", "Users +60. Reputation -6. Volatility +8."],
+        }),
+      },
+      {
+        id: "go-dark",
+        text: "Go dark. No statements.",
+        apply: (s) => ({
+          state: addRep(addMorale(s, -2), -3),
+          logs: ["Silence is a strategy. It is not always a good one.", "Reputation -3. Morale -2."],
+        }),
+      },
+    ],
+  },
+
+  {
+    id: "growth-hack-backfires",
+    title: "Growth Hack Backfires",
+    prompt: () => "A ‘viral loop’ ships. It also spams people who did not ask.",
+    when: (s) => s.users >= 60 && s.week >= 3,
+    weight: (s, ctx) => 4 + ctx.usersGrowthRate * 5 + (s.reputation < 25 ? 2 : 0),
+    choices: [
+      {
+        id: "roll-back",
+        text: "Roll it back. Fix it properly.",
+        apply: (s) => ({
+          state: addUsers(addRep(addTrust(s, 1), 2), -20),
+          logs: ["You undo the damage and apologize in-product.", "Users -20. Reputation +2. Trust +1."],
+        }),
+      },
+      {
+        id: "keep-it",
+        text: "Keep it. Numbers first.",
+        apply: (s) => ({
+          state: addUsers(addRep({ ...s, stress: clamp(s.stress + 2, 0, 100) }, -5), 120),
+          logs: ["The chart goes up. The sentiment goes down.", "Users +120. Reputation -5. Stress +2."],
+        }),
+      },
+      {
+        id: "toggle",
+        text: "Add an opt-out toggle. Pretend it was always the plan.",
+        apply: (s) => ({
+          state: addUsers(addRep(s, 1), 40),
+          logs: ["You keep some lift and regain some trust.", "Users +40. Reputation +1."],
+        }),
+      },
+    ],
+  },
+
+  {
+    id: "dark-pattern-debate",
+    title: "Dark Pattern Debate",
+    prompt: () => "A PM suggests ‘improving conversion’ with a checkbox that is… already checked.",
+    when: (s) => s.stage !== "garage" && s.users >= 120,
+    weight: (s) => 3 + (30 - s.reputation) / 15 + s.stress / 40,
+    choices: [
+      {
+        id: "ship",
+        text: "Ship it. Pretend it’s UX.",
+        apply: (s) => ({
+          state: addUsers(addRep(addTrust(s, -2), -4), 140),
+          logs: ["Conversion pops. So do the angry threads.", "Users +140. Reputation -4. Trust -2."],
+        }),
+      },
+      {
+        id: "dont",
+        text: "Don’t. Keep it clean.",
+        apply: (s) => ({
+          state: addRep(addCohesion(s, 2), 2),
+          logs: ["You choose long-term trust over short-term graphs.", "Reputation +2. Cohesion +2."],
+        }),
+      },
+    ],
+  },
+
+  {
+    id: "data-leak-screenshot",
+    title: "Screenshot of a Data Leak",
+    prompt: () => "A customer posts a screenshot that looks like… someone else’s data.",
+    when: (s) => s.users >= 140 && s.week >= 5,
+    weight: (s) => 2 + s.users / 120 + (s.team.ops > 0 ? 0 : 3),
+    choices: [
+      {
+        id: "incident",
+        text: "Treat it like an incident. Patch, notify, postmortem.",
+        apply: (s) => ({
+          state: addCash(addRep(addTrust({ ...s, stress: clamp(s.stress + 2, 0, 100) }, 1), 2), -3500),
+          logs: ["You do the painful adult thing.", "Cash -$3,500. Reputation +2. Trust +1. Stress +2."],
+        }),
+      },
+      {
+        id: "bury",
+        text: "Bury it. Say nothing.",
+        apply: (s) => ({
+          state: addUsers(addRep({ ...s, volatility: clamp(s.volatility + 10, 0, 100) }, -8), -60),
+          logs: ["It comes out anyway. It always comes out.", "Users -60. Reputation -8. Volatility +10."],
+        }),
+      },
+    ],
+  },
+
+  {
+    id: "cloud-bill-surprise",
+    title: "Cloud Bill Surprise",
+    prompt: () => "The cloud bill arrives. It is… interpretive.",
+    when: (s) => s.week >= 3 && s.users >= 80,
+    weight: (_s, ctx) => 4 + ctx.usersGrowthRate * 6 + ctx.burnIntensity * 2,
+    choices: [
+      {
+        id: "optimize",
+        text: "Optimize ruthlessly. Cost is a feature.",
+        apply: (s) => ({
+          state: addCash(addRep({ ...s, stress: clamp(s.stress + 2, 0, 100) }, 1), -1800),
+          logs: ["You cut spend and ship better discipline.", "Cash -$1,800. Reputation +1. Stress +2."],
+        }),
+      },
+      {
+        id: "shrug",
+        text: "Shrug and pay. Future-you can cry later.",
+        apply: (s) => ({
+          state: addCash({ ...s, stress: clamp(s.stress + 3, 0, 100) }, -5200),
+          logs: ["You buy time with money.", "Cash -$5,200. Stress +3."],
+        }),
+      },
+    ],
+  },
+
+  {
+    id: "payments-freeze",
+    title: "Payments Processor Freeze",
+    prompt: () => "Your payments processor emails: ‘We’ve detected unusual activity.’ Funds are now ‘reviewing.’",
+    when: (s) => s.stage !== "garage" && s.week >= 6,
+    weight: (s, ctx) => 2 + (ctx.nearBankruptcy ? 4 : 0) + s.volatility / 18,
+    choices: [
+      {
+        id: "comply",
+        text: "Comply instantly. Over-document everything.",
+        apply: (s) => ({
+          state: addCash(addRep({ ...s, stress: clamp(s.stress + 2, 0, 100) }, 1), -1200),
+          logs: ["You send receipts, policies, and a small novel.", "Cash -$1,200. Reputation +1. Stress +2."],
+        }),
+      },
+      {
+        id: "rant",
+        text: "Rant publicly. Tag them.",
+        apply: (s) => ({
+          state: addRep({ ...s, volatility: clamp(s.volatility + 6, 0, 100), stress: clamp(s.stress + 3, 0, 100) }, -2),
+          logs: ["You go viral among founders. The processor is not charmed.", "Reputation -2. Volatility +6. Stress +3."],
+        }),
+      },
+    ],
+  },
+
+  {
+    id: "ai-pivot-week",
+    title: "AI Pivot Week",
+    prompt: () => "Investors ask the question: ‘Where is the AI?’ It is suddenly the whole meeting.",
+    when: (s) => s.week >= 4,
+    weight: (s) => 3 + s.vcReputation / 25 + s.volatility / 30,
+    choices: [
+      {
+        id: "slap-on",
+        text: "Slap ‘AI’ on the deck. Ship a demo.",
+        apply: (s) => ({
+          state: addVcRep(addRep({ ...s, volatility: clamp(s.volatility + 5, 0, 100) }, -1), 3),
+          logs: ["The demo works on your laptop and in exactly one pitch meeting.", "VC rep +3. Reputation -1. Volatility +5."],
+        }),
+      },
+      {
+        id: "real",
+        text: "Do it properly. Slow down.",
+        apply: (s) => ({
+          state: addVcRep(addRep(addCash({ ...s, stress: clamp(s.stress + 2, 0, 100) }, -1800), 1), 1),
+          logs: ["You invest in reality. It’s slower and it sticks.", "Cash -$1,800. Reputation +1. VC rep +1. Stress +2."],
+        }),
+      },
+      {
+        id: "nope",
+        text: "Say no. We’re not doing theater.",
+        apply: (s) => ({
+          state: addVcRep(addTrust(s, 1), -2),
+          logs: ["You keep focus. You lose some hype.", "VC rep -2. Trust +1."],
+        }),
+      },
+    ],
+  },
+
+  {
+    id: "press-hit-piece",
+    title: "Press Hit Piece",
+    prompt: () => "A journalist DMs: ‘Quick questions.’ The next day, your company is a villain in 900 words.",
+    when: (s) => s.week >= 5 && s.reputation >= 12,
+    weight: (s) => 2 + s.reputation / 20 + s.volatility / 25,
+    choices: [
+      {
+        id: "respond",
+        text: "Respond carefully. Receipts, not rage.",
+        apply: (s) => ({
+          state: addRep(addTrust({ ...s, stress: clamp(s.stress + 2, 0, 100) }, 1), 2),
+          logs: ["You correct the record without starting a fire.", "Reputation +2. Trust +1. Stress +2."],
+        }),
+      },
+      {
+        id: "quote-tweet",
+        text: "Quote-tweet dunk. Go viral.",
+        apply: (s) => ({
+          state: addUsers(addRep({ ...s, volatility: clamp(s.volatility + 6, 0, 100) }, -3), 90),
+          logs: ["You win the timeline. You lose the room.", "Users +90. Reputation -3. Volatility +6."],
+        }),
+      },
+      {
+        id: "ignore",
+        text: "Ignore it. It’ll pass.",
+        apply: (s) => ({
+          state: addRep(addMorale(s, -1), -2),
+          logs: ["You say nothing. People fill in the blanks.", "Reputation -2. Morale -1."],
+        }),
+      },
+    ],
+  },
+
+  {
+    id: "talent-poach",
+    title: "Talent Poach Attempt",
+    prompt: () => "A bigger startup tries to poach your best person with a title that has two commas.",
+    when: (s, ctx) => s.week >= 5 && ctx.teamSize >= 5,
+    weight: (s) => 3 + (75 - s.culture.morale) / 18 + s.volatility / 30,
+    choices: [
+      {
+        id: "match",
+        text: "Match the offer. Spend to keep them.",
+        apply: (s) => ({
+          state: addCash(addMorale(addCohesion(s, 1), 2), -3200),
+          logs: ["You retain them. The budget cries softly.", "Cash -$3,200. Morale +2. Cohesion +1."],
+        }),
+      },
+      {
+        id: "growth",
+        text: "Offer growth: scope, autonomy, mission.",
+        apply: (s) => ({
+          state: addMorale(addTrust(addRep(s, 1), 1), 2),
+          logs: ["You sell the dream. Sometimes it works.", "Morale +2. Trust +1. Reputation +1."],
+        }),
+      },
+      {
+        id: "let-go",
+        text: "Let them go. We’ll hire around it.",
+        apply: (s) => ({
+          state: addCohesion(addMorale({ ...s, stress: clamp(s.stress + 3, 0, 100) }, -3), -3),
+          logs: ["You lose a key person and gain a key lesson.", "Cohesion -3. Morale -3. Stress +3."],
+        }),
+      },
+    ],
+  },
+
+  {
+    id: "union-whisper",
+    title: "Union Whisper",
+    prompt: () => "Someone mentions ‘collective bargaining’ in a channel. The channel suddenly goes quiet.",
+    when: (s, ctx) => ctx.teamSize >= 8 && s.week >= 6,
+    weight: (s) => 2 + (70 - s.culture.morale) / 15 + (70 - s.culture.cohesion) / 18,
+    choices: [
+      {
+        id: "listen",
+        text: "Listen. Fix root causes.",
+        apply: (s) => ({
+          state: addCash(addMorale(addCohesion(addTrust(s, 1), 2), 3), -1600),
+          logs: ["You treat it as feedback, not betrayal.", "Cash -$1,600. Morale +3. Cohesion +2. Trust +1."],
+        }),
+      },
+      {
+        id: "lawyer",
+        text: "Call a lawyer. Prepare.",
+        apply: (s) => ({
+          state: addCash(addCohesion(addMorale(addRep(s, -1), -2), -2), -2200),
+          logs: ["You prepare for conflict and manufacture some of it.", "Cash -$2,200. Morale -2. Cohesion -2. Reputation -1."],
+        }),
+      },
+      {
+        id: "crackdown",
+        text: "Crack down. No more ‘negativity.’",
+        apply: (s) => ({
+          state: addCohesion(addMorale(addRep({ ...s, stress: clamp(s.stress + 4, 0, 100) }, -2), -6), -6),
+          logs: ["You win control and lose the team.", "Morale -6. Cohesion -6. Reputation -2. Stress +4."],
+        }),
+      },
+    ],
+  },
+
+  {
+    id: "pricing-backlash",
+    title: "Pricing Backlash",
+    prompt: () => "You change pricing. Customers interpret it as a personal attack.",
+    when: (s) => s.stage !== "garage" && s.users >= 120 && s.week >= 5,
+    weight: (s) => 3 + s.users / 160 + (s.reputation < 30 ? 2 : 0),
+    choices: [
+      {
+        id: "rollback",
+        text: "Rollback and apologize. Eat the pride.",
+        apply: (s) => ({
+          state: addUsers(addRep(addTrust(s, 1), 2), -40),
+          logs: ["You take the L and keep the relationship.", "Users -40. Reputation +2. Trust +1."],
+        }),
+      },
+      {
+        id: "hold",
+        text: "Hold the line. Let the churn happen.",
+        apply: (s) => ({
+          state: addUsers(addRep({ ...s, stress: clamp(s.stress + 2, 0, 100) }, -3), -90),
+          logs: ["You learn what ‘price elasticity’ feels like in your chest.", "Users -90. Reputation -3. Stress +2."],
+        }),
+      },
+      {
+        id: "grandfather",
+        text: "Grandfather existing customers. New pricing for new folks.",
+        apply: (s) => ({
+          state: addUsers(addRep(s, 1), -20),
+          logs: ["You keep trust and accept slower growth.", "Users -20. Reputation +1."],
+        }),
+      },
+    ],
+  },
+
+  {
+    id: "competitor-mega-round",
+    title: "Competitor Raises a Mega-Round",
+    prompt: () => "A competitor announces a gigantic round at a valuation that feels like performance art.",
+    when: (s) => s.stage !== "garage" && s.week >= 5,
+    weight: (s) => 2 + s.vcReputation / 20 + (s.reputation < 25 ? 2 : 0),
+    choices: [
+      {
+        id: "panic",
+        text: "Panic. Copy their roadmap immediately.",
+        apply: (s) => ({
+          state: addCohesion(addMorale({ ...s, stress: clamp(s.stress + 4, 0, 100) }, -3), -4),
+          logs: ["You chase a ghost. The team feels it.", "Cohesion -4. Morale -3. Stress +4."],
+        }),
+      },
+      {
+        id: "focus",
+        text: "Focus. Talk to customers.",
+        apply: (s) => ({
+          state: addRep(addCohesion(addTrust(s, 1), 2), 2),
+          logs: ["You do the unsexy thing that works.", "Reputation +2. Cohesion +2. Trust +1."],
+        }),
+      },
+      {
+        id: "fundraise",
+        text: "Start fundraising. Enter the valuation circus.",
+        apply: (s) => ({
+          state: addVcRep({ ...s, volatility: clamp(s.volatility + 4, 0, 100), stress: clamp(s.stress + 2, 0, 100) }, 2),
+          logs: ["You book meetings. You also lose sleep.", "VC rep +2. Volatility +4. Stress +2."],
+        }),
+      },
+    ],
+  },
+
+  {
+    id: "regulator-side-quest",
+    title: "Regulator Side Quest",
+    prompt: () => "A regulator asks friendly questions. They do not feel friendly.",
+    when: (s) => s.week >= 6 && s.users >= 150,
+    weight: (s) => 2 + s.reputation / 30 + (s.team.legal > 0 ? 0 : 2.5),
+    choices: [
+      {
+        id: "prepare",
+        text: "Prepare. Document. Comply.",
+        apply: (s) => ({
+          state: addCash(addRep({ ...s, stress: clamp(s.stress + 2, 0, 100) }, 2), -2400),
+          logs: ["You become a temporary compliance company.", "Cash -$2,400. Reputation +2. Stress +2."],
+        }),
+      },
+      {
+        id: "wing",
+        text: "Wing it. How hard can laws be?",
+        apply: (s) => ({
+          state: addRep({ ...s, volatility: clamp(s.volatility + 7, 0, 100), stress: clamp(s.stress + 3, 0, 100) }, -4),
+          logs: ["You discover laws are, in fact, hard.", "Reputation -4. Volatility +7. Stress +3."],
+        }),
+      },
+    ],
+  },
+
+  {
+    id: "macro-rate-shock",
+    title: "Macro Shock: Rates Jump",
+    prompt: () => "Interest rates spike. Everyone on Twitter becomes a macro strategist.",
+    when: (s) => s.stage !== "garage" && s.week >= 6,
+    weight: (s) => 1.5 + s.volatility / 18,
+    choices: [
+      {
+        id: "cut-burn",
+        text: "Cut burn now. Survive the vibe shift.",
+        apply: (s) => ({
+          state: addRep(addMorale({ ...s, stress: clamp(s.stress + 1, 0, 100) }, -2), 1),
+          logs: ["You get disciplined. It’s not fun. It is runway.", "Reputation +1. Morale -2. Stress +1."],
+        }),
+      },
+      {
+        id: "pretend",
+        text: "Pretend it’s fine. Keep spending.",
+        apply: (s) => ({
+          state: addVcRep({ ...s, volatility: clamp(s.volatility + 6, 0, 100), stress: clamp(s.stress + 2, 0, 100) }, -3),
+          logs: ["You keep the party going. The market stops dancing.", "VC rep -3. Volatility +6. Stress +2."],
+        }),
+      },
+    ],
+  },
+
+  {
     id: "ipo-window",
     title: "IPO Window",
     prompt: () => "Banks call it a ‘window.’ It feels like a trap door with gold light behind it.",

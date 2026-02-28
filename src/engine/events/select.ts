@@ -7,6 +7,7 @@ import type { EventDef } from "./types";
 const EVENT_COOLDOWN_WEEKS = 7;
 const EVENT_RECENT_PENALTY_COUNT = 10;
 const EVENT_RECENT_PENALTY_MULT = 0.25;
+const EVENT_HISTORY_MAX = 120;
 
 export interface EventSelection {
   state: GameState;
@@ -70,6 +71,6 @@ export const maybeSelectEvent = (state: GameState, ctx: EngineContext): EventSel
     return { state: s2, event: null };
   }
 
-  const nextHistory = [{ id: event.id, week: s2.week }, ...history.filter((h) => h.id !== event.id)].slice(0, 12);
+  const nextHistory = [{ id: event.id, week: s2.week }, ...history].slice(0, EVENT_HISTORY_MAX);
   return { state: { ...s2, eventHistory: nextHistory }, event };
 };

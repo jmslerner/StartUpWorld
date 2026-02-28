@@ -376,7 +376,10 @@ export const TerminalInput = forwardRef<HTMLInputElement, TerminalInputProps>(
 
   return (
     <div className="relative">
-      <form onSubmit={handleSubmit} className="panel-surface flex items-center gap-2 rounded-t-xl rounded-b-none border-b-0 px-3 py-2.5">
+      <form
+        onSubmit={handleSubmit}
+        className="panel-surface flex items-center gap-2 rounded-t-xl rounded-b-none border-b-0 px-3 py-2 md:py-1.5"
+      >
         <span className="select-none text-neon" aria-hidden>
           &gt;
         </span>
@@ -442,7 +445,7 @@ export const TerminalInput = forwardRef<HTMLInputElement, TerminalInputProps>(
             setDismissedSuggestions(false);
             setActiveSuggestionIndex(0);
         }}
-          className="w-full bg-transparent text-base text-slate-100/90 outline-none caret-neon"
+          className="w-full bg-transparent text-base text-slate-100/90 outline-none caret-neon md:text-sm"
           autoCapitalize="off"
           autoCorrect="off"
           spellCheck={false}
@@ -458,8 +461,8 @@ export const TerminalInput = forwardRef<HTMLInputElement, TerminalInputProps>(
           onClick={toggleSfx}
           className={
             sfxEnabled
-              ? "shrink-0 rounded-lg bg-neon/10 px-2 py-1 text-[0.65rem] font-semibold text-neon"
-              : "shrink-0 rounded-lg bg-steel/30 px-2 py-1 text-[0.65rem] text-mist/80"
+              ? "shrink-0 rounded-lg bg-neon/10 px-2 py-1 text-[0.65rem] font-semibold text-neon md:px-1.5 md:py-0.5"
+              : "shrink-0 rounded-lg bg-steel/30 px-2 py-1 text-[0.65rem] text-mist/80 md:px-1.5 md:py-0.5"
           }
           title="Typing sound effects"
         >
