@@ -257,6 +257,7 @@ export const createInitialState = (): GameState => {
     investors: { pipeline: [] },
     bootstrapFunding: { friends: 0, "credit-cards": 0, "personal-loan": 0, preseed: 0, mortgage: 0 },
     pendingEvent: null,
+    eventHistory: [],
     gameOver: null,
     seed,
     rng: (seed ^ 0x9e3779b9) >>> 0,

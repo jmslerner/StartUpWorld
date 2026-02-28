@@ -1,6 +1,7 @@
 import type { GameState } from "../../types/game";
 import { PanelCard } from "../components/PanelCard";
 import { Delta } from "../components/Gauge";
+import { Tooltip } from "../components/Tooltip";
 import type { ReactNode } from "react";
 
 interface GrowthPanelProps {
@@ -27,28 +28,31 @@ export const GrowthPanel = ({ state }: GrowthPanelProps) => {
 
   return (
     <PanelCard title="Growth">
-      <Row label="Users" description="Active users. Momentum compounds.">
-        <span className="tabular-nums">
-          {state.users.toLocaleString()}
-          <Delta current={state.users} previous={state.lastWeek.users} />
-        </span>
-      </Row>
-      <Row label="MRR" description="Monthly Recurring Revenue.">
-        <span className="tabular-nums">
-          {fmtUsd(state.mrr)}
-          <Delta current={state.mrr} previous={state.lastWeek.mrr} format={(v) => fmtUsd(v)} />
-        </span>
-      </Row>
-      <Row label="ARPU" description="Average revenue per user per month.">
-        <span className="tabular-nums">${state.arpu}</span>
-      </Row>
-      <div className="mt-1 border-t border-white/5 pt-2">
-        <Row label="Weekly" description="Week-over-week growth snapshot.">
-          <span className="flex items-center gap-2 tabular-nums">
+      <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+        <Metric label="Users" description="Active users. Momentum compounds." align="left">
+          <span className="tabular-nums">
+            {state.users.toLocaleString()}
+            <Delta current={state.users} previous={state.lastWeek.users} />
+          </span>
+        </Metric>
+
+        <Metric label="MRR" description="Monthly Recurring Revenue." align="right">
+          <span className="tabular-nums">
+            {fmtUsd(state.mrr)}
+            <Delta current={state.mrr} previous={state.lastWeek.mrr} format={(v) => fmtUsd(v)} />
+          </span>
+        </Metric>
+
+        <Metric label="ARPU" description="Average revenue per user per month." align="left">
+          <span className="tabular-nums">${state.arpu}</span>
+        </Metric>
+
+        <Metric label="Weekly" description="Week-over-week growth snapshot." align="right">
+          <span className="flex flex-wrap justify-end gap-2 tabular-nums">
             <GrowthChip label="MRR" pct={mrrWeeklyPct} />
             <GrowthChip label="Users" pct={usersWeeklyPct} />
           </span>
-        </Row>
+        </Metric>
       </div>
 
       <div className="mt-2 border-t border-white/5 pt-2">
@@ -66,6 +70,35 @@ export const GrowthPanel = ({ state }: GrowthPanelProps) => {
         )}
       </div>
     </PanelCard>
+  );
+};
+
+const Metric = ({
+  label,
+  description,
+  align,
+  children,
+}: {
+  label: string;
+  description: string;
+  align: "left" | "right";
+  children: ReactNode;
+}) => {
+  const labelEl = (
+    <span className="text-mist/80" aria-label={label}>
+      {label}
+    </span>
+  );
+
+  return (
+    <div className={align === "right" ? "text-right" : "text-left"}>
+      <div className={align === "right" ? "flex justify-end" : "flex justify-start"}>
+        <Tooltip content={description} align={align} widthClassName="w-72" className="cursor-help">
+          {labelEl}
+        </Tooltip>
+      </div>
+      <div className={align === "right" ? "mt-0.5 flex justify-end" : "mt-0.5"}>{children}</div>
+    </div>
   );
 };
 
@@ -92,9 +125,13 @@ const Row = ({
   children: ReactNode;
 }) => (
   <div className="flex items-center justify-between">
-    <span className="text-mist/80" title={description}>
-      {label}
-    </span>
+    {description ? (
+      <Tooltip content={description} align="left" widthClassName="w-72" className="cursor-help">
+        <span className="text-mist/80">{label}</span>
+      </Tooltip>
+    ) : (
+      <span className="text-mist/80">{label}</span>
+    )}
     {children}
   </div>
 );
