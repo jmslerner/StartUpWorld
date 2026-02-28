@@ -10,8 +10,14 @@ interface GameStore {
   runCommand: (input: string) => void;
 }
 
-const introLogs: LogEntry[] = [
+const seedLabel = (state: GameState): string => {
+  const t = state.seedText?.trim();
+  return t ? t : String(state.seed);
+};
+
+const makeIntroLogs = (state: GameState): LogEntry[] => [
   toLog("=== STARTUP WORLD ===", "system", "intro-1"),
+  toLog(`Seed: ${seedLabel(state)}`, "system", "intro-seed"),
   toLog("Build your AI startup from garage to IPO.", "system", "intro-2"),
   toLog("Start: founder visionary|hacker|sales-animal|philosopher", "system", "intro-3"),
   toLog("Then: cofounder operator|builder|rainmaker|powderkeg", "system", "intro-4"),
@@ -19,11 +25,17 @@ const introLogs: LogEntry[] = [
   toLog("Type 'help' for commands.", "system", "intro-6"),
 ];
 
-const clearedLogs: LogEntry[] = [introLogs[0]!, introLogs[introLogs.length - 1]!];
+const makeClearedLogs = (state: GameState): LogEntry[] => [
+  toLog("=== STARTUP WORLD ===", "system", "intro-1"),
+  toLog(`Seed: ${seedLabel(state)}`, "system", "intro-seed"),
+  toLog("Type 'help' for commands.", "system", "intro-6"),
+];
+
+const initialState = createInitialState();
 
 export const useGameStore = create<GameStore>((set) => ({
-  state: createInitialState(),
-  log: introLogs,
+  state: initialState,
+  log: makeIntroLogs(initialState),
   runCommand: (input: string) =>
     set((current) => {
       const trimmed = input.trim();
@@ -32,7 +44,7 @@ export const useGameStore = create<GameStore>((set) => ({
       if (lower === "clear" || lower === "cls") {
         return {
           state: current.state,
-          log: clearedLogs,
+          log: makeClearedLogs(current.state),
         };
       }
 

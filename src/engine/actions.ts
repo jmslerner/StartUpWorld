@@ -38,6 +38,25 @@ const normalizeName = (input: string, maxLen: number): string => {
   return trimmed.length > maxLen ? trimmed.slice(0, maxLen).trim() : trimmed;
 };
 
+const fnv1a32 = (input: string): number => {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < input.length; i += 1) {
+    h ^= input.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return h >>> 0;
+};
+
+const parseSeedToU32 = (raw: string): number => {
+  const s = raw.trim();
+  if (!s) return 0;
+  if (/^\d+$/.test(s)) {
+    const n = Number(s);
+    return (Number.isFinite(n) ? (n >>> 0) : 0) || 1;
+  }
+  return fnv1a32(s) || 1;
+};
+
 type ArchetypeBlurb = {
   title: string;
   desc: string;
@@ -184,6 +203,7 @@ export const setCofounderArchetype = (state: GameState, archetype: CofounderArch
   const updated: GameState = {
     ...state,
     rng: pick.rng,
+    seedLocked: true,
     cofounder: {
       ...state.cofounder,
       name,
@@ -241,6 +261,8 @@ export const createInitialState = (): GameState => {
     seed,
     rng: (seed ^ 0x9e3779b9) >>> 0,
     logSeq: 0,
+    seedText: null,
+    seedLocked: false,
     lastWeek: { users: 50, mrr: 50 * 10, cash: 20_000, teamSize: 1 },
   };
 
@@ -249,7 +271,35 @@ export const createInitialState = (): GameState => {
 
 export const canSpendAp = (state: GameState, cost = 1): boolean => state.ap >= cost;
 
-export const spendAp = (state: GameState, cost = 1): GameState => ({ ...state, ap: Math.max(0, state.ap - cost) });
+export const spendAp = (state: GameState, cost = 1): GameState => ({
+  ...state,
+  ap: Math.max(0, state.ap - cost),
+  seedLocked: true,
+});
+
+export const setSeed = (state: GameState, rawSeed: string): ActionResult => {
+  if (state.gameOver) {
+    return err(state, "Game over.");
+  }
+  if (state.week !== 1 || state.seedLocked || state.cofounder.archetype) {
+    return err(state, "Seed is locked for this run. Set it before choosing your cofounder / starting play.");
+  }
+
+  const trimmed = rawSeed.trim();
+  if (!trimmed) {
+    return err(state, "Usage: seed <value> (number or text)");
+  }
+
+  const seed = parseSeedToU32(trimmed);
+  const updated: GameState = {
+    ...state,
+    seed,
+    rng: (seed ^ 0x9e3779b9) >>> 0,
+    seedText: trimmed,
+  };
+
+  return withLogLines(updated, [{ text: `Seed set: ${trimmed}.`, kind: "system" }]);
+};
 
 export const raiseBootstrap = (state: GameState, source: BootstrapFundingSource): ActionResult => {
   const gate = ensurePlayable(state);
@@ -594,7 +644,7 @@ export const endWeek = (state: GameState): ActionResult => {
     text: t,
     kind: isEventLine(t) ? "event" : "system",
   }));
-  return withLogLines(tick.state, lines);
+  return withLogLines({ ...tick.state, seedLocked: true }, lines);
 };
 
 export const status = (state: GameState): ActionResult => {

@@ -8,6 +8,7 @@ import {
   pitchInvestors,
   raiseBootstrap,
   raiseSeed,
+  setSeed,
   setCofounderArchetype,
   setCompanyName,
   setFounderArchetype,
@@ -35,11 +36,13 @@ type FounderToken = (typeof founderOptions)[number];
 const cofounderOptions = ["operator", "builder", "rainmaker", "powderkeg"] as const;
 type CofounderToken = (typeof cofounderOptions)[number];
 
-const allowDuringPending = new Set(["choose", "status", "help", "name", "company", "cofounder"]);
-const allowBeforeSetup = new Set(["founder", "cofounder", "status", "help", "name", "company"]);
+const allowDuringPending = new Set(["choose", "status", "help", "seed", "name", "company", "cofounder"]);
+const allowBeforeSetup = new Set(["founder", "cofounder", "status", "help", "seed", "name", "company"]);
 
 const setupHelpText: LogEntry[] = [
   toLog("Commands:"),
+  toLog("seed <value> - set run seed (optional; locked once you start)"),
+  toLog("seed - show current seed"),
   toLog("name <your name> - set your name (locked after set)"),
   toLog("company <name> - set company name (locked after set)"),
   toLog("founder <visionary|hacker|sales-animal|philosopher> - pick your founder (required)"),
@@ -62,6 +65,7 @@ const mainHelpText: LogEntry[] = [
   toLog("Commands:"),
   toLog("help - show commands"),
   toLog("clear / cls - reset the log output"),
+  toLog("seed - show current seed"),
   toLog("status - show current stats"),
   toLog("hire <role> <count> - hire teammates (engineering|design|marketing|sales|ops|hr|legal)"),
   toLog("ship <feature> - ship a feature"),
@@ -114,6 +118,14 @@ export const executeCommand = (state: GameState, input: string): ActionResult =>
   switch (command) {
     case "help":
       return { state, logs: isSetupComplete(state) ? mainHelpText : setupHelpText };
+    case "seed": {
+      if (rest.length === 0) {
+        const shown = state.seedText?.trim() ? state.seedText : String(state.seed);
+        const lock = state.seedLocked || state.week !== 1 || Boolean(state.cofounder.archetype);
+        return { state, logs: [toLog(`Seed: ${shown}${lock ? " (locked)" : ""}`)] };
+      }
+      return setSeed(state, rest.join(" "));
+    }
     case "name":
       return setPlayerName(state, rest.join(" "));
     case "company":

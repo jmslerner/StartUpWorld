@@ -4,12 +4,14 @@ import { TerminalInput, TerminalLog, useTypewriterQueue } from "./ui/terminal";
 import { useGameStore } from "./state/useGameStore";
 import { GrowthPanel, TeamPanel, RiskProfilePanel } from "./ui/panels";
 import { MobilePanelsSheet } from "./ui/components/MobilePanelsSheet";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 const App = () => {
   const state = useGameStore((store) => store.state);
   const log = useGameStore((store) => store.log);
   const runCommand = useGameStore((store) => store.runCommand);
+
+  const [seedDraft, setSeedDraft] = useState("");
 
   const { rendered: typedLog, isTyping, fastForward } = useTypewriterQueue(log);
 
@@ -60,6 +62,37 @@ const App = () => {
               terminalInputRef.current?.focus();
             }}
           >
+            {!state.seedLocked && state.week === 1 && !state.cofounder.archetype && (
+              <form
+                className="panel-surface flex items-center gap-2 rounded-xl px-3 py-2.5"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  const trimmed = seedDraft.trim();
+                  if (!trimmed) return;
+                  runCommand(`seed ${trimmed}`);
+                  setSeedDraft("");
+                  queueMicrotask(() => terminalInputRef.current?.focus());
+                }}
+              >
+                <span className="select-none text-mist/70">Seed</span>
+                <input
+                  value={seedDraft}
+                  onChange={(e) => setSeedDraft(e.target.value)}
+                  placeholder="optional (numbers or text)"
+                  className="w-full bg-transparent text-base text-slate-100/90 outline-none caret-neon"
+                  autoCapitalize="off"
+                  autoCorrect="off"
+                  spellCheck={false}
+                />
+                <button
+                  type="submit"
+                  className="shrink-0 rounded-lg bg-steel/30 px-2 py-1 text-[0.65rem] text-mist/80"
+                  title="Set a deterministic seed for this run"
+                >
+                  Set
+                </button>
+              </form>
+            )}
             <TerminalInput ref={terminalInputRef} onSubmit={runCommand} isTyping={isTyping} fastForward={fastForward} />
             <TerminalLog log={typedLog} isTyping={isTyping} />
           </div>

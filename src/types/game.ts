@@ -121,6 +121,10 @@ export interface GameState {
   rng: number; // uint32 internal RNG state
   logSeq: number;
 
+  // Optional player-provided seed (for display/replay). Seed cannot be changed once locked.
+  seedText: string | null;
+  seedLocked: boolean;
+
   lastWeek: {
     users: number;
     mrr: number;
