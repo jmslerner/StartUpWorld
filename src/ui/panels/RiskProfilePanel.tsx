@@ -10,8 +10,8 @@ export const RiskProfilePanel = ({ state }: RiskProfilePanelProps) => (
   <PanelCard title="Risk Profile">
     <div className="space-y-2">
       <div>
-        <div className="mb-1 text-[0.6rem] uppercase tracking-[0.22em] text-mist/60">Internal</div>
-        <div className="grid grid-cols-3 gap-2">
+        <div className="mb-1 text-center text-[0.6rem] uppercase tracking-[0.22em] text-mist/60">Internal</div>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
           <Stat
             label="Cohesion"
             value={`${state.culture.cohesion}/100`}
@@ -52,8 +52,8 @@ export const RiskProfilePanel = ({ state }: RiskProfilePanelProps) => (
       </div>
 
       <div className="border-t border-white/5 pt-2">
-        <div className="mb-1 text-[0.6rem] uppercase tracking-[0.22em] text-mist/60">External</div>
-        <div className="grid grid-cols-3 gap-2">
+        <div className="mb-1 text-center text-[0.6rem] uppercase tracking-[0.22em] text-mist/60">External</div>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
           <Stat
             label="Volatility"
             value={`${state.volatility}/100`}
@@ -132,11 +132,11 @@ const Stat = ({
           : "text-slate-100/90";
 
   return (
-    <div className="rounded-lg bg-steel/30 px-2 py-1">
+    <div className="rounded-lg bg-steel/30 px-2 py-1 text-center">
       <Tooltip content={help} align="left" widthClassName="w-80">
         <button
           type="button"
-          className="text-left text-[0.6rem] uppercase tracking-[0.2em] text-mist/60 underline decoration-white/10 decoration-dotted underline-offset-4"
+          className="w-full text-center text-[0.6rem] uppercase tracking-[0.2em] text-mist/60 underline decoration-white/10 decoration-dotted underline-offset-4"
           onMouseDown={(event) => event.preventDefault()}
         >
           {label}

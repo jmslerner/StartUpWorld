@@ -34,7 +34,7 @@ export const TeamPanel = ({ state }: TeamPanelProps) => {
 
   return (
     <PanelCard title="Team">
-      <div className="flex flex-wrap gap-x-3 gap-y-1">
+      <div className="flex flex-wrap justify-center gap-x-3 gap-y-1 text-center">
         {roles.map(({ key, label }) => (
           <Tooltip key={key} content={roleTips[key]} align="right">
             <span className={state.team[key] > 0 ? "text-slate-100/90" : "text-mist/40"}>
@@ -43,16 +43,19 @@ export const TeamPanel = ({ state }: TeamPanelProps) => {
           </Tooltip>
         ))}
       </div>
-      <div className="mt-1 flex items-center justify-between border-t border-white/5 pt-1">
-        <span className="text-mist/60" title="Total team size. Hiring increases burn and can strain cohesion.">Headcount</span>
-        <span className="tabular-nums">
-          {total}
-          <Delta current={total} previous={state.lastWeek.teamSize} />
-        </span>
-      </div>
-      <div className="flex items-center justify-between">
-        <span className="text-mist/60" title="How hard it is for the founders to coordinate and manage the team.">Mgmt strain</span>
-        <span className={`font-medium ${strainClass}`}>{strain}</span>
+
+      <div className="mt-2 grid grid-cols-2 gap-2 border-t border-white/5 pt-2">
+        <div className="text-center">
+          <span className="text-mist/60" title="Total team size. Hiring increases burn and can strain cohesion.">Headcount</span>
+          <div className="tabular-nums">
+            {total}
+            <Delta current={total} previous={state.lastWeek.teamSize} />
+          </div>
+        </div>
+        <div className="text-center">
+          <span className="text-mist/60" title="How hard it is for the founders to coordinate and manage the team.">Mgmt strain</span>
+          <div className={`font-medium ${strainClass}`}>{strain}</div>
+        </div>
       </div>
     </PanelCard>
   );
