@@ -44,17 +44,13 @@ const commandsWithArgs = new Set([
 ]);
 
 const hireRoleOptions: Array<{ token: string; label: string; tooltip: string }> = [
-  { token: "engineering", label: "engineering (eng)", tooltip: "Builds product faster. Increases burn." },
-  { token: "eng", label: "eng → engineering", tooltip: "Alias for engineering." },
-  { token: "design", label: "design (ux)", tooltip: "Improves UX and feature quality. Increases burn." },
-  { token: "ux", label: "ux → design", tooltip: "Alias for design." },
-  { token: "marketing", label: "marketing (gtm)", tooltip: "Drives demand and top-of-funnel. Increases burn." },
-  { token: "gtm", label: "gtm → marketing", tooltip: "Alias for marketing." },
-  { token: "sales", label: "sales (ae)", tooltip: "Turns demand into revenue. Can outpace delivery if over-hired." },
-  { token: "ae", label: "ae → sales", tooltip: "Alias for sales." },
-  { token: "ops", label: "ops", tooltip: "Reduces churn/drag and keeps the org running. Increases burn." },
-  { token: "hr", label: "hr", tooltip: "Helps scale hiring and reduce people issues. Adds process overhead." },
-  { token: "legal", label: "legal", tooltip: "Reduces legal risk and contract friction. Increases burn." },
+  { token: "eng", label: "eng", tooltip: "Engineering. Builds product faster; increases burn." },
+  { token: "ux", label: "ux", tooltip: "Design/UX. Improves quality; increases burn." },
+  { token: "marketing", label: "marketing", tooltip: "Marketing. Drives demand; increases burn." },
+  { token: "sales", label: "sales", tooltip: "Sales. Converts demand into revenue; increases burn." },
+  { token: "ops", label: "ops", tooltip: "Ops. Reduces churn/drag; increases burn." },
+  { token: "hr", label: "hr", tooltip: "HR. Helps hiring + people issues; increases burn." },
+  { token: "legal", label: "legal", tooltip: "Legal. Reduces legal risk + friction; increases burn." },
 ] as const;
 
 const founderOptions = [
