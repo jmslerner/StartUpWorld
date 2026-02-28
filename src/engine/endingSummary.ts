@@ -7,6 +7,7 @@ export interface EndingSummary {
   narrative: string;
   stats: EndingStats;
   grade: string;
+  score: number;
   achievements: string[];
 }
 
@@ -37,7 +38,7 @@ const narratives: Record<EndingType, (s: GameState) => string> = {
     "You sold the narrative before the product caught up. An acquirer — drunk on AI FOMO — writes a check that buys you a very nice house and a very quiet LinkedIn. [[beat]] The technology? It works on demos. It always worked on demos.",
 };
 
-const computeGrade = (s: GameState): string => {
+export const computeScore = (s: GameState): number => {
   let score = 0;
 
   // Valuation contribution (0-30)
@@ -72,12 +73,18 @@ const computeGrade = (s: GameState): string => {
   };
   score += endingScores[s.gameOver?.ending ?? "bankruptcy"];
 
+  return Math.max(0, Math.min(100, score));
+};
+
+export const gradeFromScore = (score: number): string => {
   if (score >= 85) return "A";
   if (score >= 70) return "B";
   if (score >= 50) return "C";
   if (score >= 30) return "D";
   return "F";
 };
+
+const computeGrade = (s: GameState): string => gradeFromScore(computeScore(s));
 
 const computeAchievements = (s: GameState): string[] => {
   const achievements: string[] = [];
@@ -123,6 +130,7 @@ export const generateEndingSummary = (state: GameState): EndingSummary | null =>
       totalRaised: state.totalRaised,
     },
     grade: computeGrade(state),
+    score: computeScore(state),
     achievements: computeAchievements(state),
   };
 };

@@ -1,5 +1,9 @@
+import { useEffect, useState } from "react";
 import type { GameState, EndingType } from "../../types/game";
 import { generateEndingSummary, type EndingSummary } from "../../engine/endingSummary";
+import { generateEpitaph } from "../../engine/epitaphs";
+import { submitScore, submitGraveyardEntry } from "../../api/client";
+import { LeaderboardOverlay } from "./LeaderboardOverlay";
 
 interface GameOverCardProps {
   state: GameState;
@@ -42,9 +46,51 @@ const endingLabel: Record<EndingType, string> = {
 
 export const GameOverCard = ({ state, onPlayAgain }: GameOverCardProps) => {
   const summary: EndingSummary | null = generateEndingSummary(state);
+  const [rank, setRank] = useState<number | null>(null);
+  const [submitted, setSubmitted] = useState(false);
+  const [showLeaderboard, setShowLeaderboard] = useState(false);
+
+  useEffect(() => {
+    if (!summary || submitted) return;
+    setSubmitted(true);
+
+    const ending = state.gameOver?.ending;
+    if (!ending) return;
+
+    // Submit to leaderboard
+    submitScore({
+      companyName: state.companyName,
+      founderName: state.founder.name,
+      ending,
+      score: summary.score,
+      finalValuation: state.valuation,
+      founderOwnership: state.capTable.founderPct,
+      finalUsers: state.users,
+      finalMrr: state.mrr,
+      week: state.week,
+      seed: state.seed,
+    }).then((result) => {
+      if (result.rank !== null) setRank(result.rank);
+    });
+
+    // Submit to graveyard
+    const epitaph = generateEpitaph(state, ending);
+    submitGraveyardEntry({
+      companyName: state.companyName,
+      ending,
+      epitaph,
+      grade: summary.grade,
+      week: state.week,
+    });
+  }, [summary, submitted, state]);
+
   if (!summary) return null;
 
   const accent = accentColor[summary.ending];
+
+  if (showLeaderboard) {
+    return <LeaderboardOverlay onClose={() => setShowLeaderboard(false)} currentSeed={state.seed} />;
+  }
 
   return (
     <div className="fixed inset-0 z-30 flex items-center justify-center bg-black/80 px-4">
@@ -65,12 +111,23 @@ export const GameOverCard = ({ state, onPlayAgain }: GameOverCardProps) => {
           {summary.narrative.replace(/\[\[beat\]\]/g, "  ...  ")}
         </div>
 
-        {/* Grade */}
-        <div className="mb-4 flex items-center gap-2">
-          <span className="text-xs text-mist/60">Grade:</span>
-          <span className={`rounded px-2 py-0.5 text-sm font-bold ${gradeColor(summary.grade)}`}>
-            {summary.grade}
-          </span>
+        {/* Grade + Rank */}
+        <div className="mb-4 flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-mist/60">Grade:</span>
+            <span className={`rounded px-2 py-0.5 text-sm font-bold ${gradeColor(summary.grade)}`}>
+              {summary.grade}
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-mist/60">Score:</span>
+            <span className="font-mono text-sm tabular-nums text-slate-100/80">{summary.score}</span>
+          </div>
+          {rank !== null && (
+            <span className="rounded bg-neon/10 px-2 py-0.5 text-xs font-bold text-neon">
+              #{rank} on leaderboard
+            </span>
+          )}
         </div>
 
         {/* Stats grid */}
@@ -102,13 +159,21 @@ export const GameOverCard = ({ state, onPlayAgain }: GameOverCardProps) => {
           </div>
         )}
 
-        {/* Play Again */}
-        <button
-          onClick={onPlayAgain}
-          className="w-full rounded bg-neon/10 px-4 py-2 text-sm font-medium text-neon transition hover:bg-neon/20"
-        >
-          Play Again
-        </button>
+        {/* Buttons */}
+        <div className="flex gap-2">
+          <button
+            onClick={onPlayAgain}
+            className="flex-1 rounded bg-neon/10 px-4 py-2 text-sm font-medium text-neon transition hover:bg-neon/20"
+          >
+            Play Again
+          </button>
+          <button
+            onClick={() => setShowLeaderboard(true)}
+            className="rounded bg-steel/30 px-4 py-2 text-sm font-medium text-mist/80 transition hover:bg-steel/50"
+          >
+            Leaderboard
+          </button>
+        </div>
       </div>
     </div>
   );

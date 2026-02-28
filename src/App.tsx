@@ -1,6 +1,7 @@
 import { HudBar } from "./ui/components/HudBar";
 import { EventCard } from "./ui/components/EventCard";
 import { GameOverCard } from "./ui/components/GameOverCard";
+import { LeaderboardOverlay } from "./ui/components/LeaderboardOverlay";
 import { TerminalInput, TerminalLog, useTypewriterQueue } from "./ui/terminal";
 import { useGameStore } from "./state/useGameStore";
 import { MobilePanelsSheet } from "./ui/components/MobilePanelsSheet";
@@ -18,6 +19,7 @@ const App = () => {
   const [statsOpen, setStatsOpen] = useState(false);
   const [statsActive, setStatsActive] = useState<StatsPanelKey>("growth");
   const [mobileStatsSnap, setMobileStatsSnap] = useState<SheetSnap>("collapsed");
+  const [leaderboardOpen, setLeaderboardOpen] = useState(false);
 
   const { rendered: typedLog, isTyping, fastForward } = useTypewriterQueue(log);
 
@@ -74,7 +76,7 @@ const App = () => {
     >
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-3">
         <div className="sticky top-3 z-20 md:static">
-          <HudBar state={state} onToggleStats={toggleStats} statsOpen={effectiveStatsOpen} />
+          <HudBar state={state} onToggleStats={toggleStats} statsOpen={effectiveStatsOpen} onToggleLeaderboard={() => setLeaderboardOpen(true)} />
         </div>
 
         {state.pendingEvent && <EventCard event={state.pendingEvent} />}
@@ -110,6 +112,10 @@ const App = () => {
         </div>
 
         {state.gameOver && <GameOverCard state={state} onPlayAgain={resetGame} />}
+
+        {leaderboardOpen && !state.gameOver && (
+          <LeaderboardOverlay onClose={() => setLeaderboardOpen(false)} currentSeed={state.seed} />
+        )}
 
         <div className="md:hidden">
           <MobilePanelsSheet

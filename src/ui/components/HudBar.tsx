@@ -5,6 +5,7 @@ interface HudBarProps {
   state: GameState;
   onToggleStats?: () => void;
   statsOpen?: boolean;
+  onToggleLeaderboard?: () => void;
 }
 
 const fmt = (v: number) => `$${v.toLocaleString()}`;
@@ -19,7 +20,7 @@ const fmtCompactUsd = (v: number) => {
   return `${sign}$${abs.toLocaleString()}`;
 };
 
-export const HudBar = ({ state, onToggleStats, statsOpen = false }: HudBarProps) => {
+export const HudBar = ({ state, onToggleStats, statsOpen = false, onToggleLeaderboard }: HudBarProps) => {
   const runway = state.burn > 0 ? Math.max(0, Math.floor(state.cash / state.burn)) : 0;
   const runwayUrgent = runway <= 4;
   const founder = state.founder.archetype;
@@ -78,20 +79,32 @@ export const HudBar = ({ state, onToggleStats, statsOpen = false }: HudBarProps)
         Phase {state.companyPhase}
       </span>
 
-      {onToggleStats ? (
-        <button
-          type="button"
-          onClick={onToggleStats}
-          className={
-            statsOpen
-              ? "ml-auto rounded-lg bg-neon/10 px-2 py-1 text-[0.65rem] font-semibold text-neon"
-              : "ml-auto rounded-lg bg-steel/30 px-2 py-1 text-[0.65rem] text-mist/80"
-          }
-          title="Toggle stats"
-        >
-          Stats
-        </button>
-      ) : null}
+      <div className="ml-auto flex gap-1.5">
+        {onToggleLeaderboard ? (
+          <button
+            type="button"
+            onClick={onToggleLeaderboard}
+            className="rounded-lg bg-steel/30 px-2 py-1 text-[0.65rem] text-mist/80 hover:bg-steel/50"
+            title="Leaderboard & Graveyard"
+          >
+            Ranks
+          </button>
+        ) : null}
+        {onToggleStats ? (
+          <button
+            type="button"
+            onClick={onToggleStats}
+            className={
+              statsOpen
+                ? "rounded-lg bg-neon/10 px-2 py-1 text-[0.65rem] font-semibold text-neon"
+                : "rounded-lg bg-steel/30 px-2 py-1 text-[0.65rem] text-mist/80"
+            }
+            title="Toggle stats"
+          >
+            Stats
+          </button>
+        ) : null}
+      </div>
     </div>
   );
 };
