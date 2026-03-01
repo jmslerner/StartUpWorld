@@ -123,8 +123,8 @@ export const eventPool: EventDef[] = [
     when: (s) => s.week >= 3 && s.users >= 80 && s.reputation >= 18,
     weight: (s) => {
       const legal = s.team.legal;
-      const risk = 2 + s.reputation / 18 + s.volatility / 22;
-      return risk + (legal > 0 ? 0.8 : 3.2);
+      const risk = 1.5 + s.reputation / 35 + s.volatility / 40;
+      return risk + (legal > 0 ? 0.5 : 2);
     },
     choices: [
       {
@@ -496,7 +496,7 @@ export const eventPool: EventDef[] = [
     title: "Regulatory Letter",
     prompt: () => "A regulator sends a friendly letter. It reads like a threat.",
     when: (s) => s.users >= 150,
-    weight: (s) => 3 + s.users / 150,
+    weight: (s) => 2 + Math.min(s.users / 400, 2),
     choices: [
       {
         id: "lawyer-up",
@@ -1125,8 +1125,8 @@ export const eventPool: EventDef[] = [
     id: "union-whisper",
     title: "Union Whisper",
     prompt: () => "Someone mentions ‘collective bargaining’ in a channel. The channel suddenly goes quiet.",
-    when: (s, ctx) => ctx.teamSize >= 8 && s.week >= 6,
-    weight: (s) => 2 + (70 - s.culture.morale) / 15 + (70 - s.culture.cohesion) / 18,
+    when: (s, ctx) => ctx.teamSize >= 10 && s.week >= 8 && s.culture.morale <= 55,
+    weight: (s) => 1.5 + (60 - s.culture.morale) / 20 + (60 - s.culture.cohesion) / 22,
     choices: [
       {
         id: "listen",
@@ -1227,8 +1227,8 @@ export const eventPool: EventDef[] = [
     id: "regulator-side-quest",
     title: "Regulator Side Quest",
     prompt: () => "A regulator asks friendly questions. They do not feel friendly.",
-    when: (s) => s.week >= 6 && s.users >= 150,
-    weight: (s) => 2 + s.reputation / 30 + (s.team.legal > 0 ? 0 : 2.5),
+    when: (s) => s.week >= 8 && s.users >= 300,
+    weight: (s) => 1.5 + s.reputation / 40 + (s.team.legal > 0 ? 0 : 1.5),
     choices: [
       {
         id: "prepare",
@@ -1929,6 +1929,291 @@ export const eventPool: EventDef[] = [
         apply: (s) => ({
           state: addVcRep(addRep(addUsers(s, 50), 3), 1),
           logs: ["They write a glowing review. [[beat]] It’s better copy than anything your marketing team produced.", "Users +50. Rep +3. VC rep +1."],
+        }),
+      },
+    ],
+  },
+
+  // ───── MORE EVENTS: Variety pack ─────
+
+  {
+    id: "open-source-pr",
+    title: "Open Source PR",
+    prompt: () =>
+      "A stranger opens a pull request on your repo. The code is clean. The commit messages are poems. [[beat]] They want nothing in return.",
+    when: (s) => s.week >= 3 && s.users >= 80,
+    weight: () => 5,
+    choices: [
+      {
+        id: "merge",
+        text: "Merge it. Welcome them to the community.",
+        apply: (s) => ({
+          state: addRep(addMorale(addUsers(s, 40), 3), 2),
+          logs: ["You merge. They stick around. [[beat]] Open source is weird like that.", "Users +40. Morale +3. Rep +2."],
+        }),
+      },
+      {
+        id: "hire",
+        text: "Offer them a job on the spot.",
+        apply: (s) => ({
+          state: addCash(addRep(addMorale(addCohesion(s, 2), 2), 1), -3000),
+          logs: ["They accept. You just recruited through code review. [[beat]] HR is confused.", "Cash -$3,000. Cohesion +2. Morale +2. Rep +1."],
+        }),
+      },
+      {
+        id: "close",
+        text: "Close it. Too risky. We don't know this person.",
+        apply: (s) => ({
+          state: addRep(s, -2),
+          logs: ["You close the PR. They tweet about it. [[beat]] The tweet has teeth.", "Rep -2."],
+        }),
+      },
+    ],
+  },
+
+  {
+    id: "partner-api-request",
+    title: "Partner API Request",
+    prompt: () =>
+      "A mid-size company emails: 'We want to integrate your product into ours. Can we get API access?' [[beat]] They have 10x your users.",
+    when: (s) => s.stage !== "garage" && s.reputation >= 15 && s.users >= 200,
+    weight: (s) => 4 + s.reputation / 20,
+    choices: [
+      {
+        id: "prioritize",
+        text: "Prioritize it. Drop everything.",
+        apply: (s) => ({
+          state: addStress(addUsers(addVcRep(addRep(s, 3), 2), 180), 3),
+          logs: ["You build the integration in a week. Your team sleeps under desks. [[beat]] Users pour in.", "Users +180. Rep +3. VC rep +2. Stress +3."],
+        }),
+      },
+      {
+        id: "charge",
+        text: "Charge them for API access. Revenue first.",
+        apply: (s) => ({
+          state: addCash(addUsers(addRep(s, 1), 80), 8000),
+          logs: ["They pay. You ship. Everybody wins. [[beat]] Except your roadmap.", "Cash +$8,000. Users +80. Rep +1."],
+        }),
+      },
+      {
+        id: "decline",
+        text: "Decline. Stay focused on your own users.",
+        apply: (s) => ({
+          state: addTrust(addCohesion(s, 2), 1),
+          logs: ["You say no to distribution. It hurts. It also protects focus.", "Cohesion +2. Trust +1."],
+        }),
+      },
+    ],
+  },
+
+  {
+    id: "team-hackathon",
+    title: "Hack Week Proposal",
+    prompt: () =>
+      "The team wants a hack week. No roadmap. No standups. Just build whatever excites you. [[beat]] The Jira board weeps.",
+    when: (s) => s.week >= 5 && ts(s) >= 4,
+    weight: (s) => 4 + ts(s) / 5 + (s.culture.morale < 60 ? 2 : 0),
+    choices: [
+      {
+        id: "full-week",
+        text: "Full hack week. Creativity unleashed.",
+        apply: (s) => ({
+          state: addUsers(addCohesion(addMorale(addCash(s, -1200), 6), 5), 60),
+          logs: ["Someone builds a feature you never imagined. [[beat]] It ships the next sprint.", "Cash -$1,200. Morale +6. Cohesion +5. Users +60."],
+        }),
+      },
+      {
+        id: "one-day",
+        text: "One hack day. Contained chaos.",
+        apply: (s) => ({
+          state: addMorale(addCohesion(s, 2), 3),
+          logs: ["One day of fun. The demos are surprisingly good. [[beat]] Someone built a Slack bot that roasts the CEO.", "Morale +3. Cohesion +2."],
+        }),
+      },
+      {
+        id: "no-time",
+        text: "No. We ship features, not side projects.",
+        apply: (s) => ({
+          state: addMorale(addCohesion(s, -2), -3),
+          logs: ["The team nods. The energy drains. [[beat]] The Jira board doesn't care.", "Morale -3. Cohesion -2."],
+        }),
+      },
+    ],
+  },
+
+  {
+    id: "viral-screenshot",
+    title: "Viral Screenshot",
+    prompt: () =>
+      "Someone screenshots your product and posts it with: 'Why is nobody talking about this?' [[beat]] Suddenly everybody is talking about this.",
+    when: (s) => s.week >= 3 && s.users >= 60,
+    weight: (s) => 5 + s.volatility / 15,
+    choices: [
+      {
+        id: "capitalize",
+        text: "Retweet. Blog post. Landing page. Go.",
+        apply: (s) => ({
+          state: addVcRep(addRep(addUsers(s, 250), 3), 2),
+          logs: ["You ride the wave perfectly. [[beat]] The signup graph goes vertical for 48 hours.", "Users +250. Rep +3. VC rep +2."],
+        }),
+      },
+      {
+        id: "improve",
+        text: "Fix every bug first. Then capitalize.",
+        apply: (s) => ({
+          state: addStress(addRep(addUsers(s, 120), 2), 2),
+          logs: ["You ship 14 hotfixes in 6 hours, then announce. [[beat]] The product holds.", "Users +120. Rep +2. Stress +2."],
+        }),
+      },
+      {
+        id: "quiet",
+        text: "Stay quiet. Let the product speak.",
+        apply: (s) => ({
+          state: addUsers(addTrust(s, 1), 80),
+          logs: ["You let organic growth do its thing. [[beat]] Less splash, more staying power.", "Users +80. Trust +1."],
+        }),
+      },
+    ],
+  },
+
+  {
+    id: "customer-case-study",
+    title: "Customer Case Study",
+    prompt: () =>
+      "A customer publishes a blog post titled: 'How we 3x'd our workflow with this tool.' [[beat]] They tagged you. Their CTO has 40K followers.",
+    when: (s) => s.week >= 5 && s.users >= 200 && s.reputation >= 15,
+    weight: (s) => 4 + s.reputation / 25,
+    choices: [
+      {
+        id: "amplify",
+        text: "Amplify everywhere. This is marketing gold.",
+        apply: (s) => ({
+          state: addVcRep(addRep(addUsers(s, 120), 4), 2),
+          logs: ["You share it on every channel. Investors forward it. [[beat]] Social proof > ad spend.", "Users +120. Rep +4. VC rep +2."],
+        }),
+      },
+      {
+        id: "deepen",
+        text: "Reach out. Turn them into a design partner.",
+        apply: (s) => ({
+          state: addRep(addTrust(addUsers(s, 60), 2), 2),
+          logs: ["You build a relationship, not just a retweet. [[beat]] They become your best beta tester.", "Users +60. Rep +2. Trust +2."],
+        }),
+      },
+      {
+        id: "nothing",
+        text: "Do nothing. Let it happen organically.",
+        apply: (s) => ({
+          state: addUsers(s, 30),
+          logs: ["You miss the moment. Some things need a push. [[beat]] The tweet fades into the timeline.", "Users +30."],
+        }),
+      },
+    ],
+  },
+
+  {
+    id: "conference-booth",
+    title: "Conference Booth",
+    prompt: () =>
+      "You're offered a booth at the biggest conference in your space. The price is aggressive. The visibility is priceless. [[beat]] Or is it?",
+    when: (s) => s.week >= 5 && s.cash >= 5000,
+    weight: (s) => 4 + s.vcReputation / 25,
+    choices: [
+      {
+        id: "full-booth",
+        text: "Full booth. Swag. Demo stations. Go big.",
+        apply: (s) => ({
+          state: addStress(addVcRep(addRep(addUsers(addCash(s, -8000), 100), 3), 3), 3),
+          logs: ["You own the conference. Three VCs stop by. [[beat]] One of them remembers your name.", "Cash -$8,000. Users +100. Rep +3. VC rep +3. Stress +3."],
+        }),
+      },
+      {
+        id: "attend-cheap",
+        text: "Skip the booth. Attend. Work the hallways.",
+        apply: (s) => ({
+          state: addVcRep(addRep(addCash(s, -1500), 1), 1),
+          logs: ["You network like your runway depends on it. [[beat]] Because it does.", "Cash -$1,500. Rep +1. VC rep +1."],
+        }),
+      },
+      {
+        id: "skip",
+        text: "Skip it entirely. Ship instead.",
+        apply: (s) => ({
+          state: addCohesion(addMorale(s, 1), 1),
+          logs: ["You stay home and ship. The conference tweets scroll past. [[beat]] You don't look.", "Morale +1. Cohesion +1."],
+        }),
+      },
+    ],
+  },
+
+  {
+    id: "feature-demand-wave",
+    title: "Feature Demand Wave",
+    prompt: () =>
+      "Users are asking for the same feature. Loudly. In every channel. The request thread has 200 upvotes. [[beat]] It's not on the roadmap.",
+    when: (s) => s.week >= 4 && s.users >= 100,
+    weight: (s) => 5 + s.users / 200,
+    choices: [
+      {
+        id: "build-it",
+        text: "Build it. The people have spoken.",
+        apply: (s) => ({
+          state: addStress(addRep(addUsers(s, 100), 3), 3),
+          logs: ["You ship it in a week. The thread erupts. [[beat]] 'Finally.'", "Users +100. Rep +3. Stress +3."],
+        }),
+      },
+      {
+        id: "roadmap",
+        text: "Acknowledge it. Put it on the roadmap properly.",
+        apply: (s) => ({
+          state: addRep(addTrust(s, 2), 1),
+          logs: ["You post a thoughtful response. People respect the process. [[beat]] Most of them.", "Rep +1. Trust +2."],
+        }),
+      },
+      {
+        id: "say-no",
+        text: "Say no. It doesn't fit the vision.",
+        apply: (s) => ({
+          state: addUsers(addRep(addCohesion(s, 2), -2), -30),
+          logs: ["You hold the line. Some users leave. The product stays focused. [[beat]] Focus has a price.", "Users -30. Rep -2. Cohesion +2."],
+        }),
+      },
+    ],
+  },
+
+  {
+    id: "cold-dm-talent",
+    title: "Cold DM from a Star",
+    prompt: () =>
+      "A senior engineer from a top company DMs you: 'I've been using your product. I want to build it.' [[beat]] Their GitHub has more stars than your company.",
+    when: (s) => s.week >= 4 && s.reputation >= 20,
+    weight: (s) => 3 + s.reputation / 25,
+    choices: [
+      {
+        id: "hire",
+        text: "Hire them immediately. Whatever it costs.",
+        apply: (s) => ({
+          state: addCash(
+            addRep(addMorale(addCohesion({ ...s, team: { ...s.team, engineering: s.team.engineering + 1 } }, 3), 4), 2),
+            -5000
+          ),
+          logs: ["They start Monday. The team's energy shifts. [[beat]] Talent attracts talent.", "Cash -$5,000. +1 Eng. Cohesion +3. Morale +4. Rep +2."],
+        }),
+      },
+      {
+        id: "advisor",
+        text: "Offer an advisor role. Equity, no salary.",
+        apply: (s) => ({
+          state: addVcRep(addRep(s, 2), 1),
+          logs: ["They agree. You get credibility and office hours. [[beat]] Best deal you've closed.", "Rep +2. VC rep +1."],
+        }),
+      },
+      {
+        id: "later",
+        text: "Not now. Ask them to check in next quarter.",
+        apply: (s) => ({
+          state: addRep(s, -1),
+          logs: ["They move on. The window was smaller than you thought. [[beat]] Windows usually are.", "Rep -1."],
         }),
       },
     ],

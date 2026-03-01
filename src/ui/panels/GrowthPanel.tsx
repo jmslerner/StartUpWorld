@@ -8,7 +8,24 @@ interface GrowthPanelProps {
   state: GameState;
 }
 
-const fmtUsd = (v: number) => `$${v.toLocaleString()}`;
+const fmtUsd = (v: number) => {
+  const abs = Math.abs(v);
+  const sign = v < 0 ? "-" : "";
+  if (abs >= 1_000_000_000_000) return `${sign}$${(abs / 1_000_000_000_000).toFixed(1)}T`;
+  if (abs >= 1_000_000_000) return `${sign}$${(abs / 1_000_000_000).toFixed(1)}B`;
+  if (abs >= 1_000_000) return `${sign}$${(abs / 1_000_000).toFixed(1)}M`;
+  if (abs >= 1_000) return `${sign}$${(abs / 1_000).toFixed(0)}K`;
+  return `${sign}$${abs.toLocaleString()}`;
+};
+
+const fmtNum = (v: number) => {
+  const abs = Math.abs(v);
+  const sign = v < 0 ? "-" : "";
+  if (abs >= 1_000_000_000) return `${sign}${(abs / 1_000_000_000).toFixed(1)}B`;
+  if (abs >= 1_000_000) return `${sign}${(abs / 1_000_000).toFixed(1)}M`;
+  if (abs >= 1_000) return `${sign}${(abs / 1_000).toFixed(0)}K`;
+  return `${sign}${abs.toLocaleString()}`;
+};
 
 const fmtPct01 = (v: number) => `${Math.round(v * 100)}%`;
 
@@ -31,8 +48,8 @@ export const GrowthPanel = ({ state }: GrowthPanelProps) => {
       <div className="grid grid-cols-2 gap-x-4 gap-y-2">
         <Metric label="Users" description="Active users. Momentum compounds.">
           <span className="tabular-nums">
-            {state.users.toLocaleString()}
-            <Delta current={state.users} previous={state.lastWeek.users} />
+            {fmtNum(state.users)}
+            <Delta current={state.users} previous={state.lastWeek.users} format={(v) => fmtNum(v)} />
           </span>
         </Metric>
 
@@ -60,10 +77,10 @@ export const GrowthPanel = ({ state }: GrowthPanelProps) => {
           <span className="tabular-nums">{fmtPct01(state.capTable.founderPct)}</span>
         </Row>
         {state.lastRound ? (
-          <div className="mt-1 text-[0.7rem] text-mist/70">
-            Last round: +{fmtUsd(state.lastRound.amount)} @ {fmtUsd(state.lastRound.preMoney)} pre ({fmtUsd(
-              state.lastRound.postMoney
-            )} post), dilution {fmtPct01(state.lastRound.dilutionPct)}.
+          <div className="mt-1 text-[0.7rem] leading-relaxed text-mist/70">
+            Last round: +{fmtUsd(state.lastRound.amount)} @{" "}
+            {fmtUsd(state.lastRound.preMoney)} pre / {fmtUsd(state.lastRound.postMoney)} post,{" "}
+            dilution {fmtPct01(state.lastRound.dilutionPct)}.
           </div>
         ) : (
           <div className="mt-1 text-[0.7rem] text-mist/70">No priced rounds yet.</div>

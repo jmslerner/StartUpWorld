@@ -19,13 +19,21 @@ export const STAGE_VALUATION_FLOOR: Record<Stage, number> = {
   growth: 250_000_000,
 };
 
+// Hard ceiling per stage — prevents runaway valuations.
+const STAGE_VALUATION_CAP: Record<Stage, number> = {
+  garage: 25_000_000,
+  seed: 200_000_000,
+  "series-a": 2_000_000_000,
+  growth: 15_000_000_000,
+};
+
 export const calcValuation = (state: GameState, ctx: EngineContext): number => {
   const arr = calcArr(state);
   const base = stageMultipleBase[state.stage];
 
   // Growth drives multiples. Use weekly MRR growth (already clamped in context).
-  // Rough mapping: +10% week -> +4.0x, +30% week -> +10x.
-  const growthBoost = clamp(ctx.mrrGrowthRate, -0.35, 0.8) * 33;
+  // Mapping: +10% week -> +1.2x, +30% week -> +3.6x, +50% week -> +6x (cap).
+  const growthBoost = clamp(ctx.mrrGrowthRate, -0.2, 0.5) * 12;
 
   const vc = clamp((state.vcReputation - 50) / 50, -1, 1) * 2.2;
   const rep = clamp((state.reputation - 50) / 50, -1, 1) * 1.2;
@@ -37,10 +45,15 @@ export const calcValuation = (state: GameState, ctx: EngineContext): number => {
   const fromArr = arr * multiple;
   const floored = Math.max(STAGE_VALUATION_FLOOR[state.stage], fromArr);
 
-  // If you just priced a round, the market narrative doesn't instantly un-price it.
-  const postMoneyFloor = state.lastRound?.postMoney ?? 0;
+  // If you just priced a round, the market narrative doesn't instantly un-price it,
+  // but it decays over time — down rounds are real. ~8-week half-life.
+  const weeksSinceRound = state.lastRound ? state.week - state.lastRound.week : 0;
+  const postMoneyFloor = (state.lastRound?.postMoney ?? 0) * Math.pow(0.92, weeksSinceRound);
   const withRound = Math.max(floored, postMoneyFloor);
 
+  // Hard cap per stage — even unicorns have limits.
+  const capped = Math.min(STAGE_VALUATION_CAP[state.stage], withRound);
+
   // Keep numbers stable/readable.
-  return Math.round(withRound / 1000) * 1000;
+  return Math.round(capped / 1000) * 1000;
 };

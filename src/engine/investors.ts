@@ -12,11 +12,70 @@ const pitchFailMessages = [
   "The partner checks their phone during your demo. Twice.",
   "They loved the vision. They hated the numbers. [[beat]] The numbers win.",
   "'We're not investing right now.' (They invested in your competitor yesterday.)",
+  "They ask about your moat. You describe a puddle. [[beat]] Meeting over.",
+  "'Love the team. Hate the TAM.' [[beat]] Translation: your market is too small for their fund.",
+  "The associate nods aggressively for 45 minutes. [[beat]] You never hear from them again.",
+  "They want to see 'more traction.' [[beat]] You need money to get traction. The circle of startup life.",
+  "'Can you come back in Q3?' [[beat]] It is Q3.",
+  "The partner loved you. The partnership meeting did not.",
+  "They pass, but offer to make an intro. [[beat]] The intro never comes.",
+  "'We just invested in a competitor in the space.' [[beat]] They say it like an apology. It isn't.",
+  "Mid-pitch, they ask: 'What happens if Google does this?' You don't have a good answer.",
+  "Their body language says yes. Their email says 'pass with conviction.'",
+  "They want unit economics. You have vibes and a Notion doc.",
+  "'Strong pass.' [[beat]] You didn't know passes had adjectives.",
+  "They say they'll 'follow the round.' [[beat]] Translation: call us when someone else leads.",
+  "The meeting runs 15 minutes short. [[beat]] That's never good.",
+  "'We love founders who've been through this before.' [[beat]] This is your first time.",
 ];
 
-const pickPitchFail = (rng: number): { rng: number; msg: string } => {
-  const pick = nextIntInclusive(rng, 0, pitchFailMessages.length - 1);
-  return { rng: pick.rng, msg: pitchFailMessages[pick.value] };
+const pitchSuccessMessages = [
+  "A partner leans in: \"Send the deck.\"",
+  "They ask for a second meeting. [[beat]] Second meetings mean something.",
+  "The partner says the magic words: \"I want to take this to the partnership.\"",
+  "They start talking terms before you've even finished. [[beat]] Good sign.",
+  "A partner nods slowly: \"This is the kind of thing we like.\"",
+  "\"We've been looking for something exactly like this.\" [[beat]] Your heart rate doubles.",
+  "They ask about your timeline. Investors only ask about timelines when they're interested.",
+  "The meeting runs 30 minutes over. [[beat]] Nobody wants to leave.",
+  "A partner pulls you aside after: \"Let me introduce you to my partner who leads this vertical.\"",
+  "\"Your numbers are early, but the narrative is compelling.\" [[beat]] They request a data room.",
+  "The energy in the room shifts. You can feel it. [[beat]] They're in.",
+  "They ask what other firms are looking. [[beat]] FOMO is the most powerful force in venture.",
+  "\"Don't sign anything until you talk to us.\" [[beat]] The power dynamic just flipped.",
+  "You finish the demo. Silence. [[beat]] Then: \"How fast can you close?\"",
+  "They share the deck with a colleague before you've left the building.",
+];
+
+const pitchNewLeadMessages = [
+  "Warm intro lands. {name} ({trend} focus) takes the call.",
+  "A mutual connection makes the intro to {name}. They're watching the {trend} space closely.",
+  "Your name came up at a dinner. {name} reaches out. They invest in {trend}.",
+  "{name} saw your tweet thread. They slide into the DMs. [[beat]] Trend bias: {trend}.",
+  "A founder you helped last year returns the favor. Intro to {name} ({trend}).",
+  "You run into {name} at a coffee shop. No, really. [[beat]] They're interested in {trend}.",
+  "{name} heard your podcast clip. They want 30 minutes. Focus area: {trend}.",
+  "An LP mentions your company to {name}. They call the next morning. Bias: {trend}.",
+  "Your advisor opens a door: {name}, deep in {trend}, wants a first look.",
+  "{name} cold-emails YOU. [[beat]] That never happens. Trend: {trend}.",
+];
+
+const pitchNoLeadMessages = [
+  "You pitch the usual circuit. Lots of nodding. Little commitment.",
+  "A dozen emails out. Three polite passes. Nine ghosts.",
+  "You shake hands, exchange cards, and watch interest evaporate in the parking lot.",
+  "The pitch goes fine. Fine is not a check.",
+  "You do the circuit. People say 'exciting.' [[beat]] Nobody says 'yes.'",
+  "Coffee meetings. Dinners. A demo day. [[beat]] Your pipeline stays the same size.",
+  "Everyone loves the mission. Nobody loves the metrics. Yet.",
+  "You deliver the pitch cleanly. The room smiles. [[beat]] Smiles don't wire money.",
+  "Three meetings, three 'let me think about it's. [[beat]] Thinking is free. Runway is not.",
+  "You work the room at a founder event. Lots of 'let's keep in touch.'",
+];
+
+const pickFrom = (rng: number, msgs: string[]): { rng: number; msg: string } => {
+  const pick = nextIntInclusive(rng, 0, msgs.length - 1);
+  return { rng: pick.rng, msg: msgs[pick.value] };
 };
 
 const investorNames = [
@@ -104,9 +163,13 @@ export const pitch = (state: GameState): { state: GameState; logs: string[]; ok:
     s = gen.state;
     const nextPipeline = [gen.lead, ...s.investors.pipeline].slice(0, 6);
     s = { ...s, investors: { pipeline: nextPipeline } };
-    logs.push(`Warm intro: ${gen.lead.name}. Trend bias: ${gen.lead.trendBias}.`);
+    const leadMsg = pickFrom(s.rng, pitchNewLeadMessages);
+    s = { ...s, rng: leadMsg.rng };
+    logs.push(leadMsg.msg.replace("{name}", gen.lead.name).replace(/\{trend\}/g, gen.lead.trendBias));
   } else {
-    logs.push("You pitch the usual circuit. Lots of nodding. Little commitment.");
+    const noLeadMsg = pickFrom(s.rng, pitchNoLeadMessages);
+    s = { ...s, rng: noLeadMsg.rng };
+    logs.push(noLeadMsg.msg);
   }
 
   // Pitch quality: traction + reputation - stress.
@@ -123,7 +186,9 @@ export const pitch = (state: GameState): { state: GameState; logs: string[]; ok:
 
   if (yes.value) {
     s = { ...s, vcReputation: clamp(s.vcReputation + 2, 0, 100) };
-    logs.push("A partner leans in: \"Send the deck.\"");
+    const successMsg = pickFrom(s.rng, pitchSuccessMessages);
+    s = { ...s, rng: successMsg.rng };
+    logs.push(successMsg.msg);
 
     // Occasionally, a small angel check appears when you’re early and the vibe is right.
     const angelGate = chance(s.rng, s.stage === "garage" ? 0.38 : runway <= 2 ? 0.22 : 0);
@@ -134,7 +199,7 @@ export const pitch = (state: GameState): { state: GameState; logs: string[]; ok:
       logs.push(`An angel wires a SAFE: +$${size.value.toLocaleString()}.`);
     }
   } else {
-    const fail = pickPitchFail(s.rng);
+    const fail = pickFrom(s.rng, pitchFailMessages);
     s = { ...s, rng: fail.rng, vcReputation: clamp(s.vcReputation - 1, 0, 100) };
     logs.push(fail.msg);
   }
