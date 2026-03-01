@@ -5,6 +5,7 @@ import type {
   FounderArchetype,
   GameState,
   LogEntry,
+  SoundHint,
   TeamRole,
 } from "../types/game";
 import { appendLog } from "./logging";
@@ -21,13 +22,13 @@ import { pitch, raise } from "./investors";
 import { evaluateEndings } from "./endings";
 import { refreshDerivedNoLog } from "./derived";
 
-const withLogLines = (state: GameState, lines: Array<{ text: string; kind?: LogEntry["kind"] }>): ActionResult => {
+const withLogLines = (state: GameState, lines: Array<{ text: string; kind?: LogEntry["kind"] }>, sound?: SoundHint): ActionResult => {
   const logs: LogEntry[] = [];
   let s = state;
   for (const line of lines) {
     s = appendLog(s, logs, line.text, line.kind ?? "system");
   }
-  return { state: refreshDerivedNoLog(s), logs };
+  return { state: refreshDerivedNoLog(s), logs, sound };
 };
 
 const err = (state: GameState, message: string): ActionResult => withLogLines(state, [{ text: message, kind: "error" }]);
@@ -374,7 +375,7 @@ export const raiseBootstrap = (state: GameState, source: BootstrapFundingSource)
   }
   lines.push({ text: `Stress +${stressDelta}.`, kind: "event" });
 
-  return withLogLines(updated, lines);
+  return withLogLines(updated, lines, "cash-in");
 };
 
 const ensurePlayable = (state: GameState): ActionResult | null => {
@@ -459,7 +460,7 @@ export const hire = (state: GameState, role: TeamRole, count: number): ActionRes
     lines.push({ text: "Rapid hiring strains cohesion.", kind: "event" });
   }
 
-  return withLogLines(updated, lines);
+  return withLogLines(updated, lines, "success");
 };
 
 export const shipFeature = (state: GameState, name: string): ActionResult => {
@@ -536,7 +537,7 @@ export const shipFeature = (state: GameState, name: string): ActionResult => {
         : []),
       { text: failPick.msg, kind: "event" },
       { text: `Reputation -${repLoss}. Morale -4. Cohesion -2.`, kind: "event" },
-    ]);
+    ], "fail");
   }
 
   const repGain = Math.max(1, Math.round((2 + eng) * (0.55 + vol * 0.9 + Math.max(0, swing.value) * 0.6)));
@@ -557,7 +558,7 @@ export const shipFeature = (state: GameState, name: string): ActionResult => {
       ? ([{ text: "You barely shipped it. The org is skewed toward GTM.", kind: "event" }] as const)
       : []),
     { text: `Reputation +${repGain}. ${arpuBump ? `ARPU +${arpuBump}.` : ""}` },
-  ]);
+  ], "success");
 };
 
 export const launchCampaign = (state: GameState, name: string): ActionResult => {
@@ -618,7 +619,7 @@ export const launchCampaign = (state: GameState, name: string): ActionResult => 
       ...freeLaunchLog,
       { text: failPick.msg, kind: "event" },
       { text: `Cash -$${spend.toLocaleString()}. Users +${Math.round(userDelta * 0.2)}. Reputation -${repLoss}.`, kind: "event" },
-    ]);
+    ], "fail");
   }
 
   const updated = markFreeActionUsed(spendAp({
@@ -632,7 +633,7 @@ export const launchCampaign = (state: GameState, name: string): ActionResult => 
     { text: `Campaign "${name}" launched.` },
     ...freeLaunchLog,
     { text: `Cash -$${spend.toLocaleString()}. Users +${userDelta}.`, kind: "system" },
-  ]);
+  ], "success");
 };
 
 export const pitchInvestors = (state: GameState): ActionResult => {
@@ -646,7 +647,7 @@ export const pitchInvestors = (state: GameState): ActionResult => {
   const p = pitch(state);
   const updated = markFreeActionUsed(spendAp(p.state, pitchCost), "pitch");
   const freePitchLog = pitchCost === 0 ? [{ text: "Sales Animal perk: first pitch of the week is free.", kind: "system" as const }] : [];
-  return withLogLines(updated, [...freePitchLog, ...p.logs.map((t) => ({ text: t, kind: "system" as const }))]);
+  return withLogLines(updated, [...freePitchLog, ...p.logs.map((t) => ({ text: t, kind: "system" as const }))], p.ok ? "success" : "fail");
 };
 
 export const raiseSeed = (state: GameState, amount: number): ActionResult => {
@@ -662,7 +663,7 @@ export const raiseSeed = (state: GameState, amount: number): ActionResult => {
 
   const r = raise(state, amount);
   const updated = spendAp({ ...r.state, burn: calcBurn(r.state) }, vcCost);
-  return withLogLines(updated, r.logs.map((t) => ({ text: t, kind: "event" })));
+  return withLogLines(updated, r.logs.map((t) => ({ text: t, kind: "event" })), r.ok ? "cash-in" : "fail");
 };
 
 export const choose = (state: GameState, choiceIndex: number): ActionResult => {

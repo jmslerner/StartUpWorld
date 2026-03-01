@@ -77,7 +77,7 @@ export const generateLead = (state: GameState): { state: GameState; lead: Invest
   return { state: { ...state, rng: r }, lead };
 };
 
-export const pitch = (state: GameState): { state: GameState; logs: string[] } => {
+export const pitch = (state: GameState): { state: GameState; logs: string[]; ok: boolean } => {
   const logs: string[] = [];
   let s: GameState = state;
 
@@ -139,7 +139,7 @@ export const pitch = (state: GameState): { state: GameState; logs: string[] } =>
     logs.push(fail.msg);
   }
 
-  return { state: s, logs };
+  return { state: s, logs, ok: yes.value };
 };
 
 const alignmentScore = (state: GameState, lead: InvestorLead): number => {
@@ -162,19 +162,19 @@ const stageFromAmount = (state: GameState, amount: number): Stage => {
   return state.stage;
 };
 
-export const raise = (state: GameState, amount: number): { state: GameState; logs: string[] } => {
+export const raise = (state: GameState, amount: number): { state: GameState; logs: string[]; ok: boolean } => {
   const logs: string[] = [];
   let s = state;
 
   if (s.investors.pipeline.length === 0) {
     logs.push("You have no active investor leads. Try `pitch` first.");
-    return { state: s, logs };
+    return { state: s, logs, ok: false };
   }
 
   const caps = stageRaiseCaps[s.stage];
   if (amount > caps.hardCap) {
     logs.push(`That ask is delusional for ${s.stage}. Hard cap is ~$${caps.hardCap.toLocaleString()}.`);
-    return { state: s, logs };
+    return { state: s, logs, ok: false };
   }
 
   // If your valuation hasn't caught up, the market won't price you into a new stage.
@@ -195,7 +195,7 @@ export const raise = (state: GameState, amount: number): { state: GameState; log
     logs.push(`You push a $${amount.toLocaleString()} ask.`);
     logs.push(`They do the math. That's ~${Math.round(askAsPctOfValue * 100)}% of your implied value.`);
     logs.push("They pass instantly. \"Come back when the numbers are real.\"");
-    return { state: s, logs };
+    return { state: s, logs, ok: false };
   }
 
   let r = s.rng;
@@ -235,7 +235,7 @@ export const raise = (state: GameState, amount: number): { state: GameState; log
     };
     logs.push(`You push a $${amount.toLocaleString()} ask to ${best.name}.`);
     logs.push("They stall. Your lawyer sends three follow-ups. Silence.");
-    return { state: s, logs };
+    return { state: s, logs, ok: false };
   }
 
   const nextStage = stageFromAmount(s, amount);
@@ -303,7 +303,7 @@ export const raise = (state: GameState, amount: number): { state: GameState; log
     logs.push("The money buys you time, not a new label.");
   }
 
-  return { state: s, logs };
+  return { state: s, logs, ok: true };
 };
 
 export const formatPipeline = (state: GameState): string[] => {

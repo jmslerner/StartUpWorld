@@ -3,6 +3,7 @@ import type { GameState, LogEntry } from "../types/game";
 import { createInitialState, executeCommand } from "../engine";
 import { toLog } from "../engine/utils";
 import { pickWeeklyQuote } from "../ui/quotes";
+import { SFX } from "../ui/sound";
 
 interface GameStore {
   state: GameState;
@@ -49,9 +50,22 @@ export const useGameStore = create<GameStore>((set) => ({
       }
 
       const prevWeek = current.state.week;
+      const hadEvent = current.state.pendingEvent;
       const userLog = trimmed ? [toLog(`> ${trimmed}`, "user")] : [];
       const result = executeCommand(current.state, trimmed);
       const advancedWeek = result.state.week > prevWeek;
+
+      // --- Sound effects (fire-and-forget, never block state update) ---
+      if (result.sound === "success") SFX.success();
+      else if (result.sound === "fail") SFX.fail();
+      else if (result.sound === "cash-in") SFX.cashIn();
+      else if (result.sound === "warning") SFX.warning();
+
+      if (advancedWeek) SFX.tick();
+      if (!hadEvent && result.state.pendingEvent) SFX.alert();
+      if (result.state.gameOver && !current.state.gameOver) {
+        setTimeout(() => SFX.gameOver(result.state.gameOver!.ending), 200);
+      }
 
       const quoteLog = advancedWeek
         ? (() => {

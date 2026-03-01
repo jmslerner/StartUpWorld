@@ -151,9 +151,12 @@ export interface LogEntry {
   kind?: "system" | "user" | "event" | "error";
 }
 
+export type SoundHint = "success" | "fail" | "cash-in" | "warning";
+
 export interface ActionResult {
   state: GameState;
   logs: LogEntry[];
+  sound?: SoundHint;
 
   // Optional structured output for future UI; terminal can ignore.
   events?: PendingEvent[];
