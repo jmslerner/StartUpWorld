@@ -113,7 +113,7 @@ const App = () => {
 
         {state.gameOver && <GameOverCard state={state} onPlayAgain={resetGame} />}
 
-        {leaderboardOpen && !state.gameOver && (
+        {leaderboardOpen && (
           <LeaderboardOverlay onClose={() => setLeaderboardOpen(false)} currentSeed={state.seed} />
         )}
 
