@@ -36,6 +36,8 @@ const growthRates = (state: GameState) => {
   const imbalanceGrowthPenalty = Math.min(0.05, execGap * 0.0025);
   const imbalanceChurnPenalty = Math.min(0.06, execGap * 0.002);
 
+  const data = state.team.data;
+
   // Baseline growth and churn; dramatic but bounded.
   const baseGrowth =
     0.015 +
@@ -44,6 +46,7 @@ const growthRates = (state: GameState) => {
     ops * 0.002 +
     mkt * 0.006 +
     sales * 0.006 +
+    data * 0.003 +
     morale * 0.01 +
     legal * 0.0015 -
     hr * 0.0015 -
@@ -55,7 +58,8 @@ const growthRates = (state: GameState) => {
     (1 - morale) * 0.03 +
     stress * 0.015 -
     legal * 0.0007 -
-    ops * 0.0015 +
+    ops * 0.0015 -
+    data * 0.008 +
     imbalanceChurnPenalty;
 
   const pm = PRICING_MODELS[state.pricingModel];

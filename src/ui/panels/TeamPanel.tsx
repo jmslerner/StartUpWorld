@@ -2,6 +2,7 @@ import type { GameState, TeamRole } from "../../types/game";
 import { PanelCard } from "../components/PanelCard";
 import { Delta } from "../components/Gauge";
 import { Tooltip } from "../components/Tooltip";
+import { canHireRole } from "../../engine/stagePerks";
 
 interface TeamPanelProps {
   state: GameState;
@@ -15,6 +16,9 @@ const roles: { key: TeamRole; label: string }[] = [
   { key: "ops", label: "Ops" },
   { key: "hr", label: "HR" },
   { key: "legal", label: "Legal" },
+  { key: "data", label: "Data" },
+  { key: "product", label: "PM" },
+  { key: "executive", label: "Exec" },
 ];
 
 const roleTips: Record<TeamRole, string> = {
@@ -25,6 +29,9 @@ const roleTips: Record<TeamRole, string> = {
   ops: "Reduces churn/drag and keeps the org running. Adds cost but prevents chaos.",
   hr: "Helps scale hiring and reduces people issues. Adds process overhead.",
   legal: "Reduces legal risk and contract friction. Adds cost.",
+  data: "Reduces churn through analytics. Unlocks at seed stage.",
+  product: "Boosts ship success as a product manager. Unlocks at series-a stage.",
+  executive: "Reduces overhead and boosts pitch success. Unlocks at growth stage.",
 };
 
 export const TeamPanel = ({ state }: TeamPanelProps) => {
@@ -35,7 +42,9 @@ export const TeamPanel = ({ state }: TeamPanelProps) => {
   return (
     <PanelCard title="Team">
       <div className="flex flex-wrap justify-center gap-x-3 gap-y-1 text-center">
-        {roles.map(({ key, label }) => (
+        {roles
+          .filter(({ key }) => canHireRole(key, state.stage) || state.team[key] > 0)
+          .map(({ key, label }) => (
           <Tooltip key={key} content={roleTips[key]} align="right">
             <span className={state.team[key] > 0 ? "text-slate-100/90" : "text-mist/40"}>
               {label} {state.team[key]}

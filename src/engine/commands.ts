@@ -1,4 +1,4 @@
-import type { ActionResult, GameState, LogEntry, PricingModel, TeamRole } from "../types/game";
+import type { ActionResult, GameState, LogEntry, PricingModel, Stage, TeamRole } from "../types/game";
 import { toLog, parseAmount } from "./utils";
 import {
   choose,
@@ -18,6 +18,7 @@ import {
   showPricingInfo,
   status,
 } from "./actions";
+import { STAGE_PERKS, ROLE_MIN_STAGE } from "./stagePerks";
 
 const roleMap: Record<string, TeamRole> = {
   engineering: "engineering",
@@ -33,6 +34,13 @@ const roleMap: Record<string, TeamRole> = {
   hr: "hr",
   legal: "legal",
   lawyer: "legal",
+  data: "data",
+  analytics: "data",
+  product: "product",
+  pm: "product",
+  executive: "executive",
+  exec: "executive",
+  vp: "executive",
 };
 
 const founderOptions = ["visionary", "hacker", "sales-animal", "philosopher"] as const;
@@ -61,11 +69,13 @@ const setupHelpText: LogEntry[] = [
   toLog("status - show current stats"),
   toLog("hire <role> <count> - hire teammates"),
   toLog("  roles: eng, ux, marketing, sales, ops, hr, legal"),
+  toLog("  unlocks: data (seed), product (series-a), executive (growth)"),
   toLog("ship <feature> - ship a feature"),
   toLog("launch <campaign> - run a growth campaign"),
   toLog("pitch - pitch investors"),
   toLog("raise [vc <amount>|friends|cards|loan|preseed|mortgage] - funding (run `raise` for options)"),
   toLog("pricing [consumer|prosumer|enterprise] - view or change pricing model"),
+  toLog("perks - view stage perks and upcoming unlocks"),
   toLog("end - end the week"),
   toLog("choose <n> - resolve a pending event choice"),
 ];
@@ -78,17 +88,65 @@ const mainHelpText: LogEntry[] = [
   toLog("status - show current stats"),
   toLog("hire <role> <count> - hire teammates"),
   toLog("  roles: eng, ux, marketing, sales, ops, hr, legal"),
+  toLog("  unlocks: data (seed), product (series-a), executive (growth)"),
   toLog("ship <feature> - ship a feature"),
   toLog("launch <campaign> - run a growth campaign"),
   toLog("pitch - pitch investors"),
   toLog("raise [vc <amount>|friends|cards|loan|preseed|mortgage] - funding (run `raise` for options)"),
   toLog("pricing [consumer|prosumer|enterprise] - view or change pricing model"),
+  toLog("perks - view stage perks and upcoming unlocks"),
   toLog("end - end the week"),
   toLog("choose <n> - resolve a pending event choice"),
 ];
 
 const isSetupComplete = (state: GameState) =>
   Boolean(state.founder.name.trim() && state.companyName.trim() && state.founder.archetype && state.cofounder.archetype);
+
+const STAGE_ORDER: Stage[] = ["garage", "seed", "series-a", "growth"];
+
+const showPerks = (state: GameState): ActionResult => {
+  const perks = STAGE_PERKS[state.stage];
+  const logs: LogEntry[] = [toLog(`Stage: ${state.stage}`, "system")];
+
+  const active: string[] = [];
+  if (perks.shipSuccessBonus > 0) active.push(`Ship success +${Math.round(perks.shipSuccessBonus * 100)}%`);
+  if (perks.launchSuccessBonus > 0) active.push(`Launch success +${Math.round(perks.launchSuccessBonus * 100)}%`);
+  if (perks.pitchSuccessBonus > 0) active.push(`Pitch success +${Math.round(perks.pitchSuccessBonus * 100)}%`);
+  if (perks.apBonus > 0) active.push(`+${perks.apBonus} max AP`);
+  if (perks.overheadDiscount > 0) active.push(`Overhead -${Math.round(perks.overheadDiscount * 100)}%`);
+
+  if (active.length > 0) {
+    logs.push(toLog("Active perks:", "system"));
+    for (const p of active) logs.push(toLog(`  ${p}`));
+  } else {
+    logs.push(toLog("No stage perks yet. Raise to advance.", "system"));
+  }
+
+  // Unlocked roles at this stage
+  const unlockedRoles = Object.entries(ROLE_MIN_STAGE)
+    .filter(([, minStage]) => STAGE_ORDER.indexOf(state.stage) >= STAGE_ORDER.indexOf(minStage))
+    .map(([role]) => role);
+  if (unlockedRoles.length > 0) {
+    logs.push(toLog(`Unlocked roles: ${unlockedRoles.join(", ")}`, "system"));
+  }
+
+  // Upcoming unlocks
+  const currentIdx = STAGE_ORDER.indexOf(state.stage);
+  if (currentIdx < STAGE_ORDER.length - 1) {
+    const nextStage = STAGE_ORDER[currentIdx + 1];
+    const nextPerks = STAGE_PERKS[nextStage];
+    logs.push(toLog(""));
+    logs.push(toLog(`Next stage (${nextStage}):`, "system"));
+    for (const msg of nextPerks.unlockMessages) {
+      logs.push(toLog(`  ${msg}`));
+    }
+  } else {
+    logs.push(toLog(""));
+    logs.push(toLog("All stage perks unlocked.", "system"));
+  }
+
+  return { state, logs };
+};
 
 export const executeCommand = (state: GameState, input: string): ActionResult => {
   const [rawCommand, ...rest] = input.trim().split(/\s+/);
@@ -175,7 +233,7 @@ export const executeCommand = (state: GameState, input: string): ActionResult =>
       if (!role) {
         return {
           state,
-          logs: [toLog("Unknown role. Try engineering/design/marketing/sales/ops/hr/legal (aliases: eng, ux, gtm, ae).", "error")],
+          logs: [toLog("Unknown role. Try eng, ux, marketing, sales, ops, hr, legal (unlocks: data, product, executive).", "error")],
         };
       }
       const count = Number(rest[1] ?? "1");
@@ -243,6 +301,8 @@ export const executeCommand = (state: GameState, input: string): ActionResult =>
       }
       return setPricingModel(state, model as PricingModel);
     }
+    case "perks":
+      return showPerks(state);
     case "end":
       return endWeek(state);
 
@@ -282,7 +342,7 @@ export const executeCommand = (state: GameState, input: string): ActionResult =>
 const knownCommands = [
   "help", "clear", "cls", "status", "seed", "name", "company",
   "founder", "cofounder", "choose", "hire", "ship", "launch",
-  "pitch", "raise", "pricing", "end",
+  "pitch", "raise", "pricing", "perks", "end",
 ];
 
 const levenshtein = (a: string, b: string): number => {

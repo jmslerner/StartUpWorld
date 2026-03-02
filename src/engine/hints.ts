@@ -51,5 +51,16 @@ export const generateHints = (state: GameState, ctx: EngineContext): Hint[] => {
     hints.push({ text: "Tip: ARPU is at the floor for your pricing model. Consider `pricing` to pivot.", priority: 4 });
   }
 
+  // Stage unlock hints — nudge players toward newly available roles.
+  if (state.stage === "seed" && state.team.data === 0 && state.week >= 4) {
+    hints.push({ text: "Tip: New role unlocked: `hire data` to reduce churn with analytics.", priority: 4 });
+  }
+  if (state.stage === "series-a" && state.team.product === 0 && state.week >= 4) {
+    hints.push({ text: "Tip: New role unlocked: `hire product` to ship faster.", priority: 4 });
+  }
+  if (state.stage === "growth" && state.team.executive === 0) {
+    hints.push({ text: "Tip: `hire executive` to reduce overhead and boost pitch success.", priority: 4 });
+  }
+
   return hints.sort((a, b) => b.priority - a.priority);
 };

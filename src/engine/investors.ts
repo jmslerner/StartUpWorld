@@ -6,6 +6,7 @@ import { calcRunwayWeeks } from "./economy";
 import { founderMods } from "./founders";
 import { STAGE_VALUATION_FLOOR } from "./valuation";
 import { computeContext } from "./context";
+import { STAGE_PERKS } from "./stagePerks";
 
 const pitchFailMessages = [
   "They pass for now. \"Come back with cleaner growth.\"",
@@ -181,7 +182,8 @@ export const pitch = (state: GameState): { state: GameState; logs: string[]; ok:
   // LTV:CAC bonus: VCs love ratios > 3. Scales 0..0.12.
   const unitEconBonus = clamp((ctx.ltvCacRatio - 1) / 8, 0, 0.12);
 
-  const base = 0.22 + traction * 0.35 + rep * 0.18 + unitEconBonus - stressPenalty + (mods?.pitchSuccess ?? 0);
+  const stagePitchBonus = STAGE_PERKS[s.stage].pitchSuccessBonus;
+  const base = 0.22 + traction * 0.35 + rep * 0.18 + unitEconBonus + stagePitchBonus - stressPenalty + (mods?.pitchSuccess ?? 0);
   const hype = signedUnit(s.rng);
   s = { ...s, rng: hype.rng };
   const p = clamp(base + hype.value * (s.volatility / 100) * 0.12, 0.02, 0.75);
@@ -370,6 +372,9 @@ export const raise = (state: GameState, amount: number): { state: GameState; log
   }
   if (nextStage !== state.stage) {
     logs.push(`Cash +$${netCash.toLocaleString()}. Stage: ${state.stage} → ${nextStage}.`);
+    for (const msg of STAGE_PERKS[nextStage].unlockMessages) {
+      logs.push(msg);
+    }
   } else {
     logs.push(`Cash +$${netCash.toLocaleString()}. Stage holds at ${state.stage}.`);
     logs.push("The money buys you time, not a new label.");

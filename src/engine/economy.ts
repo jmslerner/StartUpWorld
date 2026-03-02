@@ -1,6 +1,7 @@
 import type { GameState, Stage, TeamRole } from "../types/game";
 import { clamp } from "./utils";
 import { founderMods } from "./founders";
+import { STAGE_PERKS } from "./stagePerks";
 
 export const BASE_AP = 3;
 
@@ -12,6 +13,9 @@ export const roleComp: Record<TeamRole, { salary: number; hireCost: number }> = 
   ops: { salary: 2400, hireCost: 2000 },
   hr: { salary: 2600, hireCost: 2200 },
   legal: { salary: 4200, hireCost: 5000 },
+  data: { salary: 3200, hireCost: 2800 },
+  product: { salary: 3400, hireCost: 3000 },
+  executive: { salary: 5000, hireCost: 6000 },
 };
 
 export const stageOverhead: Record<Stage, number> = {
@@ -26,7 +30,9 @@ export const calcBurn = (state: GameState): number => {
     (acc, role) => acc + state.team[role] * roleComp[role].salary,
     0
   );
-  const overhead = stageOverhead[state.stage];
+  const overheadDiscount = STAGE_PERKS[state.stage].overheadDiscount;
+  const execReduction = Math.min(0.15, state.team.executive * 0.05);
+  const overhead = Math.round(stageOverhead[state.stage] * (1 - overheadDiscount) * (1 - execReduction));
 
   // Org imbalance: too much go-to-market without enough operators makes everything more expensive.
   const gtm = state.team.sales + state.team.marketing;
@@ -70,10 +76,11 @@ export const AP_COSTS: Record<string, number> = {
   "raise-bootstrap": 1,
 };
 
-/** Philosopher gets 4 AP per week; everyone else gets 3. */
+/** Base AP + philosopher bonus + stage perk bonus. */
 export const getEffectiveMaxAp = (state: GameState): number => {
-  if (state.founder.archetype === "philosopher") return BASE_AP + 1;
-  return BASE_AP;
+  const philosopherBonus = state.founder.archetype === "philosopher" ? 1 : 0;
+  const stageBonus = STAGE_PERKS[state.stage].apBonus;
+  return BASE_AP + philosopherBonus + stageBonus;
 };
 
 /**

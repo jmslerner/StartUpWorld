@@ -23,6 +23,7 @@ import { pitch, raise } from "./investors";
 import { evaluateEndings } from "./endings";
 import { refreshDerivedNoLog } from "./derived";
 import { PRICING_MODELS } from "./pricing";
+import { canHireRole, ROLE_MIN_STAGE, STAGE_PERKS } from "./stagePerks";
 
 const withLogLines = (state: GameState, lines: Array<{ text: string; kind?: LogEntry["kind"] }>, sound?: SoundHint): ActionResult => {
   const logs: LogEntry[] = [];
@@ -122,6 +123,18 @@ const COFOUNDER_ARCHETYPE_BLURB: Record<CofounderArchetype, ArchetypeBlurb> = {
 };
 
 const stripPrefix = (s: string, prefix: string) => (s.toLowerCase().startsWith(prefix.toLowerCase()) ? s.slice(prefix.length).trim() : s);
+
+const formatActivePerks = (state: GameState): string => {
+  const perks = STAGE_PERKS[state.stage];
+  const parts: string[] = [];
+  if (perks.shipSuccessBonus > 0) parts.push(`Ship +${Math.round(perks.shipSuccessBonus * 100)}%`);
+  if (perks.launchSuccessBonus > 0) parts.push(`Launch +${Math.round(perks.launchSuccessBonus * 100)}%`);
+  if (perks.pitchSuccessBonus > 0) parts.push(`Pitch +${Math.round(perks.pitchSuccessBonus * 100)}%`);
+  if (perks.apBonus > 0) parts.push(`AP +${perks.apBonus}`);
+  if (perks.overheadDiscount > 0) parts.push(`Overhead -${Math.round(perks.overheadDiscount * 100)}%`);
+  if (parts.length === 0) return "";
+  return `\nStage perks: ${parts.join(", ")}`;
+};
 
 // ── Randomized flavor messages ──
 
@@ -269,7 +282,7 @@ export const createInitialState = (): GameState => {
     arpu: 10,
     mrr: 50 * 10,
     burn: 0,
-    team: { engineering: 1, design: 0, marketing: 0, sales: 0, ops: 0, hr: 0, legal: 0 },
+    team: { engineering: 1, design: 0, marketing: 0, sales: 0, ops: 0, hr: 0, legal: 0, data: 0, product: 0, executive: 0 },
     reputation: 10,
     vcReputation: 8,
     stage: "garage",
@@ -438,6 +451,10 @@ export const hire = (state: GameState, role: TeamRole, count: number): ActionRes
   if (count <= 0) {
     return err(state, "Hire count must be at least 1.");
   }
+  if (!canHireRole(role, state.stage)) {
+    const minStage = ROLE_MIN_STAGE[role]!;
+    return err(state, `${role} unlocks at ${minStage} stage. Raise to advance.`);
+  }
 
   const { hireCost } = roleComp[role];
   const totalHireCost = hireCost * count;
@@ -499,11 +516,15 @@ export const shipFeature = (state: GameState, name: string): ActionResult => {
   // HR adds process overhead (slower shipping); Legal adds operational efficiency.
   const processDrag = hr * 0.015;
   const efficiencyBoost = legal * 0.01;
+  const productBoost = state.team.product * 0.025;
+  const stageShipBonus = STAGE_PERKS[state.stage].shipSuccessBonus;
   const base =
     0.68 +
     eng * 0.03 +
     cohesion * 0.08 +
-    mods.shipSuccess -
+    mods.shipSuccess +
+    productBoost +
+    stageShipBonus -
     stressPenalty -
     processDrag +
     efficiencyBoost -
@@ -592,7 +613,8 @@ export const launchCampaign = (state: GameState, name: string): ActionResult => 
   const rep = clamp(state.reputation / 100, 0, 1);
   const processDrag = hr * 0.006;
   const efficiencyBoost = legal * 0.008;
-  const base = 0.55 + mkt * 0.05 + sales * 0.03 + rep * 0.08 + mods.launchSuccess - stressPenalty - processDrag + efficiencyBoost;
+  const stageLaunchBonus = STAGE_PERKS[state.stage].launchSuccessBonus;
+  const base = 0.55 + mkt * 0.05 + sales * 0.03 + rep * 0.08 + mods.launchSuccess + stageLaunchBonus - stressPenalty - processDrag + efficiencyBoost;
   const p = clamp(base, 0.04, 0.9);
 
   let s = { ...state, cash: state.cash - spend };
@@ -734,6 +756,7 @@ export const status = (state: GameState): ActionResult => {
     `\nMRR $${state.mrr.toLocaleString()} | Users ${state.users.toLocaleString()} | ARPU $${state.arpu}` +
     `\nPricing ${state.pricingModel} (ARPU $${PRICING_MODELS[state.pricingModel].arpuMin}–$${PRICING_MODELS[state.pricingModel].arpuMax})` +
     `\nStage ${state.stage} | Phase ${state.companyPhase} | Founder ${founder} | Thesis ${state.thesis}` +
+    formatActivePerks(state) +
     `\nAP ${state.ap} | Rep ${state.reputation}/100 | VC ${state.vcReputation}/100 | Stress ${state.stress}/100 | Vol ${state.volatility}/100` +
     `\nCofounder ${state.cofounder.name} (${cofounder}) | Trust ${state.cofounder.trust}/100 | Ego ${state.cofounder.ego}/100` +
     `\nCohesion ${state.culture.cohesion}/100 | Morale ${state.culture.morale}/100` +

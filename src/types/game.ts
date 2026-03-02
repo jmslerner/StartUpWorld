@@ -8,7 +8,7 @@ export type CofounderArchetype = "operator" | "builder" | "rainmaker" | "powderk
 
 export type PricingModel = "consumer" | "prosumer" | "enterprise";
 
-export type TeamRole = "engineering" | "design" | "marketing" | "sales" | "ops" | "hr" | "legal";
+export type TeamRole = "engineering" | "design" | "marketing" | "sales" | "ops" | "hr" | "legal" | "data" | "product" | "executive";
 
 export type TeamRoster = Record<TeamRole, number>;
 
