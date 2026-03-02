@@ -25,6 +25,7 @@ const accentColor: Record<EndingType, string> = {
   "founder-removal": "text-red-400 border-red-400/40",
   "zombie-saas": "text-mist border-mist/40",
   "ai-hype-exit": "text-amber-300 border-amber-300/40",
+  "forced-acquisition": "text-red-400 border-red-400/40",
 };
 
 const gradeColor = (grade: string): string => {
@@ -42,6 +43,7 @@ const endingLabel: Record<EndingType, string> = {
   "founder-removal": "REMOVED",
   "zombie-saas": "ZOMBIE SAAS",
   "ai-hype-exit": "AI HYPE EXIT",
+  "forced-acquisition": "FORCED SALE",
 };
 
 export const GameOverCard = ({ state, onPlayAgain }: GameOverCardProps) => {

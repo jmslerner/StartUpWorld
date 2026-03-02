@@ -1,5 +1,6 @@
 import type { GameState } from "../types/game";
 import type { EngineContext } from "./context";
+import { isBoardHostile, boardVote } from "./board";
 
 export const evaluateEndings = (state: GameState, ctx: EngineContext): { state: GameState; logs: string[] } => {
   if (state.gameOver) {
@@ -96,8 +97,57 @@ export const evaluateEndings = (state: GameState, ctx: EngineContext): { state: 
     };
   }
 
-  // Founder removal: cofounder trust collapses + board leverage.
+  // Board-driven founder removal: majority of board has lost confidence.
+  if (state.board.members.length >= 3 && isBoardHostile(state)) {
+    const vote = boardVote(state);
+    const voteLog = vote.members.map(m => `${m.name}: ${m.vote}`).join(", ");
+    return {
+      state: {
+        ...state,
+        gameOver: {
+          ending: "founder-removal",
+          week: state.week,
+          headline: "Founder removed. The board voted. You lost.",
+        },
+      },
+      logs: [
+        "An emergency board meeting is called. [[beat]] You weren't the one who called it.",
+        `The vote: ${voteLog}.`,
+        `${vote.against} to ${vote.total - vote.against}. You're out.`,
+        "Ending unlocked: Founder Removal.",
+      ],
+    };
+  }
+
+  // Forced acquisition: deeply hostile board forces a fire sale.
   if (
+    state.board.members.length >= 3 &&
+    state.valuation >= 50_000_000 &&
+    state.board.members.filter(m => m.confidence < 35).length >= Math.ceil(state.board.members.length * 0.6)
+  ) {
+    const salePrice = Math.round(state.valuation * 0.7);
+    const salePriceM = Math.round(salePrice / 1_000_000);
+    return {
+      state: {
+        ...state,
+        gameOver: {
+          ending: "forced-acquisition",
+          week: state.week,
+          headline: `Forced sale at $${salePriceM}M. The board decided for you.`,
+        },
+      },
+      logs: [
+        "The board convenes. The mood is grim. [[beat]] 'We've found a buyer.'",
+        `They force a sale at $${salePrice.toLocaleString()}. A 30% discount to current valuation.`,
+        "You don't get a vote. That's the point.",
+        "Ending unlocked: Forced Acquisition.",
+      ],
+    };
+  }
+
+  // Fallback founder removal: cofounder trust collapses before board exists.
+  if (
+    state.board.members.length < 3 &&
     state.cofounder.trust <= 15 &&
     state.cofounder.ego >= 80 &&
     state.capTable.founderPct < 0.4 &&

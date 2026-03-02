@@ -30,6 +30,11 @@ const templates: Record<EndingType, string[]> = {
     "Sold the demo. Kept the house. Lost the plot.",
     "AI-powered exit. Human-powered regret.",
   ],
+  "forced-acquisition": [
+    "The board sold {company}. {founder} found out via email.",
+    "Forced exit. The board called it strategy. {founder} called it betrayal.",
+    "{company} sold at a discount. The board got their money. {founder} got a lesson.",
+  ],
 };
 
 export const generateEpitaph = (state: GameState, ending: EndingType): string => {

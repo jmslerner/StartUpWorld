@@ -24,6 +24,7 @@ import { evaluateEndings } from "./endings";
 import { refreshDerivedNoLog } from "./derived";
 import { PRICING_MODELS } from "./pricing";
 import { canHireRole, ROLE_MIN_STAGE, STAGE_PERKS } from "./stagePerks";
+import { createInitialBoard, PERSONALITY_PROFILES } from "./board";
 
 const withLogLines = (state: GameState, lines: Array<{ text: string; kind?: LogEntry["kind"] }>, sound?: SoundHint): ActionResult => {
   const logs: LogEntry[] = [];
@@ -299,6 +300,7 @@ export const createInitialState = (): GameState => {
     peakValuation: 0,
     totalRaised: 0,
     freeActionUsed: {},
+    board: createInitialBoard(),
     pendingEvent: null,
     eventHistory: [],
     gameOver: null,
@@ -814,4 +816,129 @@ export const setPricingModel = (state: GameState, model: PricingModel): ActionRe
     { text: pm.description, kind: "system" },
     { text: `ARPU reset to $${pm.arpuDefault}. Users -${userLoss} (transition churn). Stress +12. Morale -8.`, kind: "event" },
   ], "warning");
+};
+
+// ── Board actions ──
+
+export const boardStatus = (state: GameState): ActionResult => {
+  if (state.board.members.length === 0) {
+    return withLogLines(state, [{ text: "No board yet. A board forms when you raise your first VC round.", kind: "system" }]);
+  }
+  const lines: Array<{ text: string; kind?: LogEntry["kind"] }> = [
+    { text: "Board of Directors:", kind: "system" },
+  ];
+  for (const m of state.board.members) {
+    const profile = PERSONALITY_PROFILES[m.personality];
+    const conf = m.confidence;
+    const mood = conf >= 70 ? "supportive" : conf >= 40 ? "neutral" : "hostile";
+    lines.push({ text: `  ${m.name} (${m.role}) — ${profile.label}: "${profile.tagline}" — Confidence ${conf}/100 [${mood}]` });
+  }
+  const hostile = state.board.members.filter(m => m.confidence < 40).length;
+  if (hostile > 0) {
+    lines.push({ text: `\n${hostile} director(s) hostile. Maintain confidence or risk a vote.`, kind: "event" });
+  }
+  return withLogLines(state, lines);
+};
+
+export const boardDinner = (state: GameState, targetName: string): ActionResult => {
+  const gate = ensurePlayable(state);
+  if (gate) return gate;
+  if (!canSpendAp(state)) return err(state, "No AP left. End the week to refresh.");
+  if (state.board.members.length === 0) return err(state, "No board yet.");
+
+  const member = state.board.members.find(m =>
+    m.name.toLowerCase().includes(targetName.toLowerCase()) && m.role !== "founder"
+  );
+  if (!member) return err(state, `No board member matching "${targetName}". Type \`board\` to see members.`);
+
+  const cost = 2000;
+  if (state.cash < cost) return err(state, "Not enough cash ($2,000 needed).");
+
+  let rng = state.rng;
+  const gain = nextIntInclusive(rng, 8, 14);
+  rng = gain.rng;
+
+  const members = state.board.members.map(m =>
+    m.id === member.id ? { ...m, confidence: clamp(m.confidence + gain.value, 0, 100) } : m
+  );
+
+  const updated = spendAp({ ...state, rng, cash: state.cash - cost, board: { ...state.board, members } });
+  return withLogLines(updated, [
+    { text: `You take ${member.name} to dinner. Cash -$${cost.toLocaleString()}.` },
+    { text: `Their confidence in you rises. (+${gain.value})`, kind: "event" },
+  ], "success");
+};
+
+export const boardGift = (state: GameState, targetName: string): ActionResult => {
+  const gate = ensurePlayable(state);
+  if (gate) return gate;
+  if (!canSpendAp(state)) return err(state, "No AP left. End the week to refresh.");
+  if (state.board.members.length === 0) return err(state, "No board yet.");
+
+  const member = state.board.members.find(m =>
+    m.name.toLowerCase().includes(targetName.toLowerCase()) && m.role !== "founder"
+  );
+  if (!member) return err(state, `No board member matching "${targetName}". Type \`board\` to see members.`);
+
+  const cost = 5000;
+  if (state.cash < cost) return err(state, "Not enough cash ($5,000 needed).");
+
+  let rng = state.rng;
+  const gain = nextIntInclusive(rng, 10, 18);
+  rng = gain.rng;
+
+  const members = state.board.members.map(m =>
+    m.id === member.id ? { ...m, confidence: clamp(m.confidence + gain.value, 0, 100) } : m
+  );
+
+  const updated = spendAp({ ...state, rng, cash: state.cash - cost, board: { ...state.board, members } });
+  return withLogLines(updated, [
+    { text: `You send ${member.name} a generous gift. Cash -$${cost.toLocaleString()}.` },
+    { text: `Their confidence in you rises. (+${gain.value})`, kind: "event" },
+  ], "success");
+};
+
+export const boardBlackmail = (state: GameState, targetName: string): ActionResult => {
+  const gate = ensurePlayable(state);
+  if (gate) return gate;
+  if (!canSpendAp(state)) return err(state, "No AP left. End the week to refresh.");
+  if (state.board.members.length === 0) return err(state, "No board yet.");
+
+  const member = state.board.members.find(m =>
+    m.name.toLowerCase().includes(targetName.toLowerCase()) && m.role !== "founder"
+  );
+  if (!member) return err(state, `No board member matching "${targetName}". Type \`board\` to see members.`);
+
+  let rng = state.rng;
+  const success = chance(rng, 0.35);
+  rng = success.rng;
+
+  if (success.value) {
+    const members = state.board.members.map(m =>
+      m.id === member.id ? { ...m, confidence: 90 } : m
+    );
+    const updated = spendAp({ ...state, rng, board: { ...state.board, members } });
+    return withLogLines(updated, [
+      { text: `You leverage something on ${member.name}. [[beat]]` },
+      { text: "It works. They're suddenly very cooperative. Confidence set to 90.", kind: "event" },
+    ], "success");
+  }
+
+  const members = state.board.members.map(m => {
+    if (m.id === member.id) return { ...m, confidence: clamp(5, 0, 100) };
+    if (m.role !== "founder") return { ...m, confidence: clamp(m.confidence - 12, 0, 100) };
+    return m;
+  });
+
+  const updated = spendAp({
+    ...state,
+    rng,
+    reputation: clamp(state.reputation - 8, 0, 100),
+    board: { ...state.board, members },
+  });
+  return withLogLines(updated, [
+    { text: `You try to leverage something on ${member.name}. [[beat]]` },
+    { text: "It backfires. They tell the other directors.", kind: "error" },
+    { text: `${member.name}'s confidence crashes to 5. Other directors lose confidence. Reputation -8.`, kind: "event" },
+  ], "fail");
 };

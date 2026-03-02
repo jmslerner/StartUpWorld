@@ -13,6 +13,7 @@ const accentColor: Record<EndingType, string> = {
   "founder-removal": "border-red-400/40",
   "zombie-saas": "border-mist/40",
   "ai-hype-exit": "border-amber-300/40",
+  "forced-acquisition": "border-red-400/40",
 };
 
 const badgeColor: Record<EndingType, string> = {
@@ -22,6 +23,7 @@ const badgeColor: Record<EndingType, string> = {
   "founder-removal": "text-red-400 bg-red-400/10",
   "zombie-saas": "text-mist bg-mist/10",
   "ai-hype-exit": "text-amber-300 bg-amber-300/10",
+  "forced-acquisition": "text-red-400 bg-red-400/10",
 };
 
 const endingLabel: Record<EndingType, string> = {
@@ -31,6 +33,7 @@ const endingLabel: Record<EndingType, string> = {
   "founder-removal": "REMOVED",
   "zombie-saas": "ZOMBIE",
   "ai-hype-exit": "HYPE EXIT",
+  "forced-acquisition": "FORCED SALE",
 };
 
 export const GraveyardPanel = ({ entries, loading }: GraveyardPanelProps) => {

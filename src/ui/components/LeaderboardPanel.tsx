@@ -31,6 +31,7 @@ const endingShort: Record<EndingType, string> = {
   "founder-removal": "REM",
   "zombie-saas": "ZOMB",
   "ai-hype-exit": "HYPE",
+  "forced-acquisition": "SOLD",
 };
 
 export const LeaderboardPanel = ({ entries, loading, currentSeed }: LeaderboardPanelProps) => {

@@ -62,5 +62,15 @@ export const generateHints = (state: GameState, ctx: EngineContext): Hint[] => {
     hints.push({ text: "Tip: `hire executive` to reduce overhead and boost pitch success.", priority: 4 });
   }
 
+  // Board confidence hints
+  if (state.board.members.length > 0) {
+    const hostile = state.board.members.filter(m => m.confidence < 40).length;
+    if (hostile >= 2) {
+      hints.push({ text: "Warning: Multiple board members are hostile. Use `board dinner` or `board gift` to rebuild confidence.", priority: 9 });
+    } else if (state.board.members.some(m => m.confidence < 30 && m.role !== "founder")) {
+      hints.push({ text: "Tip: A board member's confidence is critically low. They may vote against you.", priority: 8 });
+    }
+  }
+
   return hints.sort((a, b) => b.priority - a.priority);
 };

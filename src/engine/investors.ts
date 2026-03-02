@@ -7,6 +7,7 @@ import { founderMods } from "./founders";
 import { STAGE_VALUATION_FLOOR } from "./valuation";
 import { computeContext } from "./context";
 import { STAGE_PERKS } from "./stagePerks";
+import { addBoardMember } from "./board";
 
 const pitchFailMessages = [
   "They pass for now. \"Come back with cleaner growth.\"",
@@ -378,6 +379,23 @@ export const raise = (state: GameState, amount: number): { state: GameState; log
   } else {
     logs.push(`Cash +$${netCash.toLocaleString()}. Stage holds at ${state.stage}.`);
     logs.push("The money buys you time, not a new label.");
+  }
+
+  // Board formation and expansion on raises
+  if (s.board.members.length === 0) {
+    s = addBoardMember(s, "founder", "cheerleader");
+    s = addBoardMember(s, "cofounder", "operator");
+    s = addBoardMember(s, "investor");
+    logs.push("Board formed: 3 seats — you, your cofounder, and an investor director.");
+  }
+  if (nextStage === "series-a" && state.stage !== "series-a") {
+    s = addBoardMember(s, "investor");
+    s = addBoardMember(s, "independent");
+    logs.push("Board expanded: +1 investor seat, +1 independent. 5 total.");
+  }
+  if (nextStage === "growth" && state.stage !== "growth") {
+    s = addBoardMember(s, "independent");
+    logs.push("Board expanded: +1 independent director. 6 total.");
   }
 
   return { state: s, logs, ok: true };

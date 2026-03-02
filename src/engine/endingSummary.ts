@@ -36,6 +36,8 @@ const narratives: Record<EndingType, (s: GameState) => string> = {
     `The product keeps running. The story stops moving. ${s.companyName} becomes that SaaS nobody talks about at conferences but somebody's bookkeeper uses every Tuesday. [[beat]] You built a job, not a company. The hoodie still fits, though.`,
   "ai-hype-exit": () =>
     "You sold the narrative before the product caught up. An acquirer — drunk on AI FOMO — writes a check that buys you a very nice house and a very quiet LinkedIn. [[beat]] The technology? It works on demos. It always worked on demos.",
+  "forced-acquisition": (s) =>
+    `The board calls it a 'strategic exit.' You call it a coup with a check attached. ${s.companyName} is sold at a discount to a competitor who promises to 'preserve the culture.' [[beat]] They won't. Your equity vests on a schedule written by people who wanted you gone.`,
 };
 
 export const computeScore = (s: GameState): number => {
@@ -68,6 +70,7 @@ export const computeScore = (s: GameState): number => {
     "ai-hype-exit": 12,
     acquisition: 8,
     "zombie-saas": 4,
+    "forced-acquisition": 5,
     "founder-removal": 2,
     bankruptcy: 0,
   };

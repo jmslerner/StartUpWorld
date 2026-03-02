@@ -669,10 +669,20 @@ export const eventPool: EventDef[] = [
       {
         id: "accept",
         text: "Accept. Take the money and the leash.",
-        apply: (s) => ({
-          state: addCash(addVcRep(addTrust(s, -4), 2), 80_000),
-          logs: ["The wire hits. Your autonomy doesn’t.", "Cash +$80,000. VC rep +2. Trust -4."],
-        }),
+        apply: (s) => {
+          let next = addCash(addVcRep(addTrust(s, -4), 2), 80_000);
+          // If board exists, the new investor director’s confidence starts moderate
+          if (next.board.members.length > 0) {
+            const members = next.board.members.map(m =>
+              m.role === "investor" ? { ...m, confidence: Math.max(m.confidence, 55) } : m
+            );
+            next = { ...next, board: { ...next.board, members } };
+          }
+          return {
+            state: next,
+            logs: ["The wire hits. Your autonomy doesn’t.", "Cash +$80,000. VC rep +2. Trust -4."],
+          };
+        },
       },
       {
         id: "refuse",
@@ -681,6 +691,108 @@ export const eventPool: EventDef[] = [
           state: addVcRep(addEgo(s, 3), -2),
           logs: ["You keep the wheel. You also keep the risk.", "Cofounder ego +3. VC rep -2."],
         }),
+      },
+    ],
+  },
+
+  {
+    id: "board-power-play",
+    title: "Board Power Play",
+    prompt: () =>
+      "An investor director calls an off-cycle meeting. They want ‘strategic realignment’ — code for taking control of product decisions.",
+    when: (s) => s.board.members.length >= 3 && s.board.members.some(m => m.role === "investor" && m.confidence < 55),
+    weight: (s) => {
+      const lowConf = s.board.members.filter(m => m.confidence < 50).length;
+      return 4 + lowConf * 2 + s.stress / 25;
+    },
+    choices: [
+      {
+        id: "comply",
+        text: "Comply. Give them what they want.",
+        apply: (s) => {
+          const members = s.board.members.map(m =>
+            m.role !== "founder" ? { ...m, confidence: clamp(m.confidence + 8, 0, 100) } : m
+          );
+          return {
+            state: addRep({ ...s, board: { ...s.board, members }, ap: Math.max(0, s.ap - 1) }, -3),
+            logs: ["You cede ground. The board relaxes — for now.", "All board confidence +8. Reputation -3. AP -1."],
+          };
+        },
+      },
+      {
+        id: "push-back",
+        text: "Push back. This is your company.",
+        apply: (s) => {
+          const members = s.board.members.map(m =>
+            m.role === "investor" ? { ...m, confidence: clamp(m.confidence - 10, 0, 100) } : m
+          );
+          return {
+            state: addTrust(addEgo({ ...s, board: { ...s.board, members } }, 4), -3),
+            logs: ["You hold your ground. The investors remember.", "Investor confidence -10. Ego +4. Trust -3."],
+          };
+        },
+      },
+      {
+        id: "compromise",
+        text: "Compromise. Offer a quarterly review process.",
+        apply: (s) => {
+          const members = s.board.members.map(m =>
+            m.role !== "founder" ? { ...m, confidence: clamp(m.confidence + 3, 0, 100) } : m
+          );
+          return {
+            state: { ...s, board: { ...s.board, members } },
+            logs: ["You agree to more transparency. Everyone saves face.", "All board confidence +3."],
+          };
+        },
+      },
+    ],
+  },
+
+  {
+    id: "board-quarterly-review",
+    title: "Quarterly Board Review",
+    prompt: (s) => {
+      const hostile = s.board.members.filter(m => m.confidence < 40).length;
+      return hostile > 0
+        ? "The quarterly board meeting arrives. The mood is tense. Directors want answers about performance."
+        : "The quarterly board meeting arrives. Time to present results and field questions.";
+    },
+    when: (s) => s.board.members.length >= 3 && s.week - s.board.lastMeetingWeek >= 8,
+    weight: () => 6,
+    choices: [
+      {
+        id: "present-honestly",
+        text: "Present honestly. Numbers speak for themselves.",
+        apply: (s, ctx) => {
+          const good = ctx.mrrGrowthRate > 0.02 && ctx.runwayWeeks > 8;
+          const delta = good ? 7 : -10;
+          const members = s.board.members.map(m =>
+            m.role !== "founder" ? { ...m, confidence: clamp(m.confidence + delta, 0, 100) } : m
+          );
+          const logs = good
+            ? ["The numbers land well. Directors nod approvingly.", `All board confidence +${delta}.`]
+            : ["The numbers are ugly. Silence in the room.", `All board confidence ${delta}.`];
+          return {
+            state: { ...s, board: { ...s.board, members, lastMeetingWeek: s.week } },
+            logs,
+          };
+        },
+      },
+      {
+        id: "spin-the-narrative",
+        text: "Spin the narrative. Emphasize the vision.",
+        apply: (s) => {
+          const members = s.board.members.map(m => {
+            if (m.role === "founder") return m;
+            // Cheerleaders buy it, activists see through it
+            const mod = m.personality === "cheerleader" ? 5 : m.personality === "activist" ? -6 : 0;
+            return { ...m, confidence: clamp(m.confidence + mod, 0, 100) };
+          });
+          return {
+            state: addRep({ ...s, board: { ...s.board, members, lastMeetingWeek: s.week } }, -2),
+            logs: ["You paint a picture. Some buy it. Some don’t.", "Cheerleader confidence +5. Activist confidence -6. Reputation -2."],
+          };
+        },
       },
     ],
   },

@@ -1,8 +1,8 @@
 import { useMemo } from "react";
 import type { GameState } from "../../types/game";
-import { GrowthPanel, RiskProfilePanel, TeamPanel } from "../panels";
+import { BoardPanel, GrowthPanel, RiskProfilePanel, TeamPanel } from "../panels";
 
-export type StatsPanelKey = "growth" | "team" | "risk";
+export type StatsPanelKey = "growth" | "team" | "risk" | "board";
 
 interface StatsDrawerProps {
   state: GameState;
@@ -14,15 +14,17 @@ export const StatsDrawer = ({ state, active, onActiveChange }: StatsDrawerProps)
   const content = useMemo(() => {
     if (active === "team") return <TeamPanel state={state} />;
     if (active === "risk") return <RiskProfilePanel state={state} />;
+    if (active === "board") return <BoardPanel state={state} />;
     return <GrowthPanel state={state} />;
   }, [active, state]);
 
   return (
     <div className="panel-surface flex max-h-[70vh] flex-col gap-2 rounded-xl p-3">
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-4 gap-2">
         <Tab label="Growth" active={active === "growth"} onClick={() => onActiveChange("growth")} />
         <Tab label="Team" active={active === "team"} onClick={() => onActiveChange("team")} />
         <Tab label="Risk" active={active === "risk"} onClick={() => onActiveChange("risk")} />
+        <Tab label="Board" active={active === "board"} onClick={() => onActiveChange("board")} />
       </div>
 
       <div className="terminal-scrollbar min-h-0 flex-1 overflow-y-auto pr-1">{content}</div>

@@ -1,5 +1,20 @@
 export type Stage = "garage" | "seed" | "series-a" | "growth";
 
+export type BoardPersonality = "activist" | "cheerleader" | "operator" | "dealmaker" | "old-guard";
+
+export interface BoardMember {
+  id: string;
+  name: string;
+  role: "founder" | "cofounder" | "investor" | "independent";
+  personality: BoardPersonality;
+  confidence: number; // 0-100 — confidence in the CEO
+}
+
+export interface BoardState {
+  members: BoardMember[];
+  lastMeetingWeek: number; // week of last board meeting event
+}
+
 export type CompanyPhase = "garage" | "coworking" | "office" | "unicorn" | "public";
 
 export type FounderArchetype = "visionary" | "hacker" | "sales-animal" | "philosopher";
@@ -62,7 +77,8 @@ export type EndingType =
   | "bankruptcy"
   | "founder-removal"
   | "zombie-saas"
-  | "ai-hype-exit";
+  | "ai-hype-exit"
+  | "forced-acquisition";
 
 export interface GameOverState {
   ending: EndingType;
@@ -125,6 +141,8 @@ export interface GameState {
   peakValuation: number;
   totalRaised: number;
   freeActionUsed: Record<string, boolean>; // tracks per-week archetype free actions
+
+  board: BoardState;
 
   pendingEvent: PendingEvent | null;
   // Recent event history (most recent first). Used to reduce repeats.

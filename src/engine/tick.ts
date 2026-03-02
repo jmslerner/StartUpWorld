@@ -5,6 +5,7 @@ import { signedUnit } from "./rng";
 import { computeContext, computeTeamSize } from "./context";
 import { applyWeeklyCulture } from "./culture";
 import { applyCofounderWeeklyDrift, founderMods, isCofounderChosen, isFounderChosen } from "./founders";
+import { applyWeeklyBoardDrift } from "./board";
 import { calcVolatility, fatTailSigned, impactMultiplier } from "./volatility";
 import { PRICING_MODELS } from "./pricing";
 import { calcStress } from "./stress";
@@ -164,6 +165,7 @@ export const endWeekTick = (state: GameState): { state: GameState; logs: string[
 
   s2 = applyWeeklyCulture(s2, { weekHit: hit, weekWin: win });
   s2 = applyCofounderWeeklyDrift(s2, { hit, win });
+  s2 = applyWeeklyBoardDrift(s2, ctx0);
 
   // Refresh derived metrics that depend on this week's results.
   // Override hiresThisWeek so events can react to hiring activity this week.

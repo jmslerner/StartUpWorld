@@ -17,6 +17,10 @@ import {
   shipFeature,
   showPricingInfo,
   status,
+  boardStatus,
+  boardDinner,
+  boardGift,
+  boardBlackmail,
 } from "./actions";
 import { STAGE_PERKS, ROLE_MIN_STAGE } from "./stagePerks";
 
@@ -76,6 +80,10 @@ const setupHelpText: LogEntry[] = [
   toLog("raise [vc <amount>|friends|cards|loan|preseed|mortgage] - funding (run `raise` for options)"),
   toLog("pricing [consumer|prosumer|enterprise] - view or change pricing model"),
   toLog("perks - view stage perks and upcoming unlocks"),
+  toLog("board - view board of directors"),
+  toLog("board dinner <name> - take a director to dinner (1 AP, $2K)"),
+  toLog("board gift <name> - send a director a gift (1 AP, $5K)"),
+  toLog("board blackmail <name> - risky leverage play (1 AP, 35% success)"),
   toLog("end - end the week"),
   toLog("choose <n> - resolve a pending event choice"),
 ];
@@ -95,6 +103,10 @@ const mainHelpText: LogEntry[] = [
   toLog("raise [vc <amount>|friends|cards|loan|preseed|mortgage] - funding (run `raise` for options)"),
   toLog("pricing [consumer|prosumer|enterprise] - view or change pricing model"),
   toLog("perks - view stage perks and upcoming unlocks"),
+  toLog("board - view board of directors"),
+  toLog("board dinner <name> - take a director to dinner (1 AP, $2K)"),
+  toLog("board gift <name> - send a director a gift (1 AP, $5K)"),
+  toLog("board blackmail <name> - risky leverage play (1 AP, 35% success)"),
   toLog("end - end the week"),
   toLog("choose <n> - resolve a pending event choice"),
 ];
@@ -303,6 +315,18 @@ export const executeCommand = (state: GameState, input: string): ActionResult =>
     }
     case "perks":
       return showPerks(state);
+    case "board": {
+      const sub = rest[0]?.toLowerCase();
+      if (!sub) return boardStatus(state);
+      const target = rest.slice(1).join(" ").trim();
+      if (!target) {
+        return { state, logs: [toLog(`Usage: board ${sub} <name>`, "error")] };
+      }
+      if (sub === "dinner") return boardDinner(state, target);
+      if (sub === "gift") return boardGift(state, target);
+      if (sub === "blackmail") return boardBlackmail(state, target);
+      return { state, logs: [toLog("Board actions: board, board dinner <name>, board gift <name>, board blackmail <name>", "error")] };
+    }
     case "end":
       return endWeek(state);
 
@@ -342,7 +366,7 @@ export const executeCommand = (state: GameState, input: string): ActionResult =>
 const knownCommands = [
   "help", "clear", "cls", "status", "seed", "name", "company",
   "founder", "cofounder", "choose", "hire", "ship", "launch",
-  "pitch", "raise", "pricing", "perks", "end",
+  "pitch", "raise", "pricing", "perks", "board", "end",
 ];
 
 const levenshtein = (a: string, b: string): number => {

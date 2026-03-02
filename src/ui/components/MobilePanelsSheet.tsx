@@ -1,9 +1,9 @@
 import { useMemo, useState } from "react";
 import type { GameState } from "../../types/game";
 import { BottomSheet, type SheetSnap } from "./BottomSheet";
-import { GrowthPanel, RiskProfilePanel, TeamPanel } from "../panels";
+import { BoardPanel, GrowthPanel, RiskProfilePanel, TeamPanel } from "../panels";
 
-type PanelKey = "growth" | "team" | "risk";
+type PanelKey = "growth" | "team" | "risk" | "board";
 
 interface MobilePanelsSheetProps {
   state: GameState;
@@ -22,6 +22,7 @@ export const MobilePanelsSheet = ({ state, snap: controlledSnap, onSnapChange: c
   const content = useMemo(() => {
     if (active === "team") return <TeamPanel state={state} />;
     if (active === "risk") return <RiskProfilePanel state={state} />;
+    if (active === "board") return <BoardPanel state={state} />;
     return <GrowthPanel state={state} />;
   }, [active, state]);
 
@@ -31,10 +32,11 @@ export const MobilePanelsSheet = ({ state, snap: controlledSnap, onSnapChange: c
       onSnapChange={onSnapChange}
       collapsedVh={collapsedVh}
       header={
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-4 gap-2">
           <Tab label="Growth" active={active === "growth"} onClick={() => setActive("growth")} />
           <Tab label="Team" active={active === "team"} onClick={() => setActive("team")} />
           <Tab label="Risk" active={active === "risk"} onClick={() => setActive("risk")} />
+          <Tab label="Board" active={active === "board"} onClick={() => setActive("board")} />
         </div>
       }
     >
