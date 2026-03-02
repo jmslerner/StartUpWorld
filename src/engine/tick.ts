@@ -1,11 +1,12 @@
 import type { GameState } from "../types/game";
 import { clamp } from "./utils";
-import { calcBurn, calcRunwayWeeks, getEffectiveMaxAp } from "./economy";
+import { calcBurn, calcRunwayWeeks, calcWeeklyRevenue, getEffectiveMaxAp } from "./economy";
 import { signedUnit } from "./rng";
 import { computeContext, computeTeamSize } from "./context";
 import { applyWeeklyCulture } from "./culture";
 import { applyCofounderWeeklyDrift, founderMods, isCofounderChosen, isFounderChosen } from "./founders";
 import { calcVolatility, fatTailSigned, impactMultiplier } from "./volatility";
+import { PRICING_MODELS } from "./pricing";
 import { calcStress } from "./stress";
 import { maybeSelectEvent } from "./events/select";
 import { toPendingEvent } from "./events/types";
@@ -57,9 +58,11 @@ const growthRates = (state: GameState) => {
     ops * 0.0015 +
     imbalanceChurnPenalty;
 
+  const pm = PRICING_MODELS[state.pricingModel];
+
   return {
-    growth: clamp(baseGrowth - stress * 0.02, -0.05, 0.22),
-    churn: clamp(baseChurn + stress * 0.02, 0.01, 0.18),
+    growth: clamp(baseGrowth * pm.growthMult - stress * 0.02, -0.05, 0.22),
+    churn: clamp(baseChurn * pm.churnMult + stress * 0.02, 0.01, 0.18),
   };
 };
 
@@ -88,7 +91,8 @@ export const endWeekTick = (state: GameState): { state: GameState; logs: string[
   // Recompute burn from current org + stage.
   let s: GameState = { ...pre, burn: calcBurn(pre) };
 
-  const cashAfterBurn = s.cash - s.burn;
+  const weeklyRevenue = calcWeeklyRevenue(s);
+  const cashAfterBurn = s.cash - s.burn + weeklyRevenue;
 
   // Users/mrr dynamics
   const rates = growthRates(s);
@@ -167,7 +171,12 @@ export const endWeekTick = (state: GameState): { state: GameState; logs: string[
   s2 = prog.state;
 
   logs.push("Week closed.");
-  logs.push(`Cash -$${s.burn.toLocaleString()} burn. Cash now $${cashAfterBurn.toLocaleString()}.`);
+  const netBurn = s.burn - weeklyRevenue;
+  if (netBurn > 0) {
+    logs.push(`Burn $${s.burn.toLocaleString()} - Revenue $${weeklyRevenue.toLocaleString()} = Net burn $${netBurn.toLocaleString()}. Cash $${cashAfterBurn.toLocaleString()}.`);
+  } else {
+    logs.push(`Revenue $${weeklyRevenue.toLocaleString()} - Burn $${s.burn.toLocaleString()} = Profit +$${Math.abs(netBurn).toLocaleString()}. Cash $${cashAfterBurn.toLocaleString()}.`);
+  }
   logs.push(`Users +${grossAdds} / -${churn} → ${nextUsers}. MRR $${nextMrr.toLocaleString()}.`);
 
   if (prog.logs.length) {

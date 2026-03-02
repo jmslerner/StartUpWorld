@@ -2,6 +2,8 @@ import type { GameState } from "../../types/game";
 import { PanelCard } from "../components/PanelCard";
 import { Delta } from "../components/Gauge";
 import { Tooltip } from "../components/Tooltip";
+import { computeContext } from "../../engine/context";
+import { calcNetBurn, calcWeeklyRevenue } from "../../engine/economy";
 import type { ReactNode } from "react";
 
 interface GrowthPanelProps {
@@ -42,6 +44,10 @@ const pctChange = (current: number, previous: number) => {
 export const GrowthPanel = ({ state }: GrowthPanelProps) => {
   const mrrWeeklyPct = pctChange(state.mrr, state.lastWeek.mrr);
   const usersWeeklyPct = pctChange(state.users, state.lastWeek.users);
+  const ctx = computeContext(state);
+  const netBurn = calcNetBurn(state);
+  const weeklyRev = calcWeeklyRevenue(state);
+  const profitable = netBurn <= 0;
 
   return (
     <PanelCard title="Growth">
@@ -70,6 +76,31 @@ export const GrowthPanel = ({ state }: GrowthPanelProps) => {
             <GrowthChip label="Users" pct={usersWeeklyPct} />
           </span>
         </Metric>
+      </div>
+
+      <div className="mt-2 border-t border-white/5 pt-2">
+        <Row label="Revenue/wk" description="Weekly revenue from MRR (MRR ÷ 4).">
+          <span className="tabular-nums">{fmtUsd(weeklyRev)}</span>
+        </Row>
+        <Row label={profitable ? "Profit/wk" : "Net Burn/wk"} description="Burn minus revenue. Negative = profitable.">
+          <span className={`tabular-nums ${profitable ? "text-emerald-400" : ""}`}>
+            {profitable ? `+${fmtUsd(Math.abs(netBurn))}` : fmtUsd(netBurn)}
+          </span>
+        </Row>
+      </div>
+
+      <div className="mt-2 border-t border-white/5 pt-2">
+        <Row label="LTV" description="Lifetime value per customer: ARPU × avg months retained.">
+          <span className="tabular-nums">{fmtUsd(ctx.ltv)}</span>
+        </Row>
+        <Row label="CAC" description="Customer acquisition cost: GTM salaries ÷ new users.">
+          <span className="tabular-nums">{fmtUsd(ctx.cac)}</span>
+        </Row>
+        <Row label="LTV:CAC" description="Ratio VCs love. >3 is great, <1 means you're burning cash per user.">
+          <span className={`tabular-nums font-semibold ${ctx.ltvCacRatio >= 3 ? "text-emerald-400" : ctx.ltvCacRatio < 1 ? "text-red-400" : "text-amber-300"}`}>
+            {ctx.ltvCacRatio}x
+          </span>
+        </Row>
       </div>
 
       <div className="mt-2 border-t border-white/5 pt-2">

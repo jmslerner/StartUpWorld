@@ -1,6 +1,7 @@
 import type { GameState, Stage } from "../types/game";
 import type { EngineContext } from "./context";
 import { clamp } from "./utils";
+import { PRICING_MODELS } from "./pricing";
 
 export const calcArr = (state: GameState): number => Math.max(0, state.mrr) * 12;
 
@@ -39,8 +40,9 @@ export const calcValuation = (state: GameState, ctx: EngineContext): number => {
   const rep = clamp((state.reputation - 50) / 50, -1, 1) * 1.2;
   const hype = clamp((state.volatility - 35) / 65, -1, 1) * 1.3;
   const stressPenalty = clamp(state.stress / 100, 0, 1) * 3.2;
+  const pmBonus = PRICING_MODELS[state.pricingModel].valuationBonus;
 
-  const multiple = clamp(base + growthBoost + vc + rep + hype - stressPenalty, 2.5, 32);
+  const multiple = clamp(base + growthBoost + vc + rep + hype - stressPenalty + pmBonus, 2.5, 32);
 
   const fromArr = arr * multiple;
   const floored = Math.max(STAGE_VALUATION_FLOOR[state.stage], fromArr);

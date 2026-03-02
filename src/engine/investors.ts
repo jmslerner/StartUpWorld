@@ -5,6 +5,7 @@ import { successPenaltyFromStress } from "./stress";
 import { calcRunwayWeeks } from "./economy";
 import { founderMods } from "./founders";
 import { STAGE_VALUATION_FLOOR } from "./valuation";
+import { computeContext } from "./context";
 
 const pitchFailMessages = [
   "They pass for now. \"Come back with cleaner growth.\"",
@@ -172,12 +173,15 @@ export const pitch = (state: GameState): { state: GameState; logs: string[]; ok:
     logs.push(noLeadMsg.msg);
   }
 
-  // Pitch quality: traction + reputation - stress.
+  // Pitch quality: traction + reputation + unit economics - stress.
+  const ctx = computeContext(s);
   const stressPenalty = successPenaltyFromStress(s);
   const traction = clamp(Math.log10(Math.max(10, s.mrr)) / 4, 0, 1); // 0..1-ish
   const rep = clamp(s.vcReputation / 100, 0, 1);
+  // LTV:CAC bonus: VCs love ratios > 3. Scales 0..0.12.
+  const unitEconBonus = clamp((ctx.ltvCacRatio - 1) / 8, 0, 0.12);
 
-  const base = 0.22 + traction * 0.35 + rep * 0.18 - stressPenalty + (mods?.pitchSuccess ?? 0);
+  const base = 0.22 + traction * 0.35 + rep * 0.18 + unitEconBonus - stressPenalty + (mods?.pitchSuccess ?? 0);
   const hype = signedUnit(s.rng);
   s = { ...s, rng: hype.rng };
   const p = clamp(base + hype.value * (s.volatility / 100) * 0.12, 0.02, 0.75);
@@ -266,17 +270,20 @@ export const raise = (state: GameState, amount: number): { state: GameState; log
   let r = s.rng;
   const best = [...s.investors.pipeline].sort((a, b) => b.relationship - a.relationship)[0];
 
+  const raiseCtx = computeContext(s);
   const stressPenalty = successPenaltyFromStress(s);
   const traction = clamp(Math.log10(Math.max(10, s.mrr)) / 4, 0, 1);
   const rep = clamp(s.vcReputation / 100, 0, 1);
   const rel = clamp(best.relationship / 100, 0, 1);
   const align = alignmentScore(s, best);
+  // LTV:CAC bonus for raises too — strong unit economics close deals.
+  const raiseUnitEconBonus = clamp((raiseCtx.ltvCacRatio - 1) / 8, 0, 0.1);
 
   const askPressure = amount <= caps.softCap ? 0 : clamp((amount - caps.softCap) / (caps.hardCap - caps.softCap), 0, 1);
   const valuationAskPenalty = clamp((askAsPctOfValue - 0.18) / 0.32, 0, 1); // starts biting above ~18% of implied value
 
   // Core probability: dramatic but not coin-flippy.
-  const base = 0.12 + traction * 0.45 + rep * 0.15 + rel * 0.25;
+  const base = 0.12 + traction * 0.45 + rep * 0.15 + rel * 0.25 + raiseUnitEconBonus;
   const p = clamp(base * align - stressPenalty - askPressure * 0.25 - valuationAskPenalty * 0.22, 0.02, 0.8);
 
   // Volatility can both help and hurt.

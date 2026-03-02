@@ -43,9 +43,16 @@ export const calcBurn = (state: GameState): number => {
   return Math.round((teamBurn + overhead) * chaosTax * efficiency * orgInefficiency) + Math.max(0, state.debtService);
 };
 
+/** Weekly revenue = MRR / 4 (burn is weekly, MRR is monthly). */
+export const calcWeeklyRevenue = (state: GameState): number => Math.round(state.mrr / 4);
+
+/** Net burn = gross burn - weekly revenue. Negative means profitable. */
+export const calcNetBurn = (state: GameState): number => state.burn - calcWeeklyRevenue(state);
+
 export const calcRunwayWeeks = (state: GameState): number => {
-  const burn = Math.max(1, state.burn);
-  return Math.floor(state.cash / burn);
+  const net = calcNetBurn(state);
+  if (net <= 0) return 999; // profitable — effectively infinite runway
+  return Math.floor(state.cash / net);
 };
 
 export const clamp01 = (n: number): number => clamp(n, 0, 1);

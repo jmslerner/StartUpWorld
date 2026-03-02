@@ -1,5 +1,5 @@
 import type { GameState } from "../../types/game";
-import { getEffectiveMaxAp } from "../../engine/economy";
+import { getEffectiveMaxAp, calcNetBurn } from "../../engine/economy";
 
 interface HudBarProps {
   state: GameState;
@@ -21,8 +21,10 @@ const fmtCompactUsd = (v: number) => {
 };
 
 export const HudBar = ({ state, onToggleStats, statsOpen = false, onToggleLeaderboard }: HudBarProps) => {
-  const runway = state.burn > 0 ? Math.max(0, Math.floor(state.cash / state.burn)) : 0;
-  const runwayUrgent = runway <= 4;
+  const netBurn = calcNetBurn(state);
+  const profitable = netBurn <= 0;
+  const runway = profitable ? 999 : Math.max(0, Math.floor(state.cash / netBurn));
+  const runwayUrgent = !profitable && runway <= 4;
   const founder = state.founder.archetype;
   const seedShown = state.seedText?.trim() ? state.seedText : String(state.seed);
 
@@ -65,9 +67,17 @@ export const HudBar = ({ state, onToggleStats, statsOpen = false, onToggleLeader
       <span className="font-semibold text-white" title="Cash in the bank. When it hits zero, the run ends.">
         Cash {fmt(state.cash)}
       </span>
-      <span title="Net cash lost per week.">Burn {fmt(state.burn)}/wk</span>
-      <span className={runwayUrgent ? "font-semibold text-red-400" : ""}>
-        <span title="Weeks until you run out of cash at current burn.">Runway {runway}w</span>
+      {profitable ? (
+        <span className="text-emerald-400" title="Revenue exceeds burn. Cash is growing.">
+          Profit +{fmt(Math.abs(netBurn))}/wk
+        </span>
+      ) : (
+        <span title="Burn minus revenue per week.">Net burn {fmt(netBurn)}/wk</span>
+      )}
+      <span className={runwayUrgent ? "font-semibold text-red-400" : profitable ? "text-emerald-400" : ""}>
+        <span title={profitable ? "Profitable — runway is infinite." : "Weeks until cash runs out at current net burn."}>
+          Runway {profitable ? "∞" : `${runway}w`}
+        </span>
       </span>
       <span className="font-semibold text-white" title="Estimated valuation derived from ARR, growth, and market mood.">
         Valuation {fmtCompactUsd(state.valuation)}

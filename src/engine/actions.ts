@@ -5,12 +5,13 @@ import type {
   FounderArchetype,
   GameState,
   LogEntry,
+  PricingModel,
   SoundHint,
   TeamRole,
 } from "../types/game";
 import { appendLog } from "./logging";
 import { clamp } from "./utils";
-import { BASE_AP, calcBurn, calcRunwayWeeks, roleComp, getApCost, markFreeActionUsed } from "./economy";
+import { BASE_AP, calcBurn, calcRunwayWeeks, calcNetBurn, calcWeeklyRevenue, roleComp, getApCost, markFreeActionUsed } from "./economy";
 import { applyHiringCohesionHit } from "./culture";
 import { isCofounderChosen, isFounderChosen, setFounder, founderMods } from "./founders";
 import { chance, nextIntInclusive, signedUnit } from "./rng";
@@ -21,6 +22,7 @@ import { computeContext } from "./context";
 import { pitch, raise } from "./investors";
 import { evaluateEndings } from "./endings";
 import { refreshDerivedNoLog } from "./derived";
+import { PRICING_MODELS } from "./pricing";
 
 const withLogLines = (state: GameState, lines: Array<{ text: string; kind?: LogEntry["kind"] }>, sound?: SoundHint): ActionResult => {
   const logs: LogEntry[] = [];
@@ -272,6 +274,7 @@ export const createInitialState = (): GameState => {
     vcReputation: 8,
     stage: "garage",
     thesis: "ai",
+    pricingModel: "prosumer",
     companyPhase: "garage",
     founder: { name: "", archetype: null },
     cofounder: { name: "Cofounder", archetype: null, trust: 72, ego: 55, ambition: 76 },
@@ -541,11 +544,12 @@ export const shipFeature = (state: GameState, name: string): ActionResult => {
   }
 
   const repGain = Math.max(1, Math.round((2 + eng) * (0.55 + vol * 0.9 + Math.max(0, swing.value) * 0.6)));
-  const arpuBump = Math.max(0, Math.round((Math.max(0, swing.value) * vol) * 2));
+  const pm = PRICING_MODELS[s.pricingModel];
+  const arpuBump = Math.max(0, Math.round(Math.max(0, swing.value) * vol * 2 * pm.arpuDriftMult));
   const updated: GameState = markFreeActionUsed(spendAp({
     ...s,
     reputation: clamp(s.reputation + repGain, 0, 100),
-    arpu: clamp(s.arpu + arpuBump, 2, 99),
+    arpu: clamp(s.arpu + arpuBump, pm.arpuMin, pm.arpuMax),
     culture: {
       cohesion: clamp(s.culture.cohesion + 1, 0, 100),
       morale: clamp(s.culture.morale + 2, 0, 100),
@@ -698,6 +702,9 @@ export const endWeek = (state: GameState): ActionResult => {
 
 export const status = (state: GameState): ActionResult => {
   const runway = calcRunwayWeeks(state);
+  const netBurn = calcNetBurn(state);
+  const weeklyRev = calcWeeklyRevenue(state);
+  const profitable = netBurn <= 0;
   const founder = state.founder.archetype ?? "(unpicked)";
   const cofounder = state.cofounder.archetype ?? "(unpicked)";
   const pipeline = state.investors.pipeline.length;
@@ -713,13 +720,19 @@ export const status = (state: GameState): ActionResult => {
     (fTldr ? `\nFounder TL;DR: ${fTldr}` : "") +
     (cTldr ? `\nCofounder TL;DR: ${cTldr}` : "");
 
+  const burnLine = profitable
+    ? `Revenue $${weeklyRev.toLocaleString()}/wk > Burn $${state.burn.toLocaleString()}/wk → Profit +$${Math.abs(netBurn).toLocaleString()}/wk | Runway ∞`
+    : `Burn $${state.burn.toLocaleString()} - Revenue $${weeklyRev.toLocaleString()} = Net burn $${netBurn.toLocaleString()}/wk | Runway ${runway}w`;
+
   const line =
     `${state.companyName} | ${state.founder.name}` +
-    `\nWeek ${state.week} | Cash $${state.cash.toLocaleString()} | Burn $${state.burn.toLocaleString()} | Runway ${runway}w` +
+    `\nWeek ${state.week} | Cash $${state.cash.toLocaleString()}` +
+    `\n${burnLine}` +
     `\nDebt $${state.debtOutstanding.toLocaleString()} | DebtSvc $${state.debtService.toLocaleString()}/wk` +
     `\nValuation ~$${state.valuation.toLocaleString()}` +
     `\nOwnership Founder ${founderOwnershipPct}% | ${lastRoundSummary}` +
     `\nMRR $${state.mrr.toLocaleString()} | Users ${state.users.toLocaleString()} | ARPU $${state.arpu}` +
+    `\nPricing ${state.pricingModel} (ARPU $${PRICING_MODELS[state.pricingModel].arpuMin}–$${PRICING_MODELS[state.pricingModel].arpuMax})` +
     `\nStage ${state.stage} | Phase ${state.companyPhase} | Founder ${founder} | Thesis ${state.thesis}` +
     `\nAP ${state.ap} | Rep ${state.reputation}/100 | VC ${state.vcReputation}/100 | Stress ${state.stress}/100 | Vol ${state.volatility}/100` +
     `\nCofounder ${state.cofounder.name} (${cofounder}) | Trust ${state.cofounder.trust}/100 | Ego ${state.cofounder.ego}/100` +
@@ -728,4 +741,54 @@ export const status = (state: GameState): ActionResult => {
     tldrBlock;
 
   return withLogLines(state, [{ text: line, kind: "system" }]);
+};
+
+export const showPricingInfo = (state: GameState): ActionResult => {
+  const current = PRICING_MODELS[state.pricingModel];
+  const lines: Array<{ text: string; kind?: LogEntry["kind"] }> = [
+    { text: `Current model: ${current.label}`, kind: "system" },
+    { text: `ARPU $${state.arpu} (range $${current.arpuMin}–$${current.arpuMax})`, kind: "system" },
+    { text: "" },
+    { text: "Available models:", kind: "system" },
+  ];
+  for (const [key, cfg] of Object.entries(PRICING_MODELS)) {
+    const marker = key === state.pricingModel ? " (current)" : "";
+    lines.push({ text: `  ${key}${marker} — ${cfg.description}`, kind: "system" });
+    lines.push({ text: `    ARPU $${cfg.arpuMin}–$${cfg.arpuMax} | Growth ${cfg.growthMult}x | Churn ${cfg.churnMult}x`, kind: "system" });
+  }
+  lines.push({ text: "" });
+  lines.push({ text: "Usage: pricing consumer|prosumer|enterprise", kind: "system" });
+  return withLogLines(state, lines);
+};
+
+export const setPricingModel = (state: GameState, model: PricingModel): ActionResult => {
+  const gate = ensurePlayable(state);
+  if (gate) return gate;
+  if (!canSpendAp(state)) {
+    return err(state, "No AP left. End the week to refresh.");
+  }
+  if (state.pricingModel === model) {
+    return err(state, "Already on that pricing model.");
+  }
+
+  const pm = PRICING_MODELS[model];
+  const userLoss = Math.round(state.users * 0.2);
+  const updated: GameState = spendAp({
+    ...state,
+    pricingModel: model,
+    arpu: pm.arpuDefault,
+    mrr: Math.max(0, (state.users - userLoss) * pm.arpuDefault),
+    users: Math.max(0, state.users - userLoss),
+    stress: clamp(state.stress + 12, 0, 100),
+    culture: {
+      ...state.culture,
+      morale: clamp(state.culture.morale - 8, 0, 100),
+    },
+  });
+
+  return withLogLines(updated, [
+    { text: `Pivoted to ${pm.label}. [[beat]]`, kind: "event" },
+    { text: pm.description, kind: "system" },
+    { text: `ARPU reset to $${pm.arpuDefault}. Users -${userLoss} (transition churn). Stress +12. Morale -8.`, kind: "event" },
+  ], "warning");
 };

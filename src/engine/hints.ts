@@ -1,5 +1,6 @@
 import type { GameState } from "../types/game";
 import type { EngineContext } from "./context";
+import { PRICING_MODELS } from "./pricing";
 
 export interface Hint {
   text: string;
@@ -37,6 +38,17 @@ export const generateHints = (state: GameState, ctx: EngineContext): Hint[] => {
 
   if (state.culture.morale <= 40) {
     hints.push({ text: "Tip: Morale is crashing. High stress and rapid hiring can erode culture.", priority: 6 });
+  }
+
+  const pm = PRICING_MODELS[state.pricingModel];
+  if (state.pricingModel === "consumer" && ctx.usersGrowthRate < -0.05) {
+    hints.push({ text: "Tip: Consumer churn is brutal. `ship` features to keep users.", priority: 5 });
+  }
+  if (state.pricingModel === "enterprise" && state.users < 20 && state.week >= 4) {
+    hints.push({ text: "Tip: Enterprise is about big contracts, not user count. Focus on `ship` and ARPU.", priority: 4 });
+  }
+  if (state.arpu <= pm.arpuMin && state.week >= 3) {
+    hints.push({ text: "Tip: ARPU is at the floor for your pricing model. Consider `pricing` to pivot.", priority: 4 });
   }
 
   return hints.sort((a, b) => b.priority - a.priority);

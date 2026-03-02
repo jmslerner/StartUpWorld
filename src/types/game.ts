@@ -6,6 +6,8 @@ export type FounderArchetype = "visionary" | "hacker" | "sales-animal" | "philos
 
 export type CofounderArchetype = "operator" | "builder" | "rainmaker" | "powderkeg";
 
+export type PricingModel = "consumer" | "prosumer" | "enterprise";
+
 export type TeamRole = "engineering" | "design" | "marketing" | "sales" | "ops" | "hr" | "legal";
 
 export type TeamRoster = Record<TeamRole, number>;
@@ -101,6 +103,7 @@ export interface GameState {
   stage: Stage;
 
   thesis: InvestorTrend;
+  pricingModel: PricingModel;
 
   companyPhase: CompanyPhase;
   founder: {

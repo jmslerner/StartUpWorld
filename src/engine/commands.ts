@@ -1,4 +1,4 @@
-import type { ActionResult, GameState, LogEntry, TeamRole } from "../types/game";
+import type { ActionResult, GameState, LogEntry, PricingModel, TeamRole } from "../types/game";
 import { toLog, parseAmount } from "./utils";
 import {
   choose,
@@ -13,7 +13,9 @@ import {
   setCompanyName,
   setFounderArchetype,
   setPlayerName,
+  setPricingModel,
   shipFeature,
+  showPricingInfo,
   status,
 } from "./actions";
 
@@ -63,6 +65,7 @@ const setupHelpText: LogEntry[] = [
   toLog("launch <campaign> - run a growth campaign"),
   toLog("pitch - pitch investors"),
   toLog("raise [vc <amount>|friends|cards|loan|preseed|mortgage] - funding (run `raise` for options)"),
+  toLog("pricing [consumer|prosumer|enterprise] - view or change pricing model"),
   toLog("end - end the week"),
   toLog("choose <n> - resolve a pending event choice"),
 ];
@@ -79,6 +82,7 @@ const mainHelpText: LogEntry[] = [
   toLog("launch <campaign> - run a growth campaign"),
   toLog("pitch - pitch investors"),
   toLog("raise [vc <amount>|friends|cards|loan|preseed|mortgage] - funding (run `raise` for options)"),
+  toLog("pricing [consumer|prosumer|enterprise] - view or change pricing model"),
   toLog("end - end the week"),
   toLog("choose <n> - resolve a pending event choice"),
 ];
@@ -229,6 +233,16 @@ export const executeCommand = (state: GameState, input: string): ActionResult =>
 
       return { state, logs: [toLog("Usage: raise vc <amount> OR raise friends|cards|loan|preseed|mortgage", "error")] };
     }
+    case "pricing": {
+      const model = (rest[0] ?? "").toLowerCase();
+      if (!model) {
+        return showPricingInfo(state);
+      }
+      if (!["consumer", "prosumer", "enterprise"].includes(model)) {
+        return { state, logs: [toLog("Usage: pricing consumer|prosumer|enterprise", "error")] };
+      }
+      return setPricingModel(state, model as PricingModel);
+    }
     case "end":
       return endWeek(state);
 
@@ -245,7 +259,7 @@ export const executeCommand = (state: GameState, input: string): ActionResult =>
     case "blame":
       return { state, logs: [toLog("Blame is not a command. It is, however, a management strategy.", "system")] };
     case "pivot":
-      return { state, logs: [toLog("You can't just type 'pivot.' You have to actually do something different. [[beat]] That's the joke.", "system")] };
+      return { state, logs: [toLog("Looking to pivot? Try `pricing consumer|prosumer|enterprise`.", "system")] };
     case "pray":
       return { state, logs: [toLog("Prayer received. [[beat]] Routing to /dev/null.", "system")] };
     case "fire":
@@ -268,7 +282,7 @@ export const executeCommand = (state: GameState, input: string): ActionResult =>
 const knownCommands = [
   "help", "clear", "cls", "status", "seed", "name", "company",
   "founder", "cofounder", "choose", "hire", "ship", "launch",
-  "pitch", "raise", "end",
+  "pitch", "raise", "pricing", "end",
 ];
 
 const levenshtein = (a: string, b: string): number => {
