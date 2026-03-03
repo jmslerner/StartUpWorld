@@ -172,7 +172,7 @@ export interface LogEntry {
   kind?: "system" | "user" | "event" | "error";
 }
 
-export type SoundHint = "success" | "fail" | "cash-in" | "warning";
+export type SoundHint = "success" | "fail" | "cash-in" | "warning" | "opportunity" | "crisis" | "click";
 
 export interface ActionResult {
   state: GameState;

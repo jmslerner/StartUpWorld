@@ -16,7 +16,13 @@ function getCtx(): AudioContext | null {
 }
 
 function isEnabled(): boolean {
-  return localStorage.getItem("startupworld:sfx:typing") !== "0";
+  try {
+    const master = localStorage.getItem("startupworld:sfx:master");
+    // Default ON; only disable if master is explicitly "0".
+    return master !== "0";
+  } catch {
+    return true;
+  }
 }
 
 // --- Helpers ---

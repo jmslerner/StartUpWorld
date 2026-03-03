@@ -707,7 +707,32 @@ export const choose = (state: GameState, choiceIndex: number): ActionResult => {
   // Re-evaluate endings after consequences.
   const end = evaluateEndings(result.state, computeContext(result.state));
   const lines = [...result.logs, ...end.logs].map((t) => ({ text: t, kind: "event" as const }));
-  return withLogLines(end.state, lines);
+
+  // Heuristic sound hint based on net effect of the choice.
+  const before = state;
+  const after = end.state;
+  const dCash = after.cash - before.cash;
+  const dMrr = after.mrr - before.mrr;
+  const dUsers = after.users - before.users;
+  const dRep = after.reputation - before.reputation;
+  const dMorale = after.culture.morale - before.culture.morale;
+  const dCohesion = after.culture.cohesion - before.culture.cohesion;
+  const dStress = after.stress - before.stress;
+
+  let sound: SoundHint | undefined;
+  if (dCash >= 5000 || dMrr >= 1000) {
+    sound = "cash-in";
+  } else {
+    const positives = (dUsers > 0 ? 1 : 0) + (dRep > 0 ? 1 : 0) + (dMorale > 0 ? 1 : 0) + (dCohesion > 0 ? 1 : 0);
+    const negatives = (dUsers < 0 ? 1 : 0) + (dRep < 0 ? 1 : 0) + (dMorale < 0 ? 1 : 0) + (dCohesion < 0 ? 1 : 0) + (dStress > 5 ? 1 : 0);
+    if (negatives >= positives + 2 || after.cash < 0 || after.stress >= 80) {
+      sound = "warning";
+    } else if (positives >= negatives + 2) {
+      sound = "success";
+    }
+  }
+
+  return withLogLines(end.state, lines, sound);
 };
 
 export const endWeek = (state: GameState): ActionResult => {

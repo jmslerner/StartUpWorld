@@ -1,5 +1,6 @@
 import { forwardRef, useCallback, useMemo, useRef, useState } from "react";
 import { Tooltip } from "../components/Tooltip";
+import { SFX } from "../sound";
 
 const INPUT_MAX_CHARS = 160;
 
@@ -366,6 +367,7 @@ export const TerminalInput = forwardRef<HTMLInputElement, TerminalInputProps>(
   const showSuggestions = isFocused && !dismissedSuggestions && suggestions.length > 0;
 
   const applySuggestion = (suggestion: Suggestion) => {
+    try { SFX.click(); } catch {}
     setValue(suggestion.nextValue);
     lastValueRef.current = suggestion.nextValue;
     setDismissedSuggestions(false);
@@ -487,7 +489,7 @@ export const TerminalInput = forwardRef<HTMLInputElement, TerminalInputProps>(
           }
           title="Typing sound effects"
         >
-          SFX {sfxEnabled ? "ON" : "OFF"}
+          Typing SFX {sfxEnabled ? "ON" : "OFF"}
         </button>
       </form>
 

@@ -60,6 +60,9 @@ export const useGameStore = create<GameStore>((set) => ({
       else if (result.sound === "fail") SFX.fail();
       else if (result.sound === "cash-in") SFX.cashIn();
       else if (result.sound === "warning") SFX.warning();
+      else if (result.sound === "opportunity") SFX.opportunity();
+      else if (result.sound === "crisis") SFX.crisis();
+      else if (result.sound === "click") SFX.click();
 
       if (advancedWeek) SFX.tick();
       if (!hadEvent && result.state.pendingEvent) SFX.alert();
