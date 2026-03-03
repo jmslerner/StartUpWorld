@@ -8,6 +8,7 @@ import { MobilePanelsSheet } from "./ui/components/MobilePanelsSheet";
 import { StatsDrawer, type StatsPanelKey } from "./ui/components/StatsDrawer";
 import type { SheetSnap } from "./ui/components/BottomSheet";
 import { OnboardingCard } from "./ui/components/OnboardingCard";
+import { HudBarMock } from "./ui/components/HudBarMock";
 import { useEffect, useRef, useState } from "react";
 import { Analytics } from "@vercel/analytics/react";
 
@@ -43,6 +44,8 @@ const App = () => {
 
   const effectiveStatsOpen = statsOpen || mobileStatsSnap !== "collapsed";
 
+  const showHudMock = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("hud");
+
   const toggleStats = () => {
     setStatsOpen((prev) => !prev);
     setMobileStatsSnap((prev) => (prev === "collapsed" ? "mid" : "collapsed"));
@@ -70,6 +73,16 @@ const App = () => {
     window.addEventListener("keydown", onKeyDown, true);
     return () => window.removeEventListener("keydown", onKeyDown, true);
   }, [onboardingComplete]);
+
+  if (showHudMock) {
+    return (
+      <div className="min-h-screen px-3 py-4 text-slate-100 md:px-6">
+        <div className="mx-auto w-full max-w-6xl">
+          <HudBarMock />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
