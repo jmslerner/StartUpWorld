@@ -9,6 +9,7 @@ import { StatsDrawer, type StatsPanelKey } from "./ui/components/StatsDrawer";
 import type { SheetSnap } from "./ui/components/BottomSheet";
 import { OnboardingCard } from "./ui/components/OnboardingCard";
 import { useEffect, useRef, useState } from "react";
+import { Analytics } from "@vercel/analytics/react";
 
 const App = () => {
   const state = useGameStore((store) => store.state);
@@ -129,6 +130,7 @@ const App = () => {
           />
         </div>
       </div>
+      <Analytics />
     </div>
   );
 };

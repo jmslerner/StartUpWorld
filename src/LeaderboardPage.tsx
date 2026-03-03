@@ -3,6 +3,7 @@ import { LeaderboardPanel } from "./ui/components/LeaderboardPanel";
 import { GraveyardPanel } from "./ui/components/GraveyardPanel";
 import { fetchLeaderboard, fetchGraveyard } from "./api/client";
 import type { LeaderboardEntry, GraveyardEntry } from "./types/social";
+import { Analytics } from "@vercel/analytics/react";
 
 type TabKey = "leaderboard" | "graveyard";
 
@@ -69,6 +70,7 @@ const LeaderboardPage = () => {
           Share this page with friends to compete.
         </div>
       </div>
+      <Analytics />
     </div>
   );
 };
