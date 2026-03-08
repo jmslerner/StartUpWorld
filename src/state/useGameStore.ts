@@ -5,9 +5,50 @@ import { toLog } from "../engine/utils";
 import { pickWeeklyQuote } from "../ui/quotes";
 import { SFX } from "../ui/sound";
 
+const SAVE_KEY = "startupworld:save";
+const SAVE_VERSION = 1;
+
+interface SaveData {
+  version: number;
+  state: GameState;
+  log: LogEntry[];
+  commandHistory: string[];
+}
+
+function saveToDisk(state: GameState, log: LogEntry[], commandHistory: string[]): void {
+  try {
+    const data: SaveData = { version: SAVE_VERSION, state, log, commandHistory };
+    window.localStorage.setItem(SAVE_KEY, JSON.stringify(data));
+  } catch {
+    // Quota exceeded or private browsing — silently ignore.
+  }
+}
+
+function loadFromDisk(): SaveData | null {
+  try {
+    const raw = window.localStorage.getItem(SAVE_KEY);
+    if (!raw) return null;
+    const data = JSON.parse(raw) as SaveData;
+    if (data.version !== SAVE_VERSION) return null;
+    if (typeof data.state?.week !== "number" || typeof data.state?.seed !== "number") return null;
+    return data;
+  } catch {
+    return null;
+  }
+}
+
+function clearSave(): void {
+  try {
+    window.localStorage.removeItem(SAVE_KEY);
+  } catch {
+    // Ignore.
+  }
+}
+
 interface GameStore {
   state: GameState;
   log: LogEntry[];
+  commandHistory: string[];
   runCommand: (input: string) => void;
   resetGame: () => void;
 }
@@ -32,21 +73,28 @@ const makeClearedLogs = (state: GameState): LogEntry[] => [
   toLog("Type 'help' for commands.", "system", "intro-6"),
 ];
 
-const initialState = createInitialState();
+const saved = loadFromDisk();
+const initialState = saved?.state ?? createInitialState();
+const initialLog = saved?.log ?? makeIntroLogs(initialState);
+const initialHistory = saved?.commandHistory ?? [];
 
 export const useGameStore = create<GameStore>((set) => ({
   state: initialState,
-  log: makeIntroLogs(initialState),
+  log: initialLog,
+  commandHistory: initialHistory,
   runCommand: (input: string) =>
     set((current) => {
       const trimmed = input.trim();
 
       const lower = trimmed.toLowerCase();
       if (lower === "clear" || lower === "cls") {
-        return {
+        const next = {
           state: current.state,
           log: makeClearedLogs(current.state),
+          commandHistory: current.commandHistory,
         };
+        queueMicrotask(() => saveToDisk(next.state, next.log, next.commandHistory));
+        return next;
       }
 
       const prevWeek = current.state.week;
@@ -78,16 +126,31 @@ export const useGameStore = create<GameStore>((set) => ({
           })()
         : [];
 
-      return {
+      // Build updated command history (dedup consecutive, cap at 50)
+      const newHistory = trimmed
+        ? (current.commandHistory[0] === trimmed
+            ? current.commandHistory
+            : [trimmed, ...current.commandHistory].slice(0, 50))
+        : current.commandHistory;
+
+      const newLog = advancedWeek
+        ? [...userLog, ...quoteLog, ...result.logs]
+        : [...current.log, ...userLog, ...result.logs];
+
+      const next = {
         state: result.state,
-        log: advancedWeek
-          ? [...userLog, ...quoteLog, ...result.logs]
-          : [...current.log, ...userLog, ...result.logs],
+        log: newLog,
+        commandHistory: newHistory,
       };
+
+      queueMicrotask(() => saveToDisk(next.state, next.log, next.commandHistory));
+
+      return next;
     }),
   resetGame: () =>
     set(() => {
+      clearSave();
       const fresh = createInitialState();
-      return { state: fresh, log: makeIntroLogs(fresh) };
+      return { state: fresh, log: makeIntroLogs(fresh), commandHistory: [] };
     }),
 }));

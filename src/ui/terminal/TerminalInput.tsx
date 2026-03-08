@@ -165,14 +165,17 @@ interface TerminalInputProps {
   onSubmit: (value: string) => void;
   isTyping?: boolean;
   fastForward?: () => void;
+  commandHistory?: string[];
 }
 
 export const TerminalInput = forwardRef<HTMLInputElement, TerminalInputProps>(
-  ({ onSubmit, isTyping = false, fastForward }, forwardedRef) => {
+  ({ onSubmit, isTyping = false, fastForward, commandHistory = [] }, forwardedRef) => {
   const [value, setValue] = useState("");
   const [isFocused, setIsFocused] = useState(false);
   const [dismissedSuggestions, setDismissedSuggestions] = useState(false);
   const [activeSuggestionIndex, setActiveSuggestionIndex] = useState(0);
+  const [historyIndex, setHistoryIndex] = useState(-1);
+  const [savedInput, setSavedInput] = useState("");
   const [shipHistory, setShipHistory] = useState<string[]>([]);
   const [launchHistory, setLaunchHistory] = useState<string[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -251,6 +254,8 @@ export const TerminalInput = forwardRef<HTMLInputElement, TerminalInputProps>(
     onSubmit(normalized);
     setValue("");
     lastValueRef.current = "";
+    setHistoryIndex(-1);
+    setSavedInput("");
     // Keep the terminal input "always first" even after state updates.
     queueMicrotask(() => inputRef.current?.focus());
   };
@@ -432,6 +437,38 @@ export const TerminalInput = forwardRef<HTMLInputElement, TerminalInputProps>(
               }
             }
 
+            // Command history navigation (only when suggestions are NOT showing)
+            if (event.key === "ArrowUp" && !showSuggestions && commandHistory.length > 0) {
+              event.preventDefault();
+              if (historyIndex === -1) {
+                setSavedInput(value);
+                setHistoryIndex(0);
+                setValue(commandHistory[0]);
+                lastValueRef.current = commandHistory[0];
+              } else if (historyIndex < commandHistory.length - 1) {
+                const next = historyIndex + 1;
+                setHistoryIndex(next);
+                setValue(commandHistory[next]);
+                lastValueRef.current = commandHistory[next];
+              }
+              return;
+            }
+
+            if (event.key === "ArrowDown" && !showSuggestions && historyIndex >= 0) {
+              event.preventDefault();
+              if (historyIndex > 0) {
+                const next = historyIndex - 1;
+                setHistoryIndex(next);
+                setValue(commandHistory[next]);
+                lastValueRef.current = commandHistory[next];
+              } else {
+                setHistoryIndex(-1);
+                setValue(savedInput);
+                lastValueRef.current = savedInput;
+              }
+              return;
+            }
+
             const isSpaceKey = event.key === " " || event.code === "Space";
             if (isSpaceKey && /\s$/.test(value)) {
               const el = event.currentTarget;
@@ -465,6 +502,7 @@ export const TerminalInput = forwardRef<HTMLInputElement, TerminalInputProps>(
           }
           lastValueRef.current = next;
           setValue(next);
+          setHistoryIndex(-1);
             setDismissedSuggestions(false);
             setActiveSuggestionIndex(0);
         }}

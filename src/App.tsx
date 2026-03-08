@@ -8,7 +8,6 @@ import { MobilePanelsSheet } from "./ui/components/MobilePanelsSheet";
 import { StatsDrawer, type StatsPanelKey } from "./ui/components/StatsDrawer";
 import type { SheetSnap } from "./ui/components/BottomSheet";
 import { OnboardingCard } from "./ui/components/OnboardingCard";
-import { HudBarMock } from "./ui/components/HudBarMock";
 import { useEffect, useRef, useState } from "react";
 import { Analytics } from "@vercel/analytics/react";
 
@@ -17,6 +16,7 @@ const App = () => {
   const log = useGameStore((store) => store.log);
   const runCommand = useGameStore((store) => store.runCommand);
   const resetGame = useGameStore((store) => store.resetGame);
+  const commandHistory = useGameStore((store) => store.commandHistory);
 
   const [statsOpen, setStatsOpen] = useState(false);
   const [statsActive, setStatsActive] = useState<StatsPanelKey>("growth");
@@ -43,8 +43,6 @@ const App = () => {
   }, [onboardingComplete]);
 
   const effectiveStatsOpen = statsOpen || mobileStatsSnap !== "collapsed";
-
-  const showHudMock = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("hud");
 
   const toggleStats = () => {
     setStatsOpen((prev) => !prev);
@@ -74,16 +72,6 @@ const App = () => {
     return () => window.removeEventListener("keydown", onKeyDown, true);
   }, [onboardingComplete]);
 
-  if (showHudMock) {
-    return (
-      <div className="min-h-screen px-3 py-4 text-slate-100 md:px-6">
-        <div className="mx-auto w-full max-w-6xl">
-          <HudBarMock />
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div
       className="min-h-screen px-3 py-4 pb-4 text-slate-100 md:px-6"
@@ -112,7 +100,7 @@ const App = () => {
             {!onboardingComplete ? (
               <OnboardingCard state={state} runCommand={runCommand} inputRef={onboardingInputRef} />
             ) : null}
-            <TerminalInput ref={terminalInputRef} onSubmit={runCommand} isTyping={isTyping} fastForward={fastForward} />
+            <TerminalInput ref={terminalInputRef} onSubmit={runCommand} isTyping={isTyping} fastForward={fastForward} commandHistory={commandHistory} />
             <TerminalLog log={typedLog} isTyping={isTyping} />
           </div>
 

@@ -49,7 +49,7 @@ export const LeaderboardOverlay = ({ onClose, currentSeed }: LeaderboardOverlayP
         {/* Header */}
         <div className="mb-3 flex items-center justify-between">
           <div className="text-[0.6rem] font-semibold uppercase tracking-widest text-mist/50">
-            {tab === "leaderboard" ? "Top 10" : "Startup Graveyard"}
+            {tab === "leaderboard" ? "Top 50" : "Startup Graveyard"}
           </div>
           <button
             type="button"

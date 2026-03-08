@@ -4,7 +4,7 @@ import { validateLeaderboard } from "./_lib/validate.js";
 
 const LEADERBOARD_KEY = "leaderboard";
 const SUBMITTED_SEEDS_KEY = "submitted-seeds";
-const MAX_ENTRIES = 10;
+const MAX_ENTRIES = 50;
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const redis = await getRedis();

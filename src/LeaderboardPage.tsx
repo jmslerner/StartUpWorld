@@ -46,7 +46,7 @@ const LeaderboardPage = () => {
         <div className="panel-surface flex flex-col rounded-xl px-5 py-5">
           {/* Title */}
           <div className="mb-3 text-[0.6rem] font-semibold uppercase tracking-widest text-mist/50">
-            {tab === "leaderboard" ? "Top 10" : "Startup Graveyard"}
+            {tab === "leaderboard" ? "Top 50" : "Startup Graveyard"}
           </div>
 
           {/* Tabs */}
