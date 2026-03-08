@@ -8,6 +8,7 @@ import { STAGE_VALUATION_FLOOR } from "./valuation";
 import { computeContext } from "./context";
 import { STAGE_PERKS } from "./stagePerks";
 import { addBoardMember } from "./board";
+import { ASSET_CATALOG } from "./assets";
 
 const pitchFailMessages = [
   "They pass for now. \"Come back with cleaner growth.\"",
@@ -98,7 +99,7 @@ const investorNames = [
 
 const allTrends: InvestorTrend[] = ["ai", "crypto", "devtools", "consumer", "enterprise", "fintech", "biotech"];
 
-const stageRaiseCaps: Record<Stage, { softCap: number; hardCap: number }> = {
+export const stageRaiseCaps: Record<Stage, { softCap: number; hardCap: number }> = {
   garage: { softCap: 250_000, hardCap: 1_000_000 },
   seed: { softCap: 2_500_000, hardCap: 6_000_000 },
   "series-a": { softCap: 12_000_000, hardCap: 30_000_000 },
@@ -184,7 +185,8 @@ export const pitch = (state: GameState): { state: GameState; logs: string[]; ok:
   const unitEconBonus = clamp((ctx.ltvCacRatio - 1) / 8, 0, 0.12);
 
   const stagePitchBonus = STAGE_PERKS[s.stage].pitchSuccessBonus;
-  const base = 0.22 + traction * 0.35 + rep * 0.18 + unitEconBonus + stagePitchBonus - stressPenalty + (mods?.pitchSuccess ?? 0);
+  const assetPitchBonus = s.assets.reduce((acc, a) => acc + (ASSET_CATALOG[a.id]?.effects.pitchSuccessBonus ?? 0), 0);
+  const base = 0.22 + traction * 0.35 + rep * 0.18 + unitEconBonus + stagePitchBonus + assetPitchBonus - stressPenalty + (mods?.pitchSuccess ?? 0);
   const hype = signedUnit(s.rng);
   s = { ...s, rng: hype.rng };
   const p = clamp(base + hype.value * (s.volatility / 100) * 0.12, 0.02, 0.75);
@@ -286,7 +288,8 @@ export const raise = (state: GameState, amount: number): { state: GameState; log
   const valuationAskPenalty = clamp((askAsPctOfValue - 0.18) / 0.32, 0, 1); // starts biting above ~18% of implied value
 
   // Core probability: dramatic but not coin-flippy.
-  const base = 0.12 + traction * 0.45 + rep * 0.15 + rel * 0.25 + raiseUnitEconBonus;
+  const assetRaiseBonus = s.assets.reduce((acc, a) => acc + (ASSET_CATALOG[a.id]?.effects.pitchSuccessBonus ?? 0), 0);
+  const base = 0.12 + traction * 0.45 + rep * 0.15 + rel * 0.25 + raiseUnitEconBonus + assetRaiseBonus;
   const p = clamp(base * align - stressPenalty - askPressure * 0.25 - valuationAskPenalty * 0.22, 0.02, 0.8);
 
   // Volatility can both help and hurt.

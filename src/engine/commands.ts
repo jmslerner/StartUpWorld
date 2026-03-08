@@ -21,6 +21,9 @@ import {
   boardDinner,
   boardGift,
   boardBlackmail,
+  showPhases,
+  buyAsset,
+  listAssets,
 } from "./actions";
 import { STAGE_PERKS, ROLE_MIN_STAGE } from "./stagePerks";
 
@@ -84,6 +87,9 @@ const setupHelpText: LogEntry[] = [
   toLog("board dinner <name> - take a director to dinner (1 AP, $2K)"),
   toLog("board gift <name> - send a director a gift (1 AP, $5K)"),
   toLog("board blackmail <name> - risky leverage play (1 AP, 35% success)"),
+  toLog("phases - view company phase progression and unlock requirements"),
+  toLog("buy [asset] - purchase company assets (type `buy` for options) (1 AP)"),
+  toLog("assets - list owned assets"),
   toLog("end - end the week"),
   toLog("choose <n> - resolve a pending event choice"),
 ];
@@ -107,6 +113,9 @@ const mainHelpText: LogEntry[] = [
   toLog("board dinner <name> - take a director to dinner (1 AP, $2K)"),
   toLog("board gift <name> - send a director a gift (1 AP, $5K)"),
   toLog("board blackmail <name> - risky leverage play (1 AP, 35% success)"),
+  toLog("phases - view company phase progression and unlock requirements"),
+  toLog("buy [asset] - purchase company assets (type `buy` for options) (1 AP)"),
+  toLog("assets - list owned assets"),
   toLog("end - end the week"),
   toLog("choose <n> - resolve a pending event choice"),
 ];
@@ -327,6 +336,15 @@ export const executeCommand = (state: GameState, input: string): ActionResult =>
       if (sub === "blackmail") return boardBlackmail(state, target);
       return { state, logs: [toLog("Board actions: board, board dinner <name>, board gift <name>, board blackmail <name>", "error")] };
     }
+    case "phases":
+    case "roadmap":
+      return showPhases(state);
+    case "buy": {
+      const target = rest.join(" ").trim();
+      return buyAsset(state, target);
+    }
+    case "assets":
+      return listAssets(state);
     case "end":
       return endWeek(state);
 
@@ -366,7 +384,8 @@ export const executeCommand = (state: GameState, input: string): ActionResult =>
 const knownCommands = [
   "help", "clear", "cls", "status", "seed", "name", "company",
   "founder", "cofounder", "choose", "hire", "ship", "launch",
-  "pitch", "raise", "pricing", "perks", "board", "end",
+  "pitch", "raise", "pricing", "perks", "board", "phases",
+  "buy", "assets", "end",
 ];
 
 const levenshtein = (a: string, b: string): number => {

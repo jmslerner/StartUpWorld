@@ -1,7 +1,9 @@
 import type {
   ActionResult,
+  Asset,
   BootstrapFundingSource,
   CofounderArchetype,
+  CompanyPhase,
   FounderArchetype,
   GameState,
   LogEntry,
@@ -25,6 +27,7 @@ import { refreshDerivedNoLog } from "./derived";
 import { PRICING_MODELS } from "./pricing";
 import { canHireRole, ROLE_MIN_STAGE, STAGE_PERKS } from "./stagePerks";
 import { createInitialBoard, PERSONALITY_PROFILES } from "./board";
+import { ASSET_CATALOG, ALL_ASSET_IDS, phaseAtLeast } from "./assets";
 
 const withLogLines = (state: GameState, lines: Array<{ text: string; kind?: LogEntry["kind"] }>, sound?: SoundHint): ActionResult => {
   const logs: LogEntry[] = [];
@@ -301,6 +304,7 @@ export const createInitialState = (): GameState => {
     totalRaised: 0,
     freeActionUsed: {},
     board: createInitialBoard(),
+    assets: [],
     pendingEvent: null,
     eventHistory: [],
     gameOver: null,
@@ -788,6 +792,7 @@ export const status = (state: GameState): ActionResult => {
     `\nCofounder ${state.cofounder.name} (${cofounder}) | Trust ${state.cofounder.trust}/100 | Ego ${state.cofounder.ego}/100` +
     `\nCohesion ${state.culture.cohesion}/100 | Morale ${state.culture.morale}/100` +
     `\nInvestor leads: ${pipeline}` +
+    (state.assets.length > 0 ? `\nAssets: ${state.assets.map(a => a.name).join(", ")}` : "") +
     tldrBlock;
 
   return withLogLines(state, [{ text: line, kind: "system" }]);
@@ -966,4 +971,241 @@ export const boardBlackmail = (state: GameState, targetName: string): ActionResu
     { text: "It backfires. They tell the other directors.", kind: "error" },
     { text: `${member.name}'s confidence crashes to 5. Other directors lose confidence. Reputation -8.`, kind: "event" },
   ], "fail");
+};
+
+// ── Phase progression ──
+
+export const showPhases = (state: GameState): ActionResult => {
+  const ctx = computeContext(state);
+  const teamSize = ctx.teamSize;
+
+  const phases: Array<{
+    phase: CompanyPhase;
+    label: string;
+    description: string;
+    requirements: string[];
+  }> = [
+    {
+      phase: "garage",
+      label: "Garage",
+      description: "Two people, a laptop, and a dangerous idea.",
+      requirements: ["Starting phase"],
+    },
+    {
+      phase: "coworking",
+      label: "Coworking",
+      description: "You have a desk. You have neighbors. You have competition for the good outlet.",
+      requirements: [
+        `Valuation >= $5M (yours: $${state.valuation.toLocaleString()})`,
+        `Users >= 250 OR Team >= 4 (yours: ${state.users.toLocaleString()} users, ${teamSize} team)`,
+      ],
+    },
+    {
+      phase: "office",
+      label: "Office",
+      description: "You signed a lease. The walls are yours. So are the problems.",
+      requirements: [
+        `Valuation >= $30M (yours: $${state.valuation.toLocaleString()})`,
+        `MRR >= $10K OR Users >= 2,500 OR Team >= 10 (yours: $${state.mrr.toLocaleString()} MRR, ${state.users.toLocaleString()} users, ${teamSize} team)`,
+      ],
+    },
+    {
+      phase: "unicorn",
+      label: "Unicorn",
+      description: "The mythical creature. You're on the cover of TechCrunch. For now.",
+      requirements: [
+        `Valuation >= $1B (yours: $${state.valuation.toLocaleString()})`,
+        `MRR >= $80K OR Users >= 20K (yours: $${state.mrr.toLocaleString()} MRR, ${state.users.toLocaleString()} users)`,
+        `Stage != "garage" (yours: ${state.stage})`,
+      ],
+    },
+    {
+      phase: "public",
+      label: "Public",
+      description: "Ring the bell. Meet your shareholders. Hire a CFO who doesn't cry.",
+      requirements: [
+        `Valuation >= $10B (yours: $${state.valuation.toLocaleString()})`,
+        `MRR >= $250K (yours: $${state.mrr.toLocaleString()})`,
+        `Stage = "growth" (yours: ${state.stage})`,
+        `Team >= 25 (yours: ${teamSize})`,
+      ],
+    },
+  ];
+
+  const phaseOrder: CompanyPhase[] = ["garage", "coworking", "office", "unicorn", "public"];
+  const currentIdx = phaseOrder.indexOf(state.companyPhase);
+
+  const lines: Array<{ text: string; kind?: LogEntry["kind"] }> = [
+    { text: "Company Phases:", kind: "system" },
+    { text: "" },
+  ];
+
+  for (let i = 0; i < phases.length; i++) {
+    const p = phases[i];
+    const isCurrent = p.phase === state.companyPhase;
+    const isCompleted = i < currentIdx;
+    const marker = isCurrent ? " <<< YOU ARE HERE" : isCompleted ? " [completed]" : "";
+
+    lines.push({ text: `${isCurrent ? ">" : " "} ${p.label}${marker}`, kind: isCurrent ? "event" : "system" });
+    lines.push({ text: `  ${p.description}` });
+    for (const req of p.requirements) {
+      lines.push({ text: `  - ${req}` });
+    }
+    lines.push({ text: "" });
+  }
+
+  if (currentIdx < phaseOrder.length - 1) {
+    lines.push({ text: `Next phase: ${phases[currentIdx + 1].label}. Keep growing.`, kind: "system" });
+  } else {
+    lines.push({ text: "You've reached the final phase. IPO awaits.", kind: "system" });
+  }
+
+  return withLogLines(state, lines);
+};
+
+// ── Asset actions ──
+
+export const buyAsset = (state: GameState, assetName: string): ActionResult => {
+  const gate = ensurePlayable(state);
+  if (gate) return gate;
+
+  // If no name given, list available assets
+  if (!assetName) {
+    return listAvailableAssets(state);
+  }
+
+  if (!canSpendAp(state)) {
+    return err(state, "No AP left. End the week to refresh.");
+  }
+
+  const normalizedInput = assetName.toLowerCase().replace(/\s+/g, "-");
+  const match = ALL_ASSET_IDS.find(id => {
+    const def = ASSET_CATALOG[id];
+    return id === normalizedInput
+      || def.name.toLowerCase().replace(/\s+/g, "-") === normalizedInput
+      || id.includes(normalizedInput)
+      || def.name.toLowerCase().includes(assetName.toLowerCase());
+  });
+
+  if (!match) {
+    return listAvailableAssets(state);
+  }
+
+  const def = ASSET_CATALOG[match];
+
+  if (state.assets.some(a => a.id === match)) {
+    return err(state, `You already own ${def.name}.`);
+  }
+
+  if (!phaseAtLeast(state.companyPhase, def.minPhase)) {
+    return err(state, `${def.name} requires ${def.minPhase} phase. You're in ${state.companyPhase}.`);
+  }
+
+  if (state.cash < def.cost) {
+    return err(state, `Not enough cash. ${def.name} costs $${def.cost.toLocaleString()}. You have $${state.cash.toLocaleString()}.`);
+  }
+
+  const newAsset: Asset = {
+    id: match,
+    name: def.name,
+    purchaseWeek: state.week,
+  };
+
+  let updated: GameState = spendAp({
+    ...state,
+    cash: state.cash - def.cost,
+    assets: [...state.assets, newAsset],
+  });
+
+  if (def.effects.vcReputationBonus) {
+    updated = { ...updated, vcReputation: clamp(updated.vcReputation + def.effects.vcReputationBonus, 0, 100) };
+  }
+  if (def.effects.boardConfidenceBonus && updated.board.members.length > 0) {
+    updated = {
+      ...updated,
+      board: {
+        ...updated.board,
+        members: updated.board.members.map(m =>
+          m.role !== "founder"
+            ? { ...m, confidence: clamp(m.confidence + def.effects.boardConfidenceBonus!, 0, 100) }
+            : m
+        ),
+      },
+    };
+  }
+
+  updated = { ...updated, burn: calcBurn(updated) };
+
+  const lines: Array<{ text: string; kind?: LogEntry["kind"] }> = [
+    { text: `Purchased: ${def.name}. [[beat]]`, kind: "event" },
+    { text: def.flavorText, kind: "system" },
+    { text: `Cash -$${def.cost.toLocaleString()}. Burn now $${updated.burn.toLocaleString()}/wk (+$${def.maintenanceCost.toLocaleString()} maintenance).`, kind: "event" },
+  ];
+
+  if (def.effects.vcReputationBonus) {
+    lines.push({ text: `VC Reputation +${def.effects.vcReputationBonus}.`, kind: "event" });
+  }
+  if (def.effects.boardConfidenceBonus) {
+    lines.push({ text: `Board confidence +${def.effects.boardConfidenceBonus} (all non-founder directors).`, kind: "event" });
+  }
+
+  return withLogLines(updated, lines, "success");
+};
+
+const listAvailableAssets = (state: GameState): ActionResult => {
+  const available = ALL_ASSET_IDS
+    .filter(id => !state.assets.some(a => a.id === id))
+    .filter(id => phaseAtLeast(state.companyPhase, ASSET_CATALOG[id].minPhase));
+
+  if (available.length === 0) {
+    const locked = ALL_ASSET_IDS.filter(id => !state.assets.some(a => a.id === id));
+    if (locked.length === 0) {
+      return withLogLines(state, [{ text: "You own every asset. Living the dream.", kind: "system" }]);
+    }
+    return withLogLines(state, [
+      { text: "No assets available at this phase. Keep growing to unlock more.", kind: "system" },
+      { text: "Type `phases` to see progression requirements.", kind: "system" },
+    ]);
+  }
+
+  const lines: Array<{ text: string; kind?: LogEntry["kind"] }> = [
+    { text: "Available assets:", kind: "system" },
+  ];
+  for (const id of available) {
+    const def = ASSET_CATALOG[id];
+    lines.push({ text: `  ${def.name} ($${def.cost.toLocaleString()}) — ${def.description}` });
+    lines.push({ text: `    Maintenance: $${def.maintenanceCost.toLocaleString()}/wk` });
+  }
+  lines.push({ text: "" });
+  lines.push({ text: "Usage: buy <asset name>", kind: "system" });
+  return withLogLines(state, lines);
+};
+
+export const listAssets = (state: GameState): ActionResult => {
+  if (state.assets.length === 0) {
+    return withLogLines(state, [
+      { text: "No assets owned.", kind: "system" },
+      { text: "Type `buy` to see available purchases.", kind: "system" },
+    ]);
+  }
+
+  const lines: Array<{ text: string; kind?: LogEntry["kind"] }> = [
+    { text: "Owned Assets:", kind: "system" },
+  ];
+  for (const a of state.assets) {
+    const def = ASSET_CATALOG[a.id];
+    lines.push({ text: `  ${def.name} — $${def.maintenanceCost.toLocaleString()}/wk maintenance (bought week ${a.purchaseWeek})` });
+    const effects: string[] = [];
+    if (def.effects.overheadReduction) effects.push(`Overhead -${Math.round(def.effects.overheadReduction * 100)}%`);
+    if (def.effects.moraleBoost) effects.push(`Morale +${def.effects.moraleBoost}/wk`);
+    if (def.effects.pitchSuccessBonus) effects.push(`Pitch +${Math.round(def.effects.pitchSuccessBonus * 100)}%`);
+    if (effects.length > 0) {
+      lines.push({ text: `    Effects: ${effects.join(", ")}` });
+    }
+  }
+
+  const totalMaint = state.assets.reduce((acc, a) => acc + (ASSET_CATALOG[a.id]?.maintenanceCost ?? 0), 0);
+  lines.push({ text: `\nTotal maintenance: $${totalMaint.toLocaleString()}/wk`, kind: "system" });
+
+  return withLogLines(state, lines);
 };

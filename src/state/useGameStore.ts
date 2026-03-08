@@ -6,7 +6,7 @@ import { pickWeeklyQuote } from "../ui/quotes";
 import { SFX } from "../ui/sound";
 
 const SAVE_KEY = "startupworld:save";
-const SAVE_VERSION = 1;
+const SAVE_VERSION = 2;
 
 interface SaveData {
   version: number;
@@ -29,8 +29,15 @@ function loadFromDisk(): SaveData | null {
     const raw = window.localStorage.getItem(SAVE_KEY);
     if (!raw) return null;
     const data = JSON.parse(raw) as SaveData;
-    if (data.version !== SAVE_VERSION) return null;
     if (typeof data.state?.week !== "number" || typeof data.state?.seed !== "number") return null;
+    // Migrate v1 saves: add assets field if missing
+    if (data.version === 1) {
+      if (!data.state.assets) {
+        (data.state as GameState).assets = [];
+      }
+      data.version = 2;
+    }
+    if (data.version !== SAVE_VERSION) return null;
     return data;
   } catch {
     return null;

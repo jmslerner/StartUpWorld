@@ -2,6 +2,7 @@ import type { GameState, Stage, TeamRole } from "../types/game";
 import { clamp } from "./utils";
 import { founderMods } from "./founders";
 import { STAGE_PERKS } from "./stagePerks";
+import { ASSET_CATALOG } from "./assets";
 
 export const BASE_AP = 3;
 
@@ -30,7 +31,11 @@ export const calcBurn = (state: GameState): number => {
     (acc, role) => acc + state.team[role] * roleComp[role].salary,
     0
   );
-  const overheadDiscount = STAGE_PERKS[state.stage].overheadDiscount;
+  const assetOverheadReduction = state.assets.reduce((acc, a) => {
+    const def = ASSET_CATALOG[a.id];
+    return acc + (def?.effects.overheadReduction ?? 0);
+  }, 0);
+  const overheadDiscount = STAGE_PERKS[state.stage].overheadDiscount + Math.min(0.15, assetOverheadReduction);
   const execReduction = Math.min(0.15, state.team.executive * 0.05);
   const overhead = Math.round(stageOverhead[state.stage] * (1 - overheadDiscount) * (1 - execReduction));
 
@@ -46,7 +51,12 @@ export const calcBurn = (state: GameState): number => {
   const archetype = state.founder.archetype;
   const efficiency = archetype ? founderMods[archetype].burnEfficiency : 1;
 
-  return Math.round((teamBurn + overhead) * chaosTax * efficiency * orgInefficiency) + Math.max(0, state.debtService);
+  const assetMaintenance = state.assets.reduce((acc, a) => {
+    const def = ASSET_CATALOG[a.id];
+    return acc + (def?.maintenanceCost ?? 0);
+  }, 0);
+
+  return Math.round((teamBurn + overhead) * chaosTax * efficiency * orgInefficiency) + Math.max(0, state.debtService) + assetMaintenance;
 };
 
 /** Weekly revenue = MRR / 4 (burn is weekly, MRR is monthly). */
@@ -74,6 +84,7 @@ export const AP_COSTS: Record<string, number> = {
   pitch: 1,
   "raise-vc": 2,
   "raise-bootstrap": 1,
+  buy: 1,
 };
 
 /** Base AP + philosopher bonus + stage perk bonus. */

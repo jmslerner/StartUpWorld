@@ -4,7 +4,7 @@ import { SFX } from "../sound";
 
 const INPUT_MAX_CHARS = 160;
 
-type SuggestionKind = "command" | "role" | "founder" | "cofounder" | "raise" | "ship" | "launch";
+type SuggestionKind = "command" | "role" | "founder" | "cofounder" | "raise" | "raise-amount" | "ship" | "launch" | "board" | "asset";
 type Suggestion = {
   kind: SuggestionKind;
   label: string;
@@ -27,6 +27,10 @@ const commandNames = [
   "launch",
   "pitch",
   "raise",
+  "board",
+  "phases",
+  "buy",
+  "assets",
   "end",
   "choose",
 ] as const;
@@ -42,6 +46,8 @@ const commandsWithArgs = new Set([
   "launch",
   "raise",
   "choose",
+  "board",
+  "buy",
 ]);
 
 const hireRoleOptions: Array<{ token: string; label: string; tooltip: string }> = [
@@ -80,6 +86,10 @@ const commandTooltips: Record<string, string> = {
   status: "Show current stats",
   help: "Show available commands",
   choose: "Resolve a pending event choice",
+  board: "Manage board of directors (dinner, gift, blackmail)",
+  phases: "View company phase progression and unlock requirements",
+  buy: "Purchase company assets (1 AP)",
+  assets: "List owned company assets",
 };
 
 const canUseAudio = () => typeof window !== "undefined" && ("AudioContext" in window || "webkitAudioContext" in window);
@@ -166,10 +176,13 @@ interface TerminalInputProps {
   isTyping?: boolean;
   fastForward?: () => void;
   commandHistory?: string[];
+  boardMembers?: Array<{ name: string; personality: string; confidence: number; role: string }>;
+  raiseAmountHints?: Array<{ label: string; value: string; tooltip: string }>;
+  availableAssets?: Array<{ id: string; name: string; cost: number; tooltip: string }>;
 }
 
 export const TerminalInput = forwardRef<HTMLInputElement, TerminalInputProps>(
-  ({ onSubmit, isTyping = false, fastForward, commandHistory = [] }, forwardedRef) => {
+  ({ onSubmit, isTyping = false, fastForward, commandHistory = [], boardMembers = [], raiseAmountHints = [], availableAssets = [] }, forwardedRef) => {
   const [value, setValue] = useState("");
   const [isFocused, setIsFocused] = useState(false);
   const [dismissedSuggestions, setDismissedSuggestions] = useState(false);
@@ -326,6 +339,21 @@ export const TerminalInput = forwardRef<HTMLInputElement, TerminalInputProps>(
         }));
     }
     if (cmd === "raise") {
+      const sub = (tokens[1] ?? "").toLowerCase();
+      // User typed "raise vc " -> show amount suggestions
+      if (sub === "vc" && ((tokens.length === 2 && endsWithSpace) || tokens.length >= 3)) {
+        const amountPrefix = (tokens[2] ?? "").toLowerCase();
+        return raiseAmountHints
+          .filter(h => amountPrefix === "" || h.value.startsWith(amountPrefix))
+          .slice(0, 6)
+          .map(h => ({
+            kind: "raise-amount" as SuggestionKind,
+            label: h.label,
+            nextValue: `raise vc ${h.value}`,
+            tooltip: h.tooltip,
+          }));
+      }
+      // First-level: suggest raise type
       const prefix = tokens.length >= 2 ? argPrefix : "";
       return raiseOptions
         .filter((r) => r.startsWith(prefix) && r !== prefix)
@@ -335,6 +363,68 @@ export const TerminalInput = forwardRef<HTMLInputElement, TerminalInputProps>(
           label: r,
           nextValue: r === "vc" ? "raise vc " : `raise ${r}`,
           tooltip: r === "vc" ? "Raise from investors (2 AP; then type an amount)." : "Bootstrap option (1 AP).",
+        }));
+    }
+
+    if (cmd === "board") {
+      const sub = (tokens[1] ?? "").toLowerCase();
+      const boardActions = ["dinner", "gift", "blackmail"];
+      // Suggest subcommands
+      if (tokens.length === 1 && endsWithSpace) {
+        return boardActions.map(a => ({
+          kind: "board" as SuggestionKind,
+          label: a,
+          nextValue: `board ${a} `,
+          tooltip: a === "dinner" ? "Take a director to dinner (1 AP, $2K, +8-14 confidence)"
+                 : a === "gift" ? "Send a director a gift (1 AP, $5K, +10-18 confidence)"
+                 : "Risky leverage play (1 AP, 35% success)",
+        }));
+      }
+      // Typing a subcommand
+      if (tokens.length === 2 && !endsWithSpace) {
+        return boardActions
+          .filter(a => a.startsWith(sub) && a !== sub)
+          .map(a => ({
+            kind: "board" as SuggestionKind,
+            label: a,
+            nextValue: `board ${a} `,
+            tooltip: a === "dinner" ? "Take a director to dinner (1 AP, $2K, +8-14 confidence)"
+                   : a === "gift" ? "Send a director a gift (1 AP, $5K, +10-18 confidence)"
+                   : "Risky leverage play (1 AP, 35% success)",
+          }));
+      }
+      // Suggest board member names
+      if (boardActions.includes(sub) && (tokens.length >= 3 || (tokens.length === 2 && endsWithSpace))) {
+        const namePrefix = tokens.slice(2).join(" ").toLowerCase();
+        return boardMembers
+          .filter(m => m.role !== "founder")
+          .filter(m => namePrefix === "" || m.name.toLowerCase().includes(namePrefix))
+          .filter(m => m.name.toLowerCase() !== namePrefix)
+          .slice(0, 8)
+          .map(m => {
+            const mood = m.confidence >= 70 ? "supportive" : m.confidence >= 40 ? "neutral" : "hostile";
+            return {
+              kind: "board" as SuggestionKind,
+              label: m.name,
+              nextValue: `board ${sub} ${m.name}`,
+              tooltip: `${m.personality} (${mood}) — Confidence ${m.confidence}/100`,
+            };
+          });
+      }
+      return [];
+    }
+
+    if (cmd === "buy") {
+      if (!availableAssets || availableAssets.length === 0) return [];
+      const prefix = tokens.length >= 2 ? remainder.toLowerCase() : "";
+      return availableAssets
+        .filter(a => prefix === "" || a.name.toLowerCase().includes(prefix) || a.id.includes(prefix))
+        .slice(0, 6)
+        .map(a => ({
+          kind: "asset" as SuggestionKind,
+          label: `${a.name} ($${a.cost.toLocaleString()})`,
+          nextValue: `buy ${a.id}`,
+          tooltip: a.tooltip,
         }));
     }
 
@@ -367,7 +457,7 @@ export const TerminalInput = forwardRef<HTMLInputElement, TerminalInputProps>(
     }
 
     return [];
-  }, [value, shipHistory, launchHistory]);
+  }, [value, shipHistory, launchHistory, boardMembers, raiseAmountHints, availableAssets]);
 
   const showSuggestions = isFocused && !dismissedSuggestions && suggestions.length > 0;
 

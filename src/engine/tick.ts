@@ -12,6 +12,7 @@ import { calcStress } from "./stress";
 import { maybeSelectEvent } from "./events/select";
 import { toPendingEvent } from "./events/types";
 import { applyProgression } from "./progression";
+import { ASSET_CATALOG } from "./assets";
 import { evaluateEndings } from "./endings";
 import { calcValuation } from "./valuation";
 import { generateHints } from "./hints";
@@ -164,6 +165,22 @@ export const endWeekTick = (state: GameState): { state: GameState; logs: string[
   const hit = clamp(hitBase * mods.cultureHitMult, 0, 1);
 
   s2 = applyWeeklyCulture(s2, { weekHit: hit, weekWin: win });
+
+  // Asset morale boosts (gentle weekly effect)
+  const assetMoraleBoost = s2.assets.reduce((acc, a) => {
+    const def = ASSET_CATALOG[a.id];
+    return acc + (def?.effects.moraleBoost ?? 0);
+  }, 0);
+  if (assetMoraleBoost > 0) {
+    s2 = {
+      ...s2,
+      culture: {
+        ...s2.culture,
+        morale: clamp(s2.culture.morale + Math.round(assetMoraleBoost * 0.3), 0, 100),
+      },
+    };
+  }
+
   s2 = applyCofounderWeeklyDrift(s2, { hit, win });
   s2 = applyWeeklyBoardDrift(s2, ctx0);
 

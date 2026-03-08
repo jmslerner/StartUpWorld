@@ -17,6 +17,14 @@ export interface BoardState {
 
 export type CompanyPhase = "garage" | "coworking" | "office" | "unicorn" | "public";
 
+export type AssetId = "office-upgrade" | "lounge" | "helicopter" | "jet" | "yacht";
+
+export interface Asset {
+  id: AssetId;
+  name: string;
+  purchaseWeek: number;
+}
+
 export type FounderArchetype = "visionary" | "hacker" | "sales-animal" | "philosopher";
 
 export type CofounderArchetype = "operator" | "builder" | "rainmaker" | "powderkeg";
@@ -143,6 +151,7 @@ export interface GameState {
   freeActionUsed: Record<string, boolean>; // tracks per-week archetype free actions
 
   board: BoardState;
+  assets: Asset[];
 
   pendingEvent: PendingEvent | null;
   // Recent event history (most recent first). Used to reduce repeats.

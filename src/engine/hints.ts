@@ -1,6 +1,7 @@
-import type { GameState } from "../types/game";
+import type { CompanyPhase, GameState } from "../types/game";
 import type { EngineContext } from "./context";
 import { PRICING_MODELS } from "./pricing";
+import { ASSET_CATALOG } from "./assets";
 
 export interface Hint {
   text: string;
@@ -70,6 +71,28 @@ export const generateHints = (state: GameState, ctx: EngineContext): Hint[] => {
     } else if (state.board.members.some(m => m.confidence < 30 && m.role !== "founder")) {
       hints.push({ text: "Tip: A board member's confidence is critically low. They may vote against you.", priority: 8 });
     }
+  }
+
+  // Phase progression hints
+  const phaseOrder: CompanyPhase[] = ["garage", "coworking", "office", "unicorn", "public"];
+  const phaseIdx = phaseOrder.indexOf(state.companyPhase);
+  if (phaseIdx === 0 && state.valuation >= 3_000_000 && state.week >= 4) {
+    hints.push({ text: "Tip: You're approaching the coworking phase. Type `phases` to see unlock requirements.", priority: 3 });
+  }
+  if (phaseIdx === 1 && state.valuation >= 20_000_000) {
+    hints.push({ text: "Tip: Office phase is within reach. Type `phases` to track your progress.", priority: 3 });
+  }
+  if (phaseIdx === 2 && state.valuation >= 500_000_000) {
+    hints.push({ text: "Tip: Unicorn status is getting close. Type `phases` to see what you need.", priority: 3 });
+  }
+
+  // Asset hints
+  if (state.assets.length === 0 && state.companyPhase !== "garage" && state.cash >= 50_000 && state.week >= 6) {
+    hints.push({ text: "Tip: Company assets are now available. Type `buy` to see options.", priority: 3 });
+  }
+  const assetMaintenance = state.assets.reduce((acc, a) => acc + (ASSET_CATALOG[a.id]?.maintenanceCost ?? 0), 0);
+  if (assetMaintenance > 0 && state.burn > 0 && assetMaintenance > state.burn * 0.3) {
+    hints.push({ text: "Warning: Asset maintenance is consuming over 30% of your burn. Flashy purchases have consequences.", priority: 6 });
   }
 
   return hints.sort((a, b) => b.priority - a.priority);

@@ -8,8 +8,10 @@ import { MobilePanelsSheet } from "./ui/components/MobilePanelsSheet";
 import { StatsDrawer, type StatsPanelKey } from "./ui/components/StatsDrawer";
 import type { SheetSnap } from "./ui/components/BottomSheet";
 import { OnboardingCard } from "./ui/components/OnboardingCard";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Analytics } from "@vercel/analytics/react";
+import { stageRaiseCaps } from "./engine/investors";
+import { ASSET_CATALOG, ALL_ASSET_IDS, phaseAtLeast } from "./engine/assets";
 
 const App = () => {
   const state = useGameStore((store) => store.state);
@@ -24,6 +26,55 @@ const App = () => {
   const [leaderboardOpen, setLeaderboardOpen] = useState(false);
 
   const { rendered: typedLog, isTyping, fastForward } = useTypewriterQueue(log);
+
+  const boardMembers = useMemo(() =>
+    state.board.members.map(m => ({
+      name: m.name,
+      personality: m.personality,
+      confidence: m.confidence,
+      role: m.role,
+    })),
+    [state.board.members]
+  );
+
+  const raiseAmountHints = useMemo(() => {
+    const caps = stageRaiseCaps[state.stage];
+    if (!caps) return [];
+    const fmt = (n: number): string => {
+      if (n >= 1_000_000) return `${n / 1_000_000}m`;
+      if (n >= 1_000) return `${n / 1_000}k`;
+      return String(n);
+    };
+    const label = (n: number): string => {
+      if (n >= 1_000_000) return `$${n / 1_000_000}M`;
+      if (n >= 1_000) return `$${n / 1_000}K`;
+      return `$${n}`;
+    };
+    const conservative = Math.round(caps.softCap * 0.4 / 1000) * 1000;
+    const mid = Math.round((caps.softCap + caps.hardCap) / 2 / 1000) * 1000;
+    return [
+      { label: `${label(conservative)} (conservative)`, value: fmt(conservative), tooltip: "A modest raise. Easier to close, less dilution." },
+      { label: `${label(caps.softCap)} (soft cap)`, value: fmt(caps.softCap), tooltip: `Standard raise for ${state.stage} stage. Good probability if pipeline is warm.` },
+      { label: `${label(mid)} (ambitious)`, value: fmt(mid), tooltip: "Above soft cap. Harder to close, more dilution pressure." },
+      { label: `${label(caps.hardCap)} (hard cap)`, value: fmt(caps.hardCap), tooltip: `Maximum for ${state.stage} stage. Very hard to close. High dilution risk.` },
+    ];
+  }, [state.stage]);
+
+  const availableAssets = useMemo(() =>
+    ALL_ASSET_IDS
+      .filter(id => !state.assets.some(a => a.id === id))
+      .filter(id => phaseAtLeast(state.companyPhase, ASSET_CATALOG[id].minPhase))
+      .map(id => {
+        const def = ASSET_CATALOG[id];
+        return {
+          id: def.id,
+          name: def.name,
+          cost: def.cost,
+          tooltip: `${def.description} | Maintenance: $${def.maintenanceCost.toLocaleString()}/wk`,
+        };
+      }),
+    [state.assets, state.companyPhase]
+  );
 
   const terminalInputRef = useRef<HTMLInputElement>(null);
   const onboardingInputRef = useRef<HTMLInputElement>(null);
@@ -100,7 +151,7 @@ const App = () => {
             {!onboardingComplete ? (
               <OnboardingCard state={state} runCommand={runCommand} inputRef={onboardingInputRef} />
             ) : null}
-            <TerminalInput ref={terminalInputRef} onSubmit={runCommand} isTyping={isTyping} fastForward={fastForward} commandHistory={commandHistory} />
+            <TerminalInput ref={terminalInputRef} onSubmit={runCommand} isTyping={isTyping} fastForward={fastForward} commandHistory={commandHistory} boardMembers={boardMembers} raiseAmountHints={raiseAmountHints} availableAssets={availableAssets} />
             <TerminalLog log={typedLog} isTyping={isTyping} />
           </div>
 
