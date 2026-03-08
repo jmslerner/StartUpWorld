@@ -2,7 +2,21 @@ import type { GameState } from "../types/game";
 import type { EngineContext } from "./context";
 import { isBoardHostile, boardVote } from "./board";
 
-export const evaluateEndings = (state: GameState, ctx: EngineContext): { state: GameState; logs: string[] } => {
+export interface EndingsResult {
+  state: GameState;
+  logs: string[];
+  /** If set, an acquisition offer event should be presented instead of instant game-over. */
+  offer?: string;
+}
+
+const OFFER_COOLDOWN_WEEKS = 8;
+
+const isOfferOnCooldown = (state: GameState, eventId: string): boolean => {
+  const last = state.eventHistory.find(h => h.id === eventId);
+  return last ? state.week - last.week <= OFFER_COOLDOWN_WEEKS : false;
+};
+
+export const evaluateEndings = (state: GameState, ctx: EngineContext): EndingsResult => {
   if (state.gameOver) {
     return { state, logs: [] };
   }
@@ -45,56 +59,29 @@ export const evaluateEndings = (state: GameState, ctx: EngineContext): { state: 
     };
   }
 
-  // Acquisition: decent valuation + profitable + stagnating growth. A soft exit.
+  // Acquisition: decent valuation + profitable + stagnating growth → offer (player chooses).
   if (
     state.week >= 25 &&
     state.valuation >= 500_000_000 &&
     ctx.profitable &&
     ctx.mrrGrowthRate < 0.03 &&
-    state.mrr >= 50_000
+    state.mrr >= 50_000 &&
+    !isOfferOnCooldown(state, "acquisition-offer")
   ) {
-    const premiumM = Math.round((state.valuation * 1.3) / 1_000_000);
-    return {
-      state: {
-        ...state,
-        gameOver: {
-          ending: "acquisition",
-          week: state.week,
-          headline: `Acquired for ~$${premiumM}M. A respectable exit.`,
-        },
-      },
-      logs: [
-        "A strategic acquirer makes an offer you can't refuse. [[beat]] Or rather, your board can't.",
-        `${state.companyName} is acquired at a 30% premium to current valuation.`,
-        "Ending unlocked: Acquisition.",
-      ],
-    };
+    return { state, logs: [], offer: "acquisition-offer" };
   }
 
-  // AI Hype Exit: high valuation from hype but weak fundamentals.
+  // AI Hype Exit: high valuation from hype but weak fundamentals → offer (player chooses).
   if (
     state.week >= 15 &&
     state.valuation >= 1_000_000_000 &&
     state.volatility >= 70 &&
     ctx.ltvCacRatio < 1.5 &&
     !ctx.profitable &&
-    state.totalRaised >= 10_000_000
+    state.totalRaised >= 10_000_000 &&
+    !isOfferOnCooldown(state, "hype-exit-offer")
   ) {
-    return {
-      state: {
-        ...state,
-        gameOver: {
-          ending: "ai-hype-exit",
-          week: state.week,
-          headline: "AI Hype Exit. You sold the dream before it became a nightmare.",
-        },
-      },
-      logs: [
-        "A BigCo wants to 'acqui-hire the team and the IP.' [[beat]] Translation: the product is worthless but the talent isn't.",
-        "You take the deal. The alternative is running out of money.",
-        "Ending unlocked: AI Hype Exit.",
-      ],
-    };
+    return { state, logs: [], offer: "hype-exit-offer" };
   }
 
   // Board-driven founder removal: majority of board has lost confidence.
@@ -120,11 +107,18 @@ export const evaluateEndings = (state: GameState, ctx: EngineContext): { state: 
   }
 
   // Forced acquisition: deeply hostile board forces a fire sale.
+  // If founder holds majority equity (>50%), they can veto → present as offer.
+  // If founder is minority, the board forces the sale (no choice).
   if (
     state.board.members.length >= 3 &&
     state.valuation >= 50_000_000 &&
     state.board.members.filter(m => m.confidence < 35).length >= Math.ceil(state.board.members.length * 0.6)
   ) {
+    if (state.capTable.founderPct > 0.5 && !isOfferOnCooldown(state, "forced-sale-offer")) {
+      return { state, logs: [], offer: "forced-sale-offer" };
+    }
+
+    // Founder is minority — board forces the sale.
     const salePrice = Math.round(state.valuation * 0.7);
     const salePriceM = Math.round(salePrice / 1_000_000);
     return {

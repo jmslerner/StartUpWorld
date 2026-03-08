@@ -10,6 +10,7 @@ import { calcVolatility, fatTailSigned, impactMultiplier } from "./volatility";
 import { PRICING_MODELS } from "./pricing";
 import { calcStress } from "./stress";
 import { maybeSelectEvent } from "./events/select";
+import { eventPool } from "./events/pool";
 import { toPendingEvent } from "./events/types";
 import { applyProgression } from "./progression";
 import { ASSET_CATALOG } from "./assets";
@@ -228,6 +229,23 @@ export const endWeekTick = (state: GameState): { state: GameState; logs: string[
   const end = evaluateEndings(s2, computeContext(s2));
   s2 = end.state;
   logs.push(...end.logs);
+
+  // Acquisition offer: present as a pending event with accept/reject choices.
+  // Overrides any random event — acquisitions take priority.
+  if (end.offer) {
+    const def = eventPool.find(e => e.id === end.offer);
+    if (def) {
+      const pending = toPendingEvent(def, s2, computeContext(s2));
+      s2 = { ...s2, pendingEvent: pending };
+      const EVENT_HISTORY_MAX = 120;
+      s2 = { ...s2, eventHistory: [{ id: end.offer, week: s2.week }, ...s2.eventHistory].slice(0, EVENT_HISTORY_MAX) };
+      logs.push("");
+      logs.push(`EVENT: ${pending.title}`);
+      logs.push(pending.prompt);
+      pending.choices.forEach((c, i) => logs.push(`${i + 1}) ${c.text}`));
+      logs.push("Type `choose <n>`.");
+    }
+  }
 
   // Contextual hint (1 per week, only if game continues)
   if (!s2.gameOver) {

@@ -20,6 +20,8 @@ import { chance, nextIntInclusive, signedUnit } from "./rng";
 import { successPenaltyFromStress } from "./stress";
 import { endWeekTick } from "./tick";
 import { applyPendingEventChoice } from "./events/applyChoice";
+import { eventPool } from "./events/pool";
+import { toPendingEvent } from "./events/types";
 import { computeContext } from "./context";
 import { pitch, raise } from "./investors";
 import { evaluateEndings } from "./endings";
@@ -710,11 +712,33 @@ export const choose = (state: GameState, choiceIndex: number): ActionResult => {
 
   // Re-evaluate endings after consequences.
   const end = evaluateEndings(result.state, computeContext(result.state));
-  const lines = [...result.logs, ...end.logs].map((t) => ({ text: t, kind: "event" as const }));
+  let afterState = end.state;
+  const allLogs = [...result.logs, ...end.logs];
+
+  // If evaluateEndings produced an acquisition offer, present it as a pending event.
+  if (end.offer) {
+    const def = eventPool.find(e => e.id === end.offer);
+    if (def) {
+      const pending = toPendingEvent(def, afterState, computeContext(afterState));
+      const EVENT_HISTORY_MAX = 120;
+      afterState = {
+        ...afterState,
+        pendingEvent: pending,
+        eventHistory: [{ id: end.offer, week: afterState.week }, ...afterState.eventHistory].slice(0, EVENT_HISTORY_MAX),
+      };
+      allLogs.push("");
+      allLogs.push(`EVENT: ${pending.title}`);
+      allLogs.push(pending.prompt);
+      pending.choices.forEach((c, i) => allLogs.push(`${i + 1}) ${c.text}`));
+      allLogs.push("Type `choose <n>`.");
+    }
+  }
+
+  const lines = allLogs.map((t) => ({ text: t, kind: "event" as const }));
 
   // Heuristic sound hint based on net effect of the choice.
   const before = state;
-  const after = end.state;
+  const after = afterState;
   const dCash = after.cash - before.cash;
   const dMrr = after.mrr - before.mrr;
   const dUsers = after.users - before.users;
@@ -736,7 +760,7 @@ export const choose = (state: GameState, choiceIndex: number): ActionResult => {
     }
   }
 
-  return withLogLines(end.state, lines, sound);
+  return withLogLines(afterState, lines, sound);
 };
 
 export const endWeek = (state: GameState): ActionResult => {

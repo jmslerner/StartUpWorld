@@ -2330,4 +2330,121 @@ export const eventPool: EventDef[] = [
       },
     ],
   },
+
+  // ── Acquisition offer events (triggered by evaluateEndings, never randomly) ──
+
+  {
+    id: "acquisition-offer",
+    title: "Acquisition Offer",
+    prompt: (s) => {
+      const premiumM = Math.round((s.valuation * 1.3) / 1_000_000);
+      return `A strategic acquirer offers ~$${premiumM}M for ${s.companyName}. Your board is eager to close. You have the final say.`;
+    },
+    when: () => false,
+    weight: () => 0,
+    choices: [
+      {
+        id: "accept",
+        text: "Accept the offer. A respectable exit.",
+        apply: (s) => {
+          const premiumM = Math.round((s.valuation * 1.3) / 1_000_000);
+          return {
+            state: gameOver(s, { ending: "acquisition", week: s.week, headline: `Acquired for ~$${premiumM}M. A respectable exit.` }),
+            logs: [`${s.companyName} is acquired at a 30% premium to current valuation.`, "Ending unlocked: Acquisition."],
+          };
+        },
+      },
+      {
+        id: "reject",
+        text: "Reject. You're not done building.",
+        apply: (s) => {
+          let next = addStress(addVolatility(s, 5), 8);
+          next = {
+            ...next,
+            board: {
+              ...next.board,
+              members: next.board.members.map(m =>
+                m.role === "founder" ? m : { ...m, confidence: clamp(m.confidence - 8, 0, 100) }
+              ),
+            },
+          };
+          return {
+            state: next,
+            logs: ["You tell the acquirer no. The board is furious.", "Board confidence -8. Stress +8. Volatility +5."],
+          };
+        },
+      },
+    ],
+  },
+
+  {
+    id: "hype-exit-offer",
+    title: "AI Hype Acquisition",
+    prompt: (s) => `A BigCo wants to acquire ${s.companyName} before the hype fades. The check is generous. The fundamentals are not.`,
+    when: () => false,
+    weight: () => 0,
+    choices: [
+      {
+        id: "accept",
+        text: "Take the money and run.",
+        apply: (s) => ({
+          state: gameOver(s, { ending: "ai-hype-exit", week: s.week, headline: "AI Hype Exit. You sold the dream before it became a nightmare." }),
+          logs: ["You take the deal. The alternative is running out of money.", "Ending unlocked: AI Hype Exit."],
+        }),
+      },
+      {
+        id: "reject",
+        text: "Refuse. You believe the product will catch up.",
+        apply: (s) => ({
+          state: addVcRep(addStress(addVolatility(s, 12), 10), -5),
+          logs: ["You turn down the check. Your investors question your judgment.", "Volatility +12. Stress +10. VC rep -5."],
+        }),
+      },
+    ],
+  },
+
+  {
+    id: "forced-sale-offer",
+    title: "Board Forced Sale",
+    prompt: (s) => {
+      const salePriceM = Math.round((s.valuation * 0.7) / 1_000_000);
+      return `The board has found a buyer at ~$${salePriceM}M — a 30% discount. They want to force the sale. But you hold majority equity.`;
+    },
+    when: () => false,
+    weight: () => 0,
+    choices: [
+      {
+        id: "accept",
+        text: "Accept the board's decision.",
+        apply: (s) => {
+          const salePrice = Math.round(s.valuation * 0.7);
+          const salePriceM = Math.round(salePrice / 1_000_000);
+          return {
+            state: gameOver(s, { ending: "forced-acquisition", week: s.week, headline: `Forced sale at $${salePriceM}M. The board decided for you.` }),
+            logs: [`${s.companyName} is sold at $${salePrice.toLocaleString()}. A 30% discount to current valuation.`, "Ending unlocked: Forced Acquisition."],
+          };
+        },
+      },
+      {
+        id: "veto",
+        text: "Veto. Your equity, your call.",
+        apply: (s) => {
+          let next = addStress(addTrust(s, -8), 15);
+          next = {
+            ...next,
+            board: {
+              ...next.board,
+              members: next.board.members.map(m =>
+                m.role === "founder" ? m : { ...m, confidence: clamp(m.confidence - 15, 0, 100) }
+              ),
+            },
+          };
+          return {
+            state: next,
+            logs: ["You invoke your equity veto. The board is livid.", "Board confidence -15. Cofounder trust -8. Stress +15."],
+          };
+        },
+      },
+    ],
+  },
 ];
