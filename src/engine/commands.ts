@@ -125,6 +125,90 @@ const isSetupComplete = (state: GameState) =>
 
 const STAGE_ORDER: Stage[] = ["garage", "seed", "series-a", "growth"];
 
+// ── Easter-egg lookup ──
+
+const EASTER_EGGS: Record<string, string> = {
+  sudo: "Nice try. Sudo doesn't work on capitalism.",
+  exit: "There is no exit. There is only pivot.",
+  quit: "There is no exit. There is only pivot.",
+  coffee: "You drink the coffee. [[beat]] It's cold. It's always cold.",
+  panic: "Panic acknowledged. [[beat]] Routing to /dev/null.",
+  blame: "Blame is not a command. It is, however, a management strategy.",
+  pivot: "Looking to pivot? Try `pricing consumer|prosumer|enterprise`.",
+  pray: "Prayer received. [[beat]] Routing to /dev/null.",
+  fire: "HR says you need to file a PIP first. [[beat]] You don't have HR.",
+  sleep: "Sleep is a feature your body keeps requesting. You keep deferring it.",
+};
+
+const handleEasterEgg = (state: GameState, command: string): ActionResult | null => {
+  const msg = EASTER_EGGS[command];
+  return msg ? { state, logs: [toLog(msg, "system")] } : null;
+};
+
+// ── Raise sub-command ──
+
+const handleRaise = (state: GameState, rest: string[]): ActionResult => {
+  if (rest.length === 0) {
+    return {
+      state,
+      logs: [
+        toLog("Funding:"),
+        toLog("Investors: raise vc <amount> (e.g. raise vc 500k, raise vc 2.5m)"),
+        toLog("Bootstrap: raise friends|cards|loan|preseed|mortgage"),
+        toLog("raise friends   (+$15k)"),
+        toLog("raise cards     (+$15k)"),
+        toLog("raise loan      (+$25k)"),
+        toLog("raise preseed   (+$50k)"),
+        toLog("raise mortgage  (+$250k)"),
+      ],
+    };
+  }
+
+  const token = (rest[0] ?? "").toLowerCase();
+
+  if (token === "vc" || token === "vs") {
+    const amount = parseAmount(rest[1] ?? "");
+    if (!amount) {
+      return { state, logs: [toLog("Usage: raise vc <amount>", "error")] };
+    }
+    return raiseSeed(state, Math.round(amount));
+  }
+
+  const source =
+    token === "friends"
+      ? ("friends" as const)
+      : token === "cards" || token === "credit" || token === "credit-cards" || token === "creditcards"
+        ? ("credit-cards" as const)
+        : token === "loan" || token === "personal-loan" || token === "personalloan"
+          ? ("personal-loan" as const)
+          : token === "preseed" || token === "pre-seed"
+            ? ("preseed" as const)
+            : token === "mortgage"
+              ? ("mortgage" as const)
+              : null;
+
+  if (source) {
+    return raiseBootstrap(state, source);
+  }
+
+  return { state, logs: [toLog("Usage: raise vc <amount> OR raise friends|cards|loan|preseed|mortgage", "error")] };
+};
+
+// ── Board sub-command ──
+
+const handleBoard = (state: GameState, rest: string[]): ActionResult => {
+  const sub = rest[0]?.toLowerCase();
+  if (!sub) return boardStatus(state);
+  const target = rest.slice(1).join(" ").trim();
+  if (!target) {
+    return { state, logs: [toLog(`Usage: board ${sub} <name>`, "error")] };
+  }
+  if (sub === "dinner") return boardDinner(state, target);
+  if (sub === "gift") return boardGift(state, target);
+  if (sub === "blackmail") return boardBlackmail(state, target);
+  return { state, logs: [toLog("Board actions: board, board dinner <name>, board gift <name>, board blackmail <name>", "error")] };
+};
+
 const showPerks = (state: GameState): ActionResult => {
   const perks = STAGE_PERKS[state.stage];
   const logs: LogEntry[] = [toLog(`Stage: ${state.stage}`, "system")];
@@ -266,52 +350,8 @@ export const executeCommand = (state: GameState, input: string): ActionResult =>
       return launchCampaign(state, rest.join(" ").trim());
     case "pitch":
       return pitchInvestors(state);
-    case "raise": {
-      if (rest.length === 0) {
-        return {
-          state,
-          logs: [
-            toLog("Funding:"),
-            toLog("Investors: raise vc <amount> (e.g. raise vc 500k, raise vc 2.5m)"),
-            toLog("Bootstrap: raise friends|cards|loan|preseed|mortgage"),
-            toLog("raise friends   (+$15k)"),
-            toLog("raise cards     (+$15k)"),
-            toLog("raise loan      (+$25k)"),
-            toLog("raise preseed   (+$50k)"),
-            toLog("raise mortgage  (+$250k)"),
-          ],
-        };
-      }
-
-      const token = (rest[0] ?? "").toLowerCase();
-
-      if (token === "vc" || token === "vs") {
-        const amount = parseAmount(rest[1] ?? "");
-        if (!amount) {
-          return { state, logs: [toLog("Usage: raise vc <amount>", "error")] };
-        }
-        return raiseSeed(state, Math.round(amount));
-      }
-
-      const source =
-        token === "friends"
-          ? ("friends" as const)
-          : token === "cards" || token === "credit" || token === "credit-cards" || token === "creditcards"
-            ? ("credit-cards" as const)
-            : token === "loan" || token === "personal-loan" || token === "personalloan"
-              ? ("personal-loan" as const)
-              : token === "preseed" || token === "pre-seed"
-                ? ("preseed" as const)
-                : token === "mortgage"
-                  ? ("mortgage" as const)
-                  : null;
-
-      if (source) {
-        return raiseBootstrap(state, source);
-      }
-
-      return { state, logs: [toLog("Usage: raise vc <amount> OR raise friends|cards|loan|preseed|mortgage", "error")] };
-    }
+    case "raise":
+      return handleRaise(state, rest);
     case "pricing": {
       const model = (rest[0] ?? "").toLowerCase();
       if (!model) {
@@ -324,18 +364,8 @@ export const executeCommand = (state: GameState, input: string): ActionResult =>
     }
     case "perks":
       return showPerks(state);
-    case "board": {
-      const sub = rest[0]?.toLowerCase();
-      if (!sub) return boardStatus(state);
-      const target = rest.slice(1).join(" ").trim();
-      if (!target) {
-        return { state, logs: [toLog(`Usage: board ${sub} <name>`, "error")] };
-      }
-      if (sub === "dinner") return boardDinner(state, target);
-      if (sub === "gift") return boardGift(state, target);
-      if (sub === "blackmail") return boardBlackmail(state, target);
-      return { state, logs: [toLog("Board actions: board, board dinner <name>, board gift <name>, board blackmail <name>", "error")] };
-    }
+    case "board":
+      return handleBoard(state, rest);
     case "phases":
     case "roadmap":
       return showPhases(state);
@@ -348,28 +378,9 @@ export const executeCommand = (state: GameState, input: string): ActionResult =>
     case "end":
       return endWeek(state);
 
-    // ── Easter eggs ──
-    case "sudo":
-      return { state, logs: [toLog("Nice try. Sudo doesn't work on capitalism.", "system")] };
-    case "exit":
-    case "quit":
-      return { state, logs: [toLog("There is no exit. There is only pivot.", "system")] };
-    case "coffee":
-      return { state, logs: [toLog("You drink the coffee. [[beat]] It's cold. It's always cold.", "system")] };
-    case "panic":
-      return { state, logs: [toLog("Panic acknowledged. [[beat]] Routing to /dev/null.", "system")] };
-    case "blame":
-      return { state, logs: [toLog("Blame is not a command. It is, however, a management strategy.", "system")] };
-    case "pivot":
-      return { state, logs: [toLog("Looking to pivot? Try `pricing consumer|prosumer|enterprise`.", "system")] };
-    case "pray":
-      return { state, logs: [toLog("Prayer received. [[beat]] Routing to /dev/null.", "system")] };
-    case "fire":
-      return { state, logs: [toLog("HR says you need to file a PIP first. [[beat]] You don't have HR.", "system")] };
-    case "sleep":
-      return { state, logs: [toLog("Sleep is a feature your body keeps requesting. You keep deferring it.", "system")] };
-
     default: {
+      const egg = handleEasterEgg(state, command);
+      if (egg) return egg;
       const suggestion = findClosestCommand(command);
       const msg = suggestion
         ? `Unknown command: ${command}. Did you mean \`${suggestion}\`?`

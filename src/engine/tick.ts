@@ -18,6 +18,39 @@ import { evaluateEndings } from "./endings";
 import { calcValuation } from "./valuation";
 import { generateHints } from "./hints";
 
+// ── Growth / churn rate constants ──
+const BASE_GROWTH = 0.015;
+const GROWTH_REP_WEIGHT = 0.06;
+const GROWTH_ENG_WEIGHT = 0.0035;
+const GROWTH_OPS_WEIGHT = 0.002;
+const GROWTH_MKT_WEIGHT = 0.006;
+const GROWTH_SALES_WEIGHT = 0.006;
+const GROWTH_DATA_WEIGHT = 0.003;
+const GROWTH_MORALE_WEIGHT = 0.01;
+const GROWTH_LEGAL_WEIGHT = 0.0015;
+const GROWTH_HR_DRAG = 0.0015; // HR adds process overhead
+
+const BASE_CHURN = 0.02;
+const CHURN_REP_WEIGHT = 0.02;
+const CHURN_MORALE_WEIGHT = 0.03;
+const CHURN_STRESS_WEIGHT = 0.015;
+const CHURN_LEGAL_REDUCTION = 0.0007;
+const CHURN_OPS_REDUCTION = 0.0015;
+const CHURN_DATA_REDUCTION = 0.008;
+
+const IMBALANCE_GROWTH_CAP = 0.05;
+const IMBALANCE_GROWTH_PER_HEAD = 0.0025;
+const IMBALANCE_CHURN_CAP = 0.06;
+const IMBALANCE_CHURN_PER_HEAD = 0.002;
+
+const STRESS_GROWTH_PENALTY = 0.02;
+const STRESS_CHURN_BOOST = 0.02;
+
+const GROWTH_CLAMP_MIN = -0.05;
+const GROWTH_CLAMP_MAX = 0.22;
+const CHURN_CLAMP_MIN = 0.01;
+const CHURN_CLAMP_MAX = 0.18;
+
 const growthRates = (state: GameState) => {
   const eng = state.team.engineering;
   const design = state.team.design;
@@ -36,40 +69,40 @@ const growthRates = (state: GameState) => {
   const execCapacity = eng + design + ops;
   const gtm = mkt + sales;
   const execGap = Math.max(0, gtm - execCapacity);
-  const imbalanceGrowthPenalty = Math.min(0.05, execGap * 0.0025);
-  const imbalanceChurnPenalty = Math.min(0.06, execGap * 0.002);
+  const imbalanceGrowthPenalty = Math.min(IMBALANCE_GROWTH_CAP, execGap * IMBALANCE_GROWTH_PER_HEAD);
+  const imbalanceChurnPenalty = Math.min(IMBALANCE_CHURN_CAP, execGap * IMBALANCE_CHURN_PER_HEAD);
 
   const data = state.team.data;
 
   // Baseline growth and churn; dramatic but bounded.
   const baseGrowth =
-    0.015 +
-    rep * 0.06 +
-    eng * 0.0035 +
-    ops * 0.002 +
-    mkt * 0.006 +
-    sales * 0.006 +
-    data * 0.003 +
-    morale * 0.01 +
-    legal * 0.0015 -
-    hr * 0.0015 -
+    BASE_GROWTH +
+    rep * GROWTH_REP_WEIGHT +
+    eng * GROWTH_ENG_WEIGHT +
+    ops * GROWTH_OPS_WEIGHT +
+    mkt * GROWTH_MKT_WEIGHT +
+    sales * GROWTH_SALES_WEIGHT +
+    data * GROWTH_DATA_WEIGHT +
+    morale * GROWTH_MORALE_WEIGHT +
+    legal * GROWTH_LEGAL_WEIGHT -
+    hr * GROWTH_HR_DRAG -
     imbalanceGrowthPenalty;
 
   const baseChurn =
-    0.02 +
-    (1 - rep) * 0.02 +
-    (1 - morale) * 0.03 +
-    stress * 0.015 -
-    legal * 0.0007 -
-    ops * 0.0015 -
-    data * 0.008 +
+    BASE_CHURN +
+    (1 - rep) * CHURN_REP_WEIGHT +
+    (1 - morale) * CHURN_MORALE_WEIGHT +
+    stress * CHURN_STRESS_WEIGHT -
+    legal * CHURN_LEGAL_REDUCTION -
+    ops * CHURN_OPS_REDUCTION -
+    data * CHURN_DATA_REDUCTION +
     imbalanceChurnPenalty;
 
   const pm = PRICING_MODELS[state.pricingModel];
 
   return {
-    growth: clamp(baseGrowth * pm.growthMult - stress * 0.02, -0.05, 0.22),
-    churn: clamp(baseChurn * pm.churnMult + stress * 0.02, 0.01, 0.18),
+    growth: clamp(baseGrowth * pm.growthMult - stress * STRESS_GROWTH_PENALTY, GROWTH_CLAMP_MIN, GROWTH_CLAMP_MAX),
+    churn: clamp(baseChurn * pm.churnMult + stress * STRESS_CHURN_BOOST, CHURN_CLAMP_MIN, CHURN_CLAMP_MAX),
   };
 };
 
@@ -112,10 +145,19 @@ export const endWeekTick = (state: GameState): { state: GameState; logs: string[
   const volImpact = impactMultiplier(s.volatility);
 
   // Amplification factor: modest when vol is low, explosive when vol is high.
-  const swingAmp = (0.9 + vol * 1.1) * (1 + (volImpact - 1) * 0.85);
+  const SWING_AMP_BASE = 0.9;
+  const SWING_AMP_VOL_SCALE = 1.1;
+  const SWING_VOL_IMPACT_BLEND = 0.85;
+  const swingAmp = (SWING_AMP_BASE + vol * SWING_AMP_VOL_SCALE) * (1 + (volImpact - 1) * SWING_VOL_IMPACT_BLEND);
 
-  const growth = clamp(rates.growth * (1 + swingFat * vol * 1.9 * swingAmp), -0.12, 0.8);
-  const churnRate = clamp(rates.churn * (1 + (-swingFat) * vol * 1.15 * swingAmp), 0.006, 0.35);
+  const GROWTH_SWING_SCALE = 1.9;
+  const CHURN_SWING_SCALE = 1.15;
+  const GROWTH_APPLIED_MIN = -0.12;
+  const GROWTH_APPLIED_MAX = 0.8;
+  const CHURN_APPLIED_MIN = 0.006;
+  const CHURN_APPLIED_MAX = 0.35;
+  const growth = clamp(rates.growth * (1 + swingFat * vol * GROWTH_SWING_SCALE * swingAmp), GROWTH_APPLIED_MIN, GROWTH_APPLIED_MAX);
+  const churnRate = clamp(rates.churn * (1 + (-swingFat) * vol * CHURN_SWING_SCALE * swingAmp), CHURN_APPLIED_MIN, CHURN_APPLIED_MAX);
 
   const grossAdds = Math.round(s.users * Math.max(0, growth));
   const churn = Math.round(s.users * churnRate);

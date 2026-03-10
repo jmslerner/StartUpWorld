@@ -107,14 +107,19 @@ export const applyWeeklyBoardDrift = (state: GameState, ctx: EngineContext): Gam
       return { ...m, confidence: clamp(Math.round(state.cofounder.trust * 0.9), 0, 100) };
     }
 
+    const MRR_DRIFT_SCALE = 20;
+    const BURN_DRIFT_SCALE = 5;
+    const CASH_DRIFT_SCALE = 6;
+    const REP_DRIFT_SCALE = 5;
+    const STRESS_DRIFT_SCALE = 8;
     const profile = PERSONALITY_PROFILES[m.personality];
     const delta =
       profile.baseDecay +
-      mrrGrowth * profile.mrrWeight * 20 +
-      burnHealth * profile.burnWeight * 5 +
-      cashHealth * profile.cashWeight * 6 +
-      repNorm * profile.reputationWeight * 5 +
-      stressNorm * profile.stressWeight * 8;
+      mrrGrowth * profile.mrrWeight * MRR_DRIFT_SCALE +
+      burnHealth * profile.burnWeight * BURN_DRIFT_SCALE +
+      cashHealth * profile.cashWeight * CASH_DRIFT_SCALE +
+      repNorm * profile.reputationWeight * REP_DRIFT_SCALE +
+      stressNorm * profile.stressWeight * STRESS_DRIFT_SCALE;
 
     return { ...m, confidence: clamp(Math.round(m.confidence + delta), 0, 100) };
   });
@@ -122,10 +127,12 @@ export const applyWeeklyBoardDrift = (state: GameState, ctx: EngineContext): Gam
   return { ...state, board: { ...state.board, members } };
 };
 
+const HOSTILE_CONFIDENCE_THRESHOLD = 40; // board members vote "against" below this
+
 export const boardVote = (state: GameState): { against: number; total: number; members: { name: string; vote: "for" | "against" }[] } => {
   const votes = state.board.members.map(m => ({
     name: m.name,
-    vote: (m.confidence < 40 ? "against" : "for") as "for" | "against",
+    vote: (m.confidence < HOSTILE_CONFIDENCE_THRESHOLD ? "against" : "for") as "for" | "against",
   }));
   const against = votes.filter(v => v.vote === "against").length;
   return { against, total: votes.length, members: votes };

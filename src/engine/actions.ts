@@ -74,10 +74,11 @@ type ArchetypeBlurb = {
   risk: string;
 };
 
-const FOUNDER_ARCHETYPE_BLURB: Record<FounderArchetype, ArchetypeBlurb> = {
+const ARCHETYPE_BLURBS: Record<FounderArchetype | CofounderArchetype, ArchetypeBlurb> = {
+  // Founder archetypes
   visionary: {
     title: "Visionary",
-    desc: "You sell a future that doesn’t exist yet—and somehow people believe you.",
+    desc: "You sell a future that doesn't exist yet—and somehow people believe you.",
     edge: "Edge: narrative gravity, talent magnet, big swings upward.",
     risk: "Risk: hype debt, expectation whiplash, volatility spikes when you miss.",
   },
@@ -95,13 +96,11 @@ const FOUNDER_ARCHETYPE_BLURB: Record<FounderArchetype, ArchetypeBlurb> = {
   },
   philosopher: {
     title: "Philosopher",
-    desc: "You build a company with principles. Sometimes that’s the moat.",
+    desc: "You build a company with principles. Sometimes that's the moat.",
     edge: "Edge: culture resilience, long-term compounding, cleaner decisions.",
-    risk: "Risk: slower aggression, missed windows, death by “thoughtful.”",
+    risk: "Risk: slower aggression, missed windows, death by 'thoughtful.'",
   },
-};
-
-const COFOUNDER_ARCHETYPE_BLURB: Record<CofounderArchetype, ArchetypeBlurb> = {
+  // Cofounder archetypes
   operator: {
     title: "Operator",
     desc: "They turn chaos into checklists and feelings into processes. [[beat]] Annoying. Necessary.",
@@ -165,15 +164,9 @@ const pickMsg = (rng: number, msgs: string[]): { rng: number; msg: string } => {
   return { rng: pick.rng, msg: msgs[pick.value] };
 };
 
-const founderTldr = (a: FounderArchetype | null): string | null => {
+const archetypeTldr = (a: FounderArchetype | CofounderArchetype | null): string | null => {
   if (!a) return null;
-  const b = FOUNDER_ARCHETYPE_BLURB[a];
-  return `${b.title} — ${stripPrefix(b.edge, "Edge:")} / ${stripPrefix(b.risk, "Risk:")}`;
-};
-
-const cofounderTldr = (a: CofounderArchetype | null): string | null => {
-  if (!a) return null;
-  const b = COFOUNDER_ARCHETYPE_BLURB[a];
+  const b = ARCHETYPE_BLURBS[a];
   return `${b.title} — ${stripPrefix(b.edge, "Edge:")} / ${stripPrefix(b.risk, "Risk:")}`;
 };
 
@@ -259,7 +252,7 @@ export const setCofounderArchetype = (state: GameState, archetype: CofounderArch
     },
   };
 
-  const b = COFOUNDER_ARCHETYPE_BLURB[archetype];
+  const b = ARCHETYPE_BLURBS[archetype];
 
   return withLogLines(updated, [
     { text: `Cofounder locked: ${name} (${b.title}). [[beat]]`, kind: "system" },
@@ -437,7 +430,7 @@ export const setFounderArchetype = (state: GameState, archetype: FounderArchetyp
 
   const updated = { ...setFounder(state, archetype), thesis, vcReputation: clamp(state.vcReputation + 2, 0, 100) };
 
-  const b = FOUNDER_ARCHETYPE_BLURB[archetype];
+  const b = ARCHETYPE_BLURBS[archetype];
 
   return withLogLines(updated, [
     { text: `Founder locked: ${b.title}. [[beat]]`, kind: "system" },
@@ -791,8 +784,8 @@ export const status = (state: GameState): ActionResult => {
     ? `Last +$${state.lastRound.amount.toLocaleString()} @ $${state.lastRound.preMoney.toLocaleString()} pre (dilution ${Math.round(state.lastRound.dilutionPct * 100)}%)`
     : "No priced rounds";
 
-  const fTldr = founderTldr(state.founder.archetype);
-  const cTldr = cofounderTldr(state.cofounder.archetype);
+  const fTldr = archetypeTldr(state.founder.archetype);
+  const cTldr = archetypeTldr(state.cofounder.archetype);
   const tldrBlock =
     (fTldr ? `\nFounder TL;DR: ${fTldr}` : "") +
     (cTldr ? `\nCofounder TL;DR: ${cTldr}` : "");

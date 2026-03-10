@@ -35,18 +35,25 @@ export const calcBurn = (state: GameState): number => {
     const def = ASSET_CATALOG[a.id];
     return acc + (def?.effects.overheadReduction ?? 0);
   }, 0);
-  const overheadDiscount = STAGE_PERKS[state.stage].overheadDiscount + Math.min(0.15, assetOverheadReduction);
-  const execReduction = Math.min(0.15, state.team.executive * 0.05);
+  const MAX_ASSET_OVERHEAD_REDUCTION = 0.15;
+  const MAX_EXEC_OVERHEAD_REDUCTION = 0.15;
+  const EXEC_REDUCTION_PER_HEAD = 0.05;
+  const overheadDiscount = STAGE_PERKS[state.stage].overheadDiscount + Math.min(MAX_ASSET_OVERHEAD_REDUCTION, assetOverheadReduction);
+  const execReduction = Math.min(MAX_EXEC_OVERHEAD_REDUCTION, state.team.executive * EXEC_REDUCTION_PER_HEAD);
   const overhead = Math.round(stageOverhead[state.stage] * (1 - overheadDiscount) * (1 - execReduction));
 
   // Org imbalance: too much go-to-market without enough operators makes everything more expensive.
+  const MAX_GTM_OPS_INEFFICIENCY = 0.18;
+  const GTM_OPS_INEFFICIENCY_PER_HEAD = 0.03;
   const gtm = state.team.sales + state.team.marketing;
   const ops = state.team.ops;
   const gtmOpsGap = Math.max(0, gtm - ops);
-  const orgInefficiency = 1 + Math.min(0.18, gtmOpsGap * 0.03);
+  const orgInefficiency = 1 + Math.min(MAX_GTM_OPS_INEFFICIENCY, gtmOpsGap * GTM_OPS_INEFFICIENCY_PER_HEAD);
 
   // Chaos tax: high volatility + low cohesion makes everything cost more.
-  const chaosTax = 1 + (state.volatility / 100) * 0.12 + (1 - state.culture.cohesion / 100) * 0.08;
+  const VOLATILITY_CHAOS_WEIGHT = 0.12;
+  const COHESION_CHAOS_WEIGHT = 0.08;
+  const chaosTax = 1 + (state.volatility / 100) * VOLATILITY_CHAOS_WEIGHT + (1 - state.culture.cohesion / 100) * COHESION_CHAOS_WEIGHT;
 
   const archetype = state.founder.archetype;
   const efficiency = archetype ? founderMods[archetype].burnEfficiency : 1;

@@ -44,6 +44,8 @@ const addAp = (s: GameState, delta: number): GameState => ({ ...s, ap: clamp(s.a
 const ts = (s: GameState): number => Object.values(s.team).reduce((a, n) => a + n, 0);
 
 export const eventPool: EventDef[] = [
+  // ══ TEAM & CULTURE ══
+
   {
     id: "employee-complaint",
     title: "Employee Complaint",
@@ -115,6 +117,8 @@ export const eventPool: EventDef[] = [
     ],
   },
 
+  // ══ LEGAL & COMPLIANCE ══
+
   {
     id: "cease-and-desist",
     title: "Cease & Desist",
@@ -178,6 +182,8 @@ export const eventPool: EventDef[] = [
     ],
   },
 
+  // ══ PRESS & REPUTATION ══
+
   {
     id: "influencer-driveby",
     title: "Influencer Drive-By",
@@ -212,6 +218,8 @@ export const eventPool: EventDef[] = [
     ],
   },
 
+  // ══ OPERATIONS & FINANCE ══
+
   {
     id: "outage-2am",
     title: "2AM Outage",
@@ -237,6 +245,8 @@ export const eventPool: EventDef[] = [
       },
     ],
   },
+
+  // ══ GROWTH & PRODUCT ══
 
   {
     id: "enterprise-pilot",
@@ -264,6 +274,8 @@ export const eventPool: EventDef[] = [
     ],
   },
 
+  // ══ FUNDRAISING & DEALS ══
+
   {
     id: "leak-rumor",
     title: "Leak Rumor",
@@ -289,6 +301,8 @@ export const eventPool: EventDef[] = [
       },
     ],
   },
+
+  // ══ BOARD DYNAMICS ══
 
   {
     id: "coup-whispers",
@@ -316,6 +330,8 @@ export const eventPool: EventDef[] = [
     ],
   },
 
+  // ══ FUNDRAISING & DEALS ══
+
   {
     id: "acquihire",
     title: "Acqui-hire Offer",
@@ -342,6 +358,8 @@ export const eventPool: EventDef[] = [
     ],
   },
 
+  // ══ PRESS & REPUTATION ══
+
   {
     id: "press-villain",
     title: "Press Wants a Villain",
@@ -367,6 +385,8 @@ export const eventPool: EventDef[] = [
       },
     ],
   },
+
+  // ══ TEAM & CULTURE ══
 
   {
     id: "key-engineer-quit",
@@ -402,6 +422,8 @@ export const eventPool: EventDef[] = [
     ],
   },
 
+  // ══ COMPETITION & MARKET ══
+
   {
     id: "competitor-copies",
     title: "Competitor Copies You",
@@ -427,6 +449,8 @@ export const eventPool: EventDef[] = [
       },
     ],
   },
+
+  // ══ GROWTH & PRODUCT ══
 
   {
     id: "ai-demo-viral",
@@ -465,6 +489,8 @@ export const eventPool: EventDef[] = [
     ],
   },
 
+  // ══ TEAM & CULTURE ══
+
   {
     id: "culture-memo",
     title: "Culture Memo",
@@ -490,6 +516,8 @@ export const eventPool: EventDef[] = [
       },
     ],
   },
+
+  // ══ LEGAL & COMPLIANCE ══
 
   {
     id: "regulatory-letter",
@@ -517,6 +545,8 @@ export const eventPool: EventDef[] = [
     ],
   },
 
+  // ══ FOUNDER & PERSONAL ══
+
   {
     id: "founder-burnout",
     title: "Founder Burnout",
@@ -542,6 +572,8 @@ export const eventPool: EventDef[] = [
       },
     ],
   },
+
+  // ══ OPERATIONS & FINANCE ══
 
   {
     id: "zombie-saas",
@@ -573,6 +605,8 @@ export const eventPool: EventDef[] = [
     ],
   },
 
+  // ══ OPERATIONS & FINANCE ══
+
   {
     id: "bankruptcy-flash",
     title: "Bankruptcy Flash",
@@ -599,6 +633,8 @@ export const eventPool: EventDef[] = [
     ],
   },
 
+  // ══ FUNDRAISING & DEALS ══
+
   {
     id: "advisor-intro",
     title: "Advisor Intro",
@@ -624,6 +660,8 @@ export const eventPool: EventDef[] = [
       },
     ],
   },
+
+  // ══ TEAM & CULTURE ══
 
   {
     id: "poached",
@@ -658,6 +696,8 @@ export const eventPool: EventDef[] = [
       },
     ],
   },
+
+  // ══ BOARD DYNAMICS ══
 
   {
     id: "board-seat-fight",
@@ -797,6 +837,8 @@ export const eventPool: EventDef[] = [
     ],
   },
 
+  // ══ LEGAL & COMPLIANCE ══
+
   {
     id: "numbers-game",
     title: "The Numbers Game",
@@ -822,6 +864,8 @@ export const eventPool: EventDef[] = [
       },
     ],
   },
+
+  // ══ TEAM & CULTURE ══
 
   {
     id: "wellness-stipend-arms-race",
@@ -959,6 +1003,8 @@ export const eventPool: EventDef[] = [
     ],
   },
 
+  // ══ PRESS & REPUTATION ══
+
   {
     id: "founder-podcast-canceled",
     title: "Founder Podcast ‘Hot Take’",
@@ -992,6 +1038,8 @@ export const eventPool: EventDef[] = [
       },
     ],
   },
+
+  // ══ GROWTH & PRODUCT ══
 
   {
     id: "growth-hack-backfires",
@@ -1027,6 +1075,8 @@ export const eventPool: EventDef[] = [
     ],
   },
 
+  // ══ GROWTH & PRODUCT ══
+
   {
     id: "dark-pattern-debate",
     title: "Dark Pattern Debate",
@@ -1053,6 +1103,8 @@ export const eventPool: EventDef[] = [
     ],
   },
 
+  // ══ LEGAL & COMPLIANCE ══
+
   {
     id: "data-leak-screenshot",
     title: "Screenshot of a Data Leak",
@@ -1078,6 +1130,8 @@ export const eventPool: EventDef[] = [
       },
     ],
   },
+
+  // ══ OPERATIONS & FINANCE ══
 
   {
     id: "cloud-bill-surprise",
@@ -1131,6 +1185,8 @@ export const eventPool: EventDef[] = [
     ],
   },
 
+  // ══ GROWTH & PRODUCT ══
+
   {
     id: "ai-pivot-week",
     title: "AI Pivot Week",
@@ -1165,6 +1221,8 @@ export const eventPool: EventDef[] = [
     ],
   },
 
+  // ══ PRESS & REPUTATION ══
+
   {
     id: "press-hit-piece",
     title: "Press Hit Piece",
@@ -1198,6 +1256,8 @@ export const eventPool: EventDef[] = [
       },
     ],
   },
+
+  // ══ TEAM & CULTURE ══
 
   {
     id: "talent-poach",
@@ -1267,6 +1327,8 @@ export const eventPool: EventDef[] = [
     ],
   },
 
+  // ══ PRESS & REPUTATION ══
+
   {
     id: "pricing-backlash",
     title: "Pricing Backlash",
@@ -1300,6 +1362,8 @@ export const eventPool: EventDef[] = [
       },
     ],
   },
+
+  // ══ COMPETITION & MARKET ══
 
   {
     id: "competitor-mega-round",
@@ -1335,6 +1399,8 @@ export const eventPool: EventDef[] = [
     ],
   },
 
+  // ══ LEGAL & COMPLIANCE ══
+
   {
     id: "regulator-side-quest",
     title: "Regulator Side Quest",
@@ -1360,6 +1426,8 @@ export const eventPool: EventDef[] = [
       },
     ],
   },
+
+  // ══ COMPETITION & MARKET ══
 
   {
     id: "macro-rate-shock",
@@ -1387,6 +1455,8 @@ export const eventPool: EventDef[] = [
     ],
   },
 
+  // ══ COMPETITION & MARKET ══
+
   {
     id: "ipo-window",
     title: "IPO Window",
@@ -1413,7 +1483,7 @@ export const eventPool: EventDef[] = [
     ],
   },
 
-  // ───── NEW EVENTS: Real-world inspired ─────
+  // ══ FOUNDER & PERSONAL ══
 
   {
     id: "consciousness-retreat",
@@ -1450,6 +1520,8 @@ export const eventPool: EventDef[] = [
     ],
   },
 
+  // ══ FOUNDER & PERSONAL ══
+
   {
     id: "private-jet-question",
     title: "The Private Jet Question",
@@ -1484,6 +1556,8 @@ export const eventPool: EventDef[] = [
       },
     ],
   },
+
+  // ══ FOUNDER & PERSONAL ══
 
   {
     id: "faked-demo",
@@ -1555,6 +1629,8 @@ export const eventPool: EventDef[] = [
     ],
   },
 
+  // ══ GROWTH & PRODUCT ══
+
   {
     id: "hockey-stick-morning",
     title: "Hockey Stick Morning",
@@ -1590,6 +1666,8 @@ export const eventPool: EventDef[] = [
     ],
   },
 
+  // ══ GROWTH & PRODUCT ══
+
   {
     id: "move-fast-break-things",
     title: "Move Fast and Break Things",
@@ -1624,6 +1702,8 @@ export const eventPool: EventDef[] = [
       },
     ],
   },
+
+  // ══ TEAM & CULTURE ══
 
   {
     id: "bro-culture-incident",
@@ -1667,6 +1747,8 @@ export const eventPool: EventDef[] = [
     ],
   },
 
+  // ══ GROWTH & PRODUCT ══
+
   {
     id: "token-pivot",
     title: "Token Pivot Proposal",
@@ -1702,6 +1784,8 @@ export const eventPool: EventDef[] = [
     ],
   },
 
+  // ══ FOUNDER & PERSONAL ══
+
   {
     id: "cereal-box-hustle",
     title: "Cereal Box Hustle",
@@ -1728,6 +1812,8 @@ export const eventPool: EventDef[] = [
       },
     ],
   },
+
+  // ══ FOUNDER & PERSONAL ══
 
   {
     id: "sleeping-in-office",
@@ -1763,6 +1849,8 @@ export const eventPool: EventDef[] = [
       },
     ],
   },
+
+  // ══ FOUNDER & PERSONAL ══
 
   {
     id: "ted-talk-invite",
@@ -1834,6 +1922,8 @@ export const eventPool: EventDef[] = [
     ],
   },
 
+  // ══ FUNDRAISING & DEALS ══
+
   {
     id: "vision-fund-call",
     title: "Vision Fund Call",
@@ -1868,6 +1958,8 @@ export const eventPool: EventDef[] = [
       },
     ],
   },
+
+  // ══ FOUNDER & PERSONAL ══
 
   {
     id: "founder-twitter-meltdown",
@@ -1906,6 +1998,8 @@ export const eventPool: EventDef[] = [
     ],
   },
 
+  // ══ FUNDRAISING & DEALS ══
+
   {
     id: "pivot-ultimatum",
     title: "The Pivot Ultimatum",
@@ -1940,6 +2034,8 @@ export const eventPool: EventDef[] = [
       },
     ],
   },
+
+  // ══ TEAM & CULTURE ══
 
   {
     id: "glassdoor-review",
@@ -2011,6 +2107,8 @@ export const eventPool: EventDef[] = [
     ],
   },
 
+  // ══ GROWTH & PRODUCT ══
+
   {
     id: "customer-zero",
     title: "Customer Zero",
@@ -2046,7 +2144,7 @@ export const eventPool: EventDef[] = [
     ],
   },
 
-  // ───── MORE EVENTS: Variety pack ─────
+  // ══ GROWTH & PRODUCT ══
 
   {
     id: "open-source-pr",
@@ -2083,6 +2181,8 @@ export const eventPool: EventDef[] = [
     ],
   },
 
+  // ══ GROWTH & PRODUCT ══
+
   {
     id: "partner-api-request",
     title: "Partner API Request",
@@ -2117,6 +2217,8 @@ export const eventPool: EventDef[] = [
       },
     ],
   },
+
+  // ══ TEAM & CULTURE ══
 
   {
     id: "team-hackathon",
@@ -2153,6 +2255,8 @@ export const eventPool: EventDef[] = [
     ],
   },
 
+  // ══ PRESS & REPUTATION ══
+
   {
     id: "viral-screenshot",
     title: "Viral Screenshot",
@@ -2187,6 +2291,8 @@ export const eventPool: EventDef[] = [
       },
     ],
   },
+
+  // ══ PRESS & REPUTATION ══
 
   {
     id: "customer-case-study",
@@ -2223,6 +2329,8 @@ export const eventPool: EventDef[] = [
     ],
   },
 
+  // ══ PRESS & REPUTATION ══
+
   {
     id: "conference-booth",
     title: "Conference Booth",
@@ -2258,6 +2366,8 @@ export const eventPool: EventDef[] = [
     ],
   },
 
+  // ══ GROWTH & PRODUCT ══
+
   {
     id: "feature-demand-wave",
     title: "Feature Demand Wave",
@@ -2292,6 +2402,8 @@ export const eventPool: EventDef[] = [
       },
     ],
   },
+
+  // ══ TEAM & CULTURE ══
 
   {
     id: "cold-dm-talent",
@@ -2331,7 +2443,7 @@ export const eventPool: EventDef[] = [
     ],
   },
 
-  // ── Acquisition offer events (triggered by evaluateEndings, never randomly) ──
+  // ══ ACQUISITION OFFERS ══
 
   {
     id: "acquisition-offer",

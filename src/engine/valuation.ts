@@ -28,29 +28,38 @@ const STAGE_VALUATION_CAP: Record<Stage, number> = {
   growth: 15_000_000_000,
 };
 
+// ── Valuation multiple weights ──
+const GROWTH_BOOST_SCALE = 12;        // +10% weekly MRR → +1.2x multiple
+const VC_REP_WEIGHT = 2.2;            // max ±2.2x from VC reputation
+const REPUTATION_WEIGHT = 1.2;        // max ±1.2x from public reputation
+const HYPE_WEIGHT = 1.3;              // max ±1.3x from volatility-driven hype
+const STRESS_PENALTY_WEIGHT = 3.2;    // max -3.2x from founder stress
+const MULTIPLE_CLAMP_MIN = 2.5;
+const MULTIPLE_CLAMP_MAX = 32;
+const POST_MONEY_DECAY_RATE = 0.92;   // ~8-week half-life for post-money floor
+
 export const calcValuation = (state: GameState, ctx: EngineContext): number => {
   const arr = calcArr(state);
   const base = stageMultipleBase[state.stage];
 
   // Growth drives multiples. Use weekly MRR growth (already clamped in context).
-  // Mapping: +10% week -> +1.2x, +30% week -> +3.6x, +50% week -> +6x (cap).
-  const growthBoost = clamp(ctx.mrrGrowthRate, -0.2, 0.5) * 12;
+  const growthBoost = clamp(ctx.mrrGrowthRate, -0.2, 0.5) * GROWTH_BOOST_SCALE;
 
-  const vc = clamp((state.vcReputation - 50) / 50, -1, 1) * 2.2;
-  const rep = clamp((state.reputation - 50) / 50, -1, 1) * 1.2;
-  const hype = clamp((state.volatility - 35) / 65, -1, 1) * 1.3;
-  const stressPenalty = clamp(state.stress / 100, 0, 1) * 3.2;
+  const vc = clamp((state.vcReputation - 50) / 50, -1, 1) * VC_REP_WEIGHT;
+  const rep = clamp((state.reputation - 50) / 50, -1, 1) * REPUTATION_WEIGHT;
+  const hype = clamp((state.volatility - 35) / 65, -1, 1) * HYPE_WEIGHT;
+  const stressPenalty = clamp(state.stress / 100, 0, 1) * STRESS_PENALTY_WEIGHT;
   const pmBonus = PRICING_MODELS[state.pricingModel].valuationBonus;
 
-  const multiple = clamp(base + growthBoost + vc + rep + hype - stressPenalty + pmBonus, 2.5, 32);
+  const multiple = clamp(base + growthBoost + vc + rep + hype - stressPenalty + pmBonus, MULTIPLE_CLAMP_MIN, MULTIPLE_CLAMP_MAX);
 
   const fromArr = arr * multiple;
   const floored = Math.max(STAGE_VALUATION_FLOOR[state.stage], fromArr);
 
   // If you just priced a round, the market narrative doesn't instantly un-price it,
-  // but it decays over time — down rounds are real. ~8-week half-life.
+  // but it decays over time — down rounds are real.
   const weeksSinceRound = state.lastRound ? state.week - state.lastRound.week : 0;
-  const postMoneyFloor = (state.lastRound?.postMoney ?? 0) * Math.pow(0.92, weeksSinceRound);
+  const postMoneyFloor = (state.lastRound?.postMoney ?? 0) * Math.pow(POST_MONEY_DECAY_RATE, weeksSinceRound);
   const withRound = Math.max(floored, postMoneyFloor);
 
   // Hard cap per stage — even unicorns have limits.
