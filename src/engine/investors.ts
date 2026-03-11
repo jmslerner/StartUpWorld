@@ -31,6 +31,14 @@ const pitchFailMessages = [
   "They say they'll 'follow the round.' [[beat]] Translation: call us when someone else leads.",
   "The meeting runs 15 minutes short. [[beat]] That's never good.",
   "'We love founders who've been through this before.' [[beat]] This is your first time.",
+  "They ask what keeps you up at night. [[beat]] Everything. You say 'execution.'",
+  "'Your deck is very... thorough.' [[beat]] That's VC for 'too many slides.'",
+  "They say they want to be 'founder-friendly.' [[beat]] The term sheet disagrees.",
+  "The partner says 'this reminds me of a company that failed.' [[beat]] Inspiring.",
+  "'We love the space. We just funded someone else in it.' [[beat]] Last week.",
+  "They ghost you after three follow-ups. [[beat]] On the fourth, their associate sends a template.",
+  "They ask for your ARR. You give your MRR and hope they don't do math.",
+  "'Interesting unit economics.' [[beat]] Their eyebrow says otherwise.",
 ];
 
 const pitchSuccessMessages = [
@@ -49,6 +57,10 @@ const pitchSuccessMessages = [
   "\"Don't sign anything until you talk to us.\" [[beat]] The power dynamic just flipped.",
   "You finish the demo. Silence. [[beat]] Then: \"How fast can you close?\"",
   "They share the deck with a colleague before you've left the building.",
+  "The partner asks if you've 'considered this as an AI play.' [[beat]] You pivot mid-sentence.",
+  "They don't ask about competitors. [[beat]] They already know you're ahead.",
+  "\"Let me call my partner right now.\" [[beat]] They call. From the room. While you're there.",
+  "The partner cancels their next meeting to keep talking. [[beat]] That meeting was with another startup.",
 ];
 
 const pitchNewLeadMessages = [
@@ -75,6 +87,10 @@ const pitchNoLeadMessages = [
   "You deliver the pitch cleanly. The room smiles. [[beat]] Smiles don't wire money.",
   "Three meetings, three 'let me think about it's. [[beat]] Thinking is free. Runway is not.",
   "You work the room at a founder event. Lots of 'let's keep in touch.'",
+  "Your cold emails have a 2% response rate. [[beat]] 100% of responses are 'unsubscribe.'",
+  "You DM a VC on Twitter. They like the tweet. [[beat]] That's it. That's the whole interaction.",
+  "You present at a demo day. The WiFi cuts out during your live demo. [[beat]] Classic.",
+  "A VC replies 'super interesting!' with no follow-up meeting request.",
 ];
 
 const pickFrom = (rng: number, msgs: string[]): { rng: number; msg: string } => {

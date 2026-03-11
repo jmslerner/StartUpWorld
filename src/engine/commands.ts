@@ -138,6 +138,18 @@ const EASTER_EGGS: Record<string, string> = {
   pray: "Prayer received. [[beat]] Routing to /dev/null.",
   fire: "HR says you need to file a PIP first. [[beat]] You don't have HR.",
   sleep: "Sleep is a feature your body keeps requesting. You keep deferring it.",
+  meditate: "You close your eyes for 10 seconds. [[beat]] Slack has 47 new messages.",
+  disrupt: "You can't disrupt from a terminal. [[beat]] Or can you?",
+  synergy: "Synergy detected. [[beat]] Just kidding. That word means nothing.",
+  scale: "You can't scale what doesn't work. [[beat]] But you can try.",
+  network: "Your network is your net worth. [[beat]] Your network is mostly bots.",
+  hustle: "Rise and grind. [[beat]] The grind doesn't care about your sleep schedule.",
+  ai: "You whisper 'AI' into the void. [[beat]] Your valuation doubles.",
+  blockchain: "The board has voted to pretend you didn't say that.",
+  vibe: "Vibes are not a business model. [[beat]] Except on Sand Hill Road.",
+  ramen: "Ramen profitability: when you can afford ramen. [[beat]] You're not there yet.",
+  vc: "A VC slides into your DMs: 'Love what you're building.' [[beat]] They say that to everyone.",
+  traction: "Traction is just another word for 'please stop asking about revenue.'",
 };
 
 const handleEasterEgg = (state: GameState, command: string): ActionResult | null => {

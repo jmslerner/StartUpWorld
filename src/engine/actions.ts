@@ -150,6 +150,14 @@ const shipFailMessages = [
   "It ships. [[beat]] It sinks.",
   "Congratulations: you've automated disappointment.",
   "The feature works on your laptop. Your laptop is not production.",
+  "You ship a feature nobody asked for. [[beat]] Somehow it still has bugs.",
+  "The build passes. The users don't.",
+  "Three engineers. Two sprints. One revert.",
+  "You shipped it. Customers immediately ask for the old version back.",
+  "The feature is technically live. [[beat]] Spiritually, it's deceased.",
+  "You break prod so hard the status page breaks too.",
+  "CI/CD worked perfectly. [[beat]] The feature did not.",
+  "You announce the launch in Slack. [[beat]] The only reaction is a :eyes: from your cofounder.",
 ];
 
 const launchFailMessages = [
@@ -157,6 +165,16 @@ const launchFailMessages = [
   "Your campaign reaches millions. [[beat]] Of bots.",
   "The landing page loads. Nobody lands.",
   "Marketing spent. Awareness achieved. Revenue: unchanged.",
+  "You go viral on Twitter. [[beat]] For the wrong reasons.",
+  "The Product Hunt launch gets 3 upvotes. One is your mom.",
+  "Your ad spend returns a CPA of $847. [[beat]] Your product costs $9/mo.",
+  "The influencer posts. Their audience does not care.",
+  "You A/B test two landing pages. They both lose.",
+  "The campaign targets developers. [[beat]] Developers have ad blockers.",
+  "Your launch tweet gets ratioed by a meme account.",
+  "Someone screenshots your pricing page and roasts it on Hacker News.",
+  "You hire a growth hacker. [[beat]] They hack the growth downward.",
+  "The billboard goes up in SOMA. [[beat]] Everyone who sees it already uses a competitor.",
 ];
 
 const pickMsg = (rng: number, msgs: string[]): { rng: number; msg: string } => {

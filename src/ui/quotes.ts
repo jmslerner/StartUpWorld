@@ -36,6 +36,22 @@ const QUOTES: FounderQuote[] = [
   { text: "The best time to raise was six months ago. The second best time is before you need to.", by: "Startup Wisdom", note: "paraphrase" },
   { text: "If your cofounder and your cap table both look healthy, one of them is lying.", by: "Sand Hill Road Proverb", note: "satirical" },
   { text: "Valuation is a story told to people who want to believe it.", by: "Late-Stage Realism", note: "satirical" },
+  { text: "We don't have competitors. We have 'adjacent players in the ecosystem.'", by: "Overheard at Demo Day", note: "satirical" },
+  { text: "Our churn is actually a feature. It means we're filtering for ideal customers.", by: "Founder Copium", note: "satirical" },
+  { text: "I'm not a CEO. I'm a chief vibes officer with equity.", by: "Overheard in the Marina", note: "satirical" },
+  { text: "We're not pivoting. We're 'expanding our thesis.'", by: "Board Meeting Minutes", note: "satirical" },
+  { text: "The company is like a family. Specifically, a dysfunctional one.", by: "Glassdoor Review", note: "satirical" },
+  { text: "We don't do layoffs. We do 'organizational right-sizing events.'", by: "HR at Scale", note: "satirical" },
+  { text: "Nobody ever got fired for buying Salesforce. Several got fired for building a Salesforce competitor.", by: "Enterprise Wisdom", note: "satirical" },
+  { text: "My therapist charges $300/hr. My advisor charges 0.5% equity. The advisor costs more.", by: "Founder Math", note: "satirical" },
+  { text: "Step 1: Add AI to the name. Step 2: Triple the valuation. Step 3: There is no step 3.", by: "2024 Playbook", note: "satirical" },
+  { text: "We're disrupting the space. The space did not ask to be disrupted.", by: "Overheard on Sand Hill Road", note: "satirical" },
+  { text: "Profitability is a choice. We choose growth. Growth also chose not to show up.", by: "Q3 Earnings Call", note: "satirical" },
+  { text: "I don't need a cofounder. I need someone to argue with at 2am who can't quit.", by: "Solo Founder Energy", note: "satirical" },
+  { text: "Our TAM is everyone on earth. Our SAM is three guys in Palo Alto.", by: "Seed Deck, Slide 7", note: "satirical" },
+  { text: "Networking is just small talk with business cards and desperation.", by: "Overheard at a Mixer", note: "satirical" },
+  { text: "We have a 10x engineer. Unfortunately, they have 10x opinions.", by: "Engineering Manager", note: "satirical" },
+  { text: "The cap table tells the real story. Everything else is marketing.", by: "Lawyer at Closing", note: "satirical" },
 ];
 
 export const pickWeeklyQuote = (week: number): FounderQuote => {
