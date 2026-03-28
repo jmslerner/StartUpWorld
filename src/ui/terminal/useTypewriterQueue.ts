@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { LogEntry } from "../../types/game";
 
 /**
@@ -148,6 +148,7 @@ export interface TypewriterQueueState {
   rendered: LogEntry[];
   isTyping: boolean;
   fastForward: () => void;
+  flushAll: () => void;
 }
 
 export const useTypewriterQueue = (entries: LogEntry[]): TypewriterQueueState => {
@@ -328,10 +329,20 @@ export const useTypewriterQueue = (entries: LogEntry[]): TypewriterQueueState =>
     setIsTyping(false);
   };
 
+  const flushAll = useCallback(() => {
+    clearTimer();
+    opIdxRef.current = 0;
+    opsRef.current = [];
+    finalTextRef.current = "";
+    speedModeRef.current = "base";
+    setRenderedText(entries.map((entry) => (entry.kind === "user" ? entry.text : stripTokens(entry.text))));
+    setIsTyping(false);
+  }, [entries]);
+
   const rendered = useMemo<LogEntry[]>(() =>
     entries.map((e, i) => ({ ...e, text: renderedText[i] ?? (e.kind === "user" ? e.text : "") })),
   [entries, renderedText]
   );
 
-  return { rendered, isTyping, fastForward };
+  return { rendered, isTyping, fastForward, flushAll };
 };

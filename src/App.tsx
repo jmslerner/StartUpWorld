@@ -25,7 +25,7 @@ const App = () => {
   const [mobileStatsSnap, setMobileStatsSnap] = useState<SheetSnap>("collapsed");
   const [leaderboardOpen, setLeaderboardOpen] = useState(false);
 
-  const { rendered: typedLog, isTyping, fastForward } = useTypewriterQueue(log);
+  const { rendered: typedLog, isTyping, fastForward, flushAll } = useTypewriterQueue(log);
 
   const boardMembers = useMemo(() =>
     state.board.members.map(m => ({
@@ -76,12 +76,13 @@ const App = () => {
     [state.assets, state.companyPhase]
   );
 
-  const terminalInputRef = useRef<HTMLInputElement>(null);
-  const onboardingInputRef = useRef<HTMLInputElement>(null);
-
   const onboardingComplete = Boolean(
     state.founder.name.trim() && state.companyName.trim() && state.founder.archetype && state.cofounder.archetype
   );
+
+  const terminalInputRef = useRef<HTMLInputElement>(null);
+  const onboardingInputRef = useRef<HTMLInputElement>(null);
+  const previousOnboardingCompleteRef = useRef(onboardingComplete);
 
   useEffect(() => {
     const isCoarsePointer = typeof window !== "undefined" && window.matchMedia?.("(pointer: coarse)").matches;
@@ -92,6 +93,14 @@ const App = () => {
     }
     terminalInputRef.current?.focus();
   }, [onboardingComplete]);
+
+  useEffect(() => {
+    const wasComplete = previousOnboardingCompleteRef.current;
+    previousOnboardingCompleteRef.current = onboardingComplete;
+    if (!wasComplete && onboardingComplete) {
+      flushAll();
+    }
+  }, [flushAll, onboardingComplete]);
 
   const effectiveStatsOpen = statsOpen || mobileStatsSnap !== "collapsed";
   const restartRun = () => {
