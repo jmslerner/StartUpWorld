@@ -141,6 +141,9 @@ const isPrefixById = (a: LogEntry[], b: LogEntry[]): boolean => {
   return true;
 };
 
+const shouldRenderImmediately = (entries: LogEntry[]): boolean =>
+  entries.length > 0 && entries.every((entry) => entry.kind === "user" || entry.id.startsWith("intro-"));
+
 export interface TypewriterQueueState {
   rendered: LogEntry[];
   isTyping: boolean;
@@ -174,6 +177,7 @@ export const useTypewriterQueue = (entries: LogEntry[]): TypewriterQueueState =>
   // Reset or extend queue based on incoming entries.
   useEffect(() => {
     const prev = prevEntriesRef.current;
+    const renderImmediately = shouldRenderImmediately(entries);
 
     const resetNeeded = !isPrefixById(prev, entries);
     if (resetNeeded) {
@@ -182,7 +186,12 @@ export const useTypewriterQueue = (entries: LogEntry[]): TypewriterQueueState =>
       queueMicrotask(() => {
         setTypingIndex(0);
         setIsTyping(false);
-        setRenderedText(entries.map((e) => (e.kind === "user" ? e.text : "")));
+        setRenderedText(
+          entries.map((e) => {
+            if (e.kind === "user") return e.text;
+            return renderImmediately ? stripTokens(e.text) : "";
+          })
+        );
       });
       return;
     }
@@ -195,7 +204,12 @@ export const useTypewriterQueue = (entries: LogEntry[]): TypewriterQueueState =>
           const next = cur.slice(0, entries.length);
           for (let i = cur.length; i < entries.length; i += 1) {
             const e = entries[i];
-            next[i] = e?.kind === "user" ? e?.text ?? "" : "";
+            next[i] =
+              e?.kind === "user"
+                ? e?.text ?? ""
+                : renderImmediately
+                  ? stripTokens(e?.text ?? "")
+                  : "";
           }
           return next;
         });
@@ -205,8 +219,16 @@ export const useTypewriterQueue = (entries: LogEntry[]): TypewriterQueueState =>
 
   // Find next entry that needs typing.
   useEffect(() => {
+    if (shouldRenderImmediately(entries)) {
+      queueMicrotask(() => setIsTyping(false));
+      return;
+    }
+
     const nextIdx = (() => {
-      for (let i = 0; i < entries.length; i += 1) {
+      // The terminal renders newest entries at the top, so we type the newest
+      // pending system line first. This makes fresh output feel complete faster
+      // instead of filling in from the bottom.
+      for (let i = entries.length - 1; i >= 0; i -= 1) {
         const e = entries[i];
         if (!e) continue;
         if (e.kind === "user") continue;

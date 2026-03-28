@@ -3,6 +3,7 @@ import { getEffectiveMaxAp, calcNetBurn } from "../../engine/economy";
 
 interface HudBarProps {
   state: GameState;
+  setupComplete?: boolean;
   onToggleStats?: () => void;
   statsOpen?: boolean;
   onToggleLeaderboard?: () => void;
@@ -20,13 +21,72 @@ const fmtCompactUsd = (v: number) => {
   return `${sign}$${abs.toLocaleString()}`;
 };
 
-export const HudBar = ({ state, onToggleStats, statsOpen = false, onToggleLeaderboard }: HudBarProps) => {
+export const HudBar = ({
+  state,
+  setupComplete = true,
+  onToggleStats,
+  statsOpen = false,
+  onToggleLeaderboard,
+}: HudBarProps) => {
   const netBurn = calcNetBurn(state);
   const profitable = netBurn <= 0;
   const runway = profitable ? 999 : Math.max(0, Math.floor(state.cash / netBurn));
   const runwayUrgent = !profitable && runway <= 4;
   const founder = state.founder.archetype;
   const seedShown = state.seedText?.trim() ? state.seedText : String(state.seed);
+  const setupProgress = [
+    state.founder.name.trim().length > 0,
+    state.companyName.trim().length > 0,
+    Boolean(state.founder.archetype),
+    Boolean(state.cofounder.archetype),
+  ].filter(Boolean).length;
+  const companyLabel = state.companyName.trim() || "StartUpWorld";
+
+  if (!setupComplete) {
+    return (
+      <div className="panel-surface flex flex-wrap items-center gap-x-4 gap-y-1 rounded-xl px-4 py-2.5 text-xs text-mist">
+        <span className="text-sm font-semibold text-white" title="Game title">
+          {companyLabel}
+        </span>
+        {state.companyName.trim() ? (
+          <span className="text-mist/60" title="Game title">
+            StartUpWorld
+          </span>
+        ) : null}
+        <span className="text-mist/60">|</span>
+        <span title="Current week of your run.">Week {state.week}</span>
+        <span
+          className="rounded bg-steel/60 px-1.5 py-0.5 font-mono tabular-nums"
+          title={state.seedLocked ? "Run seed (locked)." : "Run seed (settable before you start)."}
+        >
+          Seed {seedShown}
+        </span>
+        <span className="font-semibold text-white" title="Cash in the bank when your run begins.">
+          Starter cash {fmt(state.cash)}
+        </span>
+        <span
+          className="rounded bg-neon/10 px-1.5 py-0.5 font-semibold text-neon"
+          title="Complete setup to unlock the full dashboard."
+        >
+          Setup {setupProgress}/4
+        </span>
+        <span className="text-mist/70">Finish setup to unlock the full cockpit.</span>
+
+        <div className="ml-auto flex gap-1.5">
+          {onToggleLeaderboard ? (
+            <button
+              type="button"
+              onClick={onToggleLeaderboard}
+              className="rounded-lg bg-steel/30 px-2 py-1 text-[0.65rem] text-mist/80 hover:bg-steel/50"
+              title="Leaderboard & Graveyard"
+            >
+              Ranks
+            </button>
+          ) : null}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="panel-surface flex flex-wrap items-center gap-x-4 gap-y-1 rounded-xl px-4 py-2.5 text-xs text-mist">

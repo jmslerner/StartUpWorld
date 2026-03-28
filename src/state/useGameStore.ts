@@ -66,12 +66,11 @@ const seedLabel = (state: GameState): string => {
 };
 
 const makeIntroLogs = (state: GameState): LogEntry[] => [
-  toLog("=== STARTUP WORLD ===", "system", "intro-1"),
-  toLog(`Seed: ${seedLabel(state)}`, "system", "intro-seed"),
-  toLog("Build your AI startup from garage to IPO.", "system", "intro-2"),
-  toLog("Set up: name → company → founder → cofounder", "system", "intro-3"),
-  toLog("(You can still type commands anytime.)", "system", "intro-4"),
-  toLog("Type 'help' for commands.", "system", "intro-6"),
+  toLog("[[typefast]]=== STARTUP WORLD ===", "system", "intro-1"),
+  toLog(`[[typefast]]Seed: ${seedLabel(state)}`, "system", "intro-seed"),
+  toLog("[[typefast]]Build your AI startup from garage to IPO.", "system", "intro-2"),
+  toLog("[[typefast]]Finish setup above to begin your run.", "system", "intro-3"),
+  toLog("[[typefast]]Type 'help' for commands anytime.", "system", "intro-6"),
 ];
 
 const makeClearedLogs = (state: GameState): LogEntry[] => [

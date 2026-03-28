@@ -129,7 +129,13 @@ const App = () => {
     >
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-3">
         <div className="sticky top-3 z-20 md:static">
-          <HudBar state={state} onToggleStats={toggleStats} statsOpen={effectiveStatsOpen} onToggleLeaderboard={() => setLeaderboardOpen(true)} />
+          <HudBar
+            state={state}
+            setupComplete={onboardingComplete}
+            onToggleStats={toggleStats}
+            statsOpen={effectiveStatsOpen}
+            onToggleLeaderboard={() => setLeaderboardOpen(true)}
+          />
         </div>
 
         {state.pendingEvent && <EventCard event={state.pendingEvent} />}
