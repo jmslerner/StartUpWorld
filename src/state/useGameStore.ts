@@ -60,6 +60,11 @@ interface GameStore {
   resetGame: () => void;
 }
 
+const restartHelpLogs = (): LogEntry[] => [
+  toLog("This will end your current run immediately.", "error"),
+  toLog("Type `restart confirm` to wipe this run and begin a fresh one.", "system"),
+];
+
 const seedLabel = (state: GameState): string => {
   const t = state.seedText?.trim();
   return t ? t : String(state.seed);
@@ -98,6 +103,36 @@ export const useGameStore = create<GameStore>((set) => ({
           state: current.state,
           log: makeClearedLogs(current.state),
           commandHistory: current.commandHistory,
+        };
+        queueMicrotask(() => saveToDisk(next.state, next.log, next.commandHistory));
+        return next;
+      }
+
+      if (lower === "restart" || lower === "reset" || lower === "new") {
+        const userLog = trimmed ? [toLog(`> ${trimmed}`, "user")] : [];
+        const next = {
+          state: current.state,
+          log: [...current.log, ...userLog, ...restartHelpLogs()],
+          commandHistory:
+            current.commandHistory[0] === trimmed
+              ? current.commandHistory
+              : [trimmed, ...current.commandHistory].slice(0, 50),
+        };
+        queueMicrotask(() => saveToDisk(next.state, next.log, next.commandHistory));
+        return next;
+      }
+
+      if (lower === "restart confirm" || lower === "reset confirm" || lower === "new confirm") {
+        clearSave();
+        const fresh = createInitialState();
+        const next = {
+          state: fresh,
+          log: [
+            ...makeIntroLogs(fresh),
+            toLog("> restart confirm", "user"),
+            toLog("Fresh run started.", "system", "intro-restart"),
+          ],
+          commandHistory: [trimmed, ...current.commandHistory.filter((entry) => entry !== trimmed)].slice(0, 50),
         };
         queueMicrotask(() => saveToDisk(next.state, next.log, next.commandHistory));
         return next;
@@ -157,6 +192,8 @@ export const useGameStore = create<GameStore>((set) => ({
     set(() => {
       clearSave();
       const fresh = createInitialState();
-      return { state: fresh, log: makeIntroLogs(fresh), commandHistory: [] };
+      const next = { state: fresh, log: makeIntroLogs(fresh), commandHistory: [] };
+      queueMicrotask(() => saveToDisk(next.state, next.log, next.commandHistory));
+      return next;
     }),
 }));

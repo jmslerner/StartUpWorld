@@ -7,6 +7,7 @@ interface HudBarProps {
   onToggleStats?: () => void;
   statsOpen?: boolean;
   onToggleLeaderboard?: () => void;
+  onRestart?: () => void;
 }
 
 const fmt = (v: number) => `$${v.toLocaleString()}`;
@@ -27,6 +28,7 @@ export const HudBar = ({
   onToggleStats,
   statsOpen = false,
   onToggleLeaderboard,
+  onRestart,
 }: HudBarProps) => {
   const netBurn = calcNetBurn(state);
   const profitable = netBurn <= 0;
@@ -73,6 +75,16 @@ export const HudBar = ({
         <span className="text-mist/70">Finish setup to unlock the full cockpit.</span>
 
         <div className="ml-auto flex gap-1.5">
+          {onRestart ? (
+            <button
+              type="button"
+              onClick={onRestart}
+              className="rounded-lg bg-steel/30 px-2 py-1 text-[0.65rem] text-mist/80 hover:bg-steel/50"
+              title="Start a fresh run"
+            >
+              New Run
+            </button>
+          ) : null}
           {onToggleLeaderboard ? (
             <button
               type="button"
@@ -150,6 +162,16 @@ export const HudBar = ({
       </span>
 
       <div className="ml-auto flex gap-1.5">
+        {onRestart ? (
+          <button
+            type="button"
+            onClick={onRestart}
+            className="rounded-lg bg-steel/30 px-2 py-1 text-[0.65rem] text-mist/80 hover:bg-steel/50"
+            title="Start a fresh run"
+          >
+            New Run
+          </button>
+        ) : null}
         {onToggleLeaderboard ? (
           <button
             type="button"

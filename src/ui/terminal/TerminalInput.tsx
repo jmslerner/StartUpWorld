@@ -33,6 +33,7 @@ const commandNames = [
   "assets",
   "end",
   "choose",
+  "restart",
 ] as const;
 
 const commandsWithArgs = new Set([
@@ -48,6 +49,7 @@ const commandsWithArgs = new Set([
   "choose",
   "board",
   "buy",
+  "restart",
 ]);
 
 const hireRoleOptions: Array<{ token: string; label: string; tooltip: string }> = [
@@ -86,6 +88,7 @@ const commandTooltips: Record<string, string> = {
   status: "Show current stats",
   help: "Show available commands",
   choose: "Resolve a pending event choice",
+  restart: "Abandon this run and start a fresh company",
   board: "Manage board of directors (dinner, gift, blackmail)",
   phases: "View company phase progression and unlock requirements",
   buy: "Purchase company assets (1 AP)",
@@ -462,7 +465,11 @@ export const TerminalInput = forwardRef<HTMLInputElement, TerminalInputProps>(
   const showSuggestions = isFocused && !dismissedSuggestions && suggestions.length > 0;
 
   const applySuggestion = (suggestion: Suggestion) => {
-    try { SFX.click(); } catch {}
+    try {
+      SFX.click();
+    } catch {
+      // Ignore audio failures.
+    }
     setValue(suggestion.nextValue);
     lastValueRef.current = suggestion.nextValue;
     setDismissedSuggestions(false);

@@ -94,6 +94,13 @@ const App = () => {
   }, [onboardingComplete]);
 
   const effectiveStatsOpen = statsOpen || mobileStatsSnap !== "collapsed";
+  const restartRun = () => {
+    const shouldRestart = typeof window === "undefined"
+      ? true
+      : window.confirm("Start a new run? Your current progress will be lost.");
+    if (!shouldRestart) return;
+    resetGame();
+  };
 
   const toggleStats = () => {
     setStatsOpen((prev) => !prev);
@@ -135,6 +142,7 @@ const App = () => {
             onToggleStats={toggleStats}
             statsOpen={effectiveStatsOpen}
             onToggleLeaderboard={() => setLeaderboardOpen(true)}
+            onRestart={restartRun}
           />
         </div>
 

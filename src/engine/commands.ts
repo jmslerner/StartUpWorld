@@ -90,6 +90,7 @@ const setupHelpText: LogEntry[] = [
   toLog("phases - view company phase progression and unlock requirements"),
   toLog("buy [asset] - purchase company assets (type `buy` for options) (1 AP)"),
   toLog("assets - list owned assets"),
+  toLog("restart confirm - abandon this run and start fresh"),
   toLog("end - end the week"),
   toLog("choose <n> - resolve a pending event choice"),
 ];
@@ -116,6 +117,7 @@ const mainHelpText: LogEntry[] = [
   toLog("phases - view company phase progression and unlock requirements"),
   toLog("buy [asset] - purchase company assets (type `buy` for options) (1 AP)"),
   toLog("assets - list owned assets"),
+  toLog("restart confirm - abandon this run and start fresh"),
   toLog("end - end the week"),
   toLog("choose <n> - resolve a pending event choice"),
 ];
@@ -408,6 +410,7 @@ const knownCommands = [
   "help", "clear", "cls", "status", "seed", "name", "company",
   "founder", "cofounder", "choose", "hire", "ship", "launch",
   "pitch", "raise", "pricing", "perks", "board", "phases",
+  "restart",
   "buy", "assets", "end",
 ];
 
