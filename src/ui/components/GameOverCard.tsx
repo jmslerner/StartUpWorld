@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { GameState, EndingType } from "../../types/game";
 import { generateEndingSummary, type EndingSummary } from "../../engine/endingSummary";
 import { generateEpitaph } from "../../engine/epitaphs";
@@ -49,12 +49,12 @@ const endingLabel: Record<EndingType, string> = {
 export const GameOverCard = ({ state, onPlayAgain }: GameOverCardProps) => {
   const summary: EndingSummary | null = generateEndingSummary(state);
   const [rank, setRank] = useState<number | null>(null);
-  const [submitted, setSubmitted] = useState(false);
+  const submittedRef = useRef(false);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
 
   useEffect(() => {
-    if (!summary || submitted) return;
-    setSubmitted(true);
+    if (!summary || submittedRef.current) return;
+    submittedRef.current = true;
 
     const ending = state.gameOver?.ending;
     if (!ending) return;
@@ -84,7 +84,7 @@ export const GameOverCard = ({ state, onPlayAgain }: GameOverCardProps) => {
       grade: summary.grade,
       week: state.week,
     });
-  }, [summary, submitted, state]);
+  }, [summary, state]);
 
   if (!summary) return null;
 
