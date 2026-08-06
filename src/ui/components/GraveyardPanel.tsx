@@ -1,9 +1,12 @@
 import type { GraveyardEntry } from "../../types/social";
 import type { EndingType } from "../../types/game";
+import { FetchError } from "./FetchError";
 
 interface GraveyardPanelProps {
   entries: GraveyardEntry[];
   loading: boolean;
+  error?: string | null;
+  onRetry?: () => void;
 }
 
 const accentColor: Record<EndingType, string> = {
@@ -36,9 +39,13 @@ const endingLabel: Record<EndingType, string> = {
   "forced-acquisition": "FORCED SALE",
 };
 
-export const GraveyardPanel = ({ entries, loading }: GraveyardPanelProps) => {
+export const GraveyardPanel = ({ entries, loading, error, onRetry }: GraveyardPanelProps) => {
   if (loading) {
     return <div className="py-8 text-center text-xs text-mist/50">Loading graveyard...</div>;
+  }
+
+  if (error) {
+    return <FetchError message={error} onRetry={onRetry} />;
   }
 
   if (entries.length === 0) {

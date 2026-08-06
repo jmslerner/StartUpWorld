@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { LeaderboardPanel } from "./LeaderboardPanel";
 import { GraveyardPanel } from "./GraveyardPanel";
 import { fetchLeaderboard, fetchGraveyard } from "../../api/client";
@@ -18,17 +18,41 @@ export const LeaderboardOverlay = ({ onClose, currentSeed }: LeaderboardOverlayP
   const [graves, setGraves] = useState<GraveyardEntry[]>([]);
   const [loadingL, setLoadingL] = useState(true);
   const [loadingG, setLoadingG] = useState(true);
+  const [errorL, setErrorL] = useState<string | null>(null);
+  const [errorG, setErrorG] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchLeaderboard().then((entries) => {
-      setLeaders(entries);
+  const loadLeaders = useCallback(() => {
+    fetchLeaderboard().then((result) => {
+      setLeaders(result.entries);
+      setErrorL(result.error);
       setLoadingL(false);
     });
-    fetchGraveyard().then((entries) => {
-      setGraves(entries);
+  }, []);
+
+  const loadGraves = useCallback(() => {
+    fetchGraveyard().then((result) => {
+      setGraves(result.entries);
+      setErrorG(result.error);
       setLoadingG(false);
     });
   }, []);
+
+  const retryLeaders = useCallback(() => {
+    setLoadingL(true);
+    setErrorL(null);
+    loadLeaders();
+  }, [loadLeaders]);
+
+  const retryGraves = useCallback(() => {
+    setLoadingG(true);
+    setErrorG(null);
+    loadGraves();
+  }, [loadGraves]);
+
+  useEffect(() => {
+    loadLeaders();
+    loadGraves();
+  }, [loadLeaders, loadGraves]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -69,9 +93,15 @@ export const LeaderboardOverlay = ({ onClose, currentSeed }: LeaderboardOverlayP
         {/* Content */}
         <div className="terminal-scrollbar min-h-0 flex-1 overflow-y-auto pr-1">
           {tab === "leaderboard" ? (
-            <LeaderboardPanel entries={leaders} loading={loadingL} currentSeed={currentSeed} />
+            <LeaderboardPanel
+              entries={leaders}
+              loading={loadingL}
+              error={errorL}
+              onRetry={retryLeaders}
+              currentSeed={currentSeed}
+            />
           ) : (
-            <GraveyardPanel entries={graves} loading={loadingG} />
+            <GraveyardPanel entries={graves} loading={loadingG} error={errorG} onRetry={retryGraves} />
           )}
         </div>
       </div>

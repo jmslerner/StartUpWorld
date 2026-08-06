@@ -1,9 +1,12 @@
 import type { LeaderboardEntry } from "../../types/social";
 import type { EndingType } from "../../types/game";
+import { FetchError } from "./FetchError";
 
 interface LeaderboardPanelProps {
   entries: LeaderboardEntry[];
   loading: boolean;
+  error?: string | null;
+  onRetry?: () => void;
   currentSeed?: number;
 }
 
@@ -34,9 +37,13 @@ const endingShort: Record<EndingType, string> = {
   "forced-acquisition": "SOLD",
 };
 
-export const LeaderboardPanel = ({ entries, loading, currentSeed }: LeaderboardPanelProps) => {
+export const LeaderboardPanel = ({ entries, loading, error, onRetry, currentSeed }: LeaderboardPanelProps) => {
   if (loading) {
     return <div className="py-8 text-center text-xs text-mist/50">Loading leaderboard...</div>;
+  }
+
+  if (error) {
+    return <FetchError message={error} onRetry={onRetry} />;
   }
 
   if (entries.length === 0) {

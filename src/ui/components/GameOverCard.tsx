@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import type { GameState, EndingType } from "../../types/game";
 import { generateEndingSummary, type EndingSummary } from "../../engine/endingSummary";
 import { generateEpitaph } from "../../engine/epitaphs";
@@ -9,6 +9,9 @@ interface GameOverCardProps {
   state: GameState;
   onPlayAgain: () => void;
 }
+
+const NAME_STORAGE_KEY = "startupworld:playerName";
+const MAX_NAME_LENGTH = 32;
 
 const fmt = (v: number): string => v.toLocaleString();
 const fmtUsd = (v: number): string => {
@@ -46,23 +49,49 @@ const endingLabel: Record<EndingType, string> = {
   "forced-acquisition": "FORCED SALE",
 };
 
+const readStoredName = (): string | null => {
+  try {
+    return localStorage.getItem(NAME_STORAGE_KEY);
+  } catch {
+    return null;
+  }
+};
+
+const storeName = (name: string): void => {
+  try {
+    localStorage.setItem(NAME_STORAGE_KEY, name);
+  } catch {
+    // private mode / storage disabled — not worth failing the submit over
+  }
+};
+
+type SubmitStatus = "idle" | "submitting" | "done";
+
 export const GameOverCard = ({ state, onPlayAgain }: GameOverCardProps) => {
   const summary: EndingSummary | null = generateEndingSummary(state);
+  const [name, setName] = useState(() => readStoredName() ?? state.founder.name ?? "");
+  const [status, setStatus] = useState<SubmitStatus>("idle");
   const [rank, setRank] = useState<number | null>(null);
-  const submittedRef = useRef(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
+  // Guards against a double-click landing before the disabled state renders.
+  const submittingRef = useRef(false);
 
-  useEffect(() => {
-    if (!summary || submittedRef.current) return;
-    submittedRef.current = true;
+  const trimmedName = name.trim();
+  const canSubmit = trimmedName.length > 0 && status === "idle";
 
+  const handleSubmit = async () => {
+    if (!summary || !canSubmit || submittingRef.current) return;
     const ending = state.gameOver?.ending;
     if (!ending) return;
 
-    // Submit to leaderboard
-    submitScore({
+    submittingRef.current = true;
+    setStatus("submitting");
+    storeName(trimmedName);
+
+    const result = await submitScore({
       companyName: state.companyName,
-      founderName: state.founder.name,
+      founderName: trimmedName,
       ending,
       score: summary.score,
       finalValuation: state.valuation,
@@ -71,20 +100,21 @@ export const GameOverCard = ({ state, onPlayAgain }: GameOverCardProps) => {
       finalMrr: state.mrr,
       week: state.week,
       seed: state.seed,
-    }).then((result) => {
-      if (result.rank !== null) setRank(result.rank);
     });
 
-    // Submit to graveyard
-    const epitaph = generateEpitaph(state, ending);
-    submitGraveyardEntry({
+    // Graveyard is fire-and-forget; it records the company, not the player.
+    void submitGraveyardEntry({
       companyName: state.companyName,
       ending,
-      epitaph,
+      epitaph: generateEpitaph(state, ending),
       grade: summary.grade,
       week: state.week,
     });
-  }, [summary, state]);
+
+    setRank(result.rank);
+    setSubmitError(result.error);
+    setStatus("done");
+  };
 
   if (!summary) return null;
 
@@ -160,6 +190,55 @@ export const GameOverCard = ({ state, onPlayAgain }: GameOverCardProps) => {
             </div>
           </div>
         )}
+
+        {/* Leaderboard submission */}
+        <div className="mb-4 rounded-lg bg-white/[0.02] px-3 py-3">
+          {status === "done" ? (
+            <div className="text-xs leading-relaxed text-mist/70">
+              {submitError ? (
+                <span className="text-amber-300/80">{submitError}</span>
+              ) : (
+                <>
+                  Submitted as <span className="font-semibold text-slate-100">{trimmedName}</span>.
+                  {rank !== null ? ` You're #${rank}.` : " Score recorded."}
+                </>
+              )}
+            </div>
+          ) : (
+            <>
+              <label
+                htmlFor="leaderboard-name"
+                className="mb-1.5 block text-[0.6rem] font-semibold uppercase tracking-widest text-mist/50"
+              >
+                Your name for the leaderboard
+              </label>
+              <div className="flex gap-2">
+                <input
+                  id="leaderboard-name"
+                  type="text"
+                  value={name}
+                  maxLength={MAX_NAME_LENGTH}
+                  autoComplete="off"
+                  placeholder="Founder name"
+                  disabled={status === "submitting"}
+                  onChange={(e) => setName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") void handleSubmit();
+                  }}
+                  className="min-w-0 flex-1 rounded bg-black/30 px-2.5 py-1.5 text-xs text-slate-100 outline-none ring-1 ring-white/10 placeholder:text-mist/30 focus:ring-neon/40 disabled:opacity-50"
+                />
+                <button
+                  type="button"
+                  onClick={() => void handleSubmit()}
+                  disabled={!canSubmit}
+                  className="shrink-0 rounded bg-neon/10 px-3 py-1.5 text-xs font-medium text-neon transition hover:bg-neon/20 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  {status === "submitting" ? "Submitting..." : "Submit"}
+                </button>
+              </div>
+            </>
+          )}
+        </div>
 
         {/* Buttons */}
         <div className="flex gap-2">

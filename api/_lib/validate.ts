@@ -5,6 +5,7 @@ const VALID_ENDINGS = [
   "founder-removal",
   "zombie-saas",
   "ai-hype-exit",
+  "forced-acquisition",
 ] as const;
 
 type EndingType = (typeof VALID_ENDINGS)[number];
@@ -13,6 +14,7 @@ const ENDING_SCORES: Record<EndingType, number> = {
   ipo: 20,
   "ai-hype-exit": 12,
   acquisition: 8,
+  "forced-acquisition": 5,
   "zombie-saas": 4,
   "founder-removal": 2,
   bankruptcy: 0,
