@@ -4,41 +4,22 @@ import { createInitialState, executeCommand } from "../engine";
 import { toLog } from "../engine/utils";
 import { pickWeeklyQuote } from "../ui/quotes";
 import { SFX } from "../ui/sound";
-
-const SAVE_KEY = "startupworld:save";
-const SAVE_VERSION = 2;
-
-interface SaveData {
-  version: number;
-  state: GameState;
-  log: LogEntry[];
-  commandHistory: string[];
-}
+import type { ActionSignal } from "../world/types";
+import { restartSignal, toActionSignal } from "../world/ui/actionSignal";
+import { parseSave, SAVE_KEY, serializeSave, type LoadedSave } from "./save";
 
 function saveToDisk(state: GameState, log: LogEntry[], commandHistory: string[]): void {
   try {
-    const data: SaveData = { version: SAVE_VERSION, state, log, commandHistory };
-    window.localStorage.setItem(SAVE_KEY, JSON.stringify(data));
+    window.localStorage.setItem(SAVE_KEY, serializeSave(state, log, commandHistory));
   } catch {
     // Quota exceeded or private browsing — silently ignore.
   }
 }
 
-function loadFromDisk(): SaveData | null {
+/** The stored run, migrated to the current save version (see ./save), or null for a fresh start. */
+function loadFromDisk(): LoadedSave | null {
   try {
-    const raw = window.localStorage.getItem(SAVE_KEY);
-    if (!raw) return null;
-    const data = JSON.parse(raw) as SaveData;
-    if (typeof data.state?.week !== "number" || typeof data.state?.seed !== "number") return null;
-    // Migrate v1 saves: add assets field if missing
-    if (data.version === 1) {
-      if (!data.state.assets) {
-        (data.state as GameState).assets = [];
-      }
-      data.version = 2;
-    }
-    if (data.version !== SAVE_VERSION) return null;
-    return data;
+    return parseSave(window.localStorage.getItem(SAVE_KEY));
   } catch {
     return null;
   }
@@ -56,9 +37,17 @@ interface GameStore {
   state: GameState;
   log: LogEntry[];
   commandHistory: string[];
+  /**
+   * The most recent command and how the engine judged it, for the 3D world to
+   * react to. `seq` goes up by one per command, so a subscriber can tell a new
+   * action from an unrelated store update. Session-only: never written to the save.
+   */
+  lastAction: ActionSignal | null;
   runCommand: (input: string) => void;
   resetGame: () => void;
 }
+
+const nextSeq = (previous: ActionSignal | null): number => (previous?.seq ?? 0) + 1;
 
 const restartHelpLogs = (): LogEntry[] => [
   toLog("This will end your current run immediately.", "error"),
@@ -86,13 +75,19 @@ const makeClearedLogs = (state: GameState): LogEntry[] => [
 
 const saved = loadFromDisk();
 const initialState = saved?.state ?? createInitialState();
-const initialLog = saved?.log ?? makeIntroLogs(initialState);
+const initialLog = saved && saved.log.length > 0 ? saved.log : makeIntroLogs(initialState);
 const initialHistory = saved?.commandHistory ?? [];
+// A save from an older version is written back once in the current format, so the next
+// load reads it as it is now (migration is idempotent, so this only saves the work).
+if (saved && saved.fromVersion !== saved.version) {
+  queueMicrotask(() => saveToDisk(initialState, initialLog, initialHistory));
+}
 
 export const useGameStore = create<GameStore>((set) => ({
   state: initialState,
   log: initialLog,
   commandHistory: initialHistory,
+  lastAction: null,
   runCommand: (input: string) =>
     set((current) => {
       const trimmed = input.trim();
@@ -133,6 +128,7 @@ export const useGameStore = create<GameStore>((set) => ({
             toLog("Fresh run started.", "system", "intro-restart"),
           ],
           commandHistory: [trimmed, ...current.commandHistory.filter((entry) => entry !== trimmed)].slice(0, 50),
+          lastAction: restartSignal(nextSeq(current.lastAction)),
         };
         queueMicrotask(() => saveToDisk(next.state, next.log, next.commandHistory));
         return next;
@@ -182,6 +178,7 @@ export const useGameStore = create<GameStore>((set) => ({
         state: result.state,
         log: newLog,
         commandHistory: newHistory,
+        lastAction: toActionSignal(nextSeq(current.lastAction), trimmed, result),
       };
 
       queueMicrotask(() => saveToDisk(next.state, next.log, next.commandHistory));
@@ -189,10 +186,15 @@ export const useGameStore = create<GameStore>((set) => ({
       return next;
     }),
   resetGame: () =>
-    set(() => {
+    set((current) => {
       clearSave();
       const fresh = createInitialState();
-      const next = { state: fresh, log: makeIntroLogs(fresh), commandHistory: [] };
+      const next = {
+        state: fresh,
+        log: makeIntroLogs(fresh),
+        commandHistory: [],
+        lastAction: restartSignal(nextSeq(current.lastAction)),
+      };
       queueMicrotask(() => saveToDisk(next.state, next.log, next.commandHistory));
       return next;
     }),

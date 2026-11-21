@@ -11,11 +11,10 @@ import type {
   SoundHint,
   TeamRole,
 } from "../types/game";
-import { appendLog } from "./logging";
 import { clamp } from "./utils";
 import { BASE_AP, calcBurn, calcRunwayWeeks, calcNetBurn, calcWeeklyRevenue, roleComp, getApCost, markFreeActionUsed } from "./economy";
 import { applyHiringCohesionHit } from "./culture";
-import { isCofounderChosen, isFounderChosen, setFounder, founderMods } from "./founders";
+import { setFounder, founderMods } from "./founders";
 import { chance, nextIntInclusive, signedUnit } from "./rng";
 import { successPenaltyFromStress } from "./stress";
 import { endWeekTick } from "./tick";
@@ -30,17 +29,14 @@ import { PRICING_MODELS } from "./pricing";
 import { canHireRole, ROLE_MIN_STAGE, STAGE_PERKS } from "./stagePerks";
 import { createInitialBoard, PERSONALITY_PROFILES } from "./board";
 import { ASSET_CATALOG, ALL_ASSET_IDS, phaseAtLeast } from "./assets";
+import { canSpendAp, ensurePlayable, err, spendAp, withLogLines } from "./tycoon/kit";
+import { DISCOVERY_WEEKS } from "./tycoon/constants";
+import { effTeam, emptyPeople, emptyProduct, reconcileRoster, rosterOf } from "./tycoon/roster";
+import { peopleStatusLine } from "./people";
+import { projectsStatusLine } from "./projects";
 
-const withLogLines = (state: GameState, lines: Array<{ text: string; kind?: LogEntry["kind"] }>, sound?: SoundHint): ActionResult => {
-  const logs: LogEntry[] = [];
-  let s = state;
-  for (const line of lines) {
-    s = appendLog(s, logs, line.text, line.kind ?? "system");
-  }
-  return { state: refreshDerivedNoLog(s), logs, sound };
-};
-
-const err = (state: GameState, message: string): ActionResult => withLogLines(state, [{ text: message, kind: "error" }]);
+// withLogLines, err, ensurePlayable, canSpendAp and spendAp moved to tycoon/kit.ts unchanged; these two stay exported here.
+export { canSpendAp, spendAp };
 
 const normalizeName = (input: string, maxLen: number): string => {
   const trimmed = input.replace(/\s+/g, " ").trim();
@@ -327,18 +323,14 @@ export const createInitialState = (): GameState => {
     seedText: null,
     seedLocked: false,
     lastWeek: { users: 50, mrr: 50 * 10, cash: 20_000, teamSize: 1 },
+    // Tycoon slices, empty. The starting engineer is minted by reconcileRoster when setup completes (`cofounder`),
+    // so a `seed <value>` typed before that still decides every name.
+    people: emptyPeople(),
+    product: emptyProduct(),
   };
 
   return refreshDerivedNoLog(base);
 };
-
-export const canSpendAp = (state: GameState, cost = 1): boolean => state.ap >= cost;
-
-export const spendAp = (state: GameState, cost = 1): GameState => ({
-  ...state,
-  ap: Math.max(0, state.ap - cost),
-  seedLocked: true,
-});
 
 export const setSeed = (state: GameState, rawSeed: string): ActionResult => {
   if (state.gameOver) {
@@ -413,22 +405,6 @@ export const raiseBootstrap = (state: GameState, source: BootstrapFundingSource)
   return withLogLines(updated, lines, "cash-in");
 };
 
-const ensurePlayable = (state: GameState): ActionResult | null => {
-  if (state.gameOver) {
-    return err(state, "Game over. Click 'Play Again' or refresh to start a new run.");
-  }
-  if (state.pendingEvent) {
-    return err(state, "Resolve the pending event first with `choose <n>`.");
-  }
-  if (!isFounderChosen(state)) {
-    return err(state, "Choose your founder first: `founder visionary|hacker|sales-animal|philosopher`.");
-  }
-  if (!isCofounderChosen(state)) {
-    return err(state, "Choose your cofounder first: `cofounder operator|builder|rainmaker|powderkeg`.");
-  }
-  return null;
-};
-
 export const setFounderArchetype = (state: GameState, archetype: FounderArchetype): ActionResult => {
   if (state.gameOver) {
     return err(state, "Game over.");
@@ -491,8 +467,19 @@ export const hire = (state: GameState, role: TeamRole, count: number): ActionRes
   updated = { ...updated, burn: calcBurn(updated) };
   updated = spendAp(updated);
 
+  // Name the people the job ad produced, in the same first line (so the log-line count, hence logSeq, is unchanged).
+  // Job-ad hires are worth exactly one standard head at the standard salary, so the burn line is unaffected.
+  const known = new Set(rosterOf(updated).map((e) => e.id));
+  updated = reconcileRoster(updated);
+  const newcomers = rosterOf(updated).filter((e) => !known.has(e.id));
+  const unlisted = Math.floor(count) - newcomers.length;
+  const who = newcomers.length === 0
+    ? ""
+    : `: ${newcomers.slice(0, 3).map((e) => `${e.name} (pace ${e.pace}, craft ${e.craft}${e.quirk ? `, ${e.quirk}` : ""})`).join(", ")}` +
+      `${newcomers.length > 3 ? ` +${newcomers.length - 3} more` : ""}${unlisted > 0 ? ` +${unlisted} unlisted` : ""}`;
+
   const lines: Array<{ text: string; kind?: LogEntry["kind"] }> = [
-    { text: `Hired ${count} ${role} ${count === 1 ? "hire" : "hires"}.` },
+    { text: `Hired ${count} ${role} ${count === 1 ? "hire" : "hires"}${who}.` },
     { text: `Cash -$${totalHireCost.toLocaleString()}. Burn now $${updated.burn.toLocaleString()}/wk.` },
   ];
   if (count >= 3) {
@@ -517,25 +504,24 @@ export const shipFeature = (state: GameState, name: string): ActionResult => {
   const mods = founderMods[archetype];
   const stressPenalty = successPenaltyFromStress(state);
 
-  const eng = state.team.engineering;
-  const design = state.team.design;
-  const ops = state.team.ops;
-  const sales = state.team.sales;
-  const mkt = state.team.marketing;
+  // Output terms read effective FTEs (everyone's full attention: a patch is instant); drags (HR) and org ratios read
+  // bodies. `effTeam` is `state.team` itself without a roster or with a roster of standard people (TYCOON-SPEC §5.1).
+  const eff = effTeam(state);
+  const eng = eff.engineering;
   const hr = state.team.hr;
-  const legal = state.team.legal;
+  const legal = eff.legal;
   const cohesion = clamp(state.culture.cohesion / 100, 0, 1);
 
   // If go-to-market outpaces execution capacity, delivery suffers.
-  const execCapacity = eng + design + ops;
-  const gtm = sales + mkt;
+  const execCapacity = state.team.engineering + state.team.design + state.team.ops;
+  const gtm = state.team.sales + state.team.marketing;
   const execGap = Math.max(0, gtm - execCapacity);
   const imbalancePenalty = Math.min(0.18, execGap * 0.025);
 
   // HR adds process overhead (slower shipping); Legal adds operational efficiency.
   const processDrag = hr * 0.015;
   const efficiencyBoost = legal * 0.01;
-  const productBoost = state.team.product * 0.025;
+  const productBoost = eff.product * 0.025;
   const stageShipBonus = STAGE_PERKS[state.stage].shipSuccessBonus;
   const base =
     0.68 +
@@ -595,8 +581,11 @@ export const shipFeature = (state: GameState, name: string): ActionResult => {
       morale: clamp(s.culture.morale + 2, 0, 100),
     },
   }, shipCost), "ship");
+  // Discovery (TYCOON-SPEC §4.9): text only, in the existing first line, while no build was ever started.
+  const discovery =
+    s.product && s.product.nextId === 1 && s.week >= DISCOVERY_WEEKS.from && s.week <= DISCOVERY_WEEKS.to ? " (Bigger bets: `build`.)" : "";
   return withLogLines(updated, [
-    { text: `Shipped feature: ${name}.` },
+    { text: `Shipped feature: ${name}.${discovery}` },
     ...freeShipLog,
     ...(imbalancePenalty > 0
       ? ([{ text: "You barely shipped it. The org is skewed toward GTM.", kind: "event" }] as const)
@@ -625,10 +614,11 @@ export const launchCampaign = (state: GameState, name: string): ActionResult => 
   const mods = founderMods[archetype];
   const stressPenalty = successPenaltyFromStress(state);
 
-  const mkt = state.team.marketing;
-  const sales = state.team.sales;
+  const eff = effTeam(state);
+  const mkt = eff.marketing;
+  const sales = eff.sales;
   const hr = state.team.hr;
-  const legal = state.team.legal;
+  const legal = eff.legal;
   const rep = clamp(state.reputation / 100, 0, 1);
   const processDrag = hr * 0.006;
   const efficiencyBoost = legal * 0.008;
@@ -808,6 +798,10 @@ export const status = (state: GameState): ActionResult => {
     (fTldr ? `\nFounder TL;DR: ${fTldr}` : "") +
     (cTldr ? `\nCofounder TL;DR: ${cTldr}` : "");
 
+  // Tycoon lines inside the same single log entry (TYCOON-SPEC §4.9): no new log line, so logSeq is unchanged.
+  const peopleLine = peopleStatusLine(state);
+  const productLine = projectsStatusLine(state);
+
   const burnLine = profitable
     ? `Revenue $${weeklyRev.toLocaleString()}/wk > Burn $${state.burn.toLocaleString()}/wk → Profit +$${Math.abs(netBurn).toLocaleString()}/wk | Runway ∞`
     : `Burn $${state.burn.toLocaleString()} - Revenue $${weeklyRev.toLocaleString()} = Net burn $${netBurn.toLocaleString()}/wk | Runway ${runway}w`;
@@ -828,6 +822,8 @@ export const status = (state: GameState): ActionResult => {
     `\nCohesion ${state.culture.cohesion}/100 | Morale ${state.culture.morale}/100` +
     `\nInvestor leads: ${pipeline}` +
     (state.assets.length > 0 ? `\nAssets: ${state.assets.map(a => a.name).join(", ")}` : "") +
+    (peopleLine ? `\n${peopleLine}` : "") +
+    (productLine ? `\n${productLine}` : "") +
     tldrBlock;
 
   return withLogLines(state, [{ text: line, kind: "system" }]);

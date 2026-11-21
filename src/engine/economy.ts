@@ -3,21 +3,13 @@ import { clamp } from "./utils";
 import { founderMods } from "./founders";
 import { STAGE_PERKS } from "./stagePerks";
 import { ASSET_CATALOG } from "./assets";
+import { roleComp } from "./tycoon/comp";
+import { payrollDelta } from "./tycoon/roster";
+
+// roleComp moved to tycoon/comp.ts (so the tycoon modules can read it without importing economy); re-exported unchanged.
+export { roleComp };
 
 export const BASE_AP = 3;
-
-export const roleComp: Record<TeamRole, { salary: number; hireCost: number }> = {
-  engineering: { salary: 3500, hireCost: 3000 },
-  design: { salary: 2800, hireCost: 2500 },
-  marketing: { salary: 2600, hireCost: 2200 },
-  sales: { salary: 3000, hireCost: 2500 },
-  ops: { salary: 2400, hireCost: 2000 },
-  hr: { salary: 2600, hireCost: 2200 },
-  legal: { salary: 4200, hireCost: 5000 },
-  data: { salary: 3200, hireCost: 2800 },
-  product: { salary: 3400, hireCost: 3000 },
-  executive: { salary: 5000, hireCost: 6000 },
-};
 
 export const stageOverhead: Record<Stage, number> = {
   garage: 500,
@@ -30,7 +22,7 @@ export const calcBurn = (state: GameState): number => {
   const teamBurn = (Object.keys(state.team) as TeamRole[]).reduce(
     (acc, role) => acc + state.team[role] * roleComp[role].salary,
     0
-  );
+  ) + payrollDelta(state); // what named people are paid above or below standard (0 without a roster)
   const assetOverheadReduction = state.assets.reduce((acc, a) => {
     const def = ASSET_CATALOG[a.id];
     return acc + (def?.effects.overheadReduction ?? 0);
@@ -92,6 +84,10 @@ export const AP_COSTS: Record<string, number> = {
   "raise-vc": 2,
   "raise-bootstrap": 1,
   buy: 1,
+  recruit: 1,
+  fire: 1,
+  retain: 1,
+  build: 1,
 };
 
 /** Base AP + philosopher bonus + stage perk bonus. */

@@ -1,5 +1,7 @@
 import type { GameState } from "../../types/game";
 import { getEffectiveMaxAp, calcNetBurn } from "../../engine/economy";
+import { playSound } from "../../audio/engine";
+import { SoundMenu } from "./SoundMenu";
 
 interface HudBarProps {
   state: GameState;
@@ -8,7 +10,31 @@ interface HudBarProps {
   statsOpen?: boolean;
   onToggleLeaderboard?: () => void;
   onRestart?: () => void;
+  /** Shows the "3D" toggle when provided. */
+  onToggleWorld?: () => void;
+  worldEnabled?: boolean;
 }
+
+/** Shows / hides the 3D world. Lives next to Stats: both toggle a view, neither changes the game. */
+const WorldToggle = ({ enabled, onToggle }: { enabled: boolean; onToggle: () => void }) => (
+  <button
+    type="button"
+    onClick={() => {
+      playSound(enabled ? "ui-toggle-off" : "ui-toggle-on");
+      onToggle();
+    }}
+    aria-pressed={enabled}
+    aria-label="3D view"
+    className={
+      enabled
+        ? "rounded-lg bg-neon/10 px-2 py-1 text-[0.65rem] font-semibold text-neon"
+        : "rounded-lg bg-steel/30 px-2 py-1 text-[0.65rem] text-mist/80 hover:bg-steel/50"
+    }
+    title={enabled ? "Hide the 3D office" : "Show the 3D office"}
+  >
+    3D
+  </button>
+);
 
 const fmt = (v: number) => `$${v.toLocaleString()}`;
 
@@ -29,6 +55,8 @@ export const HudBar = ({
   statsOpen = false,
   onToggleLeaderboard,
   onRestart,
+  onToggleWorld,
+  worldEnabled = false,
 }: HudBarProps) => {
   const netBurn = calcNetBurn(state);
   const profitable = netBurn <= 0;
@@ -95,6 +123,8 @@ export const HudBar = ({
               Ranks
             </button>
           ) : null}
+          {onToggleWorld ? <WorldToggle enabled={worldEnabled} onToggle={onToggleWorld} /> : null}
+          <SoundMenu />
         </div>
       </div>
     );
@@ -196,6 +226,8 @@ export const HudBar = ({
             Stats
           </button>
         ) : null}
+        {onToggleWorld ? <WorldToggle enabled={worldEnabled} onToggle={onToggleWorld} /> : null}
+        <SoundMenu />
       </div>
     </div>
   );

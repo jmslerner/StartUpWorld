@@ -4,10 +4,13 @@ import { generateEndingSummary, type EndingSummary } from "../../engine/endingSu
 import { generateEpitaph } from "../../engine/epitaphs";
 import { submitScore, submitGraveyardEntry } from "../../api/client";
 import { LeaderboardOverlay } from "./LeaderboardOverlay";
+import { listBuilds, productSummary } from "../../engine/projects";
 
 interface GameOverCardProps {
   state: GameState;
   onPlayAgain: () => void;
+  /** Offer "View office": put the card aside (it stays mounted, keeping the name form) to watch the 3D ending. */
+  canPeek?: boolean;
 }
 
 const NAME_STORAGE_KEY = "startupworld:playerName";
@@ -15,10 +18,12 @@ const MAX_NAME_LENGTH = 32;
 
 const fmt = (v: number): string => v.toLocaleString();
 const fmtUsd = (v: number): string => {
+  // A bankrupt run ends below zero: "-$5.1M", not "$-5064494".
+  if (v < 0) return `-${fmtUsd(-v)}`;
   if (v >= 1_000_000_000) return `$${(v / 1_000_000_000).toFixed(1)}B`;
   if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(1)}M`;
   if (v >= 1_000) return `$${(v / 1_000).toFixed(0)}K`;
-  return `$${v}`;
+  return `$${Math.round(v)}`;
 };
 
 const accentColor: Record<EndingType, string> = {
@@ -67,13 +72,14 @@ const storeName = (name: string): void => {
 
 type SubmitStatus = "idle" | "submitting" | "done";
 
-export const GameOverCard = ({ state, onPlayAgain }: GameOverCardProps) => {
+export const GameOverCard = ({ state, onPlayAgain, canPeek = false }: GameOverCardProps) => {
   const summary: EndingSummary | null = generateEndingSummary(state);
   const [name, setName] = useState(() => readStoredName() ?? state.founder.name ?? "");
   const [status, setStatus] = useState<SubmitStatus>("idle");
   const [rank, setRank] = useState<number | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
+  const [peeking, setPeeking] = useState(false);
   // Guards against a double-click landing before the disabled state renders.
   const submittingRef = useRef(false);
 
@@ -119,14 +125,37 @@ export const GameOverCard = ({ state, onPlayAgain }: GameOverCardProps) => {
   if (!summary) return null;
 
   const accent = accentColor[summary.ending];
+  // Product slices are optional (a legacy save has none): both views return empty data then.
+  const product = productSummary(state);
+  const unfinished = listBuilds(state);
+  const best = product.recent.reduce<(typeof product.recent)[number] | null>(
+    (top, r) => (top === null || r.reception > top.reception ? r : top),
+    null,
+  );
 
   if (showLeaderboard) {
     return <LeaderboardOverlay onClose={() => setShowLeaderboard(false)} currentSeed={state.seed} />;
   }
 
+  const peek = canPeek && peeking;
+
   return (
-    <div className="fixed inset-0 z-30 flex items-center justify-center bg-black/80 px-4">
-      <div className={`panel-surface w-full max-w-lg rounded-xl border-l-2 px-5 py-5 ${accent}`}>
+    <>
+    {peek ? (
+      // Bottom right on wide screens, where the log's left-aligned lines rarely reach.
+      <div className="pointer-events-none fixed inset-x-0 bottom-4 z-30 flex justify-center px-4 md:justify-end md:px-8">
+        <button
+          type="button"
+          onClick={() => setPeeking(false)}
+          className={`pointer-events-auto panel-surface rounded-full border px-4 py-2 text-xs font-semibold shadow-lg transition hover:bg-white/10 ${accent}`}
+        >
+          {endingLabel[summary.ending]} · Show results
+        </button>
+      </div>
+    ) : null}
+    {/* Scrolls when the window is shorter than the card; m-auto centres it otherwise. */}
+    <div className={`fixed inset-0 z-30 overflow-y-auto bg-black/80 p-4 ${peek ? "hidden" : "flex"}`}>
+      <div className={`panel-surface m-auto w-full max-w-lg rounded-xl border-l-2 px-5 py-5 ${accent}`}>
         {/* Header */}
         <div className="mb-1 text-[0.6rem] font-semibold uppercase tracking-widest opacity-70">
           Game Over
@@ -173,7 +202,29 @@ export const GameOverCard = ({ state, onPlayAgain }: GameOverCardProps) => {
           <Stat label="Ownership" value={`${summary.stats.founderOwnership}%`} />
           <Stat label="Total Raised" value={fmtUsd(summary.stats.totalRaised)} />
           <Stat label="Team Size" value={String(summary.stats.teamSize)} />
+          {product.shippedCount > 0 ? <Stat label="Releases" value={String(product.shippedCount)} /> : null}
         </div>
+
+        {/* Builds: the best release on file, and whatever was still on the whiteboard when the run ended. */}
+        {best || unfinished.length > 0 ? (
+          <div className="mb-4 space-y-1 text-xs leading-relaxed text-mist/70">
+            {best ? (
+              <div>
+                Best release: <span className="text-slate-100/90">{best.name}</span>, week {best.week},{" "}
+                {best.reception} {best.tier.toUpperCase()}.
+              </div>
+            ) : null}
+            {unfinished.length > 0 ? (
+              <div>
+                Left on the whiteboard:{" "}
+                <span className="text-slate-100/90">
+                  {unfinished.map((b) => `${b.name} (${b.pct}%)`).join(", ")}
+                </span>
+                . {unfinished.length === 1 ? "It lives" : "They live"} on the roadmap slide now. Forever.
+              </div>
+            ) : null}
+          </div>
+        ) : null}
 
         {/* Achievements */}
         {summary.achievements.length > 0 && (
@@ -240,8 +291,8 @@ export const GameOverCard = ({ state, onPlayAgain }: GameOverCardProps) => {
           )}
         </div>
 
-        {/* Buttons */}
-        <div className="flex gap-2">
+        {/* Buttons ("View office" takes its own row on phones rather than squeezing the others onto two lines) */}
+        <div className="flex flex-wrap gap-2 whitespace-nowrap">
           <button
             onClick={onPlayAgain}
             className="flex-1 rounded bg-neon/10 px-4 py-2 text-sm font-medium text-neon transition hover:bg-neon/20"
@@ -254,9 +305,19 @@ export const GameOverCard = ({ state, onPlayAgain }: GameOverCardProps) => {
           >
             Leaderboard
           </button>
+          {canPeek ? (
+            <button
+              type="button"
+              onClick={() => setPeeking(true)}
+              className="w-full rounded bg-steel/30 px-4 py-2 text-sm font-medium text-mist/80 transition hover:bg-steel/50 sm:w-auto"
+            >
+              View office
+            </button>
+          ) : null}
         </div>
       </div>
     </div>
+    </>
   );
 };
 
