@@ -8,9 +8,10 @@ import { useGameStore } from './state/useGameStore.ts'
 
 const path = window.location.pathname;
 
-// Dev-only sandboxes for the 3D world (stripped from production builds).
+// Dev-only sandboxes for the 3D world and the audio lab (stripped from production builds).
 const WorldPreview = import.meta.env.DEV ? lazy(() => import('./world/dev/WorldPreview.tsx')) : null;
 const PropGallery = import.meta.env.DEV ? lazy(() => import('./world/dev/PropGallery.tsx')) : null;
+const AudioLab = import.meta.env.DEV ? lazy(() => import('./audio/dev/AudioLab.tsx')) : null;
 
 const Root =
   path === '/leaderboard'
@@ -19,7 +20,9 @@ const Root =
       ? WorldPreview
       : path === '/world-gallery' && PropGallery
         ? PropGallery
-        : App;
+        : path === '/audio-lab' && AudioLab
+          ? AudioLab
+          : App;
 
 // A crash in the game offers "new game", which wipes the saved run. The leaderboard
 // page and the dev sandboxes never touch the save, so a crash there only reloads.

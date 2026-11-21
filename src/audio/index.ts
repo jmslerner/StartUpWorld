@@ -58,16 +58,12 @@
  *   Self-contained popover (mute, master, ambience, music toggle); drop it into the HUD bar's button group.
  *   For custom UI: `audioSettings` + `useSyncExternalStore(audioSettings.subscribe, audioSettings.get)`.
  *
- * ── 4. The terminal's typing clicks (MERGE STEP — do this when merging) ───────
- *   src/ui/terminal/TerminalInput.tsx builds its OWN AudioContext for key clicks and connects
- *   straight to the speakers, so the Sound menu's mute and Master fader do not reach the most
- *   frequent sound in the game, and the app runs two contexts. Replace its private synth
- *   (createNoiseBuffer, the AudioContext ref, ensureContext and the body of play) with:
- *       import { playSound } from "../../audio";
- *       const useTypingSound = () => ({ play: () => { playSound("ui-key"); } });
- *   keeping its existing "startupworld:sfx:typing" toggle and shouldSoundForKey filter. ui-key
- *   has its own 18 ms retrigger limit, so the manual throttle can go. Afterwards exactly one
- *   `new AudioContext` exists in src (engine.ts). See SOUND-INTEGRATION.md for the full diff.
+ * ── 4. The terminal's typing clicks (wired) ─────────────────────────────────
+ *   src/ui/terminal/TerminalInput.tsx plays `playSound("ui-key")` on this engine (its own
+ *   "startupworld:sfx:typing" toggle and shouldSoundForKey filter still apply), so the Sound
+ *   menu's mute and Master fader reach the most frequent sound in the game, and the app runs a
+ *   single AudioContext: engine.ts is the only place in src/ that constructs one (plus the
+ *   lab's offline / sink-less renders under dev/).
  *
  * ── 5. Anything else ─────────────────────────────────────────────────────────
  *   playSound("positive-small");                   // one-off sounds on the shared engine (never throws)

@@ -1,6 +1,7 @@
 import { forwardRef, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Tooltip } from "../components/Tooltip";
 import { SFX } from "../sound";
+import { playSound } from "../../audio/engine";
 import { useUiStore } from "../../state/useUiStore";
 
 const INPUT_MAX_CHARS = 160;
@@ -96,20 +97,6 @@ const commandTooltips: Record<string, string> = {
   assets: "List owned company assets",
 };
 
-const canUseAudio = () => typeof window !== "undefined" && ("AudioContext" in window || "webkitAudioContext" in window);
-
-const createNoiseBuffer = (ctx: AudioContext) => {
-  const durationSeconds = 0.018;
-  const length = Math.max(1, Math.floor(ctx.sampleRate * durationSeconds));
-  const buffer = ctx.createBuffer(1, length, ctx.sampleRate);
-  const data = buffer.getChannelData(0);
-  for (let i = 0; i < length; i += 1) {
-    // Softened noise (more "key" than "hiss")
-    data[i] = (Math.random() * 2 - 1) * 0.35;
-  }
-  return buffer;
-};
-
 const shouldSoundForKey = (event: React.KeyboardEvent<HTMLInputElement>) => {
   if (event.ctrlKey || event.metaKey || event.altKey) return false;
   if (event.key === "Enter" || event.key === "Escape" || event.key === "Tab") return false;
@@ -117,63 +104,14 @@ const shouldSoundForKey = (event: React.KeyboardEvent<HTMLInputElement>) => {
   return event.key.length === 1;
 };
 
-const useTypingSound = () => {
-  const audioCtxRef = useRef<AudioContext | null>(null);
-  const noiseRef = useRef<AudioBuffer | null>(null);
-  const lastPlayMsRef = useRef(0);
-
-  const ensureContext = async () => {
-    if (!canUseAudio()) return null;
-    if (!audioCtxRef.current) {
-      const Ctx = (window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext) as typeof AudioContext;
-      audioCtxRef.current = new Ctx();
-    }
-    const ctx = audioCtxRef.current;
-    if (ctx.state === "suspended") {
-      try {
-        await ctx.resume();
-      } catch {
-        // Ignore (browser may block); we just won't play.
-      }
-    }
-    if (!noiseRef.current) noiseRef.current = createNoiseBuffer(ctx);
-    return ctx;
-  };
-
-  const play = async () => {
-    const now = performance.now();
-    if (now - lastPlayMsRef.current < 18) return;
-    lastPlayMsRef.current = now;
-
-    const ctx = await ensureContext();
-    if (!ctx || ctx.state !== "running" || !noiseRef.current) return;
-
-    const source = ctx.createBufferSource();
-    source.buffer = noiseRef.current;
-
-    const gain = ctx.createGain();
-    const filter = ctx.createBiquadFilter();
-    filter.type = "highpass";
-    filter.frequency.value = 900 + Math.random() * 400;
-
-    // Gentle envelope to avoid clicks.
-    const t0 = ctx.currentTime;
-    const base = 0.0001;
-    const peak = 0.05 + Math.random() * 0.02;
-    gain.gain.setValueAtTime(base, t0);
-    gain.gain.exponentialRampToValueAtTime(peak, t0 + 0.004);
-    gain.gain.exponentialRampToValueAtTime(base, t0 + 0.03);
-
-    source.connect(filter);
-    filter.connect(gain);
-    gain.connect(ctx.destination);
-
-    source.start(t0);
-    source.stop(t0 + 0.035);
-  };
-
-  return { play };
-};
+// Typing clicks play on the shared audio engine (ui bus), so they follow the Sound menu's mute
+// and Master fader and the legacy "startupworld:sfx:master" flag. ui-key has its own 18 ms
+// retrigger limit, so the keydown and the change event of one key press sound once.
+const useTypingSound = () => ({
+  play: () => {
+    playSound("ui-key");
+  },
+});
 
 interface TerminalInputProps {
   onSubmit: (value: string) => void;
@@ -231,6 +169,8 @@ export const TerminalInput = forwardRef<HTMLInputElement, TerminalInputProps>(
       useUiStore.subscribe((state, previous) => {
         const request = state.prefill;
         if (!request || request === previous.prefill) return;
+        // "Your turn to type": the command is in the terminal, waiting to be finished.
+        playSound("ui-prefill");
         const text = request.text.slice(0, INPUT_MAX_CHARS);
         setValue(text);
         lastValueRef.current = text;
@@ -625,13 +565,13 @@ export const TerminalInput = forwardRef<HTMLInputElement, TerminalInputProps>(
           }
           if (!shouldSoundForKey(event)) return;
           if (!sfxEnabled) return;
-          void play();
+          play();
         }}
           onChange={(event) => {
             const next = event.target.value.slice(0, INPUT_MAX_CHARS);
           // Mobile keyboards may not fire keydown reliably; play when text actually changes.
           if (next !== lastValueRef.current) {
-            if (sfxEnabled) void play();
+            if (sfxEnabled) play();
           }
           lastValueRef.current = next;
           setValue(next);
