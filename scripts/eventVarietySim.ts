@@ -3,6 +3,10 @@ import { executeCommand } from "../src/engine/commands";
 import { refreshDerivedNoLog } from "../src/engine/derived";
 import { STAGE_VALUATION_FLOOR } from "../src/engine/valuation";
 import type { CofounderArchetype, EventHistoryEntry, FounderArchetype, GameState } from "../src/types/game";
+import { tycoonEvents } from "../src/engine/events/tycoonPool";
+import { mulberry } from "../src/engine/__golden__/legacyBots";
+import { ALL_BOTS, newTally, playWeek as playBotWeek } from "./tycoon/bots";
+import type { BotKind } from "./tycoon/bots";
 
 const EVENT_COOLDOWN_WEEKS = 7;
 
@@ -105,8 +109,12 @@ const playWeek = (state: GameState): GameState => {
   return s;
 };
 
-const runOne = (seed: number, founder: FounderArchetype, cofounder: CofounderArchetype, maxWeeks: number): GameState => {
+const runOne = (seed: number, founder: FounderArchetype, cofounder: CofounderArchetype, maxWeeks: number, bot: BotKind | null): GameState => {
   let s = mkSeededInitial(seed);
+  // `bot=<kind>` plays one of the tycoon harness bots (scripts/tycoon/bots.ts) instead of the legacy policy below,
+  // so engaged play can be checked too (the tycoon events can only fire once something was built).
+  const tally = newTally();
+  const r = mulberry(seed ^ 0x51ed270b);
 
   // Setup.
   s = safeCmd(s, "name Sim");
@@ -116,7 +124,7 @@ const runOne = (seed: number, founder: FounderArchetype, cofounder: CofounderArc
 
   for (let w = 0; w < maxWeeks; w++) {
     if (s.gameOver) break;
-    s = playWeek(s);
+    s = bot ? playBotWeek(s, bot, tally, r) : playWeek(s);
   }
 
   return s;
@@ -173,6 +181,9 @@ const main = () => {
 
   const founder = (args.get("founder") as FounderArchetype | undefined) ?? "hacker";
   const cofounder = (args.get("cofounder") as CofounderArchetype | undefined) ?? "operator";
+  const botArg = args.get("bot") ?? null;
+  if (botArg !== null && !ALL_BOTS.includes(botArg as BotKind)) throw new Error(`bot must be one of ${ALL_BOTS.join(", ")}`);
+  const bot = botArg as BotKind | null;
 
   if (!Number.isFinite(runs) || runs <= 0) throw new Error("runs must be a positive number");
   if (!Number.isFinite(weeks) || weeks <= 0) throw new Error("weeks must be a positive number");
@@ -181,10 +192,12 @@ const main = () => {
   let totalEvents = 0;
   let repeatWithinCooldown = 0;
   let minGap: number | null = null;
+  let weeksPlayed = 0;
 
   for (let i = 0; i < runs; i++) {
     const seed = (seed0 + i) >>> 0;
-    const s = runOne(seed, founder, cofounder, weeks);
+    const s = runOne(seed, founder, cofounder, weeks, bot);
+    weeksPlayed += s.week - 1;
     totalEvents += s.eventHistory.length;
     allIds.push(...s.eventHistory.map((h) => h.id));
 
@@ -196,7 +209,7 @@ const main = () => {
   const counts = countBy(allIds);
   const top = topN(counts, 12);
 
-  console.log(`\n=== Event Variety Sim (${founder} + ${cofounder}) ===`);
+  console.log(`\n=== Event Variety Sim (${founder} + ${cofounder}${bot ? `, ${bot} bot` : ""}) ===`);
   console.log(`runs=${runs} weeks=${weeks} (seed start=${seed0})`);
   console.log(`events fired: ${totalEvents} | unique events: ${counts.size}`);
   console.log(
@@ -230,6 +243,12 @@ const main = () => {
 
   console.log("\nNew-event sightings:");
   for (const id of newIds) console.log(`- ${id}: ${counts.get(id) ?? 0}`);
+
+  // Tycoon events (TYCOON-SPEC §7.2): never in a legacy run; rare seasoning (about one per ~140 engaged weeks) otherwise.
+  const tycoonIds = tycoonEvents.map((e) => e.id);
+  const tycoonFired = tycoonIds.reduce((a, id) => a + (counts.get(id) ?? 0), 0);
+  console.log(`\nTycoon-event sightings (${weeksPlayed} weeks played; ${tycoonFired} of ${totalEvents} events = ${totalEvents ? ((100 * tycoonFired) / totalEvents).toFixed(1) : "0.0"}%, one per ${tycoonFired ? Math.round(weeksPlayed / tycoonFired) : "-"} weeks):`);
+  for (const id of tycoonIds) console.log(`- ${id}: ${counts.get(id) ?? 0}`);
 };
 
 main();

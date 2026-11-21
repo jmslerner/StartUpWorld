@@ -2,6 +2,8 @@ import type { CompanyPhase, GameState } from "../types/game";
 import type { EngineContext } from "./context";
 import { PRICING_MODELS } from "./pricing";
 import { ASSET_CATALOG } from "./assets";
+import { peopleHints } from "./people";
+import { projectHints } from "./projects";
 
 export interface Hint {
   text: string;
@@ -94,6 +96,9 @@ export const generateHints = (state: GameState, ctx: EngineContext): Hint[] => {
   if (assetMaintenance > 0 && state.burn > 0 && assetMaintenance > state.burn * 0.3) {
     hints.push({ text: "Warning: Asset maintenance is consuming over 30% of your burn. Flashy purchases have consequences.", priority: 6 });
   }
+
+  // Tycoon hints: both lists are empty until the player has engaged (TYCOON-SPEC §7.1), so legacy runs keep today's hint.
+  hints.push(...peopleHints(state), ...projectHints(state));
 
   return hints.sort((a, b) => b.priority - a.priority);
 };

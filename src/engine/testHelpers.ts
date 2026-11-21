@@ -2,8 +2,9 @@
  * Shared test fixtures for engine unit tests.
  * NOT imported by production code.
  */
-import type { GameState } from "../types/game";
+import type { Build, Employee, GameState } from "../types/game";
 import type { EngineContext } from "./context";
+import { reconcileRoster, withSlices } from "./tycoon/roster";
 
 const defaultTeam = (): GameState["team"] => ({
   engineering: 1,
@@ -75,5 +76,57 @@ export const makeCtx = (overrides?: Partial<EngineContext>): EngineContext => ({
   cac: 30,
   ltvCacRatio: 4.0,
   profitable: false,
+  ...overrides,
+});
+
+// ── Tycoon fixtures (new exports only: makeState() itself stays slice-less, the legacy mode) ──
+
+/** makeState() plus both tycoon slices and a job-ad roster matching `team` (TYCOON-SPEC §12). */
+export const makeTycoonState = (overrides?: Partial<GameState>): GameState => reconcileRoster(withSlices(makeState(overrides)));
+
+/** A 3/3 standard engineer, id e1, energy 100, standard salary, not engaged, on the day job. */
+export const makeEmployee = (overrides?: Partial<Employee>): Employee => ({
+  id: "e1",
+  name: "Mei Kowalski",
+  role: "engineering",
+  pace: 3,
+  craft: 3,
+  quirk: null,
+  salary: 3500,
+  energy: 100,
+  hiredWeek: 1,
+  shipped: 0,
+  buildId: null,
+  joinedWeek: 0,
+  engaged: false,
+  offerDueWeek: 0,
+  offerKind: null,
+  leadOnNotice: null,
+  retainedWeek: 0,
+  ledWeek: 0,
+  ...overrides,
+});
+
+/** A Feature M called Atlas (b1, slug `atlas`), kicked off in week 1, nothing built yet. */
+export const makeBuild = (overrides?: Partial<Build>): Build => ({
+  id: "b1",
+  name: "Atlas",
+  slug: "atlas",
+  type: "feature",
+  size: "m",
+  units: 2.5,
+  baseScope: 12,
+  scope: 12,
+  progress: 0,
+  qSum: 0,
+  qPts: 0,
+  polish: 0,
+  surprises: 0,
+  crunch: false,
+  crunchWeeks: 0,
+  crunchedWeek: 0,
+  startedWeek: 1,
+  dueWeek: 6,
+  readyWeek: 0,
   ...overrides,
 });

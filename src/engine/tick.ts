@@ -17,6 +17,9 @@ import { ASSET_CATALOG } from "./assets";
 import { evaluateEndings } from "./endings";
 import { calcValuation } from "./valuation";
 import { generateHints } from "./hints";
+import { effTeam, reconcileRoster } from "./tycoon/roster";
+import { adjustChurn, runProjectsWeek } from "./projects";
+import { runPeopleWeek } from "./people";
 
 // ── Growth / churn rate constants ──
 const BASE_GROWTH = 0.015;
@@ -52,13 +55,16 @@ const CHURN_CLAMP_MIN = 0.01;
 const CHURN_CLAMP_MAX = 0.18;
 
 const growthRates = (state: GameState) => {
-  const eng = state.team.engineering;
-  const design = state.team.design;
-  const mkt = state.team.marketing;
-  const sales = state.team.sales;
-  const ops = state.team.ops;
+  // Output terms read effective FTEs, with the day-job share of people on a build (TYCOON-SPEC §5.1).
+  // `effTeam` returns `state.team` itself without a roster, so a legacy state sees exactly today's operands.
+  const eff = effTeam(state, true);
+  const eng = eff.engineering;
+  const mkt = eff.marketing;
+  const sales = eff.sales;
+  const ops = eff.ops;
+  const legal = eff.legal;
+  // Drags and org ratios read bodies.
   const hr = state.team.hr;
-  const legal = state.team.legal;
 
   const rep = clamp(state.reputation / 100, 0, 1);
   const morale = clamp(state.culture.morale / 100, 0, 1);
@@ -66,13 +72,13 @@ const growthRates = (state: GameState) => {
   const stress = clamp(state.stress / 100, 0, 1);
 
   // If GTM outpaces execution, you leak churn and miss growth.
-  const execCapacity = eng + design + ops;
-  const gtm = mkt + sales;
+  const execCapacity = state.team.engineering + state.team.design + state.team.ops;
+  const gtm = state.team.marketing + state.team.sales;
   const execGap = Math.max(0, gtm - execCapacity);
   const imbalanceGrowthPenalty = Math.min(IMBALANCE_GROWTH_CAP, execGap * IMBALANCE_GROWTH_PER_HEAD);
   const imbalanceChurnPenalty = Math.min(IMBALANCE_CHURN_CAP, execGap * IMBALANCE_CHURN_PER_HEAD);
 
-  const data = state.team.data;
+  const data = eff.data;
 
   // Baseline growth and churn; dramatic but bounded.
   const baseGrowth =
@@ -121,7 +127,8 @@ export const endWeekTick = (state: GameState): { state: GameState; logs: string[
   }
 
   const logs: string[] = [];
-  const pre = state;
+  // N0: defensive reconcile, for callers that bypass executeCommand (a no-op after any command).
+  const pre = reconcileRoster(state);
   const mods = founderMods[pre.founder.archetype!];
 
   // Capture hires made during the week that’s ending.
@@ -157,7 +164,8 @@ export const endWeekTick = (state: GameState): { state: GameState; logs: string[
   const CHURN_APPLIED_MIN = 0.006;
   const CHURN_APPLIED_MAX = 0.35;
   const growth = clamp(rates.growth * (1 + swingFat * vol * GROWTH_SWING_SCALE * swingAmp), GROWTH_APPLIED_MIN, GROWTH_APPLIED_MAX);
-  const churnRate = clamp(rates.churn * (1 + (-swingFat) * vol * CHURN_SWING_SCALE * swingAmp), CHURN_APPLIED_MIN, CHURN_APPLIED_MAX);
+  // Cruft and moat act before today's clamp; adjustChurn returns its argument unchanged when both are 0.
+  const churnRate = clamp(adjustChurn(s, rates.churn * (1 + (-swingFat) * vol * CHURN_SWING_SCALE * swingAmp)), CHURN_APPLIED_MIN, CHURN_APPLIED_MAX);
 
   const grossAdds = Math.round(s.users * Math.max(0, growth));
   const churn = Math.round(s.users * churnRate);
@@ -165,7 +173,7 @@ export const endWeekTick = (state: GameState): { state: GameState; logs: string[
   const nextUsers = Math.max(0, s.users + grossAdds - churn);
   const nextMrr = Math.max(0, Math.round(nextUsers * s.arpu));
 
-  const next: GameState = {
+  const nextBase: GameState = {
     ...s,
     week: s.week + 1,
     ap: getEffectiveMaxAp(s),
@@ -180,6 +188,13 @@ export const endWeekTick = (state: GameState): { state: GameState; logs: string[
       teamSize: computeTeamSize(pre),
     },
   };
+
+  // Tycoon steps N1-N3 (TYCOON-SPEC §6): the work week (state.week is already the new week; the week worked is
+  // week - 1), then the people week (departures, energy, notices), then the roster invariant. All three return their
+  // input untouched when there are no builds and nobody is engaged, which is every legacy run.
+  const work = runProjectsWeek(nextBase);
+  const upkeep = runPeopleWeek(work.state);
+  const next: GameState = reconcileRoster(upkeep.state);
 
   // Compute context based on new state vs lastWeek.
   const ctx0 = computeContext(next);
@@ -245,6 +260,10 @@ export const endWeekTick = (state: GameState): { state: GameState; logs: string[
   }
   logs.push(`Users +${grossAdds} / -${churn} → ${nextUsers}. MRR $${nextMrr.toLocaleString()}.`);
 
+  // Build lines are rendered from the finished tick (after stress, culture, volatility and departures), so their
+  // forecasts equal what `build` prints right after; then the people lines.
+  logs.push(...work.render(s2), ...upkeep.logs);
+
   if (prog.logs.length) {
     logs.push(...prog.logs);
   }
@@ -297,5 +316,6 @@ export const endWeekTick = (state: GameState): { state: GameState; logs: string[
     }
   }
 
-  return { state: s2, logs };
+  // N4: belt and braces, for anything an event or ending path wrote.
+  return { state: reconcileRoster(s2), logs };
 };

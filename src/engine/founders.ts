@@ -60,6 +60,10 @@ export const isFounderChosen = (state: GameState): boolean => state.founder.arch
 
 export const isCofounderChosen = (state: GameState): boolean => state.cofounder.archetype !== null;
 
+/** Name, company, founder and cofounder are all set: the run (and its seed) is locked in. (Moved here from commands.ts.) */
+export const isSetupComplete = (state: GameState): boolean =>
+  Boolean(state.founder.name.trim() && state.companyName.trim() && state.founder.archetype && state.cofounder.archetype);
+
 export const setFounder = (state: GameState, archetype: FounderArchetype): GameState => ({
   ...state,
   founder: { ...state.founder, archetype },
