@@ -1,6 +1,9 @@
-import type { GameState } from "../types/game";
+import type { GameState, TeamRole } from "../types/game";
 import { calcRunwayWeeks, calcNetBurn, roleComp } from "./economy";
 import { clamp } from "./utils";
+import { payrollDelta } from "./tycoon/roster";
+
+const GTM_ROLES: TeamRole[] = ["marketing", "sales"];
 
 export interface EngineContext {
   runwayWeeks: number;
@@ -39,7 +42,8 @@ export const computeContext = (state: GameState): EngineContext => {
   const ltv = state.arpu * avgLifetimeMonths;
 
   // CAC = monthly GTM spend / monthly new users
-  const gtmWeeklyCost = state.team.marketing * roleComp.marketing.salary + state.team.sales * roleComp.sales.salary;
+  const gtmWeeklyCost =
+    state.team.marketing * roleComp.marketing.salary + state.team.sales * roleComp.sales.salary + payrollDelta(state, GTM_ROLES);
   const grossAdds = Math.max(0, state.users - state.lastWeek.users + Math.round(state.lastWeek.users * grossChurnRate));
   const monthlyAdds = Math.max(1, grossAdds * 4.33);
   const monthlyCost = gtmWeeklyCost * 4.33;

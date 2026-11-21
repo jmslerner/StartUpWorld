@@ -2,6 +2,7 @@ import type { GameState } from "../../types/game";
 import { clamp } from "../utils";
 import { impactMultiplier } from "../volatility";
 import type { EventDef } from "./types";
+import { tycoonEvents } from "./tycoonPool";
 
 const scaleEventDelta = (s: GameState, delta: number): number => {
   const m = impactMultiplier(s.volatility);
@@ -2559,4 +2560,8 @@ export const eventPool: EventDef[] = [
       },
     ],
   },
+
+  // Tycoon events come last, so the order (and the weighted pick) of everything above is unchanged.
+  // Every `when` is false until the player has engaged with builds (TYCOON-SPEC §7.2).
+  ...tycoonEvents,
 ];

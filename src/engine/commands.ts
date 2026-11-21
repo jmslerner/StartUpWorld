@@ -1,4 +1,4 @@
-import type { ActionResult, GameState, LogEntry, PricingModel, Stage, TeamRole } from "../types/game";
+import type { ActionResult, GameState, LogEntry, PricingModel, Stage } from "../types/game";
 import { toLog, parseAmount } from "./utils";
 import {
   choose,
@@ -26,29 +26,16 @@ import {
   listAssets,
 } from "./actions";
 import { STAGE_PERKS, ROLE_MIN_STAGE } from "./stagePerks";
+import { isSetupComplete } from "./founders";
+import { refreshDerivedNoLog } from "./derived";
+import { roleAliases } from "./tycoon/comp";
+import { reply } from "./tycoon/kit";
+import { reconcileRoster } from "./tycoon/roster";
+import { peopleCommand } from "./people";
+import { projectsCommand, shipRoute } from "./projects";
 
-const roleMap: Record<string, TeamRole> = {
-  engineering: "engineering",
-  eng: "engineering",
-  design: "design",
-  ux: "design",
-  marketing: "marketing",
-  gtm: "marketing",
-  sales: "sales",
-  ae: "sales",
-  ops: "ops",
-  operations: "ops",
-  hr: "hr",
-  legal: "legal",
-  lawyer: "legal",
-  data: "data",
-  analytics: "data",
-  product: "product",
-  pm: "product",
-  executive: "executive",
-  exec: "executive",
-  vp: "executive",
-};
+// Role tokens moved to tycoon/comp.ts so every module parses roles the same way.
+const roleMap = roleAliases;
 
 const founderOptions = ["visionary", "hacker", "sales-animal", "philosopher"] as const;
 type FounderToken = (typeof founderOptions)[number];
@@ -56,7 +43,8 @@ type FounderToken = (typeof founderOptions)[number];
 const cofounderOptions = ["operator", "builder", "rainmaker", "powderkeg"] as const;
 type CofounderToken = (typeof cofounderOptions)[number];
 
-const allowDuringPending = new Set(["choose", "status", "help", "seed", "name", "company", "cofounder"]);
+// The tycoon listings are read-only; every state-changing path behind them refuses a pending event itself (ensurePlayable).
+const allowDuringPending = new Set(["choose", "status", "help", "seed", "name", "company", "cofounder", "team", "build", "project", "projects", "recruit"]);
 
 const allowBeforeName = new Set(["status", "help", "seed", "name"]);
 const allowBeforeCompany = new Set(["status", "help", "seed", "name", "company"]);
@@ -77,7 +65,15 @@ const setupHelpText: LogEntry[] = [
   toLog("hire <role> <count> - hire teammates"),
   toLog("  roles: eng, ux, marketing, sales, ops, hr, legal"),
   toLog("  unlocks: data (seed), product (series-a), executive (growth)"),
-  toLog("ship <feature> - ship a feature"),
+  toLog("ship <name> - release the build called <name>, or ship a quick patch under any other name"),
+  toLog("team [role|name] - who works here: pace, craft, energy, pay, offers"),
+  toLog("recruit <role> [n] - this week's three candidates; sign one (1 AP + hire cost)"),
+  toLog("retain <name> - bonus and a raise so they stay (1 AP); answers an outside offer"),
+  toLog("fire <name> | fire <role> <count> - let people go (1 AP, two weeks' severance each)"),
+  toLog("build - product board: builds in progress, forecasts, cruft, moat"),
+  toLog("build <type> [size] [name] - start a build (1 AP + kickoff). types: feature, growth, premium, plumbing, moonshot; sizes: s, m, l, xl"),
+  toLog("build crunch <name> [off] / build cancel <name> - push a build harder, or kill it (free)"),
+  toLog("staff <build> auto|<name|role n> / staff off <name|build> - put people on a build (free; first week is ramp-up)"),
   toLog("launch <campaign> - run a growth campaign"),
   toLog("pitch - pitch investors"),
   toLog("raise [vc <amount>|friends|cards|loan|preseed|mortgage] - funding (run `raise` for options)"),
@@ -104,7 +100,15 @@ const mainHelpText: LogEntry[] = [
   toLog("hire <role> <count> - hire teammates"),
   toLog("  roles: eng, ux, marketing, sales, ops, hr, legal"),
   toLog("  unlocks: data (seed), product (series-a), executive (growth)"),
-  toLog("ship <feature> - ship a feature"),
+  toLog("ship <name> - release the build called <name>, or ship a quick patch under any other name"),
+  toLog("team [role|name] - who works here: pace, craft, energy, pay, offers"),
+  toLog("recruit <role> [n] - this week's three candidates; sign one (1 AP + hire cost)"),
+  toLog("retain <name> - bonus and a raise so they stay (1 AP); answers an outside offer"),
+  toLog("fire <name> | fire <role> <count> - let people go (1 AP, two weeks' severance each)"),
+  toLog("build - product board: builds in progress, forecasts, cruft, moat"),
+  toLog("build <type> [size] [name] - start a build (1 AP + kickoff). types: feature, growth, premium, plumbing, moonshot; sizes: s, m, l, xl"),
+  toLog("build crunch <name> [off] / build cancel <name> - push a build harder, or kill it (free)"),
+  toLog("staff <build> auto|<name|role n> / staff off <name|build> - put people on a build (free; first week is ramp-up)"),
   toLog("launch <campaign> - run a growth campaign"),
   toLog("pitch - pitch investors"),
   toLog("raise [vc <amount>|friends|cards|loan|preseed|mortgage] - funding (run `raise` for options)"),
@@ -121,9 +125,6 @@ const mainHelpText: LogEntry[] = [
   toLog("end - end the week"),
   toLog("choose <n> - resolve a pending event choice"),
 ];
-
-const isSetupComplete = (state: GameState) =>
-  Boolean(state.founder.name.trim() && state.companyName.trim() && state.founder.archetype && state.cofounder.archetype);
 
 const STAGE_ORDER: Stage[] = ["garage", "seed", "series-a", "growth"];
 
@@ -153,6 +154,14 @@ const EASTER_EGGS: Record<string, string> = {
   vc: "A VC slides into your DMs: 'Love what you're building.' [[beat]] They say that to everyone.",
   traction: "Traction is just another word for 'please stop asking about revenue.'",
 };
+
+// Bare `fire` keeps today's joke (the `fire` key above stays, the world layer reads EASTER_EGGS) and adds usage.
+// A `reply`: it changes nothing, not even logSeq. With args, `fire` is the people module's command (TYCOON-SPEC §4.5).
+const FIRE_WITH_HR = "HR has a form for that. [[beat]] HR has a form for everything.";
+const FIRE_USAGE = "Usage: fire <name|id> | fire <role> <count>  (1 AP, two weeks' severance each)";
+
+const bareFire = (state: GameState): ActionResult =>
+  reply(state, [{ text: Math.floor(state.team.hr) >= 1 ? FIRE_WITH_HR : EASTER_EGGS.fire }, { text: FIRE_USAGE }]);
 
 const handleEasterEgg = (state: GameState, command: string): ActionResult | null => {
   const msg = EASTER_EGGS[command];
@@ -267,7 +276,8 @@ const showPerks = (state: GameState): ActionResult => {
   return { state, logs };
 };
 
-export const executeCommand = (state: GameState, input: string): ActionResult => {
+/** Today's executeCommand body, renamed. Only reached through the reconciling wrapper below. */
+const dispatchCommand = (state: GameState, input: string): ActionResult => {
   const [rawCommand, ...rest] = input.trim().split(/\s+/);
   const command = rawCommand?.toLowerCase() ?? "";
   if (!command) {
@@ -359,7 +369,19 @@ export const executeCommand = (state: GameState, input: string): ActionResult =>
       return hire(state, role, Number.isNaN(count) ? 1 : count);
     }
     case "ship":
-      return shipFeature(state, rest.join(" ").trim());
+      // A build's exact name releases it; a near-miss is refused; anything else is the patch it always was (§4.8).
+      return shipRoute(state, rest.join(" ").trim(), shipFeature);
+    case "fire":
+      return rest.length === 0 ? bareFire(state) : peopleCommand(state, command, rest);
+    case "team":
+    case "recruit":
+    case "retain":
+      return peopleCommand(state, command, rest);
+    case "build":
+    case "project":
+    case "projects":
+    case "staff":
+      return projectsCommand(state, command, rest);
     case "launch":
       return launchCampaign(state, rest.join(" ").trim());
     case "pitch":
@@ -412,6 +434,8 @@ const knownCommands = [
   "pitch", "raise", "pricing", "perks", "board", "phases",
   "restart",
   "buy", "assets", "end",
+  // Appended, so a legacy typo that ties at the same distance keeps today's suggestion.
+  "team", "recruit", "retain", "fire", "build", "staff", "project",
 ];
 
 const levenshtein = (a: string, b: string): number => {
@@ -442,4 +466,17 @@ const findClosestCommand = (input: string): string | null => {
     }
   }
   return best;
+};
+
+/**
+ * The one entry point. Reconciles the roster with `state.team` before the command (a state that arrived out of step
+ * heals itself) and after it (`hire` and event choices write `team` directly), so the headcount invariant holds between
+ * commands. Returns the dispatcher's result object untouched when neither reconcile changed anything (TYCOON-SPEC §3.4).
+ */
+export const executeCommand = (state: GameState, input: string): ActionResult => {
+  const pre = reconcileRoster(state);
+  const result = dispatchCommand(pre, input);
+  const post = reconcileRoster(result.state);
+  if (post === result.state && pre === state) return result;
+  return { ...result, state: refreshDerivedNoLog(post) };
 };
