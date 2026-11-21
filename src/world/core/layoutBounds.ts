@@ -1,11 +1,12 @@
 import type { AssetId } from "../../types/game";
-import { assetFootprint } from "../office/layouts";
+import { assetFootprint, groundRect } from "../office/layouts";
 import type { OfficeLayout } from "../types";
 import type { GroundBounds } from "./CameraRig";
 
 /**
- * The ground area covered by the building plus the given assets (several of
- * which — helipad, jet, yacht — are parked well outside the floor).
+ * The ground area covered by the diorama: the tile the building stands on
+ * (lawn, street, the neighbours' half of the loft) plus the given assets,
+ * several of which — helipad, jet, yacht — are parked beyond the tile.
  *
  * Used twice with different asset lists: pan limits include everything on show
  * (owned assets and the "for sale" blueprints), while the shadow frustum only
@@ -13,7 +14,9 @@ import type { GroundBounds } from "./CameraRig";
  * keeps the shadow map sharp.
  */
 export const layoutBounds = (layout: OfficeLayout, assets: readonly AssetId[]): GroundBounds => {
-  const bounds: GroundBounds = { ...layout.floor };
+  // The default shot may crop the tile's far corners, so the player must be able to
+  // pan to them; and the scenery standing on it (a parked car, trees) casts shadows too.
+  const bounds: GroundBounds = { ...groundRect(layout) };
   const include = (minX: number, maxX: number, minZ: number, maxZ: number): void => {
     bounds.minX = Math.min(bounds.minX, minX);
     bounds.maxX = Math.max(bounds.maxX, maxX);

@@ -1,6 +1,7 @@
-import { forwardRef, useCallback, useMemo, useRef, useState } from "react";
+import { forwardRef, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Tooltip } from "../components/Tooltip";
 import { SFX } from "../sound";
+import { useUiStore } from "../../state/useUiStore";
 
 const INPUT_MAX_CHARS = 160;
 
@@ -220,6 +221,41 @@ export const TerminalInput = forwardRef<HTMLInputElement, TerminalInputProps>(
       return next;
     });
   };
+
+  // Prefill requests ("Ship a feature…" on a card in the 3D world) arrive through
+  // the UI store. They are handled in the subscription callback rather than by
+  // mirroring the store into state from an effect, so a request is applied
+  // exactly once and typing afterwards is never overwritten by a re-render.
+  useEffect(
+    () =>
+      useUiStore.subscribe((state, previous) => {
+        const request = state.prefill;
+        if (!request || request === previous.prefill) return;
+        const text = request.text.slice(0, INPUT_MAX_CHARS);
+        setValue(text);
+        lastValueRef.current = text;
+        // A prefill starts a fresh line: leave history browsing and show suggestions for it.
+        setHistoryIndex(-1);
+        setSavedInput("");
+        setDismissedSuggestions(false);
+        setActiveSuggestionIndex(0);
+
+        const el = inputRef.current;
+        if (!el) return;
+        // Focus now, while we are still inside the click that asked for it (mobile
+        // browsers only raise the keyboard for a focus made during a user gesture)…
+        el.focus();
+        // …and move the caret once React has written the new value into the input.
+        requestAnimationFrame(() => {
+          try {
+            el.setSelectionRange(text.length, text.length);
+          } catch {
+            // Ignore: the input may have gone away.
+          }
+        });
+      }),
+    []
+  );
 
   const setRefs = useCallback(
     (el: HTMLInputElement | null) => {
@@ -629,7 +665,9 @@ export const TerminalInput = forwardRef<HTMLInputElement, TerminalInputProps>(
       </form>
 
       {showSuggestions ? (
-        <div className="panel-surface border-t-0 border-b-0 rounded-none px-1 py-1">
+        // Drops down over the log rather than pushing it: the input's height never
+        // changes, so the app shell's layout (and a short window) is unaffected.
+        <div className="terminal-scrollbar absolute inset-x-0 top-full z-30 max-h-[min(18rem,45dvh)] overflow-y-auto rounded-b-xl border border-t-0 border-white/10 bg-[#14181e] px-1 py-1 shadow-panel">
           {suggestions.map((s, idx) => {
             const active = idx === activeSuggestionIndex;
             return (

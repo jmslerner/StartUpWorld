@@ -11,19 +11,9 @@
  * Pure logic — no three.js, no DOM. Owned by the World and exposed to the systems
  * as `ctx.seating` (SeatingApi).
  */
-import type { OfficeLayout, PersonView, Placement, Seat, SeatingApi, SeatKind } from "../types";
+import type { OfficeLayout, PersonView, Placement, Seat, SeatChange, SeatingApi, SeatKind } from "../types";
 
-/** One person's move in the most recent `reconcile`. */
-export interface SeatChange {
-  personId: string;
-  /** Where they were. null = nowhere visible (a new hire, or somebody the office had no room for). */
-  from: Seat | null;
-  /**
-   * Where they are now. null = nowhere visible: they either left the company
-   * (no longer in the roster) or the new office has no room for them.
-   */
-  to: Seat | null;
-}
+export type { SeatChange } from "../types";
 
 const samePlacement = (a: Placement, b: Placement): boolean =>
   a === b || (a.x === b.x && a.z === b.z && a.facing === b.facing);

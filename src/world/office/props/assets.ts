@@ -30,10 +30,10 @@ import { ASSET_SIZES } from "../footprints";
 import { addLightPool } from "./building";
 import { drawMonitor, drawMug, drawPlant, monitorScreen } from "./parts";
 import { createScreenSurface, PropKit, screenQuads, shapeMesh } from "./shared";
-import type { Footprint, PropHandle } from "./shared";
+import type { PropFootprint, PropHandle } from "./shared";
 
 /** Ground rectangle of each asset as { w, d } (mirrors ASSET_SIZES). */
-export const ASSET_FOOTPRINTS: Record<AssetId, Footprint> = {
+export const ASSET_FOOTPRINTS: Record<AssetId, PropFootprint> = {
   "office-upgrade": { w: ASSET_SIZES["office-upgrade"].width, d: ASSET_SIZES["office-upgrade"].depth },
   lounge: { w: ASSET_SIZES.lounge.width, d: ASSET_SIZES.lounge.depth },
   helicopter: { w: ASSET_SIZES.helicopter.width, d: ASSET_SIZES.helicopter.depth },
@@ -99,7 +99,7 @@ export const createOfficeUpgradeKit = (): PropHandle => {
   kit.add(shapeMesh(bakeModel("asset:office-upgrade:strip", (b) => b.box(barW - 0.06, 0.025, 0.02, 0xffffff, barX, top - 0.09, d / 2 - 0.03, { r: 0 })), strip, false));
   kit.onGlow((amount) => screen.setGlow(amount));
 
-  const steam = glowMat(0xffffff, { opacity: 0.55 });
+  const steam = glowMat(0xffffff, { opacity: 0.7 });
   const puffs = [0, 1, 2].map(() => {
     const puff = new THREE.Mesh(unitSphere(8), steam);
     puff.scale.setScalar(0);
@@ -478,7 +478,7 @@ export const createJet = (): PropHandle => {
 // Yacht
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Company yacht afloat on its patch of water. Bow toward +Z; the jetty is on the −X side. Bobs in update(). */
+/** Company yacht afloat on its patch of water. Bow toward +Z; the jetty is on the +X side. Bobs in update(). */
 export const createYacht = (): PropHandle => {
   const { w, d } = ASSET_FOOTPRINTS.yacht;
   const kit = new PropKit("asset:yacht");
@@ -486,13 +486,13 @@ export const createYacht = (): PropHandle => {
   const water = kit.model("asset:yacht:water", (b) => {
     b.plate(roundedRect(w - 0.1, d - 0.1, 0.5), 0.06, C.waterDeep, 0, -0.02, 0);
     b.plate(roundedRect(w - 0.4, d - 0.4, 0.4), 0.012, C.water, 0, 0.04, 0);
-    // Jetty out from the −X shore.
+    // Jetty out from the +X shore (with the layouts' yacht facing, +X is the side nearest the office).
     for (const z of [-1.9, -1.3]) {
-      b.cyl(0.07, 0.5, C.trunk, -w / 2 + 0.3, -0.02, z, { seg: 8 });
-      b.cyl(0.07, 0.5, C.trunk, -1.05, -0.02, z, { seg: 8 });
+      b.cyl(0.07, 0.5, C.trunk, w / 2 - 0.3, -0.02, z, { seg: 8 });
+      b.cyl(0.07, 0.5, C.trunk, 1.05, -0.02, z, { seg: 8 });
     }
-    for (let i = 0; i < 6; i += 1) b.box(0.16, 0.04, 0.82, i % 2 ? C.oak : C.pallet, -w / 2 + 0.16 + i * 0.172, 0.4, -1.6, { r: 0.006 });
-    b.torus(0.12, 0.04, C.red, -1.1, 0.44, -1.86, { seg: 10 });
+    for (let i = 0; i < 6; i += 1) b.box(0.16, 0.04, 0.82, i % 2 ? C.oak : C.pallet, w / 2 - 0.16 - i * 0.172, 0.4, -1.6, { r: 0.006 });
+    b.torus(0.12, 0.04, C.red, 1.1, 0.44, -1.86, { seg: 10 });
   });
   water.castShadow = false;
 

@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import type { EndingType } from "../../types/game";
+import { WIN_ENDINGS } from "../outcomes";
 import type { QualityLevel, WorldEvent, WorldSnapshot, WorldSystem } from "../types";
 import type { GroundBounds } from "./CameraRig";
 import { bindLightingState, releaseLightingState, type LightingState } from "./lightingState";
@@ -72,15 +72,28 @@ const floorBrightness = (look: LightKey): number =>
 //    from the open side it floods the interior with ember light and throws
 //    long shadows onto the back wall instead.
 const MORNING = key(0xfff6ea, 1.75, [-0.28, 1, 0.52], 0xd9e8ff, 0xb5ada6, 1.3, 1.1, 0);
-const AFTERNOON = key(0xffd9a6, 1.75, [0.1, 0.8, 0.9], 0xffe4c0, 0xa8947d, 1.15, 1.0, 0.15);
-/** Ember key against a cool, much dimmer sky, so anything emissive glows. */
-const DUSK = key(0xff9d5c, 2.0, [0.3, 0.6, 1], 0x7d86b0, 0x4a4350, 0.8, 0.45, 1);
+// The afternoon sun is warm but the sky stays near white: with both warm, every
+// cool colour in the office (the carpet, the glass, half the shirts) went grey.
+const AFTERNOON = key(0xffe2b8, 1.75, [0.1, 0.8, 0.9], 0xf3eef6, 0xa8947d, 1.15, 1.0, 0.15);
+/**
+ * Ember key against a cool, dimmer sky, so anything emissive glows. The sun is
+ * kept well short of full strength and the sky fairly blue: lit faces go amber,
+ * shaded ones go blue-violet, and the office keeps its colours instead of
+ * turning one shade of terracotta.
+ */
+const DUSK = key(0xffaa78, 1.6, [0.3, 0.6, 1], 0x8e9ad8, 0x4a4350, 0.95, 0.5, 1);
 const NIGHT = key(0x7f9bd9, 0.5, [0.2, 0.9, 0.6], 0x2b3861, 0x10131c, 0.6, 0.2, 1);
 const SUNRISE = key(0xffb48a, 1.7, [-0.4, 0.36, 0.95], 0xf2c4c9, 0x6b5a60, 0.8, 0.5, 0.55);
-/** Before the company exists: a single warm bulb in a dark garage. */
-const SETUP = key(0xffb26b, 1.6, [0.15, 1, 0.45], 0x38476b, 0x12121a, 0.45, 0.1, 0.75);
+/** Before the company exists: a single warm bulb in a dark garage, with enough cool bounce to read the room. */
+const SETUP = key(0xffbd80, 1.45, [0.15, 1, 0.45], 0x4a5c8c, 0x16161f, 0.6, 0.2, 0.75);
 const WIN = key(0xffe39a, 2.2, [-0.2, 0.95, 0.6], 0xfff0c2, 0xb89b6a, 1.5, 1.1, 0);
-const LOSS = key(0x93a5c4, 0.55, [0.1, 0.9, 0.5], 0x46526b, 0x12151c, 0.5, 0.12, 0.45);
+/**
+ * Lights out: cold moonlight and a dim blue sky, with the screens and lamps
+ * glowing. Dark enough to read as the end at a glance (the floor gets well under
+ * a sixth of the morning's light), but the cool fill from the camera's side keeps
+ * the furniture and the two founders left at their desks legible.
+ */
+const LOSS = key(0x9aabcb, 0.78, [0.1, 0.9, 0.5], 0x56627e, 0x161a22, 0.62, 0.34, 0.45);
 
 const MORNING_BRIGHTNESS = floorBrightness(MORNING);
 
@@ -98,7 +111,6 @@ const LOOKS: Record<LightingLook, LightKey> = {
   loss: LOSS,
 };
 
-const WIN_ENDINGS: ReadonlySet<EndingType> = new Set<EndingType>(["ipo", "acquisition", "ai-hype-exit"]);
 
 /**
  * Cool fill from the camera's side, leaning toward +X: those faces never see

@@ -15,6 +15,7 @@ import type {
   CompanyPhase,
   EndingType,
   FounderArchetype,
+  PricingModel,
   SoundHint,
   Stage,
   TeamRole,
@@ -89,6 +90,8 @@ export interface WorldSnapshot {
   valuation: number;
   users: number;
   mrr: number;
+  /** Which of the three pricing models the company sells under (shown on the pricing board). */
+  pricingModel: PricingModel;
 
   /** All 0–100. */
   reputation: number;
@@ -102,6 +105,11 @@ export interface WorldSnapshot {
   /**
    * Founder first, cofounder second (cofounder only once chosen), then employees
    * grouped by role in canonical role order. Capped at MAX_WORLD_PEOPLE.
+   *
+   * Employees are listed even while `setupComplete` is false (the engine starts
+   * every run with one engineer). The World hides them until setup completes by
+   * seating only the founder, so systems should treat `ctx.seating.seatOf(id)`
+   * — not presence in this list — as "this person is in the office".
    */
   people: PersonView[];
   /** Employees beyond the cap that are not in `people`. */
@@ -127,7 +135,12 @@ export interface ActionSignal {
   args: string[];
   /** The engine's outcome hint for this command, if any. */
   sound: SoundHint | null;
-  /** True when the engine refused the command (error log, state unchanged) — e.g. "No AP left". */
+  /**
+   * True when the engine refused the command — e.g. "No AP left". Defined exactly as:
+   * the result carried no sound hint AND at least one of its logs has kind "error".
+   * (A backfired `board blackmail` logs an error line but is a real outcome with sound
+   * "fail", so it is not a rejection; an invalid `choose 9` logs kind "event" and is not one either.)
+   */
   rejected: boolean;
 }
 
@@ -139,8 +152,12 @@ export type WorldEvent =
   | { type: "run-reset" }
   | { type: "setup-completed" }
   | { type: "week-advanced"; week: number }
-  | { type: "hired"; role: TeamRole; personIds: string[] }
-  | { type: "departed"; role: TeamRole; personIds: string[] }
+  /**
+   * `personIds` are the people who now have a visible place in the office (capped);
+   * `count` is the true head-count change for the role (absent = `personIds.length`).
+   */
+  | { type: "hired"; role: TeamRole; personIds: string[]; count?: number }
+  | { type: "departed"; role: TeamRole; personIds: string[]; count?: number }
   | { type: "ship"; ok: boolean; reputationDelta: number }
   | { type: "launch"; ok: boolean; usersDelta: number }
   | { type: "pitch"; ok: boolean }
@@ -204,7 +221,11 @@ export interface OfficeLayout {
   wanderSpots: Placement[];
   /** Where each purchasable asset is shown (owned = real, available = blueprint ghost). */
   assetAnchors: Record<AssetId, Placement>;
-  /** Default camera framing for this phase. */
+  /**
+   * Reference framing for this phase at a 3:2 viewport. The camera rig does not
+   * read it directly: it frames from getLayoutFrame() so the shot adapts to the
+   * canvas aspect and to owned outdoor assets.
+   */
   camera: {
     target: Vec2;
     /** World units visible vertically at default zoom. */
@@ -217,6 +238,18 @@ export interface OfficeLayout {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export type SeatKind = "founder" | "cofounder" | "desk" | "overflow";
+
+/** One person's move in the most recent seating reconcile. */
+export interface SeatChange {
+  personId: string;
+  /** Where they were. null = nowhere visible (a new hire, or somebody the office had no room for). */
+  from: Seat | null;
+  /**
+   * Where they are now. null = nowhere visible: they either left the company
+   * (no longer in the roster) or the new office has no room for them.
+   */
+  to: Seat | null;
+}
 
 export interface Seat extends Placement {
   kind: SeatKind;
@@ -231,6 +264,12 @@ export interface SeatingApi {
   freeDeskSlots(): number[];
   /** People in the snapshot (plus snapshot.hiddenPeople) that have no visible spot. */
   hiddenCount(): number;
+  /** Who moved, arrived or left in the most recent reconcile (empty when nothing changed). */
+  lastChanges(): readonly SeatChange[];
+  /** Person id sitting at layout.deskSeats[slotIndex], or null when that desk is empty. */
+  deskOccupant(slotIndex: number): string | null;
+  /** Person id at layout.overflowSpots[slotIndex], or null when that spot is empty. */
+  overflowOccupant(slotIndex: number): string | null;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -253,7 +292,13 @@ export interface InteractableOptions {
   anchor?: THREE.Object3D;
   /** World-unit offset above the anchor origin where the card/marker attaches. Default 1.6. */
   anchorHeight?: number;
-  /** Skip the built-in hover/selection highlight (for objects that manage their own look). */
+  /**
+   * Skip the built-in hover/selection highlight (for objects that manage their own look).
+   *
+   * Picking notes: only objects attached to the scene and visible are hit. To give a small
+   * or hollow object a generous click area, add a child mesh with `visible = false` and
+   * `userData.hitProxy = true` — it is pickable while its parent is shown.
+   */
   noHighlight?: boolean;
 }
 
@@ -296,7 +341,11 @@ export interface FxApi {
   stream(kind: BurstKind, from: Vec3Like, to: Vec3Like, count?: number): void;
   /** Short text that floats up and fades, e.g. "+12 rep", "−$3,000". */
   floatText(text: string, at: Vec3Like, tone?: FloatTone): void;
-  /** Small icon bubble that follows `anchor` for `seconds` (default 2.2) then pops. */
+  /**
+   * Small icon bubble that follows `anchor` for `seconds` (default 2.2) then pops.
+   * `heightOffset` defaults to 0: the bubble's tail tip sits on the anchor, which is what a
+   * character's head anchor wants. For an object whose origin is on the floor pass ≈ 1.7.
+   */
   bubble(anchor: THREE.Object3D, icon: BubbleIcon, seconds?: number, heightOffset?: number): void;
   /** Brief camera shake; `strength` 0..1. No-op when reduced motion is on. */
   shake(strength: number): void;
@@ -308,6 +357,34 @@ export interface FxApi {
 
 export type QualityLevel = "low" | "high";
 
+/**
+ * Live facts one system publishes for the others to read each frame — the few
+ * places where the systems have to act in step without knowing each other.
+ */
+export interface WorldSignals {
+  /**
+   * How many people are walking through the doorway right now (arriving or
+   * leaving). Written by the people system every frame; the office holds the
+   * front door open while it is above zero.
+   */
+  doorTraffic: number;
+  /**
+   * The desk chairs somebody is using, and how far each is pulled out: 0 (sitting in
+   * it) … 1 (rolled back out of the way: getting up, sitting down, or away from the
+   * desk). Keyed by `chairKey(seat)`: the desk's slot index, or −1 / −2 for the
+   * founder's / cofounder's chair. A chair nobody is using is not listed (the office
+   * tucks it in). Rewritten in place by the people system every frame; absent while
+   * there is no people system.
+   */
+  chairsOut?: ReadonlyMap<number, number>;
+  /**
+   * People who still hold a seat in the seating plan but are no longer in the office
+   * (after a lost run the staff go home). Their desks look vacant. Replaced — never
+   * modified — whenever its contents change, so readers can compare by reference.
+   */
+  vacated?: ReadonlySet<string>;
+}
+
 export interface WorldContext {
   readonly scene: THREE.Scene;
   readonly camera: THREE.OrthographicCamera;
@@ -316,6 +393,7 @@ export interface WorldContext {
   readonly interactables: InteractableRegistry;
   readonly fx: FxApi;
   readonly seating: SeatingApi;
+  readonly signals: WorldSignals;
   /** The layout for the snapshot currently being applied / last applied. */
   getLayout(): OfficeLayout;
   /** Smoothly re-frame the camera on a point (e.g. on phase change). */
@@ -345,6 +423,26 @@ export interface ScreenPoint {
   y: number;
 }
 
+/** An axis-aligned rectangle in the same CSS-pixel space as ScreenPoint. */
+export interface ScreenRect {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+}
+
+export interface WorldFocusOptions {
+  /**
+   * CSS pixels at the bottom of the canvas that are covered (a docked card):
+   * the target is brought into the area above them.
+   */
+  avoidBottomPx?: number;
+  /** CSS pixels at the top of the canvas that are covered (the HUD row). */
+  avoidTopPx?: number;
+  /** Glide length in seconds (snaps under reduced motion). */
+  seconds?: number;
+}
+
 export interface InteractableHit {
   target: InteractableTarget;
   label: string;
@@ -359,6 +457,8 @@ export interface WorldCallbacks {
   /** The selected target's projected anchor moved (camera pan/zoom, person walking). null = no longer visible. */
   onSelectedAnchorMove?(screen: ScreenPoint | null): void;
   onContextLost?(): void;
+  /** The WebGL context came back after a loss; the world has already resumed rendering. */
+  onContextRestored?(): void;
 }
 
 export interface WorldOptions {
@@ -375,6 +475,17 @@ export interface WorldHandle {
   setSelected(target: InteractableTarget | null): void;
   /** Projected anchor of a target, or null if it is not in the scene. */
   project(target: InteractableTarget): ScreenPoint | null;
+  /** Where a target is drawn: the projected box around its visible meshes and its anchor. Null if not in the scene. */
+  screenBounds(target: InteractableTarget): ScreenRect | null;
+  /**
+   * Pan (never zoom) so the target sits in the visible part of the canvas, e.g.
+   * above a docked card. Does nothing when it is already comfortably in view.
+   */
+  focus(target: InteractableTarget, options?: WorldFocusOptions): void;
+  /** Indices into the current layout's desks that nobody sits at, lowest first. */
+  freeDeskSlots(): readonly number[];
+  /** People on the team the office has no visible spot for (the overflow sign's count). */
+  hiddenCount(): number;
   /** Multiply the current zoom (>1 zooms in). Clamped to sane limits. */
   zoomBy(factor: number): void;
   /** Return to the phase's default framing. */

@@ -15,7 +15,7 @@ import type {
   WorldSnapshot,
   WorldSystem,
 } from "../types";
-import type { EndingType } from "../../types/game";
+import { isPromotion, isWinEnding } from "../outcomes";
 import { BubbleLayer, DEFAULT_BUBBLE_HEIGHT, DEFAULT_BUBBLE_SECONDS } from "./BubbleLayer";
 import { FloatTextLayer } from "./FloatTextLayer";
 import { formatCountDelta, formatHeadcountDelta, formatMoneyDelta } from "./format";
@@ -74,7 +74,6 @@ const DEFAULT_STREAM_COUNT = 8;
 const MAX_STREAM_COUNT = 40;
 const MAX_INTENSITY = 4;
 
-const WIN_ENDINGS: ReadonlySet<EndingType> = new Set<EndingType>(["ipo", "acquisition", "ai-hype-exit"]);
 
 /** What a stream particle turns into when it lands: a glint, or a puff for the grubby kinds. */
 const ARRIVAL_POP: Record<BurstKind, BurstKind> = {
@@ -230,11 +229,12 @@ export class FxSystem implements WorldSystem, FxApi {
     switch (event.type) {
       case "hired":
       case "departed": {
-        // Counted from the rosters, not from personIds: those only list people
-        // who fit on screen, and a big office can hire past that.
-        const change = next.team[event.role] - prev.team[event.role];
-        const fallback = (event.personIds.length || 1) * (event.type === "hired" ? 1 : -1);
-        const delta = change !== 0 ? change : fallback;
+        // The event's true head-count change, not personIds: those only list people
+        // who fit on screen, and a big office can hire past that. (Hand-built events
+        // without a count fall back to the rosters.)
+        const sign = event.type === "hired" ? 1 : -1;
+        const change = event.count !== undefined ? sign * event.count : next.team[event.role] - prev.team[event.role];
+        const delta = change !== 0 ? change : (event.personIds.length || 1) * sign;
         this.floatText(formatHeadcountDelta(delta, event.role), this.door(layout, DOOR_TEXT_Y), delta > 0 ? "good" : "bad");
         break;
       }
@@ -279,7 +279,8 @@ export class FxSystem implements WorldSystem, FxApi {
         if (!launched && event.delta > 0) this.streamUsers(layout, clamp(Math.round(2 + 2 * Math.log10(1 + event.delta)), 2, 10));
         break;
       case "phase-changed":
-        this.celebrateAcrossFloor(layout, 5, 0.5, 1.3);
+        // Moving up is a party. Falling back a phase is the same rebuild without one.
+        if (isPromotion(event.from, event.to)) this.celebrateAcrossFloor(layout, 5, 0.5, 1.3);
         this.shake(0.4);
         break;
       case "stage-changed":
@@ -292,7 +293,7 @@ export class FxSystem implements WorldSystem, FxApi {
         this.burst("sparkle", this.door(layout, STATION_BURST_Y));
         break;
       case "game-over":
-        if (WIN_ENDINGS.has(event.ending)) this.celebrateAcrossFloor(layout, 12, 1.8, 1.4);
+        if (isWinEnding(event.ending)) this.celebrateAcrossFloor(layout, 12, 1.8, 1.4);
         else this.smokeOut(layout);
         break;
       // Reactions to these belong to the office and the characters (see the spec's table).

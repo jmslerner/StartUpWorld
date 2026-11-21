@@ -19,7 +19,7 @@ export const StatsDrawer = ({ state, active, onActiveChange }: StatsDrawerProps)
   }, [active, state]);
 
   return (
-    <div className="panel-surface flex max-h-[70vh] flex-col gap-2 rounded-xl p-3">
+    <div className="panel-surface flex max-h-full min-h-0 flex-col gap-2 rounded-xl p-3">
       <div className="grid grid-cols-4 gap-2">
         <Tab label="Growth" active={active === "growth"} onClick={() => onActiveChange("growth")} />
         <Tab label="Team" active={active === "team"} onClick={() => onActiveChange("team")} />

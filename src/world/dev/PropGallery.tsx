@@ -548,12 +548,14 @@ const mountGallery = (host: HTMLDivElement, params: GalleryParams): Gallery => {
   canvas.addEventListener("wheel", onWheel, { passive: false });
 
   // ── Loop ───────────────────────────────────────────────────────────────────
-  const clock = new THREE.Clock();
   let elapsed = 0;
   let frame = 0;
-  const tick = (): void => {
+  let last = performance.now();
+  const tick = (now: number): void => {
     frame = requestAnimationFrame(tick);
-    const dt = Math.min(clock.getDelta(), 0.1);
+    // Clamped like the game loop, so a background tab does not fast-forward every animation on return.
+    const dt = Math.min(Math.max(0, (now - last) / 1000), 0.1);
+    last = now;
     elapsed += dt;
     for (const { item } of placed) item.update?.(dt, elapsed);
     renderer.render(scene, camera);
@@ -568,7 +570,7 @@ const mountGallery = (host: HTMLDivElement, params: GalleryParams): Gallery => {
       }
     }
   };
-  tick();
+  frame = requestAnimationFrame(tick);
 
   return {
     dispose(): void {

@@ -8,8 +8,8 @@
  * (+Z) side of the top with its screen facing back toward −Z.
  */
 import * as THREE from "three";
-import type { CompanyPhase } from "../../../types/game";
-import { bakeModel, C, darken, glowMat, lighten, modelMesh, NEON, SLATE } from "../../core/palette";
+import type { CompanyPhase, TeamRole } from "../../../types/game";
+import { bakeModel, C, darken, glowMat, lighten, modelMesh, NEON, SCALE, SLATE } from "../../core/palette";
 import type { ColorFilter, ModelBuilder } from "../../core/palette";
 import { CHAIR_SIZE, DESK_SIZE, OVERFLOW_SIZE } from "../footprints";
 import {
@@ -26,8 +26,8 @@ import {
   monitorScreen,
 } from "./parts";
 import type { ChairStyle, MonitorSpec } from "./parts";
-import { createScreenSurface, PropKit, screenQuads } from "./shared";
-import type { Footprint, PropHandle, ScreenKind } from "./shared";
+import { createScreenSurface, PropKit, screenQuads, shapeMesh } from "./shared";
+import type { PropFootprint, PropHandle, ScreenKind } from "./shared";
 
 export type DeskStyle = "garage" | "hotdesk" | "standard" | "premium" | "executive";
 export const DESK_STYLES: readonly DeskStyle[] = ["garage", "hotdesk", "standard", "premium", "executive"];
@@ -41,9 +41,9 @@ export const DESK_STYLE_FOR_PHASE: Record<CompanyPhase, DeskStyle> = {
   public: "executive",
 };
 
-export const DESK_FOOTPRINT: Footprint = { w: DESK_SIZE.width, d: DESK_SIZE.depth };
-export const DESK_TOP_Y = 0.72;
-export const CHAIR_FOOTPRINT: Footprint = { w: CHAIR_SIZE.width, d: CHAIR_SIZE.depth };
+export const DESK_FOOTPRINT: PropFootprint = { w: DESK_SIZE.width, d: DESK_SIZE.depth };
+export const DESK_TOP_Y = SCALE.deskTop;
+export const CHAIR_FOOTPRINT: PropFootprint = { w: CHAIR_SIZE.width, d: CHAIR_SIZE.depth };
 
 const DESK_ACCENT: Record<DeskStyle, number> = {
   garage: C.red,
@@ -51,6 +51,22 @@ const DESK_ACCENT: Record<DeskStyle, number> = {
   standard: C.blue,
   premium: C.purple,
   executive: C.burgundy,
+};
+
+/** What each role (and the founders) typically has on screen — pass to `createDesk({ screen })` / `setScreen`. */
+export const SCREEN_FOR_ROLE: Record<TeamRole | "founder" | "cofounder", ScreenKind> = {
+  founder: "terminal",
+  cofounder: "deck",
+  engineering: "code",
+  design: "design",
+  product: "deck",
+  data: "chart",
+  marketing: "chart",
+  sales: "sheet",
+  ops: "sheet",
+  hr: "sheet",
+  legal: "sheet",
+  executive: "deck",
 };
 
 /** Number of distinct clutter arrangements per style (pick with `variant`). */
@@ -102,12 +118,12 @@ const deskMonitors = (style: DeskStyle, upgraded: boolean): MonitorSpec[] => {
   }
 };
 
-/** Dual-monitor arm, plant-free: the visible "office upgrade" accent strip under the back edge. */
+/** The visible mark of the "office upgrade": a neon accent strip under the back edge of the top. */
 const drawUpgradeStrip = (b: ModelBuilder): void => {
   b.box(1.1, 0.02, 0.02, NEON, 0, TOP - 0.075, 0.3, { r: 0 });
 };
 
-const drawBody = (b: ModelBuilder, style: DeskStyle, accent: number, upgraded: boolean): void => {
+const drawBody = (b: ModelBuilder, style: DeskStyle, accent: number): void => {
   switch (style) {
     case "garage": {
       // A sheet of plywood across two sawhorses.
@@ -189,7 +205,6 @@ const drawBody = (b: ModelBuilder, style: DeskStyle, accent: number, upgraded: b
       return;
     }
   }
-  void upgraded;
 };
 
 /** Keyboard + mouse: stays on the desk when it is vacant. */
@@ -322,7 +337,7 @@ const vacantFilter: ColorFilter = (color) => {
 
 const drawDesk = (b: ModelBuilder, style: DeskStyle, accent: number, upgraded: boolean, occupied: boolean, variant: number): void => {
   if (!occupied) b.setColorFilter(vacantFilter);
-  drawBody(b, style, accent, upgraded);
+  drawBody(b, style, accent);
   if (upgraded) drawUpgradeStrip(b);
   for (const monitor of deskMonitors(style, upgraded)) drawMonitor(b, monitor);
   drawHardware(b, style);
@@ -417,48 +432,60 @@ export interface VacantMarkerOptions {
   height?: number;
 }
 
+/** The fixed isometric camera's compass angle (spec §6): markers turn to face it. */
+const CAMERA_AZIMUTH = Math.PI / 4;
+
 /**
- * Floating "+" coin that says "hire someone here". It spins so the plus reads
- * from the fixed camera whatever the desk's orientation, and gently pulses.
+ * Floating "+" coin that says "hire someone here". It keeps its face toward
+ * the fixed camera whatever its parent's rotation (so it can simply be added
+ * to a rotated desk group), and bobs, sways and pulses to catch the eye.
  */
 export const createVacantMarker = (options: VacantMarkerOptions = {}): PropHandle => {
   const height = options.height ?? 1.35;
   const kit = new PropKit("vacant-marker");
   const coin = new THREE.Group();
   coin.position.y = height;
+  // Lean back a little so the face also tilts up toward the elevated camera.
+  coin.rotation.order = "YXZ";
+  coin.rotation.x = -0.35;
+  coin.rotation.y = CAMERA_AZIMUTH;
   kit.add(coin);
 
   const disc = kit.model(
     "vacant-marker:disc",
     (b) => {
-      b.cyl(0.15, 0.05, SLATE, 0, -0.15, 0, { axis: "z", seg: 20 });
+      b.cyl(0.16, 0.05, SLATE, 0, -0.16, 0, { axis: "z", seg: 20 });
     },
     coin
   );
   disc.castShadow = false;
   disc.receiveShadow = false;
-  const glow = new THREE.Mesh(
-    bakeModel("vacant-marker:glow", (b) => {
-      b.torus(0.15, 0.02, NEON, 0, -0.17, 0, { axis: "z", seg: 20 });
-      b.box(0.17, 0.05, 0.075, NEON, 0, -0.025, 0, { r: 0.012 });
-      b.box(0.05, 0.17, 0.075, NEON, 0, -0.085, 0, { r: 0.012 });
-    }),
-    glowMat(lighten(NEON, 0.15))
+  coin.add(
+    shapeMesh(
+      bakeModel("vacant-marker:glow", (b) => {
+        b.torus(0.16, 0.022, NEON, 0, -0.182, 0, { axis: "z", seg: 20 });
+        b.box(0.18, 0.052, 0.075, NEON, 0, -0.026, 0, { r: 0.012 });
+        b.box(0.052, 0.18, 0.075, NEON, 0, -0.09, 0, { r: 0.012 });
+      }),
+      glowMat(lighten(NEON, 0.15)),
+      false
+    )
   );
-  coin.add(glow);
 
-  kit.onUpdate((dt, elapsed) => {
-    coin.rotation.y += dt * 1.5;
+  kit.onUpdate((_dt, elapsed) => {
+    // World yaw of whatever we are attached to, read off its matrix (one frame stale at worst).
+    const m = kit.group.matrixWorld.elements;
+    const parentYaw = Math.atan2(m[8], m[10]);
+    coin.rotation.y = CAMERA_AZIMUTH - parentYaw + Math.sin(elapsed * 1.6) * 0.3;
     coin.position.y = height + Math.sin(elapsed * 2.2) * 0.05;
-    const pulse = 1 + Math.sin(elapsed * 4.4) * 0.07;
-    coin.scale.setScalar(pulse);
+    coin.scale.setScalar(1 + Math.sin(elapsed * 4.4) * 0.07);
   });
   return kit.finish({ w: 0.4, d: 0.4 });
 };
 
 /** Height of the beanbag's seat dip; "floor-sit" characters put their hips here. */
-export const FLOOR_SEAT_Y = 0.24;
-export const OVERFLOW_FOOTPRINT: Footprint = { w: OVERFLOW_SIZE.width, d: OVERFLOW_SIZE.depth };
+export const FLOOR_SEAT_Y = SCALE.floorSeat;
+export const OVERFLOW_FOOTPRINT: PropFootprint = { w: OVERFLOW_SIZE.width, d: OVERFLOW_SIZE.depth };
 
 const BEANBAG_COLORS = [C.coral, C.teal, C.yellow, C.purple, C.blue, C.pink];
 

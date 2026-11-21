@@ -181,11 +181,26 @@ export const PHASE_THEMES: Record<CompanyPhase, PhaseTheme> = {
 
 export const PHASES: readonly CompanyPhase[] = ["garage", "coworking", "office", "unicorn", "public"];
 
+/**
+ * The scale guide every model is built to (spec §2), in world units ≈ metres.
+ * Furniture and characters both read these, so a seated person always meets
+ * their chair.
+ */
+export const SCALE = {
+  /** Desk surface height. */
+  deskTop: 0.72,
+  /** Chair seat height: seated characters put their hips here. */
+  seat: 0.45,
+  /** Beanbag seat height, for the cross-legged "floor-sit" pose. */
+  floorSeat: 0.24,
+  /** Standing character, before the ± 8 % look variation. */
+  person: 1.5,
+  /** Back walls. */
+  wall: 2.6,
+} as const;
+
 /** 0 for the garage … 4 for the public HQ. */
 export const phaseTier = (phase: CompanyPhase): number => PHASES.indexOf(phase);
-
-const _mixA = new THREE.Color();
-const _mixB = new THREE.Color();
 
 /** Blend two hex colours (t = 0 → a, t = 1 → b) in sRGB, which is what the eye expects. */
 export const mixColor = (a: number, b: number, t: number): number => {
@@ -1057,7 +1072,3 @@ export const disposeSharedResources = (): void => {
   geometryCache.clear();
   textureCache.clear();
 };
-
-// Kept for callers that want to blend in linear space with THREE.Color scratch objects.
-export const lerpColorInto = (target: THREE.Color, a: number, b: number, t: number): THREE.Color =>
-  target.copy(_mixA.setHex(a)).lerp(_mixB.setHex(b), t);

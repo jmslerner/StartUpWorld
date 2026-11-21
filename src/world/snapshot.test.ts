@@ -86,6 +86,7 @@ describe("buildWorldSnapshot", () => {
       valuation: 9_000_000,
       users: 4_200,
       mrr: 42_000,
+      pricingModel: "enterprise",
       burn: 12_000,
       reputation: 61,
       stress: 44,
@@ -111,6 +112,7 @@ describe("buildWorldSnapshot", () => {
     expect(snapshot.valuation).toBe(9_000_000);
     expect(snapshot.users).toBe(4_200);
     expect(snapshot.mrr).toBe(42_000);
+    expect(snapshot.pricingModel).toBe("enterprise");
     expect(snapshot.reputation).toBe(61);
     expect(snapshot.morale).toBe(71);
     expect(snapshot.cohesion).toBe(58);

@@ -23,7 +23,7 @@ import {
 } from "../../core/palette";
 import type { CanvasDraw, MatOptions, ModelBuilder } from "../../core/palette";
 
-export interface Footprint {
+export interface PropFootprint {
   /** Extent along local X. */
   w: number;
   /** Extent along local Z. */
@@ -39,7 +39,7 @@ export interface Footprint {
  */
 export interface PropHandle {
   readonly group: THREE.Group;
-  readonly footprint: Footprint;
+  readonly footprint: PropFootprint;
   /** Present only on props that animate. Call once per frame. */
   update?(dt: number, elapsed: number): void;
   /** Present only on props with emissive parts: 0 = daylight, 1 = full dusk glow. */
@@ -129,10 +129,10 @@ export class PropKit {
     return material;
   }
 
-  finish(footprint: Footprint): PropHandle;
+  finish(footprint: PropFootprint): PropHandle;
   // NoInfer: E must come from `extra`, never from the caller's expected return type.
-  finish<E extends object>(footprint: Footprint, extra: E): PropHandle & NoInfer<E>;
-  finish(footprint: Footprint, extra?: object): PropHandle {
+  finish<E extends object>(footprint: PropFootprint, extra: E): PropHandle & NoInfer<E>;
+  finish(footprint: PropFootprint, extra?: object): PropHandle {
     const { group, owned, updaters, glowers } = this;
     const handle: PropHandle = {
       group,
@@ -516,8 +516,8 @@ const drawPlate =
 
 /**
  * The glowing face of a command plate: a plane showing "> text" in the
- * terminal's colours. Returns null in node — bake `plateBack` into the model so
- * the sign still reads as a dark plaque with a neon underline.
+ * terminal's colours. Returns null in node (the plaque behind it carries a
+ * neon underline for exactly that case).
  */
 export const plateFace = (text: string, height: number): THREE.Mesh | null => {
   const texture = canvasTexture(`plate:${text}`, plateTextureWidth(text), PLATE_TEXTURE_HEIGHT, drawPlate(text));
@@ -526,25 +526,19 @@ export const plateFace = (text: string, height: number): THREE.Mesh | null => {
   return planeMesh(plateWidth(text, height), height, material);
 };
 
-/** Dark backing board for a command plate, centred at (x, yBase + height / 2, z). */
-export const plateBack = (b: ModelBuilder, text: string, height: number, x: number, yBase: number, z: number, tilt = 0): void => {
-  const w = plateWidth(text, height) + 0.05;
-  b.place(x, yBase + height / 2, z, { rx: -tilt }, () => {
-    b.box(w, height + 0.05, 0.04, INK, 0, -(height + 0.05) / 2, -0.02, { r: 0.012 });
-    // Underline that survives when the text texture is unavailable.
-    b.box(w * 0.7, 0.014, 0.012, NEON, 0, -height / 2 + 0.012, 0.004, { r: 0 });
-  });
-};
-
 /**
- * Add a full command plate (back + glowing text) to a prop.
- * `tilt` leans the top backwards so it faces up toward the isometric camera.
- * When the builder is inside `b.place(...)`, pass the matching `parent` group so
- * the text lands on the baked back.
+ * Add a command plate to a prop: a dark plaque (with a neon underline that still
+ * reads when the text cannot be drawn) carrying the glowing "> text" face.
+ *
+ * `tilt` leans the top backwards so the plate faces up toward the isometric
+ * camera; (x, yBase, z) is the bottom-centre of the plate's front.
+ *
+ * Call this from the factory body, never from inside a `kit.model(...)`
+ * callback: those only run on a cache miss, and the second copy of a prop
+ * would silently lose its plate.
  */
 export const addCommandPlate = (
   kit: PropKit,
-  b: ModelBuilder,
   text: string,
   x: number,
   yBase: number,
@@ -553,14 +547,22 @@ export const addCommandPlate = (
   tilt = 0.3,
   parent: THREE.Object3D = kit.group
 ): void => {
-  plateBack(b, text, height, x, yBase, z, tilt);
-  const face = plateFace(text, height);
-  if (!face) return;
   const pivot = new THREE.Group();
   pivot.position.set(x, yBase + height / 2, z);
   pivot.rotation.x = -tilt;
-  face.position.set(0, 0, 0.004);
-  pivot.add(face);
+  const back = modelMesh(
+    bakeModel(`plate:${text}:${height}`, (b) => {
+      const w = plateWidth(text, height) + 0.05;
+      b.box(w, height + 0.05, 0.04, INK, 0, -(height + 0.05) / 2, -0.02, { r: 0.012 });
+      b.box(w * 0.7, 0.014, 0.012, NEON, 0, -height / 2 + 0.012, 0.004, { r: 0 });
+    })
+  );
+  pivot.add(back);
+  const face = plateFace(text, height);
+  if (face) {
+    face.position.set(0, 0, 0.004);
+    pivot.add(face);
+  }
   parent.add(pivot);
 };
 

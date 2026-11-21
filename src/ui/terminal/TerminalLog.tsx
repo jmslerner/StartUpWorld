@@ -73,7 +73,10 @@ export const TerminalLog = ({ log, isTyping = false }: TerminalLogProps) => {
   }, [log, isTyping]);
 
   return (
-    <div className="relative min-h-0 flex-1">
+    // The log keeps at least 200 px: in the app shell everything else gives way first.
+    // grow from a 0 px basis (not flex-1's 0%): it fills what is left, and its lines never count
+    // towards the terminal's minimum height, so a long log cannot squeeze the world.
+    <div className="relative min-h-[202px] shrink grow basis-0">
       <div
         ref={containerRef}
         data-terminal-log
@@ -104,8 +107,9 @@ export const TerminalLog = ({ log, isTyping = false }: TerminalLogProps) => {
           if (dy > 2) maybeResumeFollowAtBottom();
         }}
       >
+        {/* pre-line: multi-line output (`status`, reports) keeps its line breaks; runs of spaces still collapse. */}
         {[...log].reverse().map((entry) => (
-          <div key={entry.id} className={entryClass(entry.kind)}>
+          <div key={entry.id} className={`whitespace-pre-line ${entryClass(entry.kind)}`}>
             {entry.text}
           </div>
         ))}

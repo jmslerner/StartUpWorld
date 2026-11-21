@@ -3,6 +3,12 @@ export default {
   content: ["./index.html", "./src/**/*.{ts,tsx}"],
   theme: {
     extend: {
+      screens: {
+        // Short windows (a 1280x600 laptop, a landscape tablet): the app shell
+        // tightens its spacing and the event card its layout so the terminal
+        // keeps a readable log without the page scrolling.
+        short: { raw: "(max-height: 720px)" },
+      },
       fontFamily: {
         mono: ["'IBM Plex Mono'", "ui-monospace", "SFMono-Regular", "Menlo", "Monaco", "Consolas", "Liberation Mono", "Courier New", "monospace"],
       },

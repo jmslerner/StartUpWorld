@@ -6,7 +6,7 @@
  * Everything here is drawn at the builder's current transform; (x, y, z) place
  * the part's floor-centre origin unless noted.
  */
-import { C, darken, lighten, NEON } from "../../core/palette";
+import { C, darken, lighten, NEON, SCALE } from "../../core/palette";
 import type { ModelBuilder } from "../../core/palette";
 import type { ScreenQuad } from "./shared";
 
@@ -17,13 +17,14 @@ import type { ScreenQuad } from "./shared";
 export type ChairStyle = "garage" | "hotdesk" | "standard" | "premium" | "executive";
 
 /** Chair seat height (spec scale guide). Seated characters put their hips here. */
-export const SEAT_Y = 0.45;
+export const SEAT_Y = SCALE.seat;
 
 const starBase = (b: ModelBuilder, frame: number, reach: number): void => {
   for (let i = 0; i < 5; i += 1) {
     b.at(0, 0, 0, (i / 5) * Math.PI * 2 + 0.31, () => {
       b.box(0.05, 0.03, reach, frame, 0, 0.05, reach / 2, { r: 0.012 });
-      b.ball(0.034, C.black, 0, 0, reach);
+      // Castor: a six-sided wheel is plenty at this size and a fifth of a sphere's triangles.
+      b.cyl(0.034, 0.04, C.black, 0, 0, reach, { axis: "x", seg: 6 });
     });
   }
   b.cyl(0.05, 0.06, frame, 0, 0.04, 0);

@@ -68,7 +68,7 @@ export const OnboardingCard = ({ state, runCommand, inputRef }: OnboardingCardPr
             setNameDraft("");
           }}
         >
-          <span className="select-none text-mist/70">Your name</span>
+          <span className="shrink-0 select-none whitespace-nowrap text-mist/70">Your name</span>
           <input
             ref={effectiveInputRef}
             value={nameDraft}
@@ -96,7 +96,7 @@ export const OnboardingCard = ({ state, runCommand, inputRef }: OnboardingCardPr
             setCompanyDraft("");
           }}
         >
-          <span className="select-none text-mist/70">Company</span>
+          <span className="shrink-0 select-none whitespace-nowrap text-mist/70">Company</span>
           <input
             ref={effectiveInputRef}
             value={companyDraft}

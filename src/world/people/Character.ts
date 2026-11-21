@@ -11,8 +11,9 @@
  *    beanbag at FLOOR_SEAT_Y (0.24).
  *  • Everything is shared geometry + the shared vertex-colour material, so a
  *    character owns no GPU resources and `update` never allocates.
- *  • Eight meshes per person; a ninth / tenth (lap laptop, phone) is only made
- *    the first time a pose needs it.
+ *  • Eight meshes per person; the pose props (lap laptop, phone, the box of
+ *    desk things somebody carries out on their last day) are only made the
+ *    first time they are needed.
  */
 import * as THREE from "three";
 import type { TeamRole } from "../../types/game";
@@ -30,6 +31,7 @@ import {
   modelMesh,
   PANTS_COLORS,
   ROLE_COLORS,
+  SCALE,
   SHOE_COLORS,
   SKIN_TONES,
   vertexMat,
@@ -40,11 +42,11 @@ export type CharacterPose = "stand" | "walk" | "sit" | "type" | "cheer" | "slump
 export const CHARACTER_POSES: readonly CharacterPose[] = ["stand", "walk", "sit", "type", "cheer", "slump", "sleep", "phone", "floor-sit"];
 
 /** Chair seat height the seated poses assume (matches the chair props). */
-export const SEAT_Y = 0.45;
+export const SEAT_Y = SCALE.seat;
 /** Beanbag seat height the "floor-sit" pose assumes (matches the overflow-spot prop). */
-export const FLOOR_SEAT_Y = 0.24;
+export const FLOOR_SEAT_Y = SCALE.floorSeat;
 /** Nominal standing height, before the ± 8 % look variation. */
-export const CHARACTER_HEIGHT = 1.5;
+export const CHARACTER_HEIGHT = SCALE.person;
 
 export interface PoseOptions {
   /**
@@ -52,6 +54,11 @@ export interface PoseOptions {
    * phone). Defaults: cheer + phone stand, slump + sleep sit.
    */
   seated?: boolean;
+  /**
+   * "slump" and "sleep" only: sitting on the floor (a beanbag) rather than on a chair.
+   * Ignored by every other pose.
+   */
+  floor?: boolean;
   /** Snap instead of blending (use when building a scene instantly). */
   immediate?: boolean;
 }
@@ -70,6 +77,11 @@ export interface CharacterHandle {
   setWalkSpeed(unitsPerSecond: number): void;
   /** 0 = drained (slow, slouched) … 1 = buzzing. Default 0.75. */
   setEnergy(energy: number): void;
+  /**
+   * Hold a cardboard box of desk things in both arms. Only shows in the upright
+   * poses ("stand" and "walk"): it is what somebody leaving the company carries out.
+   */
+  setCarrying(carrying: boolean): void;
   /** Greyed-out look for "setup incomplete" / game over. */
   setDimmed(dimmed: boolean): void;
   /** Multiply the whole character by a colour (null restores it). Use a handful of distinct tints at most — each is a cached material. */
@@ -231,7 +243,7 @@ const hex = (color: number): string => color.toString(16);
 const drawTorso = (b: ModelBuilder, look: CharacterLook): void => {
   const { top, trim } = look;
   const front = TORSO_D / 2;
-  b.box(TORSO_W, NECK_Y + 0.04, TORSO_D, top, 0, -0.04, 0, { r: 0.085, round: 3, taper: 0.9 });
+  b.box(TORSO_W, NECK_Y + 0.04, TORSO_D, top, 0, -0.04, 0, { r: 0.085, round: 2, taper: 0.9 });
   if (look.outfit === "hoodie") {
     // Trim hem, kangaroo pocket, drawstrings and a hood bunched at the nape.
     b.box(TORSO_W + 0.014, 0.065, TORSO_D + 0.014, trim, 0, -0.035, 0, { r: 0.03 });
@@ -300,8 +312,8 @@ const drawHair = (b: ModelBuilder, look: CharacterLook): void => {
   const h = look.hair;
   const back = -HEAD_D / 2;
   const crop = (): void => {
-    b.box(HEAD_W + 0.03, 0.15, HEAD_D + 0.03, h, 0, HEAD_H - 0.11, -0.006, { r: 0.075, round: 3 });
-    b.box(HEAD_W + 0.03, 0.24, 0.12, h, 0, 0.12, back + 0.035, { r: 0.055, round: 2 });
+    b.box(HEAD_W + 0.03, 0.15, HEAD_D + 0.03, h, 0, HEAD_H - 0.11, -0.006, { r: 0.075, round: 2 });
+    b.box(HEAD_W + 0.03, 0.24, 0.12, h, 0, 0.12, back + 0.035, { r: 0.055 });
   };
   switch (look.hairStyle) {
     case "bald":
@@ -337,12 +349,12 @@ const drawHair = (b: ModelBuilder, look: CharacterLook): void => {
       return;
     case "cap":
       b.box(HEAD_W + 0.02, 0.13, 0.09, h, 0, 0.13, back + 0.025, { r: 0.04 });
-      b.box(HEAD_W + 0.035, 0.16, HEAD_D + 0.035, look.gear, 0, HEAD_H - 0.11, 0, { r: 0.078, round: 3 });
+      b.box(HEAD_W + 0.035, 0.16, HEAD_D + 0.035, look.gear, 0, HEAD_H - 0.11, 0, { r: 0.078, round: 2 });
       b.box(0.3, 0.03, 0.18, darken(look.gear, 0.18), 0, HEAD_H - 0.095, HEAD_D / 2 + 0.07, { r: 0.012 });
       b.ball(0.022, darken(look.gear, 0.18), 0, HEAD_H + 0.04, 0, { seg: 6 });
       return;
     case "beanie":
-      b.box(HEAD_W + 0.035, 0.21, HEAD_D + 0.035, look.gear, 0, HEAD_H - 0.14, 0, { r: 0.1, round: 3 });
+      b.box(HEAD_W + 0.035, 0.21, HEAD_D + 0.035, look.gear, 0, HEAD_H - 0.14, 0, { r: 0.1, round: 2 });
       b.box(HEAD_W + 0.055, 0.075, HEAD_D + 0.055, darken(look.gear, 0.18), 0, HEAD_H - 0.14, 0, { r: 0.03 });
       b.ball(0.05, lighten(look.gear, 0.35), 0, HEAD_H + 0.055, 0, { seg: 8 });
       return;
@@ -352,7 +364,7 @@ const drawHair = (b: ModelBuilder, look: CharacterLook): void => {
 const drawHead = (b: ModelBuilder, look: CharacterLook): void => {
   const front = HEAD_D / 2;
   b.cyl(0.085, 0.08, look.skin, 0, -0.05, 0, { seg: 10 });
-  b.box(HEAD_W, HEAD_H, HEAD_D, look.skin, 0, 0, 0, { r: 0.12, round: 4 });
+  b.box(HEAD_W, HEAD_H, HEAD_D, look.skin, 0, 0, 0, { r: 0.12, round: 3 });
   if (look.accessory === "glasses") {
     for (const sx of [-1, 1]) {
       b.box(0.125, 0.095, 0.02, C.black, sx * 0.085, 0.145, front - 0.004, { r: 0 });
@@ -378,7 +390,7 @@ const drawHead = (b: ModelBuilder, look: CharacterLook): void => {
 /** Arm hanging from the shoulder pivot (origin) down −Y. */
 const drawArm = (b: ModelBuilder, look: CharacterLook): void => {
   const sleeve = look.shortSleeves ? 0.2 : 0.35;
-  b.box(0.105, ARM_LEN - sleeve + 0.03, 0.115, look.skin, 0, -ARM_LEN, 0, { r: 0.05, round: 2 });
+  b.box(0.105, ARM_LEN - sleeve + 0.03, 0.115, look.skin, 0, -ARM_LEN, 0, { r: 0.045 });
   b.box(0.125, sleeve, 0.135, look.top, 0, 0.05 - sleeve, 0, { r: 0.058, round: 2 });
   if (look.outfit === "hoodie") b.box(0.132, 0.045, 0.142, look.trim, 0, 0.05 - sleeve, 0, { r: 0.02 });
   if (look.outfit === "suit") b.box(0.128, 0.03, 0.138, C.white, 0, 0.04 - sleeve, 0, { r: 0.012 });
@@ -386,14 +398,14 @@ const drawArm = (b: ModelBuilder, look: CharacterLook): void => {
 
 /** Thigh hanging from the hip pivot (origin) down −Y to the knee. */
 const drawThigh = (b: ModelBuilder, look: CharacterLook): void => {
-  b.box(LEG_W, THIGH_LEN + 0.07, LEG_D, look.pants, 0, -THIGH_LEN - 0.03, 0, { r: 0.05, round: 2 });
+  b.box(LEG_W, THIGH_LEN + 0.07, LEG_D, look.pants, 0, -THIGH_LEN - 0.03, 0, { r: 0.055 });
 };
 
 /** Shin hanging from the knee pivot (origin) down −Y, shoe pointing +Z. */
 const drawShin = (b: ModelBuilder, look: CharacterLook): void => {
   const length = LEG_LEN - THIGH_LEN;
-  b.box(LEG_W - 0.006, length + 0.01, LEG_D - 0.006, look.pants, 0, -length + 0.05, 0, { r: 0.05, round: 2 });
-  b.box(LEG_W + 0.012, 0.09, LEG_D + 0.075, look.shoes, 0, -length, 0.032, { r: 0.04, round: 2 });
+  b.box(LEG_W - 0.006, length + 0.01, LEG_D - 0.006, look.pants, 0, -length + 0.05, 0, { r: 0.05 });
+  b.box(LEG_W + 0.012, 0.09, LEG_D + 0.075, look.shoes, 0, -length, 0.032, { r: 0.04 });
   if (look.outfit === "hoodie") b.box(LEG_W + 0.016, 0.022, LEG_D + 0.079, look.trim, 0, -length + 0.012, 0.032, { r: 0 });
 };
 
@@ -408,6 +420,16 @@ const drawLapLaptop = (b: ModelBuilder): void => {
 
 const drawPhone = (b: ModelBuilder): void => {
   b.box(0.022, 0.14, 0.075, C.black, 0, 0, 0, { r: 0.008 });
+};
+
+/** A box of desk things: taped cardboard with a plant and some papers poking out. */
+const drawCarryBox = (b: ModelBuilder): void => {
+  b.box(0.33, 0.2, 0.25, C.cardboard, 0, 0, 0, { r: 0.012 });
+  b.box(0.34, 0.035, 0.26, C.cardboardDark, 0, 0.17, 0, { r: 0.006 });
+  b.box(0.07, 0.204, 0.254, C.tape, 0, 0, 0, { r: 0 });
+  b.box(0.12, 0.11, 0.018, C.paper, -0.07, 0.15, -0.04, { rz: 0.12, r: 0 });
+  b.cyl(0.04, 0.07, C.terracotta, 0.09, 0.17, 0.03, { seg: 8 });
+  b.ball(0.07, C.leaf, 0.09, 0.22, 0.03, { seg: 7 });
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -488,23 +510,35 @@ export const createCharacter = (view: PersonView): CharacterHandle => {
 
   const armKey = `arm:${look.outfit}:${hex(look.top)}:${hex(look.trim)}:${hex(look.skin)}:${look.shortSleeves ? "s" : "l"}`;
   const shinKey = `shin:${hex(look.pants)}:${hex(look.shoes)}:${look.outfit === "hoodie" ? hex(look.trim) : "plain"}`;
-  const makeLimb = (x: number, y: number, key: string, draw: (b: ModelBuilder) => void, parent: THREE.Object3D): THREE.Group => {
+  const makeLimb = (x: number, y: number, key: string, draw: (b: ModelBuilder) => void, parent: THREE.Object3D, castShadow = true): THREE.Group => {
     const pivot = new THREE.Group();
     pivot.position.set(x, y, 0);
     parent.add(pivot);
-    part(key, draw, pivot);
+    part(key, draw, pivot).castShadow = castShadow;
     return pivot;
   };
   // "L" is the character's own left, which is +X when it faces +Z.
-  const armL = makeLimb(SHOULDER_X, SHOULDER_Y, armKey, (b) => drawArm(b, look), chest);
-  const armR = makeLimb(-SHOULDER_X, SHOULDER_Y, armKey, (b) => drawArm(b, look), chest);
+  // Arms do not cast shadows: theirs fall inside the torso's anyway, and with 64 people on
+  // screen that is 128 fewer draws in the shadow pass.
+  const armL = makeLimb(SHOULDER_X, SHOULDER_Y, armKey, (b) => drawArm(b, look), chest, false);
+  const armR = makeLimb(-SHOULDER_X, SHOULDER_Y, armKey, (b) => drawArm(b, look), chest, false);
   const legL = makeLimb(LEG_X, 0, `thigh:${hex(look.pants)}`, (b) => drawThigh(b, look), hips);
   const legR = makeLimb(-LEG_X, 0, `thigh:${hex(look.pants)}`, (b) => drawThigh(b, look), hips);
+  const legMeshes = [legL.children[0], legR.children[0]];
   // Pitch first, then splay about the vertical, so splayed legs stay level.
   legL.rotation.order = "YXZ";
   legR.rotation.order = "YXZ";
   const kneeL = makeLimb(0, -THIGH_LEN, shinKey, (b) => drawShin(b, look), legL);
   const kneeR = makeLimb(0, -THIGH_LEN, shinKey, (b) => drawShin(b, look), legR);
+  legMeshes.push(kneeL.children[0], kneeR.children[0]);
+  /**
+   * Legs cast shadows only while the person is up: seated legs are under a desk (or
+   * folded on a beanbag), inside the shadow of the furniture and the body, and with
+   * a full office that is four shadow-pass draws per person nobody would miss.
+   */
+  const setLegShadows = (cast: boolean): void => {
+    for (const mesh of legMeshes) mesh.castShadow = cast;
+  };
 
   // Pose props are created on first use: most characters never sit on a beanbag or take a call.
   let laptop: THREE.Mesh | null = null;
@@ -512,6 +546,7 @@ export const createCharacter = (view: PersonView): CharacterHandle => {
   const showLaptop = (visible: boolean): void => {
     if (!laptop && visible) {
       laptop = part("lap-laptop", drawLapLaptop, hips);
+      laptop.castShadow = false;
       laptop.position.set(0, LEG_D / 2, 0.27);
     }
     if (laptop) laptop.visible = visible;
@@ -519,9 +554,20 @@ export const createCharacter = (view: PersonView): CharacterHandle => {
   const showPhone = (visible: boolean): void => {
     if (!phone && visible) {
       phone = part("phone", drawPhone, armL);
+      phone.castShadow = false;
       phone.position.set(-0.075, -ARM_LEN - 0.02, 0.0);
     }
     if (phone) phone.visible = visible;
+  };
+  let carryBox: THREE.Mesh | null = null;
+  const showCarryBox = (visible: boolean): void => {
+    if (!carryBox && visible) {
+      carryBox = part("carry-box", drawCarryBox, chest);
+      carryBox.castShadow = false;
+      // Resting in the hands of two arms held forward (see the carry override in computeTarget).
+      carryBox.position.set(0, 0.16, TORSO_D / 2 + 0.17);
+    }
+    if (carryBox) carryBox.visible = visible;
   };
 
   const standHip = LEG_LEN;
@@ -534,11 +580,25 @@ export const createCharacter = (view: PersonView): CharacterHandle => {
   const current = new Float32Array(CHANNEL_COUNT);
   let pose: CharacterPose = "stand";
   let seated = false;
+  let floor = false;
   let blend = 1;
   let clock = look.phase;
   let stride = look.phase;
   let walkSpeed = 0;
   let energy = 0.75;
+  let carrying = false;
+  /** The box is in the arms only while upright; a seated pose puts it out of sight. */
+  const refreshCarryBox = (): void => showCarryBox(carrying && (pose === "stand" || pose === "walk"));
+
+  /** Hips on a beanbag, legs out in front and a little apart. */
+  const floorLegs = (): void => {
+    target[HIP_Y] = floorHip;
+    target[LEG_L_PITCH] = THIGHS_FORWARD;
+    target[LEG_R_PITCH] = THIGHS_FORWARD;
+    target[KNEE_L] = 0;
+    target[KNEE_R] = 0;
+    target[LEG_SPLAY] = 0.5;
+  };
 
   /** Fill `target` for the active pose at animation time `t`. */
   const computeTarget = (t: number): void => {
@@ -645,10 +705,7 @@ export const createCharacter = (view: PersonView): CharacterHandle => {
         break;
       }
       case "floor-sit": {
-        target[HIP_Y] = floorHip;
-        target[LEG_L_PITCH] = THIGHS_FORWARD;
-        target[LEG_R_PITCH] = THIGHS_FORWARD;
-        target[LEG_SPLAY] = 0.5;
+        floorLegs();
         target[CHEST_PITCH] += 0.16;
         target[ARM_L_PITCH] = -0.82 + Math.sin(t * 12) * 0.06;
         target[ARM_R_PITCH] = -0.82 + Math.cos(t * 10.5) * 0.06;
@@ -657,6 +714,17 @@ export const createCharacter = (view: PersonView): CharacterHandle => {
         target[HEAD_PITCH] += 0.22 + Math.sin(t * 2.7) * 0.025;
         break;
       }
+    }
+
+    // A beanbag slump or doze: the same upper body, on the floor.
+    if (floor) floorLegs();
+
+    if (carrying && (pose === "stand" || pose === "walk")) {
+      // Both arms forward and slightly in, under the box; they do not swing.
+      target[ARM_L_PITCH] = -1.02;
+      target[ARM_R_PITCH] = -1.02;
+      target[ARM_L_ROLL] = -0.14;
+      target[ARM_R_ROLL] = 0.14;
     }
   };
 
@@ -694,14 +762,18 @@ export const createCharacter = (view: PersonView): CharacterHandle => {
     height: (LEG_LEN + NECK_Y + HEAD_H) * look.scale,
 
     setPose(next, options = {}) {
-      const nextSeated = next === "floor-sit" ? false : (options.seated ?? SEATED_BY_DEFAULT[next]);
-      if (next !== pose || nextSeated !== seated) {
+      const nextFloor = (next === "slump" || next === "sleep") && options.floor === true;
+      const nextSeated = next === "floor-sit" || nextFloor ? false : (options.seated ?? SEATED_BY_DEFAULT[next]);
+      if (next !== pose || nextSeated !== seated || nextFloor !== floor) {
         pose = next;
         seated = nextSeated;
+        floor = nextFloor;
+        setLegShadows(!seated && pose !== "floor-sit" && !floor);
         from.set(current);
         blend = 0;
         showLaptop(pose === "floor-sit");
         showPhone(pose === "phone");
+        refreshCarryBox();
       }
       if (options.immediate) settle();
     },
@@ -711,6 +783,14 @@ export const createCharacter = (view: PersonView): CharacterHandle => {
     },
     setEnergy(next) {
       energy = Math.min(1, Math.max(0, next));
+    },
+    setCarrying(next) {
+      if (next === carrying) return;
+      carrying = next;
+      // Ease the arms into (or out of) the hold instead of snapping them.
+      from.set(current);
+      blend = 0;
+      refreshCarryBox();
     },
     setDimmed(next) {
       dimmed = next;

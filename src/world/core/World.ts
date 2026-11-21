@@ -1,7 +1,8 @@
 import * as THREE from "three";
 import { FxSystem } from "../fx/FxSystem";
 import { Interaction } from "../interaction/Interaction";
-import { getLayoutFrame, getOfficeLayout } from "../office/layouts";
+import { computeBuildingFrame, type LayoutFrame } from "../office/framing";
+import { getOfficeLayout } from "../office/layouts";
 import { OfficeSystem } from "../office/OfficeSystem";
 import { EmployeeSystem } from "../people/EmployeeSystem";
 import { SeatingPlan } from "../people/seating";
@@ -10,15 +11,19 @@ import type {
   OfficeLayout,
   QualityLevel,
   ScreenPoint,
+  ScreenRect,
   WorldCallbacks,
   WorldContext,
   WorldEvent,
+  WorldFocusOptions,
   WorldHandle,
   WorldOptions,
   WorldSnapshot,
 } from "../types";
 import { CameraRig } from "./CameraRig";
 import { layoutBounds } from "./layoutBounds";
+import { clamp } from "./math";
+import { disposeSharedResources } from "./palette";
 import { Lighting } from "./Lighting";
 import { configureRenderer } from "./rendererLook";
 import { SystemRunner } from "./SystemRunner";
@@ -42,6 +47,15 @@ export interface WorldDebug {
 const MAX_FRAME_SECONDS = 0.1;
 /** How far past the content the centre of the view may be dragged, in world units. */
 const PAN_MARGIN = 1.5;
+/**
+ * Share of the viewport's binding dimension (height on a wide, short canvas,
+ * width on a phone in portrait) the building fills at the default zoom. The
+ * building is diamond-shaped on screen, so the corners the HUD sits in stay
+ * clear even at this size.
+ */
+const FRAME_FILL = 0.85;
+/** A focused target must be at least this far (CSS px) inside the visible area to count as in view. */
+const FOCUS_PADDING_PX = 16;
 /** Spec §5: device-pixel-ratio caps per quality level. */
 const MAX_PIXEL_RATIO: Record<QualityLevel, number> = { high: 2, low: 1.5 };
 const CONTEXT_RELEASE_DELAY_MS = 300;
@@ -151,6 +165,9 @@ class World {
   private readonly seatingPlan = new SeatingPlan();
   private layout: OfficeLayout = getOfficeLayout("garage", []);
   private previous: WorldSnapshot | null = null;
+  /** The building frame the camera was last pointed at. */
+  private shot: LayoutFrame | null = null;
+  private readonly focusCentre = new THREE.Vector3();
   private pixelRatioQuery: MediaQueryList | null = null;
   private frameRequest = 0;
   private running = false;
@@ -209,6 +226,7 @@ class World {
       interactables: this.interaction,
       fx: this.fx,
       seating,
+      signals: { doorTraffic: 0 },
       getLayout,
       focusCamera: (target, viewHeight, seconds) => this.rig.focus(target, viewHeight, seconds),
     };
@@ -231,6 +249,10 @@ class World {
       resize: (width, height) => this.resize(width, height),
       setSelected: (target) => this.setSelected(target),
       project: (target) => this.project(target),
+      screenBounds: (target) => this.screenBounds(target),
+      focus: (target, focusOptions) => this.focus(target, focusOptions),
+      freeDeskSlots: () => (this.disposed ? [] : this.seatingPlan.freeDeskSlots()),
+      hiddenCount: () => (this.disposed ? 0 : this.seatingPlan.hiddenCount()),
       zoomBy: (factor) => this.zoomBy(factor),
       resetCamera: () => this.resetCamera(),
       setPaused: (paused) => this.setPaused(paused),
@@ -255,14 +277,17 @@ class World {
       applied = NO_EVENTS;
     }
 
-    const previousLayout = this.layout;
     // If the floor plan cannot be produced the world keeps the one it has.
     this.runner.run("layout", () => {
       this.layout = getOfficeLayout(next.phase, next.ownedAssets);
     });
     const layout = this.layout;
-    this.runner.run("seating.reconcile", () => this.seatingPlan.reconcile(next.people, next.hiddenPeople, layout));
-    this.frameLayout(next, prev, previousLayout, applied);
+    // Until setup is finished the company is just the founder: the engine's starting
+    // engineer only "arrives" (with the cofounder) once the run actually begins.
+    const roster = next.setupComplete ? next.people : next.people.filter((person) => person.kind === "founder");
+    const beyondRoster = next.setupComplete ? next.hiddenPeople : 0;
+    this.runner.run("seating.reconcile", () => this.seatingPlan.reconcile(roster, beyondRoster, layout));
+    this.frameLayout(next, prev, applied);
     this.runner.applySnapshot(next, prev, applied);
     this.previous = next;
   }
@@ -279,6 +304,35 @@ class World {
 
   private project(target: InteractableTarget): ScreenPoint | null {
     return this.disposed ? null : this.interaction.project(target);
+  }
+
+  private screenBounds(target: InteractableTarget): ScreenRect | null {
+    return this.disposed ? null : this.interaction.screenBounds(target);
+  }
+
+  private focus(target: InteractableTarget, options: WorldFocusOptions = {}): void {
+    if (this.disposed) return;
+    const centre = this.focusCentre;
+    const rect = this.interaction.screenBounds(target, centre);
+    if (!rect) return;
+    const { width, height } = this.rig.viewport;
+    const visibleBottom = height - clamp(options.avoidBottomPx ?? 0, 0, height * 0.8);
+    const visibleTop = clamp(options.avoidTopPx ?? 0, 0, visibleBottom * 0.5);
+    const pad = Math.min(FOCUS_PADDING_PX, (visibleBottom - visibleTop) * 0.08);
+    const inView =
+      rect.left >= pad && rect.right <= width - pad && rect.top >= visibleTop + pad && rect.bottom <= visibleBottom - pad;
+    if (inView) return;
+    // Centre the drawn box in the visible area; one too tall for it keeps its top (the anchor, the face) in view.
+    const rectHeight = rect.bottom - rect.top;
+    const wantY =
+      rectHeight > visibleBottom - visibleTop - 2 * pad ? visibleTop + pad + rectHeight / 2 : (visibleTop + visibleBottom) / 2;
+    // Projection is affine, so moving the box's centre by an offset moves its world centre by the same offset.
+    const drawn = this.rig.project(centre);
+    const at = {
+      x: drawn.x + (width / 2 - (rect.left + rect.right) / 2),
+      y: drawn.y + (wantY - (rect.top + rect.bottom) / 2),
+    };
+    this.rig.focusPoint(centre, at, { seconds: options.seconds });
   }
 
   private zoomBy(factor: number): void {
@@ -326,6 +380,9 @@ class World {
       disposeTree(child);
     }
     for (const material of materials) material.dispose();
+    // The prop/character caches are module-level: free them with the world so a
+    // re-created world (StrictMode, the 3D toggle) starts from clean GPU state.
+    disposeSharedResources();
     // The context outlives this renderer whenever a new world is created on the
     // same canvas (React StrictMode does exactly that). Hand it back in its
     // default state: a leftover such as UNPACK_FLIP_Y would otherwise trip up
@@ -333,6 +390,7 @@ class World {
     this.renderer.resetState();
     this.renderer.dispose();
     this.previous = null;
+    this.shot = null;
     debugByHandle.delete(this.handle);
     releaseContextWhenOrphaned(this.canvas, this.gl);
   }
@@ -359,33 +417,32 @@ class World {
   }
 
   /** Point the camera, the pan limits and the shadow frustum at the layout being applied. */
-  private frameLayout(
-    next: WorldSnapshot,
-    prev: WorldSnapshot | null,
-    previousLayout: OfficeLayout,
-    events: readonly WorldEvent[]
-  ): void {
+  private frameLayout(next: WorldSnapshot, prev: WorldSnapshot | null, events: readonly WorldEvent[]): void {
     const layout = this.layout;
-    // Bounds first: the new framing's target is clamped against them.
+    // Bounds first: the new framing's target is clamped against them. Pan limits
+    // reach the whole diorama (ground tile, everything for sale); the shadow
+    // frustum covers the tile and what actually casts a shadow.
     this.rig.setBounds(layoutBounds(layout, [...next.ownedAssets, ...next.availableAssets]), PAN_MARGIN);
     this.lighting.setBounds(layoutBounds(layout, next.ownedAssets));
 
-    // The frame is what the default shot must contain, as on-screen extents.
-    // Handing the rig both extents (rather than layout.camera.viewHeight, which
-    // is pre-computed for one reference aspect ratio) lets it fill a wide, short
-    // viewport and still fit everything into a phone in portrait.
-    const frame = getLayoutFrame(layout);
-    const previousFrame = getLayoutFrame(previousLayout);
-    const firstSnapshot = prev === null;
+    // The default shot frames the building — floor, walls, doorway and owned
+    // assets — tightly, as on-screen extents, and the rig fits whichever of its
+    // width and height binds on this canvas. Scenery (lawn, street, skyline,
+    // blueprints) may crop at the edges; the player can pan to it.
+    const frame = computeBuildingFrame(layout, next.ownedAssets);
+    const previousFrame = this.shot;
+    this.shot = frame;
+    const firstSnapshot = prev === null || previousFrame === null;
     const phaseChanged =
       firstSnapshot || prev.phase !== next.phase || events.some((event) => event.type === "phase-changed");
     const frameChanged =
+      previousFrame === null ||
       frame.width !== previousFrame.width ||
       frame.height !== previousFrame.height ||
       frame.target.x !== previousFrame.target.x ||
       frame.target.z !== previousFrame.target.z;
     if (!phaseChanged && !frameChanged) return;
-    this.rig.setFraming(frame.target, frame.height, { instant: firstSnapshot, fitWidth: frame.width });
+    this.rig.setFraming(frame.target, frame.height, { instant: firstSnapshot, fitWidth: frame.width, fill: FRAME_FILL });
   }
 
   // ── Size ──────────────────────────────────────────────────────────────────
@@ -477,6 +534,7 @@ class World {
     // three.js has already rebuilt its GL state in its own (earlier) listener.
     this.contextLost = false;
     this.syncLoop();
+    this.callbacks.onContextRestored?.();
   };
 }
 

@@ -27,6 +27,7 @@ import {
   PHASE_THEMES,
   phaseTier,
   roundedRect,
+  SCALE,
   STEEL,
   unitDisc,
   unitPlane,
@@ -34,7 +35,7 @@ import {
 } from "../../core/palette";
 import type { CanvasDraw } from "../../core/palette";
 import { addCommandPlate, clamp01, hash01, PropKit, shapeMesh, texturedPlane } from "./shared";
-import type { Footprint, PropHandle } from "./shared";
+import type { PropFootprint, PropHandle } from "./shared";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Floor + ground
@@ -377,7 +378,7 @@ const drawWall = (b: ModelBuilder, glass: ModelBuilder, length: number, height: 
  * rotate it by +π/2.
  */
 export const createWall = (length: number, options: WallOptions = {}): PropHandle => {
-  const height = options.height ?? 2.6;
+  const height = options.height ?? SCALE.wall;
   const style = options.style ?? "plaster";
   const kit = new PropKit(`wall:${style}`);
   const solid = new ModelBuilder();
@@ -394,7 +395,7 @@ export const createWall = (length: number, options: WallOptions = {}): PropHandl
 
 /** Square post for the corner where the two back walls meet. Same origin rule as walls (centre of its footprint). */
 export const createCornerPost = (options: { height?: number; style?: WallStyle } = {}): PropHandle => {
-  const height = options.height ?? 2.6;
+  const height = options.height ?? SCALE.wall;
   const style = options.style ?? "plaster";
   const look = WALL_LOOKS[style];
   const kit = new PropKit("corner-post");
@@ -435,7 +436,7 @@ export interface DoorHandle extends PropHandle {
 
 const DOOR_W = 1.0;
 const DOOR_H = 2.1;
-export const DOOR_FOOTPRINT: Footprint = { w: 1.3, d: 0.2 };
+export const DOOR_FOOTPRINT: PropFootprint = { w: 1.3, d: 0.2 };
 
 /**
  * Free-standing door frame with a hinged leaf, styled per phase. Front (+Z)
@@ -456,8 +457,8 @@ export const createDoor = (phase: CompanyPhase = "office"): DoorHandle => {
     // Welcome mat on the room side.
     b.box(0.8, 0.014, 0.5, tier === 0 ? 0x8a6a45 : theme.accents[0], 0, 0, 0.4, { r: 0 });
     b.box(0.66, 0.016, 0.36, tier === 0 ? 0x9c7a52 : darken(theme.accents[0], 0.15), 0, 0, 0.4, { r: 0 });
-    addCommandPlate(kit, b, "phases", 0, DOOR_H + 0.14, 0.02, 0.17, 0.15);
   });
+  addCommandPlate(kit, "phases", 0, DOOR_H + 0.14, 0.02, 0.17, 0.15);
 
   const drawLeaf = (b: ModelBuilder, w: number): void => {
     // Drawn with the hinge on the origin, the leaf extending toward +X.
@@ -517,27 +518,51 @@ export const createDoor = (phase: CompanyPhase = "office"): DoorHandle => {
   });
 };
 
+export interface GarageDoorOptions {
+  /**
+   * Cut-away version for a door that stands between the camera and the room:
+   * the same posts, but the header is reduced to its drum so it hides as little
+   * of the interior as possible. Default false.
+   */
+  slim?: boolean;
+}
+
 /**
  * Roll-up garage door shown raised: two posts, the header with the curtain
  * rolled into its drum, and a couple of slats still hanging. Runs along X; the
  * opening is `width` wide and clear to 2.1.
  */
-export const createGarageDoor = (width = 3.2): PropHandle => {
+export const createGarageDoor = (width = 3.2, options: GarageDoorOptions = {}): PropHandle => {
+  const slim = options.slim ?? false;
   const kit = new PropKit("garage-door");
   kit.ownModel((b) => {
     const steel = C.galvanised;
-    for (const sx of [-1, 1]) {
-      b.box(0.14, 2.5, 0.16, 0xcfc8b8, sx * (width / 2 + 0.07), 0, 0, { r: 0.014 });
-      b.box(0.05, 2.2, 0.06, steel, sx * (width / 2 - 0.03), 0, 0.02, { r: 0 });
+    const frame = 0xcfc8b8;
+    if (slim) {
+      // Guide rails only, the drum resting on their tops.
+      for (const sx of [-1, 1]) {
+        b.box(0.1, 2.34, 0.12, frame, sx * (width / 2 + 0.05), 0, 0, { r: 0.014 });
+        b.box(0.04, 2.2, 0.05, steel, sx * (width / 2 - 0.02), 0, 0.02, { r: 0 });
+        b.box(0.16, 0.2, 0.16, frame, sx * (width / 2 + 0.05), 2.26, 0, { r: 0.02 });
+      }
+      b.cyl(0.085, width + 0.1, 0xe4e0d6, 0, 2.275, 0, { axis: "x", seg: 10 });
+      b.box(width - 0.1, 0.06, 0.03, 0xd8d3c7, 0, 2.2, 0.05, { r: 0.008 });
+    } else {
+      for (const sx of [-1, 1]) {
+        b.box(0.14, 2.5, 0.16, frame, sx * (width / 2 + 0.07), 0, 0, { r: 0.014 });
+        b.box(0.05, 2.2, 0.06, steel, sx * (width / 2 - 0.03), 0, 0.02, { r: 0 });
+      }
+      b.box(width + 0.28, 0.2, 0.2, frame, 0, 2.5, 0, { r: 0.014 });
+      // Drum + the last slats of the curtain.
+      b.cyl(0.17, width - 0.04, 0xe4e0d6, 0, 2.2, -0.02, { axis: "x", seg: 12 });
+      for (let i = 0; i < 3; i += 1) b.box(width - 0.08, 0.1, 0.035, i % 2 ? 0xe4e0d6 : 0xd8d3c7, 0, 2.02 - i * 0.105, 0.04, { r: 0.008 });
+      b.box(0.3, 0.03, 0.05, C.charcoal, 0, 1.79, 0.07, { r: 0.008 });
     }
-    b.box(width + 0.28, 0.2, 0.2, 0xcfc8b8, 0, 2.5, 0, { r: 0.014 });
-    // Drum + the last slats of the curtain.
-    b.cyl(0.17, width - 0.04, 0xe4e0d6, 0, 2.2, -0.02, { axis: "x", seg: 12 });
-    for (let i = 0; i < 3; i += 1) b.box(width - 0.08, 0.1, 0.035, i % 2 ? 0xe4e0d6 : 0xd8d3c7, 0, 2.02 - i * 0.105, 0.04, { r: 0.008 });
-    b.box(0.3, 0.03, 0.05, C.charcoal, 0, 1.79, 0.07, { r: 0.008 });
     // Pull cord.
-    b.tube([width / 2 - 0.2, 1.8, 0.06], [width / 2 - 0.2, 1.35, 0.06], 0.008, C.red, { seg: 5 });
+    b.tube([width / 2 - 0.2, slim ? 2.2 : 1.8, 0.06], [width / 2 - 0.2, 1.35, 0.06], 0.008, C.red, { seg: 5 });
     b.ball(0.03, C.red, width / 2 - 0.2, 1.31, 0.06, { seg: 6 });
+    // Threshold strip where the door comes down.
+    if (slim) b.box(width, 0.012, 0.1, C.concreteDark, 0, 0, 0, { r: 0 });
   });
   return kit.finish({ w: width + 0.28, d: 0.3 });
 };
@@ -685,7 +710,7 @@ export interface PendantOptions {
  * line, a cable and a dome shade. `setGlow` lights it and its floor pool.
  */
 export const createPendantLamp = (options: PendantOptions = {}): PropHandle => {
-  const ceiling = options.ceiling ?? 2.6;
+  const ceiling = options.ceiling ?? SCALE.wall;
   const drop = options.drop ?? 1.9;
   const shade = options.shade ?? C.teal;
   const kit = new PropKit("pendant");

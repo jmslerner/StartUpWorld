@@ -8,6 +8,7 @@ import type {
   InteractableRegistry,
   InteractableTarget,
   ScreenPoint,
+  ScreenRect,
   WorldCallbacks,
 } from "../types";
 import { computeLocalBounds, createFootprint, footprintFromBounds } from "./footprint";
@@ -97,6 +98,9 @@ export class Interaction implements InteractableRegistry {
   private readonly pointer: ScreenPoint = { x: 0, y: 0 };
   private readonly scratchPoint: ScreenPoint = { x: 0, y: 0 };
   private readonly anchorPoint: ScreenPoint = { x: 0, y: 0 };
+  private readonly measureBounds = new THREE.Box3();
+  private readonly measureCorner = new THREE.Vector3();
+  private readonly measureScreen: ScreenPoint = { x: 0, y: 0 };
   private readonly previousTouchAction: string;
   private readonly previousCursor: string;
 
@@ -179,6 +183,59 @@ export class Interaction implements InteractableRegistry {
   project(target: InteractableTarget): ScreenPoint | null {
     const entry = this.store.get(target);
     return entry ? this.store.projectEntry(entry) : null;
+  }
+
+  /**
+   * Where a target is drawn on the canvas: the projected corners of the box
+   * around its visible meshes, plus its anchor. Writes the box's world-space
+   * centre into `centre` when given. Null when the target is not in the scene.
+   */
+  screenBounds(target: InteractableTarget, centre?: THREE.Vector3): ScreenRect | null {
+    const entry = this.store.get(target);
+    if (!entry || !this.store.isLive(entry)) return null;
+    const anchor = this.store.projectEntry(entry, this.measureScreen);
+    if (!anchor) return null;
+    const rect: ScreenRect = { left: anchor.x, top: anchor.y, right: anchor.x, bottom: anchor.y };
+    const { object } = entry;
+    const bounds = this.measureBounds;
+    const corner = this.measureCorner;
+    if (!computeLocalBounds(object, bounds)) {
+      // Nothing visible to measure: the anchor and the ground beneath it.
+      this.store.anchorWorld(entry, corner);
+      corner.y = 0;
+      centre?.copy(corner);
+      const ground = this.rig.project(corner, this.measureScreen);
+      rect.bottom = Math.max(rect.bottom, ground.y);
+      return rect;
+    }
+    let minX = Infinity;
+    let minY = Infinity;
+    let minZ = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    let maxZ = -Infinity;
+    for (let index = 0; index < 8; index += 1) {
+      corner
+        .set(
+          index & 1 ? bounds.max.x : bounds.min.x,
+          index & 2 ? bounds.max.y : bounds.min.y,
+          index & 4 ? bounds.max.z : bounds.min.z
+        )
+        .applyMatrix4(object.matrixWorld);
+      minX = Math.min(minX, corner.x);
+      minY = Math.min(minY, corner.y);
+      minZ = Math.min(minZ, corner.z);
+      maxX = Math.max(maxX, corner.x);
+      maxY = Math.max(maxY, corner.y);
+      maxZ = Math.max(maxZ, corner.z);
+      const screen = this.rig.project(corner, this.measureScreen);
+      rect.left = Math.min(rect.left, screen.x);
+      rect.right = Math.max(rect.right, screen.x);
+      rect.top = Math.min(rect.top, screen.y);
+      rect.bottom = Math.max(rect.bottom, screen.y);
+    }
+    centre?.set((minX + maxX) / 2, (minY + maxY) / 2, (minZ + maxZ) / 2);
+    return rect;
   }
 
   /** Per frame, after the systems and the camera have moved: hover, highlights, anchor tracking. */

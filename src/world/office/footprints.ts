@@ -138,6 +138,144 @@ export const ASSET_IDS: readonly AssetId[] = ["office-upgrade", "lounge", "helic
 /** Assets that live outside the building (off the open +X / +Z sides) in every phase. */
 export const OUTDOOR_ASSET_IDS: readonly AssetId[] = ["helicopter", "jet", "yacht"];
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Set dressing that stands on the floor
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Free-standing indoor set dressing: furniture that is not a desk, a station or
+ * an asset, but that people still have to walk around. The floor plans say
+ * where each piece stands; OfficeSystem builds the matching prop.
+ */
+export type DecorKind =
+  | "plant"
+  | "plant-large"
+  | "bookshelf"
+  | "filing-cabinet"
+  | "boxes"
+  | "couch"
+  | "couch-wide"
+  | "coffee-table"
+  | "water-cooler"
+  | "whiteboard"
+  | "bicycle"
+  | "ping-pong"
+  | "arcade"
+  | "vending"
+  | "trophy-shelf"
+  | "stock-ticker"
+  | "reception"
+  | "meeting-pod"
+  | "floor-lamp"
+  | "guest-desk"
+  | "partition";
+
+/**
+ * Floor area each kind of set dressing needs (the props are built to fit).
+ * A "partition" is as long as its spot says (`DecorSpot.width`).
+ */
+export const DECOR_SIZES: Record<DecorKind, FootprintSize> = {
+  plant: { width: 0.55, depth: 0.55 },
+  "plant-large": { width: 0.8, depth: 0.8 },
+  bookshelf: { width: 0.95, depth: 0.34 },
+  "filing-cabinet": { width: 0.46, depth: 0.6 },
+  boxes: { width: 1.0, depth: 0.6 },
+  couch: { width: 1.6, depth: 0.84 },
+  "couch-wide": { width: 2.22, depth: 0.84 },
+  "coffee-table": { width: 1.0, depth: 0.55 },
+  "water-cooler": { width: 0.45, depth: 0.4 },
+  whiteboard: { width: 1.62, depth: 0.5 },
+  bicycle: { width: 0.6, depth: 1.75 },
+  "ping-pong": { width: 2.2, depth: 1.37 },
+  arcade: { width: 0.72, depth: 0.8 },
+  vending: { width: 0.92, depth: 0.74 },
+  "trophy-shelf": { width: 1.1, depth: 0.36 },
+  "stock-ticker": { width: 2.8, depth: 0.3 },
+  reception: { width: 2.36, depth: 0.9 },
+  "meeting-pod": { width: 2.4, depth: 2.0 },
+  "floor-lamp": { width: 0.4, depth: 0.4 },
+  // Somebody else's desk and chair in a shared space, as one block.
+  "guest-desk": { width: 1.3, depth: 1.25 },
+  partition: { width: 1, depth: 0.16 },
+};
+
+/** One piece of set dressing: where it stands and which way its front faces. */
+export interface DecorSpot extends Placement {
+  kind: DecorKind;
+  /** Picks a colour / arrangement among the prop's variants. */
+  variant: number;
+  /** Extent across the facing, for kinds without a fixed size (partitions). */
+  width?: number;
+}
+
+/** Width of the strip of shared loft beyond the coworking floor's +X edge. */
+export const LOFT_ANNEX_WIDTH = 2.5;
+
+/**
+ * Height the scenery behind the back walls reaches, where there is any (the
+ * skyline behind the public HQ). The default shot leaves room for it.
+ */
+export const SKYLINE_HEIGHTS: Record<CompanyPhase, number> = {
+  garage: 0,
+  coworking: 0,
+  office: 0,
+  unicorn: 0,
+  public: 5.6,
+};
+
+/**
+ * How far the ground tile under the building extends past the floor on each
+ * side. The back sides only need room for the walls; the open sides carry the
+ * street, the driveway and whatever stands outside.
+ */
+export interface GroundMargins {
+  negX: number;
+  posX: number;
+  negZ: number;
+  posZ: number;
+}
+
+export const GROUND_MARGINS: Record<CompanyPhase, GroundMargins> = {
+  // The garage's driveway runs out of the +X side to the street, where a car is parked.
+  garage: { negX: 1.2, posX: 4.7, negZ: 1.2, posZ: 2.4 },
+  // +X is the rest of the shared loft (other people's desks); +Z is a pavement and a road.
+  coworking: { negX: 1.2, posX: LOFT_ANNEX_WIDTH, negZ: 1.2, posZ: 3.4 },
+  office: { negX: 1.2, posX: 2.2, negZ: 1.2, posZ: 2.4 },
+  unicorn: { negX: 1.4, posX: 2.2, negZ: 1.4, posZ: 2.4 },
+  public: { negX: 1.4, posX: 2.2, negZ: 1.4, posZ: 2.4 },
+};
+
+/**
+ * How far the ground's surface lies below the office floor (y = 0). Just enough
+ * that the ground never shows through the joints between floor tiles, and the
+ * floor reads as a slab laid on the site. Roads, pads and paving sink with it.
+ */
+export const GROUND_SINK = 0.02;
+
+/** Thickness of the ground tile, i.e. how far below y = 0 the diorama reaches. */
+export const GROUND_DEPTH = 0.5;
+
+export interface GroundRect {
+  minX: number;
+  maxX: number;
+  minZ: number;
+  maxZ: number;
+}
+
+/** The ground tile the building stands on: the floor grown by the phase's margins. */
+export const groundRect = (layout: Pick<OfficeLayout, "phase" | "floor">): GroundRect => {
+  const margins = GROUND_MARGINS[layout.phase];
+  return {
+    minX: layout.floor.minX - margins.negX,
+    maxX: layout.floor.maxX + margins.posX,
+    minZ: layout.floor.minZ - margins.negZ,
+    maxZ: layout.floor.maxZ + margins.posZ,
+  };
+};
+
+/** Paving kept around an asset parked outside, beyond its own footprint. */
+export const APRON_MARGIN = 0.5;
+
 /** An oriented rectangle on the floor. */
 export interface Footprint extends FootprintSize {
   /** Centre. */
@@ -180,8 +318,15 @@ export interface OverflowObstacle extends Footprint {
   slotIndex: number;
 }
 
+export interface DecorObstacle extends Footprint {
+  kind: "decor";
+  decor: DecorKind;
+  /** Index into getLayoutDecor(layout). */
+  decorIndex: number;
+}
+
 /** Something on the floor that people walk around. */
-export type Obstacle = DeskObstacle | ChairObstacle | StationObstacle | AssetObstacle | OverflowObstacle;
+export type Obstacle = DeskObstacle | ChairObstacle | StationObstacle | AssetObstacle | OverflowObstacle | DecorObstacle;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Rectangle maths
@@ -382,6 +527,28 @@ export const isFootprintInsideFloor = (
 // ─────────────────────────────────────────────────────────────────────────────
 
 const obstacleCache = new WeakMap<OfficeLayout, readonly Obstacle[]>();
+const decorByLayout = new WeakMap<OfficeLayout, readonly DecorSpot[]>();
+const NO_DECOR: readonly DecorSpot[] = Object.freeze([]);
+
+/**
+ * For layouts.ts only: record the set dressing of a floor plan. It is kept
+ * beside the layout rather than on it because OfficeLayout (../types.ts) is the
+ * cross-team contract and says nothing about décor. Must be called before the
+ * layout's obstacles are first asked for.
+ */
+export const registerLayoutDecor = (layout: OfficeLayout, decor: readonly DecorSpot[]): void => {
+  decorByLayout.set(layout, decor);
+};
+
+/** The free-standing set dressing of a layout from getOfficeLayout (empty for any other layout). */
+export const getLayoutDecor = (layout: OfficeLayout): readonly DecorSpot[] => decorByLayout.get(layout) ?? NO_DECOR;
+
+export const decorSize = (spot: DecorSpot): FootprintSize => {
+  const size = DECOR_SIZES[spot.kind];
+  return spot.width === undefined ? size : { width: spot.width, depth: size.depth };
+};
+
+export const decorFootprint = (spot: DecorSpot): Footprint => makeFootprint(spot, decorSize(spot), spot.facing);
 
 const buildObstacles = (layout: OfficeLayout): readonly Obstacle[] => {
   const obstacles: Obstacle[] = [];
@@ -411,12 +578,17 @@ const buildObstacles = (layout: OfficeLayout): readonly Obstacle[] => {
     }
   }
 
+  getLayoutDecor(layout).forEach((spot, decorIndex) => {
+    obstacles.push({ ...decorFootprint(spot), kind: "decor", decor: spot.kind, decorIndex });
+  });
+
   return Object.freeze(obstacles);
 };
 
 /**
  * Everything on the floor of this layout that blocks walking: desks, chairs,
- * stations, overflow cushions and indoor asset zones. Memoised per layout object.
+ * stations, overflow cushions, indoor asset zones and free-standing set
+ * dressing. Memoised per layout object.
  *
  * The office builder can use the same list to place props (filter by `kind`).
  */

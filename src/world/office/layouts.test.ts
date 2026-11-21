@@ -17,11 +17,14 @@ import {
   OUTDOOR_ASSET_IDS,
   STAND_DISTANCE,
   STATION_KINDS,
+  FRAME_APRON,
+  GROUND_DEPTH,
   STATION_SIZES,
   WALL_HEIGHT,
   assetFootprint,
   chairFootprint,
   computeLayoutFrame,
+  decorFootprint,
   deskCenter,
   deskFootprint,
   doorExterior,
@@ -31,9 +34,11 @@ import {
   footprintGap,
   footprintsOverlap,
   forwardOf,
+  getLayoutDecor,
   getLayoutFrame,
   getLayoutObstacles,
   getOfficeLayout,
+  groundRect,
   isFootprintInsideFloor,
   isInsideFloor,
   isOutdoorAsset,
@@ -112,7 +117,9 @@ const describeObstacle = (obstacle: Obstacle): string =>
       ? `asset ${obstacle.assetId}`
       : obstacle.kind === "overflow"
         ? `overflow ${obstacle.slotIndex}`
-        : `${obstacle.kind} ${obstacle.seatKind} ${obstacle.slotIndex}`;
+        : obstacle.kind === "decor"
+          ? `decor ${obstacle.decor} ${obstacle.decorIndex}`
+          : `${obstacle.kind} ${obstacle.seatKind} ${obstacle.slotIndex}`;
 
 /** Obstacles a walk from `from` to `to` comes within `pad` of, ignoring the furniture each end sits in. */
 const obstaclesCrossed = (layout: OfficeLayout, from: Destination, to: Destination, path: Vec2[], pad: number): string[] => {
@@ -416,6 +423,64 @@ describe.each(PHASES)("%s floor plan", (phase) => {
     expect(frame.height).toBeGreaterThan(0);
   });
 
+  it("fits the whole ground tile across the default shot, and the building with its doorstep down it", () => {
+    const frame = getLayoutFrame(layout);
+    const sinAz = Math.sin(ISO_AZIMUTH);
+    const cosAz = Math.cos(ISO_AZIMUTH);
+    const sinEl = Math.sin(ISO_ELEVATION);
+    const cosEl = Math.cos(ISO_ELEVATION);
+    const project = (x: number, y: number, z: number): { u: number; v: number } => ({
+      u: x * cosAz - z * sinAz,
+      v: -(x * sinAz + z * cosAz) * sinEl + y * cosEl,
+    });
+    const centre = project(frame.target.x, 0, frame.target.z);
+    const ground = groundRect(layout);
+    expect(ground.minX).toBeLessThan(layout.floor.minX);
+    expect(ground.maxX).toBeGreaterThan(layout.floor.maxX);
+    expect(ground.minZ).toBeLessThan(layout.floor.minZ);
+    expect(ground.maxZ).toBeGreaterThan(layout.floor.maxZ);
+    // Side to side nothing of the diorama is cut off (this is what a phone in portrait is limited by).
+    const corners = [
+      project(ground.minX, 0, ground.minZ),
+      project(ground.minX, 0, ground.maxZ),
+      project(ground.maxX, 0, ground.minZ),
+      project(ground.maxX, 0, ground.maxZ),
+    ];
+    for (const point of corners) {
+      expect(Math.abs(point.u - centre.u)).toBeLessThanOrEqual(frame.width / 2);
+    }
+    // Top to bottom the shot holds the building and the ground just outside its open
+    // edges — where the door is and people arrive — but not the tile's far corner:
+    // on the wide, short viewport above the terminal that corner would cost the office its size.
+    const doorstep = project(
+      Math.min(ground.maxX, layout.floor.maxX + FRAME_APRON),
+      0,
+      Math.min(ground.maxZ, layout.floor.maxZ + FRAME_APRON)
+    );
+    const outside = doorExterior(layout, 0.8);
+    for (const point of [doorstep, project(outside.x, 0, outside.z), project(outside.x, 1.6, outside.z)]) {
+      expect(Math.abs(point.u - centre.u)).toBeLessThanOrEqual(frame.width / 2);
+      expect(Math.abs(point.v - centre.v)).toBeLessThanOrEqual(frame.height / 2);
+    }
+    const tileCorner = project(ground.maxX, -GROUND_DEPTH, ground.maxZ);
+    expect(Math.abs(tileCorner.v - centre.v)).toBeGreaterThan(frame.height / 2);
+  });
+
+  it("stands its set dressing on the floor, and shares it between asset variants", () => {
+    const decor = getLayoutDecor(layout);
+    expect(decor.length).toBeGreaterThan(0);
+    expect(getLayoutDecor(getOfficeLayout(phase, ALL_ASSETS))).toBe(decor);
+    for (const spot of decor) {
+      expect(isFootprintInsideFloor(layout, decorFootprint(spot)), `${spot.kind} @ ${spot.x},${spot.z}`).toBe(true);
+    }
+    const blockers = obstacles.filter((obstacle) => obstacle.kind === "decor");
+    expect(blockers.length).toBe(decor.length);
+    // No stand spot, wander spot or the door has been furnished over.
+    for (const spot of [...STATION_KINDS.map((kind) => layout.stationStandSpots[kind]), ...layout.wanderSpots, layout.door]) {
+      expect(isWalkable(layout, spot), `spot ${spot.x},${spot.z}`).toBe(true);
+    }
+  });
+
   it("does not waste the shot: the default view is at most a third bigger than its content", () => {
     const frame = getLayoutFrame(layout);
     expect(layout.camera.viewHeight).toBeLessThanOrEqual(frame.height * 1.34);
@@ -477,6 +542,17 @@ describe.each(PHASES)("%s floor plan", (phase) => {
 });
 
 describe("getOfficeLayout", () => {
+  it("knows of no set dressing for a layout it did not make", () => {
+    const copy = { ...getOfficeLayout("office") };
+    expect(getLayoutDecor(copy)).toEqual([]);
+    expect(getLayoutObstacles(copy).some((obstacle) => obstacle.kind === "decor")).toBe(false);
+  });
+
+  it("moors the yacht with its jetty side toward the building", () => {
+    // The yacht prop has its jetty on local +X; a bow pointing toward −Z turns that side to −X.
+    for (const phase of PHASES) expect(Math.abs(getOfficeLayout(phase).assetAnchors.yacht.facing)).toBeCloseTo(Math.PI, 6);
+  });
+
   it("is memoised per phase and set of owned assets, in any order", () => {
     for (const phase of PHASES) {
       expect(getOfficeLayout(phase)).toBe(getOfficeLayout(phase));

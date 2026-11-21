@@ -28,18 +28,21 @@ import {
   DESK_SIZE,
   OUTDOOR_ASSET_IDS,
   STAND_DISTANCE,
+  DECOR_SIZES,
   STATION_SIZES,
   WALL_GAP,
+  groundRect,
   isInsideFloor,
   normalizeFacing,
+  registerLayoutDecor,
 } from "./footprints";
-import type { FootprintSize } from "./footprints";
+import type { DecorKind, DecorSpot, FootprintSize } from "./footprints";
 import { FRAME_REFERENCE_ASPECT, computeLayoutFrame, viewHeightForFrame } from "./framing";
 import type { LayoutFrame } from "./framing";
 
 export * from "./footprints";
 export { NAV_AGENT_RADIUS, NAV_CELL_SIZE, findPath, isWalkable, pathLength } from "./pathfinding";
-export { FRAME_REFERENCE_ASPECT, ISO_AZIMUTH, ISO_ELEVATION, computeLayoutFrame, viewHeightForFrame } from "./framing";
+export { FRAME_APRON, FRAME_REFERENCE_ASPECT, ISO_AZIMUTH, ISO_ELEVATION, computeLayoutFrame, viewHeightForFrame } from "./framing";
 export type { LayoutFrame } from "./framing";
 
 type Floor = OfficeLayout["floor"];
@@ -48,6 +51,8 @@ type Floor = OfficeLayout["floor"];
 interface FloorPlan extends Omit<OfficeLayout, "camera"> {
   /** Extra hang-out spots that only exist once the asset has been bought. */
   assetWanderSpots: Partial<Record<AssetId, Placement[]>>;
+  /** Free-standing set dressing: plants, couches, shelves… (see DecorKind in footprints.ts). */
+  decor: DecorSpot[];
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -113,6 +118,14 @@ const standSpots = (
   };
 };
 
+/** A piece of set dressing standing at `spot`, front toward the spot's facing. */
+const decor = (kind: DecorKind, spot: Placement, variant = 0, width?: number): DecorSpot =>
+  width === undefined ? { kind, ...spot, variant } : { kind, ...spot, variant, width };
+
+/** A glass partition `length` long whose middle is at (x, z); `facing` is the side it shows its face to. */
+const partition = (x: number, z: number, facing: number, length: number): DecorSpot =>
+  decor("partition", at(x, z, facing), 0, length);
+
 /** Centre-to-centre spacing of desks standing side by side. */
 const DESK_PITCH = DESK_SIZE.width + 0.1;
 
@@ -162,8 +175,8 @@ const BEYOND_PATIO = PATIO_GAP + ASSET_SIZES.lounge.depth + OUTDOOR_CLEARANCE;
  * Both the jet and the yacht lie parallel to the building. That keeps their
  * tall parts (tail fin, superstructure) a few units away from the edge, so
  * from the camera they do not cover the floor behind them. The yacht's bow
- * points toward +Z, which puts its port (−X) side — where the prop has its
- * jetty — toward the building.
+ * points toward −Z, which puts the side the prop has its jetty on (its local
+ * +X) toward the building.
  *
  * Where along each side they sit is chosen per plan so that, seen by the
  * isometric camera, they tuck under the building's two front edges and enlarge
@@ -176,7 +189,7 @@ const outdoorAnchors = (
 ): Pick<Record<AssetId, Placement>, "helicopter" | "jet" | "yacht"> => ({
   jet: at(spots.jetX, floor.maxZ + OUTDOOR_CLEARANCE + ASSET_SIZES.jet.width / 2, TO_POS_X),
   helicopter: at(spots.helipadX, floor.maxZ + OUTDOOR_CLEARANCE + ASSET_SIZES.helicopter.depth / 2, TO_POS_Z),
-  yacht: at(floor.maxX + (spots.yachtGap ?? OUTDOOR_CLEARANCE) + ASSET_SIZES.yacht.width / 2, spots.yachtZ, TO_POS_Z),
+  yacht: at(floor.maxX + (spots.yachtGap ?? OUTDOOR_CLEARANCE) + ASSET_SIZES.yacht.width / 2, spots.yachtZ, TO_NEG_Z),
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -237,6 +250,11 @@ const garagePlan = (): FloorPlan => {
     ],
     // Standing at the near end of the bar: its far end is somebody's cushion.
     assetWanderSpots: { "office-upgrade": [inFrontOf(bar, ASSET_SIZES["office-upgrade"], 0.5)] },
+    // What was in the garage before the company was: boxes by the door, a cabinet nobody has opened.
+    decor: [
+      decor("filing-cabinet", onBackWall(floor, DECOR_SIZES["filing-cabinet"], 2.45)),
+      decor("boxes", at(3.66, -1.5, TO_NEG_X), 2),
+    ],
     assetAnchors: {
       "office-upgrade": bar,
       lounge: patioLounge(floor, -1.7),
@@ -305,6 +323,13 @@ const coworkingPlan = (): FloorPlan => {
       at(3.3, 2.7, TO_POS_Z),
     ],
     assetWanderSpots: { "office-upgrade": [inFrontOf(bar, ASSET_SIZES["office-upgrade"])] },
+    // A loft somebody has made an effort with: greenery in the corners, a sofa by the meeting table.
+    decor: [
+      decor("plant-large", at(-5.5, -4.5, TO_POS_Z)),
+      decor("water-cooler", onBackWall(floor, DECOR_SIZES["water-cooler"], 2.68)),
+      decor("couch", onSideWall(floor, DECOR_SIZES.couch, 4.1), 1),
+      decor("plant", at(5.6, 4.6, TO_POS_Z), 1),
+    ],
     assetAnchors: {
       "office-upgrade": bar,
       lounge: patioLounge(floor, -3.0),
@@ -388,6 +413,22 @@ const officePlan = (): FloorPlan => {
       "office-upgrade": [inFrontOf(bar, ASSET_SIZES["office-upgrade"])],
       lounge: [inFrontOf(lounge, ASSET_SIZES.lounge, -0.8), inFrontOf(lounge, ASSET_SIZES.lounge, 0.8)],
     },
+    decor: [
+      // The board table gets a glass room of its own in the corner; you walk in past the end of its front wall.
+      partition(-6.3, 3.6, TO_POS_Z, 4.4),
+      partition(-4.0, 4.45, TO_POS_X, 1.7),
+      // A server closet: glass fins either side of the rack.
+      partition(-7.95, -0.65, TO_POS_Z, 1.1),
+      partition(-7.95, 1.52, TO_POS_Z, 1.1),
+      // Kitchenette beside the coffee machine.
+      decor("vending", onBackWall(floor, DECOR_SIZES.vending, 3.5)),
+      decor("water-cooler", onBackWall(floor, DECOR_SIZES["water-cooler"], 2.65)),
+      decor("bookshelf", onSideWall(floor, DECOR_SIZES.bookshelf, -3.7)),
+      decor("plant-large", at(-8.05, -6.05, TO_POS_Z)),
+      decor("plant", at(8.15, -5.15, TO_POS_Z), 1),
+      decor("plant-large", at(6.45, 6.0, TO_POS_Z), 2),
+      decor("plant", at(-0.575, -2.9, TO_POS_Z), 2),
+    ],
     assetAnchors: {
       "office-upgrade": bar,
       lounge,
@@ -471,6 +512,31 @@ const unicornPlan = (): FloorPlan => {
       "office-upgrade": [inFrontOf(bar, ASSET_SIZES["office-upgrade"])],
       lounge: [inFrontOf(lounge, ASSET_SIZES.lounge, -0.8), inFrontOf(lounge, ASSET_SIZES.lounge, 0.8)],
     },
+    decor: [
+      // Glass fins frame the board table against the wall; its long side stays open to the floor.
+      partition(-9.85, 2.9, TO_POS_Z, 3.3),
+      partition(-9.85, 6.95, TO_POS_Z, 3.3),
+      decor("meeting-pod", at(-8.2, -1.2, TO_POS_Z)),
+      decor("reception", at(7.6, 7.3, TO_POS_X)),
+      // The play corner.
+      decor("ping-pong", at(-1.2, 6.4, TO_POS_Z)),
+      decor("arcade", at(3.9, 5.9, TO_POS_Z)),
+      decor("arcade", at(4.75, 5.9, TO_POS_Z), 1),
+      decor("vending", onBackWall(floor, DECOR_SIZES.vending, 3.85), 1),
+      decor("water-cooler", onBackWall(floor, DECOR_SIZES["water-cooler"], 6.98)),
+      // Plants wherever a bench ends or a corner would otherwise be bare.
+      decor("plant-large", at(-10.95, -7.95, TO_POS_Z)),
+      decor("plant", at(-8.7, -8.05, TO_POS_Z), 1),
+      decor("plant-large", at(9.8, -8.0, TO_POS_Z), 1),
+      decor("plant-large", at(10.9, -7.9, TO_POS_Z), 2),
+      decor("plant-large", at(-11.0, 7.8, TO_POS_Z), 3),
+      decor("plant", at(11.05, -0.8, TO_POS_Z), 2),
+      decor("plant", at(-4.675, -5.6, TO_POS_Z)),
+      decor("plant", at(-0.425, -5.6, TO_POS_Z), 1),
+      decor("plant", at(3.825, -5.6, TO_POS_Z), 2),
+      decor("plant", at(-0.425, 4.6, TO_POS_Z), 3),
+      decor("plant", at(3.825, 3.2, TO_POS_Z)),
+    ],
     assetAnchors: {
       "office-upgrade": bar,
       lounge,
@@ -562,6 +628,25 @@ const publicPlan = (): FloorPlan => {
       "office-upgrade": [inFrontOf(bar, ASSET_SIZES["office-upgrade"])],
       lounge: [inFrontOf(lounge, ASSET_SIZES.lounge, -0.8), inFrontOf(lounge, ASSET_SIZES.lounge, 0.8)],
     },
+    decor: [
+      // The boardroom: glass fins from the wall on both sides of the long table.
+      partition(-11.4, 3.3, TO_POS_Z, 4.2),
+      partition(-11.4, 8.1, TO_POS_Z, 4.2),
+      // Lobby: reception by the door, somewhere for visitors to wait.
+      decor("reception", at(8.2, 8.3, TO_POS_X)),
+      decor("couch", at(12.9, 7.0, TO_NEG_X), 4),
+      decor("coffee-table", at(11.9, 7.0, TO_POS_X)),
+      decor("plant-large", at(11.9, 9.0, TO_POS_Z)),
+      decor("trophy-shelf", onBackWall(floor, DECOR_SIZES["trophy-shelf"], 4.6)),
+      decor("water-cooler", onBackWall(floor, DECOR_SIZES["water-cooler"], 8.2)),
+      decor("bookshelf", onSideWall(floor, DECOR_SIZES.bookshelf, -5.5)),
+      decor("bookshelf", onBackWall(floor, DECOR_SIZES.bookshelf, -12.7)),
+      decor("plant-large", at(13.0, -8.95, TO_POS_Z), 1),
+      decor("plant-large", at(-13.0, 8.95, TO_POS_Z), 2),
+      decor("plant", at(-0.4, -4.5, TO_POS_Z), 1),
+      decor("plant", at(-0.4, 4.0, TO_POS_Z), 2),
+      decor("plant", at(13.0, 5.8, TO_POS_Z), 3),
+    ],
     assetAnchors: {
       "office-upgrade": bar,
       lounge,
@@ -636,7 +721,7 @@ export const getOfficeLayout = (phase: CompanyPhase, ownedAssets: readonly Asset
   const cached = layoutCache.get(key);
   if (cached) return cached;
 
-  const frame = computeLayoutFrame(plan, framed);
+  const frame = computeLayoutFrame(plan, framed, groundRect(plan));
   const layout: OfficeLayout = deepFreeze({
     phase: plan.phase,
     floor: plan.floor,
@@ -653,6 +738,7 @@ export const getOfficeLayout = (phase: CompanyPhase, ownedAssets: readonly Asset
   });
   layoutCache.set(key, layout);
   frameCache.set(layout, deepFreeze(frame));
+  registerLayoutDecor(layout, plan.decor);
   return layout;
 };
 

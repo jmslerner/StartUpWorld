@@ -1,5 +1,9 @@
 import * as THREE from "three";
 import { describe, expect, it } from "vitest";
+import type { AssetId, CompanyPhase } from "../../types/game";
+import { computeBuildingFrame } from "../office/framing";
+import { ASSET_HEIGHTS, WALL_HEIGHT, assetFootprint } from "../office/footprints";
+import { getOfficeLayout, groundRect } from "../office/layouts";
 import { CAMERA_ELEVATION, CameraRig, ZOOM_MAX, ZOOM_MIN } from "./CameraRig";
 
 const WIDTH = 1200;
@@ -342,5 +346,156 @@ describe("CameraRig revision", () => {
     expect(rig.revision).toBe(start);
     rig.panByPixels(5, 0);
     expect(rig.revision).toBeGreaterThan(start);
+  });
+});
+
+describe("CameraRig building framing", () => {
+  const PHASES: readonly CompanyPhase[] = ["garage", "coworking", "office", "public", "unicorn"];
+  const OUTDOOR: readonly AssetId[] = ["helicopter", "jet", "yacht"];
+  const FILL = 0.85;
+  const ASPECTS = [0.45, 0.6, 0.8, 1, 1.5, 2, 2.4, 2.9, 3];
+
+  /** Screen rectangle (canvas px) of the building: floor, back walls, doorway, owned assets. */
+  const buildingRect = (rig: CameraRig, phase: CompanyPhase, owned: readonly AssetId[]) => {
+    const layout = getOfficeLayout(phase, owned);
+    const points: Array<{ x: number; y: number; z: number }> = [];
+    const box = (minX: number, maxX: number, minZ: number, maxZ: number, height: number): void => {
+      for (const y of [0, height]) for (const x of [minX, maxX]) for (const z of [minZ, maxZ]) points.push({ x, y, z });
+    };
+    const { floor } = layout;
+    box(floor.minX, floor.maxX, floor.minZ, floor.maxZ, WALL_HEIGHT);
+    points.push({ x: layout.door.x, y: 0, z: layout.door.z });
+    for (const id of owned) {
+      const f = assetFootprint(layout, id);
+      box(f.minX, f.maxX, f.minZ, f.maxZ, ASSET_HEIGHTS[id]);
+    }
+    let left = Infinity;
+    let right = -Infinity;
+    let top = Infinity;
+    let bottom = -Infinity;
+    for (const point of points) {
+      const screen = rig.project(point);
+      left = Math.min(left, screen.x);
+      right = Math.max(right, screen.x);
+      top = Math.min(top, screen.y);
+      bottom = Math.max(bottom, screen.y);
+    }
+    return { left, right, top, bottom, layout };
+  };
+
+  const frameFor = (phase: CompanyPhase, owned: readonly AssetId[], width: number, height: number) => {
+    const rig = new CameraRig();
+    rig.setViewport(width, height);
+    const layout = getOfficeLayout(phase, owned);
+    const frame = computeBuildingFrame(layout, owned);
+    rig.setFraming(frame.target, frame.height, { instant: true, fitWidth: frame.width, fill: FILL });
+    return rig;
+  };
+
+  for (const phase of PHASES) {
+    for (const owned of [[], OUTDOOR] as const) {
+      it(`${phase}${owned.length ? " with outdoor assets" : ""}: fills the binding dimension and crops nothing of the building`, () => {
+        for (const aspect of ASPECTS) {
+          const height = 400;
+          const width = Math.round(height * aspect);
+          const rig = frameFor(phase, owned, width, height);
+          const rect = buildingRect(rig, phase, owned);
+          const fracW = (rect.right - rect.left) / width;
+          const fracH = (rect.bottom - rect.top) / height;
+          const label = `${phase} ${owned.join("+") || "bare"} @ ${aspect}`;
+          // Everything of the building is on screen, with the margin split evenly.
+          expect(rect.left, label).toBeGreaterThan(0);
+          expect(rect.top, label).toBeGreaterThan(0);
+          expect(rect.right, label).toBeLessThan(width);
+          expect(rect.bottom, label).toBeLessThan(height);
+          expect(Math.abs(rect.left - (width - rect.right)), label).toBeLessThan(1);
+          expect(Math.abs(rect.top - (height - rect.bottom)), label).toBeLessThan(1);
+          // Whichever dimension binds is filled to the target; the other one fits.
+          expect(Math.max(fracW, fracH), label).toBeCloseTo(FILL, 3);
+          expect(Math.min(fracW, fracH), label).toBeLessThanOrEqual(FILL + 1e-6);
+        }
+      });
+    }
+  }
+
+  it("frames the building, not the ground tile: scenery may crop on a wide, short canvas", () => {
+    const rig = frameFor("garage", [], 1150, 394);
+    const layout = getOfficeLayout("garage", []);
+    const ground = groundRect(layout);
+    const corners = [
+      rig.project({ x: ground.maxX, y: 0, z: ground.maxZ }),
+      rig.project({ x: ground.minX, y: 0, z: ground.maxZ }),
+      rig.project({ x: ground.maxX, y: 0, z: ground.minZ }),
+    ];
+    // The front corner of the tile (the street) runs off the bottom...
+    expect(corners.some((point) => point.y > 394)).toBe(true);
+    // ...and the building is drawn larger than when the whole tile had to fit across.
+    const rect = buildingRect(rig, "garage", []);
+    expect((rect.bottom - rect.top) / 394).toBeCloseTo(FILL, 3);
+  });
+
+  it("frames owned outdoor assets but not the ones merely for sale", () => {
+    const layout = getOfficeLayout("public", []);
+    const bare = computeBuildingFrame(layout, []);
+    const withJet = computeBuildingFrame(getOfficeLayout("public", ["jet"]), ["jet"]);
+    expect(withJet.width).toBeGreaterThan(bare.width);
+  });
+});
+
+describe("CameraRig focusPoint", () => {
+  it("brings a world point to the requested screen position without zooming", () => {
+    const rig = makeRig();
+    rig.zoomAt(1.5);
+    const zoom = rig.zoom;
+    const point = { x: 2, y: 1, z: 3 };
+    rig.focusPoint(point, { x: 600, y: 150 }, { seconds: 0.5 });
+    run(rig, 1);
+    const drawn = rig.project(point);
+    expect(drawn.x).toBeCloseTo(600, 4);
+    expect(drawn.y).toBeCloseTo(150, 4);
+    expect(rig.zoom).toBeCloseTo(zoom, 9);
+  });
+
+  it("may pass the pan limit by the requested offset, and the next drag does not jump back", () => {
+    const rig = makeRig();
+    rig.setBounds({ minX: -2, maxX: 2, minZ: -2, maxZ: 2 });
+    // A point on the front edge, to be shown near the top (as above a bottom sheet).
+    const point = { x: 2, y: 0, z: 2 };
+    rig.focusPoint(point, { x: WIDTH / 2, y: HEIGHT * 0.25 }, { seconds: 0 });
+    const drawn = rig.project(point);
+    expect(drawn.x).toBeCloseTo(WIDTH / 2, 4);
+    expect(drawn.y).toBeCloseTo(HEIGHT * 0.25, 4);
+    const outside = rig.getTarget();
+    expect(outside.x > 2 || outside.z > 2).toBe(true);
+
+    // A small drag back toward the diorama moves the view by exactly that much,
+    // rather than snapping it back inside the limit.
+    const before = rig.project(point);
+    rig.panByPixels(0, 3);
+    const after = rig.project(point);
+    expect(after.x - before.x).toBeCloseTo(0, 4);
+    expect(after.y - before.y).toBeCloseTo(3, 4);
+
+    // Dragging further out is refused; dragging back in is allowed.
+    const held = rig.getTarget();
+    rig.panByPixels(0, -400);
+    const further = rig.getTarget();
+    expect(further.x).toBeLessThanOrEqual(Math.max(held.x, 2) + 1e-9);
+    expect(further.z).toBeLessThanOrEqual(Math.max(held.z, 2) + 1e-9);
+  });
+
+  it("re-applying unchanged bounds keeps a focus that went past them", () => {
+    const rig = makeRig();
+    const bounds = { minX: -2, maxX: 2, minZ: -2, maxZ: 2 };
+    rig.setBounds(bounds);
+    rig.focusPoint({ x: 2, y: 0, z: 2 }, { x: WIDTH / 2, y: HEIGHT * 0.2 }, { seconds: 0 });
+    const focused = rig.getTarget();
+    rig.setBounds({ ...bounds });
+    expect(rig.getTarget()).toEqual(focused);
+    // New limits (a different office) do apply.
+    rig.setBounds({ minX: -1, maxX: 1, minZ: -1, maxZ: 1 });
+    const clamped = rig.getTarget();
+    expect(clamped.x).toBeLessThanOrEqual(1);
+    expect(clamped.z).toBeLessThanOrEqual(1);
   });
 });

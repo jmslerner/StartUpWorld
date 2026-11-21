@@ -398,7 +398,14 @@ describe("ParticlePool streams", () => {
 // FxSystem (runs without a DOM: sprites are simply skipped)
 // ─────────────────────────────────────────────────────────────────────────────
 
-const seating: SeatingApi = { seatOf: () => null, freeDeskSlots: () => [], hiddenCount: () => 0 };
+const seating: SeatingApi = {
+  seatOf: () => null,
+  freeDeskSlots: () => [],
+  hiddenCount: () => 0,
+  lastChanges: () => [],
+  deskOccupant: () => null,
+  overflowOccupant: () => null,
+};
 const layout = getOfficeLayout("garage", []);
 const snapshot = buildWorldSnapshot(createInitialState());
 

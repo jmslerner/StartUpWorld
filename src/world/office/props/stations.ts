@@ -25,22 +25,22 @@ import {
   lighten,
   mat,
   MIST,
+  ModelBuilder,
   modelMesh,
   NEON,
   PHASE_THEMES,
-  PHASES,
   phaseTier,
   STEEL,
   unitPlane,
   unitSphere,
   vertexMat,
 } from "../../core/palette";
-import type { CanvasDraw, ModelBuilder, PhaseTheme } from "../../core/palette";
+import type { CanvasDraw } from "../../core/palette";
 import { STATION_SIZES, WALL_GAP } from "../footprints";
 import { drawChair, drawMonitor, drawMug, drawPaperCup, drawPlant, SEAT_Y } from "./parts";
 import type { ChairStyle } from "./parts";
 import { addCommandPlate, clamp01, createScreenSurface, hash01, PropKit, Pulse, screenQuads } from "./shared";
-import type { Footprint, PropHandle } from "./shared";
+import type { PropFootprint, PropHandle } from "./shared";
 
 export interface StationHandle extends PropHandle {
   readonly kind: StationKind;
@@ -48,12 +48,12 @@ export interface StationHandle extends PropHandle {
 }
 
 /** The floor rectangle a station fills, per phase (mirrors STATION_SIZES as { w, d }). */
-export const stationFootprint = (kind: StationKind, phase: CompanyPhase): Footprint => {
+export const stationFootprint = (kind: StationKind, phase: CompanyPhase): PropFootprint => {
   const size = STATION_SIZES[phase][kind];
   return { w: size.width, d: size.depth };
 };
 
-const allStationFootprints = (phase: CompanyPhase): Record<StationKind, Footprint> => ({
+const allStationFootprints = (phase: CompanyPhase): Record<StationKind, PropFootprint> => ({
   ship: stationFootprint("ship", phase),
   launch: stationFootprint("launch", phase),
   investors: stationFootprint("investors", phase),
@@ -64,7 +64,7 @@ const allStationFootprints = (phase: CompanyPhase): Record<StationKind, Footprin
   pricing: stationFootprint("pricing", phase),
 });
 
-export const STATION_FOOTPRINTS: Record<CompanyPhase, Record<StationKind, Footprint>> = {
+export const STATION_FOOTPRINTS: Record<CompanyPhase, Record<StationKind, PropFootprint>> = {
   garage: allStationFootprints("garage"),
   coworking: allStationFootprints("coworking"),
   office: allStationFootprints("office"),
@@ -100,7 +100,7 @@ export interface ProductWallHandle extends StationHandle {
   readonly maxNotes: number;
   /** Show the first `count` sticky notes (clamped to 0..maxNotes). */
   setNoteCount(count: number): void;
-  /** Flash the frame: "good" = a clean ship (green glow + bounce), "bad" = a red flicker. */
+  /** Flash the frame: "good" = a clean ship (green glow, the notes jump), "bad" = a red flicker. */
   pulse(kind: "good" | "bad"): void;
 }
 
@@ -153,7 +153,7 @@ export const createProductWall = (phase: CompanyPhase = "office"): ProductWallHa
       });
       b.box(0.11, 0.035, 0.05, C.charcoal, tray / 2 - 0.14, -0.03, face + 0.045, { r: 0.008 });
       if (tier === 0) {
-        // Duct tape holding one corner up, and a printout pinned on.
+        // Duct tape holding one corner up.
         b.box(0.16, 0.05, 0.008, C.tape, -width / 2 + 0.05, BOARD_HEIGHT - 0.04, face + 0.02, { rz: 0.7, r: 0 });
       }
       if (tier >= 3) {
@@ -163,7 +163,6 @@ export const createProductWall = (phase: CompanyPhase = "office"): ProductWallHa
         }
       }
     });
-    void theme;
   });
 
   // Sticky notes: one geometry, revealed with drawRange so any count is one draw call.
@@ -222,17 +221,14 @@ export const createProductWall = (phase: CompanyPhase = "office"): ProductWallHa
   );
   kit.add(frame);
 
-  const plateModel = kit.model(`ship-plate:${phase}`, (b) => {
-    // Flat against the wall: a tilted plate would dig its top edge into the plaster.
-    addCommandPlate(kit, b, STATION_COMMAND.ship, 0, BOARD_BOTTOM + BOARD_HEIGHT + 0.1, wall + 0.045, 0.2, 0);
-  });
-  plateModel.castShadow = false;
+  // Flat against the wall: a tilted plate would dig its top edge into the plaster.
+  addCommandPlate(kit, STATION_COMMAND.ship, 0, BOARD_BOTTOM + BOARD_HEIGHT + 0.1, wall + 0.045, 0.2, 0);
 
   const flash = new Pulse(0.9);
   let flashKind: "good" | "bad" = "good";
-  let noteCount = maxNotes;
+  // Starts with a few notes up so a freshly built board is not bare; the office sets the real count.
+  let noteCount = Math.round(maxNotes * 0.4);
   const applyNotes = (): void => notesGeometry.setDrawRange(0, noteCount * indicesPerNote);
-  noteCount = Math.round(maxNotes * 0.4);
   applyNotes();
 
   kit.onUpdate((dt, elapsed) => {
@@ -240,7 +236,7 @@ export const createProductWall = (phase: CompanyPhase = "office"): ProductWallHa
     const flicker = flashKind === "bad" && Math.sin(elapsed * 55) > 0 ? 0.25 : 1;
     frameMaterial.emissive.copy(idleColor).lerp(_colorA.setHex(flashKind === "good" ? C.good : C.alarm), Math.min(1, p * 2));
     frameMaterial.emissiveIntensity = kit.glowAmount * 0.55 + p * 1.6 * flicker;
-    // A good ship makes the whole board hop off the wall for a moment.
+    // A good ship makes the notes jump off the board and the frame swell for a moment.
     const hop = flashKind === "good" ? Math.sin(Math.min(1, p) * Math.PI) * 0.03 : 0;
     notes.position.z = hop;
     frame.scale.setScalar(1 + hop * 0.5);
@@ -356,8 +352,8 @@ export const createGrowthCorner = (phase: CompanyPhase = "office"): GrowthCorner
       b.cyl(0.022, hornY * 0.5 - 0.1, stand, hornX, hornY * 0.5, 0, { seg: 8 });
     }
     b.place(hornX, hornY, -0.12, { rx: -0.35 }, () => drawMegaphone(b, hornScale, tier === 4 ? C.brass : C.red, C.white));
-    addCommandPlate(kit, b, STATION_COMMAND.launch, boardX, boardY + boardH + 0.03, boardZ, tier === 0 ? 0.14 : 0.17, 0.3);
   });
+  addCommandPlate(kit, STATION_COMMAND.launch, boardX, boardY + boardH + 0.03, boardZ, tier === 0 ? 0.14 : 0.17, 0.3);
 
   // The chart itself: bars that glow when a campaign flashes (and at dusk on LED boards).
   const barMaterial = kit.own(vertexMat().clone());
@@ -502,9 +498,9 @@ export const createInvestorLine = (phase: CompanyPhase = "office"): InvestorLine
       drawPiggyBank(b, 0.22, 0, 0.16, -0.6);
       // Sticky note with an investor's number.
       b.box(0.09, 0.004, 0.09, C.noteYellow, 0.14, 0.74, -0.12, { ry: 0.3, r: 0 });
-      addCommandPlate(kit, b, STATION_COMMAND.investors, -0.02, 1.02, -depth / 2 + 0.03, 0.15, 0.1);
       b.box(0.03, 0.34, 0.03, C.pallet, -0.02, 0.7, -depth / 2 + 0.02, { r: 0 });
     });
+    addCommandPlate(kit, STATION_COMMAND.investors, -0.02, 1.02, -depth / 2 + 0.03, 0.15, 0.1);
   } else if (tier <= 2) {
     // Phone booth pod: a quiet box with a glass door.
     const w = width - 0.06;
@@ -530,8 +526,8 @@ export const createInvestorLine = (phase: CompanyPhase = "office"): InvestorLine
       b.at(phoneAt.x, phoneAt.y, phoneAt.z, 0, () => drawPhoneBody(b, C.charcoal));
       b.cyl(0.15, 0.06, lining, 0, 0.5, 0.02, { seg: 12 });
       b.cyl(0.03, 0.46, C.charcoal, 0, 0.06, 0.02, { seg: 8 });
-      addCommandPlate(kit, b, STATION_COMMAND.investors, 0, h + 0.02, d / 2 - 0.1, 0.17, 0.35);
     });
+    addCommandPlate(kit, STATION_COMMAND.investors, 0, h + 0.02, d / 2 - 0.1, 0.17, 0.35);
     // Glass: door + side windows, one mesh.
     const glass = new THREE.Mesh(
       bakeModel(`investors-glass:${phase}`, (b) => {
@@ -575,37 +571,38 @@ export const createInvestorLine = (phase: CompanyPhase = "office"): InvestorLine
         b.cyl(0.018, 0.8, C.brass, -width / 2 + 0.16, 0.03, depth / 2 - 0.16, { seg: 8 });
         b.ball(0.035, C.brass, -width / 2 + 0.16, 0.81, depth / 2 - 0.16, { seg: 8 });
       }
-      addCommandPlate(kit, b, STATION_COMMAND.investors, -0.15, screenY + screenH + 0.02, screenZ + 0.03, 0.17, 0.2);
     });
+    addCommandPlate(kit, STATION_COMMAND.investors, -0.15, screenY + screenH + 0.02, screenZ + 0.03, 0.17, 0.2);
     screen = createScreenSurface("deck");
     kit.own(screen.material);
     const quad = { x: -0.15, y: screenY + screenH / 2, z: screenZ + 0.057, w: screenW - 0.06, h: screenH - 0.06 };
     kit.add(new THREE.Mesh(screenQuads(`investors:${phase}`, [quad]), screen.material));
   }
 
-  // The part that rattles when the line rings.
-  const handset = kit.model(
-    `investors-handset:${tier === 0 ? "red" : "dark"}`,
+  // The part that rattles when the line rings: a handset, or on the podiums a conference puck.
+  const puck = tier >= 3;
+  const restY = phoneAt.y + (puck ? 0 : 0.1);
+  const handsetPivot = new THREE.Group();
+  handsetPivot.position.set(phoneAt.x, restY, phoneAt.z + (puck ? 0 : -0.07));
+  handsetPivot.rotation.y = tier === 0 ? 0.25 : 0;
+  kit.add(handsetPivot);
+  kit.model(
+    `investors-handset:${tier === 0 ? "red" : puck ? "puck" : "dark"}`,
     (b) => {
-      if (tier >= 3) {
-        // Podiums get a conference phone: a three-armed puck.
+      if (puck) {
         b.cyl(0.07, 0.03, C.charcoal, 0, 0, 0, { seg: 12 });
         for (let i = 0; i < 3; i += 1) b.at(0, 0, 0, (i / 3) * Math.PI * 2, () => b.box(0.05, 0.022, 0.12, C.charcoal, 0, 0, 0.08, { r: 0.01 }));
       } else {
         drawHandset(b, tier === 0 ? C.red : C.charcoal);
       }
     },
-    new THREE.Group()
+    handsetPivot
   );
-  const handsetPivot = handset.parent as THREE.Group;
-  handsetPivot.position.set(phoneAt.x, phoneAt.y + (tier >= 3 ? 0 : 0.1), phoneAt.z + (tier >= 3 ? 0 : -0.07));
-  handsetPivot.rotation.y = tier === 0 ? 0.25 : 0;
-  kit.add(handsetPivot);
 
   const lampMaterial = kit.own(mat(C.charcoal, { emissive: C.good, emissiveIntensity: 0 }).clone());
   const lamp = new THREE.Mesh(unitSphere(10), lampMaterial);
   lamp.scale.setScalar(0.06);
-  lamp.position.set(phoneAt.x + 0.11, phoneAt.y + (tier >= 3 ? 0.04 : 0.1), phoneAt.z + 0.06);
+  lamp.position.set(phoneAt.x + 0.11, phoneAt.y + (puck ? 0.04 : 0.1), phoneAt.z + 0.06);
   kit.add(lamp);
 
   let ringing = false;
@@ -615,7 +612,7 @@ export const createInvestorLine = (phase: CompanyPhase = "office"): InvestorLine
     const cycle = elapsed % 1.4;
     const burst = cycle < 0.35 || (cycle > 0.5 && cycle < 0.85);
     handsetPivot.rotation.z = burst ? Math.sin(elapsed * 60) * 0.12 : 0;
-    handsetPivot.position.y = phoneAt.y + (tier >= 3 ? 0 : 0.1) + (burst ? Math.abs(Math.sin(elapsed * 45)) * 0.018 : 0);
+    handsetPivot.position.y = restY + (burst ? Math.abs(Math.sin(elapsed * 45)) * 0.018 : 0);
     lampMaterial.emissiveIntensity = burst ? 1.6 : 0.2;
     lamp.scale.setScalar(burst ? 0.085 : 0.06);
   });
@@ -628,7 +625,7 @@ export const createInvestorLine = (phase: CompanyPhase = "office"): InvestorLine
       ringing = on;
       if (!on) {
         handsetPivot.rotation.z = 0;
-        handsetPivot.position.y = phoneAt.y + (tier >= 3 ? 0 : 0.1);
+        handsetPivot.position.y = restY;
         lampMaterial.emissiveIntensity = 0;
         lamp.scale.setScalar(0.06);
       }
@@ -711,7 +708,6 @@ export const createBoardTable = (phase: CompanyPhase = "office"): StationHandle 
       ]) {
         b.cyl(0.035, 0.09, C.red, cx, top, cz, { taper: 1.25, seg: 8 });
       }
-      addCommandPlate(kit, b, STATION_COMMAND.boardroom, 0, top + 0.01, -td / 2 + 0.05, 0.14, 0.9);
       return;
     }
 
@@ -734,7 +730,6 @@ export const createBoardTable = (phase: CompanyPhase = "office"): StationHandle 
       drawPaperCup(b, 0.2, top, 0.12);
       drawPaperCup(b, 0.14, top, -0.14, theme.accents[1]);
       drawPlant(b, "small", 0.32, top, -0.04, C.white);
-      addCommandPlate(kit, b, STATION_COMMAND.boardroom, 0, top + 0.005, d / 2 - 0.07, 0.13, 1.0);
       return;
     }
 
@@ -763,8 +758,12 @@ export const createBoardTable = (phase: CompanyPhase = "office"): StationHandle 
       drawPlant(b, "small", tw / 2 - 0.5, top, 0, tier === 4 ? C.brass : C.white, 1);
       drawPlant(b, "small", -tw / 2 + 0.5, top, 0, tier === 4 ? C.brass : C.white, 2);
     }
-    addCommandPlate(kit, b, STATION_COMMAND.boardroom, 0, top + 0.005, 0.2, 0.14, 1.0);
   });
+
+  // A tent card lying back on the table top.
+  if (tier === 0) addCommandPlate(kit, STATION_COMMAND.boardroom, 0, top + 0.01, -(depth - 0.16) / 2 + 0.05, 0.14, 0.9);
+  else if (tier === 1) addCommandPlate(kit, STATION_COMMAND.boardroom, 0, top + 0.005, Math.max(0.5, depth - 0.3) / 2 - 0.07, 0.13, 1.0);
+  else addCommandPlate(kit, STATION_COMMAND.boardroom, 0, top + 0.005, 0.2, 0.14, 1.0);
 
   return kit.finish(stationFootprint("boardroom", phase), { kind: "boardroom" as const, phase });
 };
@@ -843,8 +842,8 @@ export const createWallCalendar = (phase: CompanyPhase = "office"): WallCalendar
         b.box(0.06, 0.06, 0.012, i === 0 ? header : C.greyLight, pageW / 2 + 0.14, pageY + pageH - 0.12 - i * 0.14, wall + 0.012, { r: 0 });
       }
     }
-    addCommandPlate(kit, b, STATION_COMMAND.calendar, 0, pageY - 0.36, wall + 0.045, 0.17, 0);
   });
+  addCommandPlate(kit, STATION_COMMAND.calendar, 0, pageY - 0.36, wall + 0.045, 0.17, 0);
 
   let week = 1;
   const texture = createDynamicTexture(128, 154, drawWeekPage(week, digital, header));
@@ -970,8 +969,15 @@ export const createCoffeeMachine = (phase: CompanyPhase = "office", options: Cof
   const w = width - 0.06;
   const d = depth - 0.06;
   const espresso = upgraded || tier >= 3;
+  // Machine placement is worked out here, not in the (cached) model callback, because the steam needs it too.
+  const machineW = espresso ? (tier === 0 ? Math.min(0.9, w * 0.45, w - 0.24) : Math.min(0.9, w * 0.45)) : 0;
+  const machineX = espresso ? (tier === 0 ? 0 : -w / 2 + Math.min(0.9, w * 0.45) / 2 + 0.12) : tier === 0 ? -0.12 : -w / 2 + 0.3;
   /** Where the steam rises from. */
-  const steamAt = new THREE.Vector3(0, COUNTER_TOP + 0.5, 0);
+  const steamAt = espresso
+    ? new THREE.Vector3(machineX, COUNTER_TOP + 0.5, 0.02)
+    : tier === 0
+      ? new THREE.Vector3(machineX, COUNTER_TOP + 0.27, 0.02)
+      : new THREE.Vector3(machineX, COUNTER_TOP + 0.22, 0.2);
 
   kit.model(`coffee:${phase}:${upgraded ? "up" : "base"}`, (b) => {
     if (tier === 0) {
@@ -1005,19 +1011,13 @@ export const createCoffeeMachine = (phase: CompanyPhase = "office", options: Cof
     // The machine, and whatever else fits along the counter.
     const shell = tier === 4 ? C.brass : C.chrome;
     if (espresso) {
-      const mw = Math.min(0.9, w * 0.45);
-      const mx = tier === 0 ? 0 : -w / 2 + mw / 2 + 0.12;
-      drawEspressoMachine(b, mx, COUNTER_TOP, -0.03, tier === 0 ? Math.min(mw, w - 0.24) : mw, shell);
-      steamAt.set(mx, COUNTER_TOP + 0.5, 0.02);
-      if (w > 1.0) drawGrinder(b, mx + mw / 2 + 0.16, COUNTER_TOP, -0.06, shell);
-      if (w > 2.0) drawGrinder(b, mx + mw / 2 + 0.36, COUNTER_TOP, -0.06, shell);
+      drawEspressoMachine(b, machineX, COUNTER_TOP, -0.03, machineW, shell);
+      if (w > 1.0) drawGrinder(b, machineX + machineW / 2 + 0.16, COUNTER_TOP, -0.06, shell);
+      if (w > 2.0) drawGrinder(b, machineX + machineW / 2 + 0.36, COUNTER_TOP, -0.06, shell);
     } else if (tier === 0) {
-      drawDripMachine(b, -0.12, COUNTER_TOP, -0.04);
-      steamAt.set(-0.12, COUNTER_TOP + 0.27, 0.02);
+      drawDripMachine(b, machineX, COUNTER_TOP, -0.04);
     } else {
-      const mx = -w / 2 + 0.3;
-      drawBeanMachine(b, mx, COUNTER_TOP, -0.03, tier === 1 ? C.white : C.charcoal);
-      steamAt.set(mx, COUNTER_TOP + 0.22, 0.2);
+      drawBeanMachine(b, machineX, COUNTER_TOP, -0.03, tier === 1 ? C.white : C.charcoal);
     }
 
     // Mugs, and extras as the counter gets longer.
@@ -1050,12 +1050,12 @@ export const createCoffeeMachine = (phase: CompanyPhase = "office", options: Cof
       }
       if (tier >= 3) drawPlant(b, "small", right + 0.02, COUNTER_TOP, -0.16, tier === 4 ? C.brass : C.white, 1);
     }
-    addCommandPlate(kit, b, STATION_COMMAND.coffee, tier === 0 ? 0.1 : w / 2 - 0.42, tier === 0 ? 0.4 : 0.34, d / 2 + 0.012, 0.16, 0);
   });
+  addCommandPlate(kit, STATION_COMMAND.coffee, tier === 0 ? 0.1 : w / 2 - 0.42, tier === 0 ? 0.4 : 0.34, d / 2 + 0.012, 0.16, 0);
 
   // Steam: three puffs that swell as they rise, then shrink away (scale only, so they share a material).
   // Unlit: lit steam would go grey on its shaded side.
-  const steamMaterial = glowMat(0xffffff, { opacity: 0.55 });
+  const steamMaterial = glowMat(0xffffff, { opacity: 0.7 });
   const puffs = [0, 1, 2].map(() => {
     const puff = new THREE.Mesh(unitSphere(8), steamMaterial);
     puff.scale.setScalar(0);
@@ -1090,93 +1090,110 @@ interface Led {
   z: number;
 }
 
-export const createServerRack = (phase: CompanyPhase = "office"): ServerRackHandle => {
-  const size = STATION_SIZES[phase].servers;
+const GARAGE_SHELF_Y = 0.78;
+const rackHeight = (tier: number): number => (tier === 1 ? 1.3 : 1.95);
+
+/** Draws the servers of `phase`; when `leds` is given, also records where every status LED sits. */
+const drawServers = (b: ModelBuilder, phase: CompanyPhase, leds: Led[] | null): void => {
+  const { width, depth } = STATION_SIZES[phase].servers;
   const tier = phaseTier(phase);
   const theme = PHASE_THEMES[phase];
-  const kit = new PropKit("station:servers");
-  const { width, depth } = size;
-  const leds: Led[] = [];
-  const ledSize = tier === 0 ? 0.026 : 0.022;
-
-  kit.model(`servers:${phase}`, (b) => {
-    if (tier === 0) {
-      // A beige tower under a plank shelf, with the router on top.
-      const shelf = 0.78;
-      for (const sx of [-1, 1]) {
-        b.box(0.05, shelf, depth - 0.1, C.pallet, sx * (width / 2 - 0.06), 0, 0, { r: 0.01 });
-      }
-      b.box(width - 0.04, 0.045, depth - 0.06, C.plywood, 0, shelf, 0, { r: 0.008 });
-      const beige = 0xdcd3bb;
-      b.box(0.22, 0.48, depth - 0.2, beige, -0.08, 0, 0, { r: 0.016 });
-      b.box(0.17, 0.035, 0.012, C.charcoal, -0.08, 0.38, depth / 2 - 0.096, { r: 0 });
-      b.box(0.17, 0.035, 0.012, C.charcoal, -0.08, 0.32, depth / 2 - 0.096, { r: 0 });
-      b.box(0.17, 0.1, 0.012, darken(beige, 0.12), -0.08, 0.06, depth / 2 - 0.096, { r: 0 });
-      // Desk fan keeping it alive.
-      b.cyl(0.1, 0.03, C.greyDark, 0.2, 0.12, 0.05, { axis: "z", seg: 12 });
-      b.torus(0.1, 0.012, C.charcoal, 0.2, 0.1, 0.05, { axis: "z", seg: 12 });
-      b.box(0.1, 0.03, 0.1, C.charcoal, 0.2, 0, 0.05, { r: 0.01 });
-      b.box(0.02, 0.1, 0.02, C.charcoal, 0.2, 0.02, 0.03, { r: 0 });
-      // Router with antennas.
-      const top = shelf + 0.045;
-      b.box(0.3, 0.05, 0.2, C.black, 0.04, top, 0, { r: 0.016 });
-      for (const sx of [-1, 1]) b.tube([0.04 + sx * 0.12, top + 0.04, -0.08], [0.04 + sx * 0.16, top + 0.3, -0.1], 0.012, C.black, { seg: 6 });
-      // Cable spaghetti.
-      b.tube([0.04, top + 0.02, -0.1], [-0.08, 0.5, -0.16], 0.01, C.blue, { seg: 5 });
-      b.tube([0.1, top + 0.02, -0.1], [0.24, 0.02, -0.14], 0.01, C.yellow, { seg: 5 });
+  if (tier === 0) {
+    // A beige tower under a plank shelf, with the router on top.
+    for (const sx of [-1, 1]) {
+      b.box(0.05, GARAGE_SHELF_Y, depth - 0.1, C.pallet, sx * (width / 2 - 0.06), 0, 0, { r: 0.01 });
+    }
+    b.box(width - 0.04, 0.045, depth - 0.06, C.plywood, 0, GARAGE_SHELF_Y, 0, { r: 0.008 });
+    const beige = 0xdcd3bb;
+    b.box(0.22, 0.48, depth - 0.2, beige, -0.08, 0, 0, { r: 0.016 });
+    b.box(0.17, 0.035, 0.012, C.charcoal, -0.08, 0.38, depth / 2 - 0.096, { r: 0 });
+    b.box(0.17, 0.035, 0.012, C.charcoal, -0.08, 0.32, depth / 2 - 0.096, { r: 0 });
+    b.box(0.17, 0.1, 0.012, darken(beige, 0.12), -0.08, 0.06, depth / 2 - 0.096, { r: 0 });
+    // Desk fan keeping it alive.
+    b.cyl(0.1, 0.03, C.greyDark, 0.2, 0.12, 0.05, { axis: "z", seg: 12 });
+    b.torus(0.1, 0.012, C.charcoal, 0.2, 0.1, 0.05, { axis: "z", seg: 12 });
+    b.box(0.1, 0.03, 0.1, C.charcoal, 0.2, 0, 0.05, { r: 0.01 });
+    b.box(0.02, 0.1, 0.02, C.charcoal, 0.2, 0.02, 0.03, { r: 0 });
+    // Router with antennas.
+    const top = GARAGE_SHELF_Y + 0.045;
+    b.box(0.3, 0.05, 0.2, C.black, 0.04, top, 0, { r: 0.016 });
+    for (const sx of [-1, 1]) b.tube([0.04 + sx * 0.12, top + 0.04, -0.08], [0.04 + sx * 0.16, top + 0.3, -0.1], 0.012, C.black, { seg: 6 });
+    // Cable spaghetti.
+    b.tube([0.04, top + 0.02, -0.1], [-0.08, 0.5, -0.16], 0.01, C.blue, { seg: 5 });
+    b.tube([0.1, top + 0.02, -0.1], [0.24, 0.02, -0.14], 0.01, C.yellow, { seg: 5 });
+    if (leds) {
       for (let i = 0; i < 5; i += 1) leds.push({ x: -0.06 + i * 0.05, y: top + 0.018, z: 0.101 });
       leds.push({ x: -0.14, y: 0.24, z: depth / 2 - 0.094 });
-      addCommandPlate(kit, b, STATION_COMMAND.servers, 0.0, shelf - 0.2, depth / 2 - 0.03, 0.13, 0);
-      return;
     }
+    return;
+  }
 
-    const count = tier;
-    const rackW = (width - 0.1) / count;
-    const rackH = tier === 1 ? 1.3 : 1.95;
-    const rackD = depth - 0.12;
-    const shell = tier === 4 ? 0x3a4250 : 0x4b5563;
-    const trim = tier === 4 ? C.brass : tier === 3 ? theme.glow : C.greyDark;
-    for (let r = 0; r < count; r += 1) {
-      const x = -width / 2 + 0.05 + rackW * (r + 0.5);
-      b.box(rackW - 0.03, rackH, rackD, shell, x, 0.04, -0.02, { r: 0.016 });
-      b.box(rackW - 0.01, 0.04, rackD + 0.02, C.black, x, 0, -0.02, { r: 0 });
-      b.box(rackW - 0.09, rackH - 0.1, 0.01, C.black, x, 0.09, rackD / 2 - 0.02, { r: 0 });
-      b.box(rackW - 0.02, 0.035, rackD + 0.01, trim, x, rackH + 0.03, -0.02, { r: 0.01 });
-      // Server units: light bars with a dark handle, each with a pair of LEDs.
-      const units = Math.floor((rackH - 0.2) / 0.16);
-      const front = rackD / 2 - 0.02;
-      for (let u = 0; u < units; u += 1) {
-        const y = 0.14 + u * 0.16;
-        const blank = hash01(r * 37 + u * 11 + tier) < 0.16;
-        b.box(rackW - 0.12, 0.11, 0.014, blank ? C.black : u % 3 === 0 ? 0x2a313b : C.charcoal, x, y, front + 0.004, { r: 0 });
-        if (blank) continue;
-        b.box(0.05, 0.02, 0.02, C.grey, x + rackW / 2 - 0.11, y + 0.045, front + 0.012, { r: 0 });
-        leds.push({ x: x - rackW / 2 + 0.1, y: y + 0.045, z: front + 0.014 });
-        leds.push({ x: x - rackW / 2 + 0.15, y: y + 0.045, z: front + 0.014 });
-        if (hash01(r * 5 + u * 3) > 0.5) leds.push({ x: x - rackW / 2 + 0.2, y: y + 0.045, z: front + 0.014 });
-      }
+  const count = tier;
+  const rackW = (width - 0.1) / count;
+  const rackH = rackHeight(tier);
+  const rackD = depth - 0.12;
+  const shell = tier === 4 ? 0x3a4250 : 0x4b5563;
+  const trim = tier === 4 ? C.brass : tier === 3 ? theme.glow : C.greyDark;
+  for (let r = 0; r < count; r += 1) {
+    const x = -width / 2 + 0.05 + rackW * (r + 0.5);
+    b.box(rackW - 0.03, rackH, rackD, shell, x, 0.04, -0.02, { r: 0.016 });
+    b.box(rackW - 0.01, 0.04, rackD + 0.02, C.black, x, 0, -0.02, { r: 0 });
+    b.box(rackW - 0.09, rackH - 0.1, 0.01, C.black, x, 0.09, rackD / 2 - 0.02, { r: 0 });
+    b.box(rackW - 0.02, 0.035, rackD + 0.01, trim, x, rackH + 0.03, -0.02, { r: 0.01 });
+    // Server units: dark bars with a pale handle, each with two or three LEDs.
+    const units = Math.floor((rackH - 0.2) / 0.16);
+    const front = rackD / 2 - 0.02;
+    for (let u = 0; u < units; u += 1) {
+      const y = 0.14 + u * 0.16;
+      const blank = hash01(r * 37 + u * 11 + tier) < 0.16;
+      b.box(rackW - 0.12, 0.11, 0.014, blank ? C.black : u % 3 === 0 ? 0x2a313b : C.charcoal, x, y, front + 0.004, { r: 0 });
+      if (blank) continue;
+      b.box(0.05, 0.02, 0.02, C.grey, x + rackW / 2 - 0.11, y + 0.045, front + 0.012, { r: 0 });
+      if (!leds) continue;
+      leds.push({ x: x - rackW / 2 + 0.1, y: y + 0.045, z: front + 0.014 });
+      leds.push({ x: x - rackW / 2 + 0.15, y: y + 0.045, z: front + 0.014 });
+      if (hash01(r * 5 + u * 3) > 0.5) leds.push({ x: x - rackW / 2 + 0.2, y: y + 0.045, z: front + 0.014 });
     }
-    if (tier === 1) {
-      // Small cabinet: a UPS and a patch of cables on top.
-      b.box(0.3, 0.14, 0.26, C.greyDark, 0.02, rackH + 0.065, 0, { r: 0.014 });
-      b.tube([0.1, rackH + 0.2, -0.05], [0.25, rackH + 0.07, -0.2], 0.012, C.yellow, { seg: 5 });
-    }
-    if (tier >= 3) {
-      // Overhead cable tray tying the row together.
-      b.box(width - 0.2, 0.05, 0.3, C.greyDark, 0, rackH + 0.17, -0.06, { r: 0.01 });
-      for (let r = 0; r < count; r += 1) b.box(0.06, 0.12, 0.06, C.greyDark, -width / 2 + 0.05 + rackW * (r + 0.5), rackH + 0.06, -0.06, { r: 0 });
-      for (const [i, cable] of [C.blue, C.yellow, C.red].entries()) b.box(width - 0.3, 0.025, 0.04, cable, 0, rackH + 0.22, -0.14 + i * 0.08, { r: 0.01 });
-    }
-    addCommandPlate(kit, b, STATION_COMMAND.servers, 0, rackH + (tier >= 3 ? 0.27 : tier === 1 ? 0.22 : 0.08), tier === 1 ? 0.16 : 0.0, 0.17, 0.35);
-  });
+  }
+  if (tier === 1) {
+    // Small cabinet: a UPS and a patch of cables on top.
+    b.box(0.3, 0.14, 0.26, C.greyDark, 0.02, rackH + 0.065, 0, { r: 0.014 });
+    b.tube([0.1, rackH + 0.2, -0.05], [0.25, rackH + 0.07, -0.2], 0.012, C.yellow, { seg: 5 });
+  }
+  if (tier >= 3) {
+    // Overhead cable tray tying the row together.
+    b.box(width - 0.2, 0.05, 0.3, C.greyDark, 0, rackH + 0.17, -0.06, { r: 0.01 });
+    for (let r = 0; r < count; r += 1) b.box(0.06, 0.12, 0.06, C.greyDark, -width / 2 + 0.05 + rackW * (r + 0.5), rackH + 0.06, -0.06, { r: 0 });
+    for (const [i, cable] of [C.blue, C.yellow, C.red].entries()) b.box(width - 0.3, 0.025, 0.04, cable, 0, rackH + 0.22, -0.14 + i * 0.08, { r: 0.01 });
+  }
+};
+
+export const createServerRack = (phase: CompanyPhase = "office"): ServerRackHandle => {
+  const { depth } = STATION_SIZES[phase].servers;
+  const tier = phaseTier(phase);
+  const kit = new PropKit("station:servers");
+  const ledSize = tier === 0 ? 0.026 : 0.022;
+
+  kit.model(`servers:${phase}`, (b) => drawServers(b, phase, null));
+  if (tier === 0) {
+    addCommandPlate(kit, STATION_COMMAND.servers, 0, GARAGE_SHELF_Y - 0.2, depth / 2 - 0.03, 0.13, 0);
+  } else {
+    const rackH = rackHeight(tier);
+    addCommandPlate(kit, STATION_COMMAND.servers, 0, rackH + (tier >= 3 ? 0.27 : tier === 1 ? 0.22 : 0.08), tier === 1 ? 0.16 : 0, 0.17, 0.35);
+  }
 
   // LEDs in four groups, each one mesh, toggled to make the blink pattern.
   const groupColors = [C.good, NEON, C.good, EMBER];
   const groups = groupColors.map((color, g) => {
-    const mine = leds.filter((_, i) => (g === 3 ? i % 9 === 4 : i % 9 !== 4 && i % 3 === g));
     const mesh = new THREE.Mesh(
       bakeModel(`servers-leds:${phase}:${g}`, (b) => {
-        for (const led of mine) b.box(ledSize, ledSize, 0.01, 0xffffff, led.x, led.y - ledSize / 2, led.z, { r: 0 });
+        // Re-run the drawing into a scratch builder purely to learn where the LEDs are.
+        const leds: Led[] = [];
+        drawServers(new ModelBuilder(), phase, leds);
+        leds.forEach((led, i) => {
+          const mine = g === 3 ? i % 9 === 4 : i % 9 !== 4 && i % 3 === g;
+          if (mine) b.box(ledSize, ledSize, 0.01, 0xffffff, led.x, led.y - ledSize / 2, led.z, { r: 0 });
+        });
       }),
       glowMat(g === 3 ? color : lighten(color, 0.2))
     );
@@ -1211,6 +1228,8 @@ export const createServerRack = (phase: CompanyPhase = "office"): ServerRackHand
 export interface PricingBoardHandle extends StationHandle {
   /** Highlight the current pricing model: its card slides forward and lights up. */
   setModel(model: PricingModel): void;
+  /** A short burst of light and a hop on the current card (the model just changed). */
+  flash(): void;
 }
 
 const PRICING_MODELS: readonly PricingModel[] = ["consumer", "prosumer", "enterprise"];
@@ -1245,8 +1264,8 @@ export const createPricingBoard = (phase: CompanyPhase = "office"): PricingBoard
       // Nailed-up plank: two visible nail heads.
       for (const sx of [-1, 1]) b.cyl(0.014, 0.01, C.galvanised, sx * (boardW / 2 - 0.05), boardY + boardH - 0.07, wall + 0.04, { axis: "z", seg: 6 });
     }
-    addCommandPlate(kit, b, STATION_COMMAND.pricing, 0, boardY + boardH + 0.06, wall + 0.045, tier === 0 ? 0.15 : 0.17, 0);
   });
+  addCommandPlate(kit, STATION_COMMAND.pricing, 0, boardY + boardH + 0.06, wall + 0.045, tier === 0 ? 0.15 : 0.17, 0);
 
   // One mesh per tier card so the current one can slide forward.
   const cards = PRICING_MODELS.map((_, i) => {
@@ -1276,7 +1295,9 @@ export const createPricingBoard = (phase: CompanyPhase = "office"): PricingBoard
   // Highlight frame + pointer that hop to the current card.
   const marker = new THREE.Group();
   kit.add(marker);
-  const frameMaterial = kit.emissive(tier === 4 ? C.brass : C.charcoal, theme.glow, 0.5, 1.3);
+  const FRAME_GLOW_DAY = 0.5;
+  const FRAME_GLOW_DUSK = 1.3;
+  const frameMaterial = kit.emissive(tier === 4 ? C.brass : C.charcoal, theme.glow, FRAME_GLOW_DAY, FRAME_GLOW_DUSK);
   const frameGeometries = cardHeights.map((h, i) =>
     bakeModel(`pricing-frame:${phase}:${i}`, (b) => {
       const t = 0.022;
@@ -1295,14 +1316,24 @@ export const createPricingBoard = (phase: CompanyPhase = "office"): PricingBoard
 
   let current = 0;
   const slide = [0, 0, 0];
+  const flash = new Pulse(1.1);
+  let flashing = false;
   kit.onUpdate((dt, elapsed) => {
     const k = 1 - Math.exp(-dt * 10);
+    const p = flash.step(dt);
+    // The new card jumps out a little further than it rests while the board flashes.
+    const hop = Math.sin(Math.min(1, p) * Math.PI) * 0.06;
     cards.forEach((card, i) => {
       slide[i] += ((i === current ? 1 : 0) - slide[i]) * k;
-      card.position.z = boardZ + slide[i] * 0.05;
+      card.position.z = boardZ + slide[i] * 0.05 + (i === current ? hop : 0);
     });
-    marker.position.set(cardX(current), boardY + 0.07, boardZ + slide[current] * 0.05);
-    pointer.position.y = cardHeights[current] + 0.08 + Math.sin(elapsed * 3.5) * 0.02;
+    marker.position.set(cardX(current), boardY + 0.07, boardZ + slide[current] * 0.05 + hop);
+    pointer.position.y = cardHeights[current] + 0.08 + Math.sin(elapsed * (p > 0 ? 9 : 3.5)) * (p > 0 ? 0.04 : 0.02);
+    if (p > 0 || flashing) {
+      flashing = p > 0;
+      frameMaterial.emissiveIntensity = FRAME_GLOW_DAY + (FRAME_GLOW_DUSK - FRAME_GLOW_DAY) * kit.glowAmount + p * 2.2;
+      frame.scale.setScalar(1 + hop * 0.8);
+    }
   });
 
   const setModel = (model: PricingModel): void => {
@@ -1311,7 +1342,12 @@ export const createPricingBoard = (phase: CompanyPhase = "office"): PricingBoard
   };
   setModel("consumer");
 
-  return kit.finish(stationFootprint("pricing", phase), { kind: "pricing" as const, phase, setModel });
+  return kit.finish(stationFootprint("pricing", phase), {
+    kind: "pricing" as const,
+    phase,
+    setModel,
+    flash: () => flash.trigger(),
+  });
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1342,7 +1378,3 @@ const STATION_FACTORIES: { [K in StationKind]: (phase: CompanyPhase) => StationH
 
 /** Build the station of `kind` in the style of `phase`, with its specific handle type. */
 export const createStation = <K extends StationKind>(kind: K, phase: CompanyPhase): StationHandles[K] => STATION_FACTORIES[kind](phase);
-
-/** Phases, re-exported for callers iterating station styles. */
-export { PHASES };
-export type { PhaseTheme };

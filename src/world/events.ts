@@ -100,7 +100,8 @@ const rosterIdsInRange = (roster: readonly PersonView[], role: TeamRole, from: n
  * their id (and therefore their name, look and desk).
  *
  * `personIds` only lists people in the capped roster; when the office is past
- * MAX_WORLD_PEOPLE it can be shorter than the real change, or empty.
+ * MAX_WORLD_PEOPLE it can be shorter than the real change, or empty. `count`
+ * then carries the real change (it is left out when it equals `personIds.length`).
  */
 const pushRosterEvents = (events: WorldEvent[], prev: WorldSnapshot, next: WorldSnapshot): void => {
   const hired: WorldEvent[] = [];
@@ -108,9 +109,13 @@ const pushRosterEvents = (events: WorldEvent[], prev: WorldSnapshot, next: World
     const before = headcount(prev.team, role);
     const after = headcount(next.team, role);
     if (after < before) {
-      events.push({ type: "departed", role, personIds: rosterIdsInRange(prev.people, role, after, before) });
+      const personIds = rosterIdsInRange(prev.people, role, after, before);
+      const count = before - after;
+      events.push(count === personIds.length ? { type: "departed", role, personIds } : { type: "departed", role, personIds, count });
     } else if (after > before) {
-      hired.push({ type: "hired", role, personIds: rosterIdsInRange(next.people, role, before, after) });
+      const personIds = rosterIdsInRange(next.people, role, before, after);
+      const count = after - before;
+      hired.push(count === personIds.length ? { type: "hired", role, personIds } : { type: "hired", role, personIds, count });
     }
   }
   // Goodbyes before hellos, so a freed desk is free by the time a newcomer needs one.

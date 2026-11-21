@@ -227,7 +227,8 @@ describe("hiring and leaving", () => {
     // 62 engineers + two founders fill the roster: the 63rd engineer exists but is off stage.
     const full = settled({ cash: 5_000_000, team: team({ engineering: 62 }) });
     const result = step(full, "hire eng 2");
-    expect(findWorldEvent(result.events, "hired")).toEqual({ type: "hired", role: "engineering", personIds: [] });
+    // Nobody new is on stage, but the event still carries the real head-count change.
+    expect(findWorldEvent(result.events, "hired")).toEqual({ type: "hired", role: "engineering", personIds: [], count: 2 });
     expect(result.next.hiddenPeople).toBe(2);
   });
 
@@ -268,7 +269,9 @@ describe("hiring and leaving", () => {
     const started = performance.now();
     const events = deriveWorldEvents(prev, next, noAction);
     expect(performance.now() - started).toBeLessThan(50);
-    expect(events).toEqual([{ type: "departed", role: "engineering", personIds: ["engineering-60", "engineering-61"] }]);
+    expect(events).toEqual([
+      { type: "departed", role: "engineering", personIds: ["engineering-60", "engineering-61"], count: 2_999_999_940 },
+    ]);
   });
 
   it("ignores half a hire", () => {

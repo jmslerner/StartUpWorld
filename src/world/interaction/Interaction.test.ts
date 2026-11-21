@@ -4,6 +4,7 @@ import { CameraRig } from "../core/CameraRig";
 import type { ScreenPoint } from "../types";
 import { computeLocalBounds, createFootprint, footprintFromBounds } from "./footprint";
 import { CLICK_THRESHOLD_PX, GestureRecognizer, type PointerKind } from "./gestures";
+import { Interaction } from "./Interaction";
 import { DEFAULT_ANCHOR_HEIGHT, InteractableStore } from "./picking";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -584,3 +585,78 @@ describe("highlight footprint", () => {
     expect(footprint.z).toBeCloseTo(-2, 6);
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Interaction.screenBounds
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Just enough of a canvas for Interaction to attach to under node. */
+const stubCanvas = (): HTMLCanvasElement =>
+  ({
+    style: { touchAction: "", cursor: "" },
+    addEventListener: () => undefined,
+    removeEventListener: () => undefined,
+    getBoundingClientRect: () => ({ left: 0, top: 0, width: 800, height: 600 }),
+  }) as unknown as HTMLCanvasElement;
+
+describe("Interaction.screenBounds", () => {
+  const setup = () => {
+    const scene = new THREE.Scene();
+    const rig = new CameraRig();
+    rig.setViewport(800, 600);
+    rig.setFraming({ x: 0, z: 0 }, 12, { instant: true });
+    const interaction = new Interaction({
+      canvas: stubCanvas(),
+      scene,
+      rig,
+      callbacks: { onHover: () => undefined, onSelect: () => undefined },
+      reducedMotion: true,
+    });
+    return { scene, rig, interaction };
+  };
+
+  it("encloses every corner of the object as drawn, plus its anchor, and reports the box centre", () => {
+    const { scene, rig, interaction } = setup();
+    const box = makeBox(2, -1, 1.2);
+    box.rotation.y = 0.4;
+    scene.add(box);
+    interaction.register(box, { kind: "door" }, { label: "Door", anchorHeight: 2 });
+    settle(scene);
+    const centre = new THREE.Vector3();
+    const rect = interaction.screenBounds({ kind: "door" }, centre);
+    expect(rect).not.toBeNull();
+    if (!rect) return;
+    // The box's own (rotated) corners, as drawn.
+    box.geometry.computeBoundingBox();
+    const local = box.geometry.boundingBox as THREE.Box3;
+    for (const x of [local.min.x, local.max.x])
+      for (const y of [local.min.y, local.max.y])
+        for (const z of [local.min.z, local.max.z]) {
+          const point = rig.project(new THREE.Vector3(x, y, z).applyMatrix4(box.matrixWorld));
+          expect(point.x).toBeGreaterThanOrEqual(rect.left - 1e-6);
+          expect(point.x).toBeLessThanOrEqual(rect.right + 1e-6);
+          expect(point.y).toBeGreaterThanOrEqual(rect.top - 1e-6);
+          expect(point.y).toBeLessThanOrEqual(rect.bottom + 1e-6);
+        }
+    // The anchor floats above the box, so it sets the top.
+    const anchor = interaction.project({ kind: "door" });
+    expect(anchor && rect.top).toBeCloseTo(anchor?.y ?? NaN, 6);
+    expect(centre.x).toBeCloseTo(2, 6);
+    expect(centre.z).toBeCloseTo(-1, 6);
+    expect(centre.y).toBeCloseTo(0.6, 6);
+    interaction.dispose();
+  });
+
+  it("is null for targets that are not in the scene or hidden", () => {
+    const { scene, interaction } = setup();
+    expect(interaction.screenBounds({ kind: "door" })).toBeNull();
+    const box = makeBox(0, 0);
+    scene.add(box);
+    interaction.register(box, { kind: "door" }, { label: "Door" });
+    box.visible = false;
+    settle(scene);
+    expect(interaction.screenBounds({ kind: "door" })).toBeNull();
+    interaction.dispose();
+  });
+});
+

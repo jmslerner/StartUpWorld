@@ -90,6 +90,22 @@ export const createEventBeacon = (): PropHandle => {
 // Alarm light
 // ─────────────────────────────────────────────────────────────────────────────
 
+export interface AlarmLightOptions {
+  /**
+   * Draw the pool of red light on the surface the lamp stands on. Default true;
+   * turn it off when the lamp is mounted somewhere narrow (the top of a wall),
+   * where the pool would hang in mid-air.
+   */
+  pool?: boolean;
+  /**
+   * Add a small wall bracket under the lamp, reaching back (−Z) to the wall it
+   * is mounted on. Default false.
+   */
+  bracket?: boolean;
+  /** Scale of the two sweeping beams (their reach). Default 1, i.e. about 1.15 from the lamp. */
+  beamScale?: number;
+}
+
 export interface AlarmLightHandle extends PropHandle {
   /** Off = dark dome, no beams. Starts on. */
   setActive(active: boolean): void;
@@ -99,11 +115,18 @@ export interface AlarmLightHandle extends PropHandle {
  * Rotating red warning light for when the runway is nearly gone. Stands on
  * whatever you put it on (floor, desk, wall top): origin at the base.
  */
-export const createAlarmLight = (): AlarmLightHandle => {
+export const createAlarmLight = (options: AlarmLightOptions = {}): AlarmLightHandle => {
+  const showPool = options.pool ?? true;
+  const bracket = options.bracket ?? false;
   const kit = new PropKit("alarm-light");
-  kit.model("alarm-light:base", (b) => {
+  kit.model(`alarm-light:base:${bracket ? "bracket" : "plain"}`, (b) => {
     b.cyl(0.13, 0.07, C.charcoal, 0, 0, 0, { seg: 12 });
     b.cyl(0.1, 0.03, C.black, 0, 0.07, 0, { seg: 12 });
+    if (bracket) {
+      b.box(0.3, 0.03, 0.3, C.charcoal, 0, -0.03, -0.02, { r: 0.008 });
+      b.strut([0, -0.03, 0.1], [0, -0.22, -0.16], 0.03, C.charcoal, { r: 0 });
+      b.box(0.1, 0.26, 0.02, C.charcoal, 0, -0.26, -0.165, { r: 0 });
+    }
   });
   const dome = kit.own(mat(0x7a1f1f, { emissive: C.alarm, emissiveIntensity: 1 }).clone());
   kit.add(
@@ -130,9 +153,11 @@ export const createAlarmLight = (): AlarmLightHandle => {
   );
   // High enough that the wide end of a beam never dips below the base.
   beams.position.y = 0.22;
+  beams.scale.setScalar(options.beamScale ?? 1);
   kit.add(beams);
   const pool = kit.own(glowMat(C.alarm, { additive: true, opacity: 1 }).clone());
   const poolMesh = shapeMesh(bakeModel("alarm-light:pool", (b) => b.cyl(0.9, 0.004, 0xffffff, 0, 0.004, 0, { seg: 20 })), pool, false);
+  poolMesh.visible = showPool;
   kit.add(poolMesh);
 
   let active = true;
@@ -149,7 +174,7 @@ export const createAlarmLight = (): AlarmLightHandle => {
       setActive: (next: boolean) => {
         active = next;
         beams.visible = next;
-        poolMesh.visible = next;
+        poolMesh.visible = next && showPool;
         dome.emissiveIntensity = next ? 1 : 0;
       },
     }

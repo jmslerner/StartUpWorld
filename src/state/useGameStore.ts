@@ -4,6 +4,8 @@ import { createInitialState, executeCommand } from "../engine";
 import { toLog } from "../engine/utils";
 import { pickWeeklyQuote } from "../ui/quotes";
 import { SFX } from "../ui/sound";
+import type { ActionSignal } from "../world/types";
+import { restartSignal, toActionSignal } from "../world/ui/actionSignal";
 
 const SAVE_KEY = "startupworld:save";
 const SAVE_VERSION = 2;
@@ -56,9 +58,17 @@ interface GameStore {
   state: GameState;
   log: LogEntry[];
   commandHistory: string[];
+  /**
+   * The most recent command and how the engine judged it, for the 3D world to
+   * react to. `seq` goes up by one per command, so a subscriber can tell a new
+   * action from an unrelated store update. Session-only: never written to the save.
+   */
+  lastAction: ActionSignal | null;
   runCommand: (input: string) => void;
   resetGame: () => void;
 }
+
+const nextSeq = (previous: ActionSignal | null): number => (previous?.seq ?? 0) + 1;
 
 const restartHelpLogs = (): LogEntry[] => [
   toLog("This will end your current run immediately.", "error"),
@@ -93,6 +103,7 @@ export const useGameStore = create<GameStore>((set) => ({
   state: initialState,
   log: initialLog,
   commandHistory: initialHistory,
+  lastAction: null,
   runCommand: (input: string) =>
     set((current) => {
       const trimmed = input.trim();
@@ -133,6 +144,7 @@ export const useGameStore = create<GameStore>((set) => ({
             toLog("Fresh run started.", "system", "intro-restart"),
           ],
           commandHistory: [trimmed, ...current.commandHistory.filter((entry) => entry !== trimmed)].slice(0, 50),
+          lastAction: restartSignal(nextSeq(current.lastAction)),
         };
         queueMicrotask(() => saveToDisk(next.state, next.log, next.commandHistory));
         return next;
@@ -182,6 +194,7 @@ export const useGameStore = create<GameStore>((set) => ({
         state: result.state,
         log: newLog,
         commandHistory: newHistory,
+        lastAction: toActionSignal(nextSeq(current.lastAction), trimmed, result),
       };
 
       queueMicrotask(() => saveToDisk(next.state, next.log, next.commandHistory));
@@ -189,10 +202,15 @@ export const useGameStore = create<GameStore>((set) => ({
       return next;
     }),
   resetGame: () =>
-    set(() => {
+    set((current) => {
       clearSave();
       const fresh = createInitialState();
-      const next = { state: fresh, log: makeIntroLogs(fresh), commandHistory: [] };
+      const next = {
+        state: fresh,
+        log: makeIntroLogs(fresh),
+        commandHistory: [],
+        lastAction: restartSignal(nextSeq(current.lastAction)),
+      };
       queueMicrotask(() => saveToDisk(next.state, next.log, next.commandHistory));
       return next;
     }),

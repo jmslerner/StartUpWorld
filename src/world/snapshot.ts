@@ -143,6 +143,7 @@ export const buildWorldSnapshot = (state: GameState): WorldSnapshot => {
     valuation: state.valuation,
     users: state.users,
     mrr: state.mrr,
+    pricingModel: state.pricingModel,
 
     reputation: state.reputation,
     morale: state.culture.morale,

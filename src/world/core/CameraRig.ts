@@ -66,6 +66,16 @@ export interface FramingOptions {
    * it, so a phone in portrait still sees the whole floor. 0 / omitted = off.
    */
   fitWidth?: number;
+  /**
+   * Fraction (0–1] of the viewport's binding dimension the framed extents
+   * should fill at zoom 1; the rest is margin. Default 1 (edge to edge).
+   */
+  fill?: number;
+}
+
+export interface FocusPointOptions {
+  /** Tween length in seconds. */
+  seconds?: number;
 }
 
 export interface CameraRigOptions {
@@ -101,7 +111,7 @@ export class CameraRig {
 
   private readonly reducedMotion: boolean;
   private readonly target = { x: 0, z: 0 };
-  private readonly framing = { x: 0, z: 0, viewHeight: 12, fitWidth: 0 };
+  private readonly framing = { x: 0, z: 0, viewHeight: 12, fitWidth: 0, fill: 1 };
   private readonly tween: Tween = {
     active: false,
     elapsed: 0,
@@ -147,8 +157,8 @@ export class CameraRig {
 
   /** View height at zoom 1 for the current framing and canvas shape. */
   get defaultViewHeight(): number {
-    const { viewHeight, fitWidth } = this.framing;
-    return fitWidth > 0 ? Math.max(viewHeight, fitWidth / this.aspect) : viewHeight;
+    const { viewHeight, fitWidth, fill } = this.framing;
+    return (fitWidth > 0 ? Math.max(viewHeight, fitWidth / this.aspect) : viewHeight) / fill;
   }
 
   /** True while a framing/focus tween or a shake is still playing. */
@@ -189,6 +199,8 @@ export class CameraRig {
     this.framing.z = target.z;
     this.framing.viewHeight = Math.max(MIN_VIEW_HEIGHT, viewHeight);
     this.framing.fitWidth = Math.max(0, options.fitWidth ?? 0);
+    const fill = options.fill ?? 1;
+    this.framing.fill = fill > 0 && fill <= 1 ? fill : 1;
     const seconds = options.instant ? 0 : (options.seconds ?? DEFAULT_FRAMING_SECONDS);
     this.startTween(target.x, target.z, 1, seconds, fromViewHeight);
   }
@@ -205,6 +217,37 @@ export class CameraRig {
     this.startTween(target.x, target.z, toZoom, seconds, this.viewHeight);
   }
 
+  /**
+   * Glide (at the current zoom) so that the world point `world` is drawn at
+   * the canvas position `at` (CSS pixels) — e.g. just above a bottom sheet that
+   * covers part of the canvas. Never zooms.
+   *
+   * The pan limit is relaxed by exactly the distance between `at` and the
+   * canvas centre, so something at the very edge of the diorama can still be
+   * brought to `at`. Afterwards panning only ever moves back toward the limit.
+   */
+  focusPoint(world: Vec3Like, at: ScreenPoint, options: FocusPointOptions = {}): void {
+    const unitsPerPixel = this.unitsPerPixel();
+    const { width, height } = this.viewport;
+    // Where `world` is drawn now, relative to the centre, in world units of screen-right/up.
+    const dx = world.x - this.target.x;
+    const dz = world.z - this.target.z;
+    const u = dx * RIGHT.x + dz * RIGHT.z;
+    const v = dx * UP.x + world.y * UP.y + dz * UP.z;
+    // ...and where it should be.
+    const wantU = (at.x - width / 2) * unitsPerPixel;
+    const wantV = (height / 2 - at.y) * unitsPerPixel;
+    const du = u - wantU;
+    const dv = v - wantV;
+    const toX = this.target.x + du * GROUND_U.x + dv * GROUND_V.x;
+    const toZ = this.target.z + du * GROUND_U.z + dv * GROUND_V.z;
+    // Ground distance between the canvas centre and `at`.
+    const slack = Math.hypot(wantU, wantV / SIN_EL);
+    const x = this.bounds ? clamp(toX, this.bounds.minX - slack, this.bounds.maxX + slack) : toX;
+    const z = this.bounds ? clamp(toZ, this.bounds.minZ - slack, this.bounds.maxZ + slack) : toZ;
+    this.startTween(x, z, this.zoomLevel, options.seconds ?? DEFAULT_FOCUS_SECONDS, this.viewHeight, false);
+  }
+
   /** Return to the framing's default target and zoom. */
   reset(seconds: number = DEFAULT_RESET_SECONDS): void {
     this.startTween(this.framing.x, this.framing.z, 1, seconds, this.viewHeight);
@@ -215,7 +258,7 @@ export class CameraRig {
    * `margin` on every side. Pass null to remove the limit.
    */
   setBounds(bounds: GroundBounds | null, margin = 0): void {
-    this.bounds = bounds
+    const next = bounds
       ? {
           minX: bounds.minX - margin,
           maxX: bounds.maxX + margin,
@@ -223,6 +266,21 @@ export class CameraRig {
           maxZ: bounds.maxZ + margin,
         }
       : null;
+    // Called on every game-state change; an unchanged limit must not undo a
+    // focusPoint() that deliberately went past it.
+    const previous = this.bounds;
+    if (
+      previous === next ||
+      (previous &&
+        next &&
+        previous.minX === next.minX &&
+        previous.maxX === next.maxX &&
+        previous.minZ === next.minZ &&
+        previous.maxZ === next.maxZ)
+    ) {
+      return;
+    }
+    this.bounds = next;
     if (this.tween.active) {
       this.tween.toX = this.clampX(this.tween.toX);
       this.tween.toZ = this.clampZ(this.tween.toZ);
@@ -245,8 +303,8 @@ export class CameraRig {
     const unitsPerPixel = this.unitsPerPixel();
     const du = dx * unitsPerPixel;
     const dv = -dy * unitsPerPixel;
-    this.target.x = this.clampX(this.target.x - du * GROUND_U.x - dv * GROUND_V.x);
-    this.target.z = this.clampZ(this.target.z - du * GROUND_U.z - dv * GROUND_V.z);
+    this.target.x = this.clampX(this.target.x - du * GROUND_U.x - dv * GROUND_V.x, this.target.x);
+    this.target.z = this.clampZ(this.target.z - du * GROUND_U.z - dv * GROUND_V.z, this.target.z);
     this.sync();
   }
 
@@ -270,8 +328,8 @@ export class CameraRig {
     const du = px * (before - after);
     const dv = py * (before - after);
     this.zoomLevel = nextZoom;
-    this.target.x = this.clampX(this.target.x + du * GROUND_U.x + dv * GROUND_V.x);
-    this.target.z = this.clampZ(this.target.z + du * GROUND_U.z + dv * GROUND_V.z);
+    this.target.x = this.clampX(this.target.x + du * GROUND_U.x + dv * GROUND_V.x, this.target.x);
+    this.target.z = this.clampZ(this.target.z + du * GROUND_U.z + dv * GROUND_V.z, this.target.z);
     this.sync();
   }
 
@@ -324,17 +382,33 @@ export class CameraRig {
     return this.viewport.width / this.viewport.height;
   }
 
-  private clampX(x: number): number {
-    return this.bounds ? clamp(x, this.bounds.minX, this.bounds.maxX) : x;
+  /**
+   * Keep a view-centre coordinate inside the pan limit. With `from` (where the
+   * centre is now), a centre that is already outside — after focusPoint() — may
+   * stay there and move back in, but never further out: no jump on the next drag.
+   */
+  private clampX(x: number, from?: number): number {
+    if (!this.bounds) return x;
+    const { minX, maxX } = this.bounds;
+    return from === undefined ? clamp(x, minX, maxX) : clamp(x, Math.min(minX, from), Math.max(maxX, from));
   }
 
-  private clampZ(z: number): number {
-    return this.bounds ? clamp(z, this.bounds.minZ, this.bounds.maxZ) : z;
+  private clampZ(z: number, from?: number): number {
+    if (!this.bounds) return z;
+    const { minZ, maxZ } = this.bounds;
+    return from === undefined ? clamp(z, minZ, maxZ) : clamp(z, Math.min(minZ, from), Math.max(maxZ, from));
   }
 
-  private startTween(toX: number, toZ: number, toZoom: number, seconds: number, fromViewHeight: number): void {
-    const x = this.clampX(toX);
-    const z = this.clampZ(toZ);
+  private startTween(
+    toX: number,
+    toZ: number,
+    toZoom: number,
+    seconds: number,
+    fromViewHeight: number,
+    clampToBounds = true
+  ): void {
+    const x = clampToBounds ? this.clampX(toX) : toX;
+    const z = clampToBounds ? this.clampZ(toZ) : toZ;
     if (seconds <= 0 || this.reducedMotion) {
       this.tween.active = false;
       this.target.x = x;

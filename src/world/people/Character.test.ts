@@ -282,6 +282,30 @@ describe("createCharacter", () => {
     expect(character.group.parent).toBeNull();
   });
 
+  it("builds each person the same whoever was built before them (no cache-key collisions)", () => {
+    const signature = (view: PersonView): string => {
+      const character = createCharacter(view);
+      character.setPose("floor-sit", { immediate: true });
+      character.setPose("phone", { immediate: true });
+      const meshes = meshesOf(character.group).map((mesh) => {
+        const colors = mesh.geometry.getAttribute("color");
+        let sum = 0;
+        for (let i = 0; i < colors.count; i += 7) sum += colors.getX(i) + colors.getY(i) * 2 + colors.getZ(i) * 3;
+        return `${mesh.geometry.getAttribute("position").count}:${sum.toFixed(3)}`;
+      });
+      const bounds = boundsOf(character.group);
+      character.dispose();
+      return `${meshes.join(",")} @ ${bounds.max.y.toFixed(4)}`;
+    };
+    const crowd: PersonView[] = [founder(3), cofounder(4)];
+    for (let i = 0; i < 150; i += 1) crowd.push(employee(ROLES[i % ROLES.length], Math.imul(i + 11, 2246822519) >>> 0));
+    const together = crowd.map(signature);
+    crowd.forEach((view, i) => {
+      disposeSharedResources();
+      expect(signature(view), `${view.id} #${i}`).toBe(together[i]);
+    });
+  });
+
   it("shares geometry between people who look alike, and survives a cache reset", () => {
     const a = createCharacter(employee("data", 99));
     const before = sharedResourceStats().geometries;

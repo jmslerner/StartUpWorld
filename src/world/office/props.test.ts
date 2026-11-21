@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { CompanyPhase } from "../../types/game";
 import {
   bakeModel,
@@ -90,8 +90,37 @@ const invertedShare = (geometry: THREE.BufferGeometry): number => {
   return total === 0 ? 0 : inverted / total;
 };
 
+/**
+ * A stand-in for the browser's canvas: every drawing call is accepted and
+ * ignored. With it installed the props take their "textures available" paths
+ * (command plates, calendar pages, signs, price tags) in node too.
+ */
+const installFakeCanvas = (): void => {
+  const makeContext = (canvas: object): unknown =>
+    new Proxy(
+      {},
+      {
+        get: (_target, property) => {
+          if (property === "canvas") return canvas;
+          if (property === "measureText") return () => ({ width: 10 });
+          if (property === "createRadialGradient" || property === "createLinearGradient") return () => ({ addColorStop: () => undefined });
+          return () => undefined;
+        },
+        set: () => true,
+      }
+    );
+  vi.stubGlobal("document", {
+    createElement: () => {
+      const canvas = { width: 0, height: 0, getContext: (): unknown => context };
+      const context = makeContext(canvas);
+      return canvas;
+    },
+  });
+};
+
 afterEach(() => {
   disposeSharedResources();
+  vi.unstubAllGlobals();
 });
 
 describe("palette", () => {
@@ -190,7 +219,7 @@ describe("prop catalog", () => {
     for (const set of PROP_SETS) expect(PROP_CATALOG.some((entry) => entry.set === set), set).toBe(true);
   });
 
-  it("builds, animates and disposes every prop within budget", () => {
+  const buildAnimateDispose = (): void => {
     for (const entry of PROP_CATALOG) {
       for (const phase of phasesFor(entry)) {
         const name = `${entry.id} (${phase})`;
@@ -221,6 +250,64 @@ describe("prop catalog", () => {
         parent.add(handle.group);
         handle.dispose();
         expect(handle.group.parent, `${name} detached`).toBeNull();
+      }
+    }
+  };
+
+  it("builds, animates and disposes every prop within budget", buildAnimateDispose);
+
+  it("does the same when canvas textures are available, as in the browser", () => {
+    installFakeCanvas();
+    expect(canDrawTextures()).toBe(true);
+    buildAnimateDispose();
+    expect(sharedResourceStats().textures).toBeGreaterThan(0);
+  });
+
+  it("builds an identical second copy of every prop (cached geometry must not skip any setup)", () => {
+    installFakeCanvas();
+    const describeProp = (handle: PropHandle): { objects: number; meshes: number; bounds: number[] } => {
+      handle.setGlow?.(1);
+      handle.update?.(0.05, 0.4);
+      let objects = 0;
+      handle.group.traverse(() => {
+        objects += 1;
+      });
+      const bounds = boundsOf(handle.group);
+      return { objects, meshes: meshesOf(handle.group).length, bounds: [...bounds.min.toArray(), ...bounds.max.toArray()].map((value) => Math.round(value * 1e4)) };
+    };
+    for (const entry of PROP_CATALOG) {
+      for (const phase of phasesFor(entry)) {
+        const first = entry.create(phase).handle;
+        const second = entry.create(phase).handle;
+        expect(describeProp(second), `${entry.id} (${phase})`).toEqual(describeProp(first));
+        first.dispose();
+        second.dispose();
+      }
+    }
+  });
+
+  it("builds each prop the same whatever was built before it (no cache-key collisions)", () => {
+    const signature = (handle: PropHandle): string => {
+      const bounds = boundsOf(handle.group);
+      const meshes = meshesOf(handle.group).map((mesh) => `${mesh.geometry.getAttribute("position").count}/${mesh.geometry.getIndex()?.count ?? 0}`);
+      return `${meshes.join(",")} @ ${[...bounds.min.toArray(), ...bounds.max.toArray()].map((value) => value.toFixed(3)).join(" ")}`;
+    };
+    // First with one cache shared by everything, in catalog order…
+    const shared = new Map<string, string>();
+    for (const entry of PROP_CATALOG) {
+      for (const phase of phasesFor(entry)) {
+        const { handle } = entry.create(phase);
+        shared.set(`${entry.id}/${phase}`, signature(handle));
+        handle.dispose();
+      }
+    }
+    // …then each one on its own from empty caches.
+    for (const entry of PROP_CATALOG) {
+      for (const phase of phasesFor(entry)) {
+        disposeSharedResources();
+        const { handle } = entry.create(phase);
+        expect(signature(handle), `${entry.id} (${phase})`).toBe(shared.get(`${entry.id}/${phase}`));
+        handle.dispose();
       }
     }
   });
@@ -342,6 +429,27 @@ describe("stations", () => {
         station.dispose();
       }
     }
+  });
+
+  it("gives every station its command plate when text can be drawn", () => {
+    const textured = (root: THREE.Object3D): number =>
+      meshesOf(root).filter((mesh) => (mesh.material as THREE.MeshLambertMaterial).map != null).length;
+    const plain = STATION_KINDS.map((kind) => {
+      const station = createStation(kind, "office");
+      const count = textured(station.group);
+      station.dispose();
+      return count;
+    });
+    disposeSharedResources();
+    installFakeCanvas();
+    STATION_KINDS.forEach((kind, i) => {
+      // Twice: the second build is served from the caches and must be just as complete.
+      for (let copy = 0; copy < 2; copy += 1) {
+        const station = createStation(kind, "office");
+        expect(textured(station.group), `${kind} copy ${copy}`).toBeGreaterThan(plain[i]);
+        station.dispose();
+      }
+    });
   });
 
   it("reveals sticky notes with a draw range", () => {
