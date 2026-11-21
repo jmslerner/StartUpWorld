@@ -152,6 +152,8 @@ export const SoundMenu = ({ className, align = "right" }: SoundMenuProps) => {
     };
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
+      // This Escape is spent: an inspector card open under the menu stays open.
+      event.preventDefault();
       const active = document.activeElement;
       const inside = active instanceof Node && (buttonRef.current?.contains(active) || panelRef.current?.contains(active));
       setAnchor(null);
@@ -237,6 +239,8 @@ export const SoundMenu = ({ className, align = "right" }: SoundMenuProps) => {
         onClick={toggleOpen}
         onKeyDown={onButtonKeyDown}
         onBlur={onBlurWithin}
+        // While open, Escape here is the menu's (App leaves it alone instead of jumping to the terminal).
+        data-own-escape={open || undefined}
         title="Sound settings"
         className={`${
           muted
@@ -255,6 +259,7 @@ export const SoundMenu = ({ className, align = "right" }: SoundMenuProps) => {
               role="dialog"
               aria-label="Sound settings"
               tabIndex={-1}
+              data-own-escape
               onKeyDown={onPanelKeyDown}
               onBlur={onBlurWithin}
               style={{ left: anchor.left, top: anchor.top, bottom: anchor.bottom, width: PANEL_WIDTH }}

@@ -660,3 +660,55 @@ describe("Interaction.screenBounds", () => {
   });
 });
 
+
+describe("Interaction: zoom reports (WorldCallbacks.onZoom)", () => {
+  const setup = (onZoom?: (factor: number) => void) => {
+    const listeners = new Map<string, (event: unknown) => void>();
+    const canvas = {
+      style: { touchAction: "", cursor: "" },
+      addEventListener: (type: string, listener: (event: unknown) => void) => listeners.set(type, listener),
+      removeEventListener: (type: string) => listeners.delete(type),
+      getBoundingClientRect: () => ({ left: 0, top: 0, width: 800, height: 600 }),
+    } as unknown as HTMLCanvasElement;
+    const scene = new THREE.Scene();
+    const rig = new CameraRig();
+    rig.setViewport(800, 600);
+    rig.setFraming({ x: 0, z: 0 }, 12, { instant: true });
+    const interaction = new Interaction({
+      canvas,
+      scene,
+      rig,
+      callbacks: { onHover: () => undefined, onSelect: () => undefined, onZoom },
+      reducedMotion: true,
+    });
+    const wheel = (deltaY: number): void =>
+      listeners.get("wheel")?.({ deltaY, deltaMode: 0, ctrlKey: false, clientX: 400, clientY: 300, preventDefault: () => undefined });
+    return { rig, interaction, wheel };
+  };
+
+  it("reports the zoom factor a wheel notch really applied, and nothing at the limit", () => {
+    const factors: number[] = [];
+    const { rig, interaction, wheel } = setup((factor) => factors.push(factor));
+    const before = rig.zoom;
+    wheel(-100);
+    expect(factors).toHaveLength(1);
+    expect(factors[0]).toBeGreaterThan(1);
+    expect(before * factors[0]).toBeCloseTo(rig.zoom, 9);
+    wheel(100);
+    expect(factors[1]).toBeLessThan(1);
+    // Far past the closest zoom: once it is reached, further notches report nothing.
+    for (let i = 0; i < 40; i += 1) wheel(-240);
+    const count = factors.length;
+    wheel(-240);
+    expect(factors).toHaveLength(count);
+    interaction.dispose();
+  });
+
+  it("works without the callback (it is optional)", () => {
+    const { rig, interaction, wheel } = setup();
+    const before = rig.zoom;
+    wheel(-100);
+    expect(rig.zoom).toBeGreaterThan(before);
+    interaction.dispose();
+  });
+});

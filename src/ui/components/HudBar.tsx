@@ -1,5 +1,7 @@
 import type { GameState } from "../../types/game";
 import { getEffectiveMaxAp, calcNetBurn } from "../../engine/economy";
+import { playSound } from "../../audio/engine";
+import { SoundMenu } from "./SoundMenu";
 
 interface HudBarProps {
   state: GameState;
@@ -17,7 +19,10 @@ interface HudBarProps {
 const WorldToggle = ({ enabled, onToggle }: { enabled: boolean; onToggle: () => void }) => (
   <button
     type="button"
-    onClick={onToggle}
+    onClick={() => {
+      playSound(enabled ? "ui-toggle-off" : "ui-toggle-on");
+      onToggle();
+    }}
     aria-pressed={enabled}
     aria-label="3D view"
     className={
@@ -119,6 +124,7 @@ export const HudBar = ({
             </button>
           ) : null}
           {onToggleWorld ? <WorldToggle enabled={worldEnabled} onToggle={onToggleWorld} /> : null}
+          <SoundMenu />
         </div>
       </div>
     );
@@ -221,6 +227,7 @@ export const HudBar = ({
           </button>
         ) : null}
         {onToggleWorld ? <WorldToggle enabled={worldEnabled} onToggle={onToggleWorld} /> : null}
+        <SoundMenu />
       </div>
     </div>
   );

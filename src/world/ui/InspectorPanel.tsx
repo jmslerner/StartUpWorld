@@ -1,5 +1,6 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import type { MouseEvent, ReactNode } from "react";
+import { playSound } from "../../audio/engine";
 import type { InteractableTarget } from "../types";
 import type { InspectorAction, InspectorCard, InspectorLine } from "./inspector";
 import { placeCard, type CardSide } from "./placement";
@@ -92,9 +93,16 @@ const ActionButton = ({ action, dense, compact = false, onRun, onPrefill }: Acti
 
   const title = disabled ? `${action.disabledReason} (${action.command.trim()})` : `${verb}: ${action.command.trim()}`;
   const press = (): void => {
-    if (disabled) return;
+    if (disabled) {
+      playSound("ui-denied");
+      return;
+    }
+    // A prefill sounds from the terminal as the command lands there ("your turn to type").
     if (action.mode === "prefill") onPrefill(action.command);
-    else onRun(action.command);
+    else {
+      playSound("ui-press");
+      onRun(action.command);
+    }
   };
 
   if (compact) {

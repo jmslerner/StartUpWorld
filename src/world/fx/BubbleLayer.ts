@@ -69,10 +69,11 @@ export class BubbleLayer {
     return this.active.length;
   }
 
-  show(anchor: THREE.Object3D, icon: BubbleIcon, seconds: number, heightOffset: number): void {
-    if (typeof document === "undefined") return;
+  /** Returns whether a bubble is now showing (false: no DOM, or the icon could not be drawn). */
+  show(anchor: THREE.Object3D, icon: BubbleIcon, seconds: number, heightOffset: number): boolean {
+    if (typeof document === "undefined") return false;
     const texture = this.textureFor(icon);
-    if (!texture) return;
+    if (!texture) return false;
 
     let bubble = this.byAnchor.get(anchor);
     if (bubble) {
@@ -94,6 +95,7 @@ export class BubbleLayer {
     bubble.material.map = texture;
     bubble.sprite.visible = true;
     this.place(bubble, 0);
+    return true;
   }
 
   update(dt: number, elapsed: number): void {

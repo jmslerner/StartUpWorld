@@ -398,6 +398,19 @@ export interface WorldContext {
   getLayout(): OfficeLayout;
   /** Smoothly re-frame the camera on a point (e.g. on phase change). */
   focusCamera(target: Vec2, viewHeight?: number, seconds?: number): void;
+  /**
+   * Where systems report the moments only they can time (see WorldSoundListener), in world
+   * coordinates. Absent unless the app asked for them: systems call it with `?.`.
+   */
+  readonly sound?: WorldSoundSink;
+}
+
+/** The world-coordinate side of WorldSoundListener, for systems (positions on the ground). */
+export interface WorldSoundSink {
+  /** Footsteps from `from` toward `to`; `approach` +1 arriving, −1 leaving, 0 passing by. */
+  footsteps(from: Vec2, to: Vec2, steps: number, approach: number): void;
+  /** Somebody sat down at `at` after walking in. */
+  chairSit(at: Vec2): void;
 }
 
 export interface WorldSystem {
@@ -459,11 +472,54 @@ export interface WorldCallbacks {
   onContextLost?(): void;
   /** The WebGL context came back after a loss; the world has already resumed rendering. */
   onContextRestored?(): void;
+  /**
+   * The zoom actually changed by `factor` (> 1 closer) because of the player: a wheel notch, a
+   * pinch, or WorldHandle.zoomBy. Not called at the zoom limits, nor for camera moves the
+   * world makes by itself (re-framing, reset).
+   */
+  onZoom?(factor: number): void;
+}
+
+/** Where on screen a sound comes from: −1 the canvas's left edge … 1 its right edge (kept moderate). */
+export interface WorldSoundCue {
+  pan: number;
+}
+
+export interface WorldFootstepsCue extends WorldSoundCue {
+  /** How many steps to play (1–6). */
+  steps: number;
+  /** +1 arriving (swells), −1 leaving (fades), 0 passing by. */
+  approach: number;
+  /** Where the walker is heading, on the same scale as `pan`. */
+  panTo: number;
+}
+
+/**
+ * Optional listener for the sounds only the world can time: real footsteps, a chair taking a
+ * new arrival's weight, a thought bubble popping up, and the lighting's time of day. The
+ * world behaves exactly the same with or without it; every method is optional and a listener
+ * that throws is ignored.
+ */
+export interface WorldSoundListener {
+  /**
+   * Somebody walks through the front door: an arrival a couple of seconds before reaching
+   * their seat (approach +1), somebody leaving as they set off (−1), and the founder's
+   * `coffee` errand there and back (0). Ordinary wandering stays silent.
+   */
+  onFootsteps?(cue: WorldFootstepsCue): void;
+  /** An arrival sits down at their desk. */
+  onChairSit?(cue: WorldSoundCue): void;
+  /** A thought bubble pops up over somebody's head. */
+  onBubble?(cue: WorldSoundCue): void;
+  /** The lighting's dusk amount (0 daylight … 1 dusk and night) whenever it has moved noticeably. */
+  onDusk?(amount: number): void;
 }
 
 export interface WorldOptions {
   quality?: QualityLevel;
   reducedMotion?: boolean;
+  /** Optional: report sound-worthy moments (see WorldSoundListener). */
+  sound?: WorldSoundListener;
 }
 
 export interface WorldHandle {

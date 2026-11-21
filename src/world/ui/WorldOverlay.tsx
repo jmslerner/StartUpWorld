@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { useStore } from "zustand";
+import { playSound } from "../../audio/engine";
 import { useGameStore } from "../../state/useGameStore";
 import { useUiStore } from "../../state/useUiStore";
 import { targetKey } from "../targets";
@@ -71,11 +72,15 @@ export const WorldOverlay = ({ stage, finePointer, runCommand }: WorldOverlayPro
           // The card stays open after a command so the same button can be pressed again.
           onRun={runCommand}
           onPrefill={(command) => {
+            // The terminal sounds the prefill; the card closing with it is part of the same gesture.
             requestPrefill(command);
             // The player's attention moves to the terminal to finish the command.
             stage.select(null);
           }}
-          onClose={() => stage.select(null)}
+          onClose={() => {
+            playSound("ui-close");
+            stage.select(null);
+          }}
         />
       ) : null}
     </div>

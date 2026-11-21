@@ -19,12 +19,14 @@ import type {
   WorldHandle,
   WorldOptions,
   WorldSnapshot,
+  WorldSoundListener,
+  WorldSoundSink,
 } from "../types";
 import { CameraRig } from "./CameraRig";
 import { layoutBounds } from "./layoutBounds";
 import { clamp } from "./math";
 import { disposeSharedResources } from "./palette";
-import { Lighting } from "./Lighting";
+import { getLightingState, Lighting } from "./Lighting";
 import { configureRenderer } from "./rendererLook";
 import { SystemRunner } from "./SystemRunner";
 
@@ -60,6 +62,15 @@ const FOCUS_PADDING_PX = 16;
 const MAX_PIXEL_RATIO: Record<QualityLevel, number> = { high: 2, low: 1.5 };
 const CONTEXT_RELEASE_DELAY_MS = 300;
 const NO_EVENTS: readonly WorldEvent[] = [];
+/**
+ * Sound pans are kept moderate: the canvas is a window in the page, not the whole sound
+ * stage, so something at its edge sounds off to the side, never hard in one ear.
+ */
+const SOUND_PAN_SPREAD = 0.6;
+/** Height (world units) at which a sound's position is projected: about a seated person's chest. */
+const SOUND_HEIGHT = 0.8;
+/** The lighting's dusk amount is passed on when it has moved this much (and at both ends). */
+const DUSK_REPORT_STEP = 0.02;
 
 /** Systems written by other owners; rebuilt from scratch when a new run starts. */
 const REBUILT_ON_RESET = ["office", "people"] as const;
@@ -168,6 +179,13 @@ class World {
   /** The building frame the camera was last pointed at. */
   private shot: LayoutFrame | null = null;
   private readonly focusCentre = new THREE.Vector3();
+  private readonly soundPoint = new THREE.Vector3();
+  /** The app's optional sound listener (WorldOptions.sound). */
+  private readonly sound: WorldSoundListener | null;
+  /** The lighting's published state (a stable object per scene), read for the sound listener's dusk. */
+  private readonly lightingState = getLightingState(this.scene);
+  /** Last dusk amount handed to the sound listener; NaN before the first. */
+  private reportedDusk = Number.NaN;
   private pixelRatioQuery: MediaQueryList | null = null;
   private frameRequest = 0;
   private running = false;
@@ -182,6 +200,7 @@ class World {
     this.canvas = canvas;
     this.callbacks = callbacks;
     this.quality = options.quality ?? detectQuality();
+    this.sound = options.sound ?? null;
     const reducedMotion = options.reducedMotion ?? prefersReducedMotion();
 
     // Everything that can fail for lack of WebGL happens before anything else
@@ -215,6 +234,7 @@ class World {
       getLayout,
       unitsPerPixel: () => this.rig.unitsPerPixel(),
       shakeCamera: (strength) => this.rig.shake(strength),
+      onBubble: this.sound?.onBubble ? (at) => this.tellSound((sound) => sound.onBubble?.({ pan: this.soundPan(at.x, at.z) })) : undefined,
     });
     this.coreRoots = new Set<THREE.Object3D>([this.lighting.root, this.interaction.root, this.fx.root]);
 
@@ -229,6 +249,7 @@ class World {
       signals: { doorTraffic: 0 },
       getLayout,
       focusCamera: (target, viewHeight, seconds) => this.rig.focus(target, viewHeight, seconds),
+      sound: this.soundSink(),
     };
 
     // Registration order is the order snapshots are applied and frames updated.
@@ -337,7 +358,10 @@ class World {
 
   private zoomBy(factor: number): void {
     if (this.disposed) return;
+    const before = this.rig.zoom;
     this.rig.zoomAt(factor);
+    const after = this.rig.zoom;
+    if (after !== before && before > 0) this.callbacks.onZoom?.(after / before);
   }
 
   private resetCamera(): void {
@@ -445,6 +469,49 @@ class World {
     this.rig.setFraming(frame.target, frame.height, { instant: firstSnapshot, fitWidth: frame.width, fill: FRAME_FILL });
   }
 
+  // ── Sound ─────────────────────────────────────────────────────────────────
+
+  /** The world-coordinate sink systems report to, or undefined when nobody listens for those sounds. */
+  private soundSink(): WorldSoundSink | undefined {
+    const sound = this.sound;
+    if (!sound || (!sound.onFootsteps && !sound.onChairSit)) return undefined;
+    return {
+      footsteps: (from, to, steps, approach) =>
+        this.tellSound((listener) =>
+          listener.onFootsteps?.({ steps, approach, pan: this.soundPan(from.x, from.z), panTo: this.soundPan(to.x, to.z) })
+        ),
+      chairSit: (at) => this.tellSound((listener) => listener.onChairSit?.({ pan: this.soundPan(at.x, at.z) })),
+    };
+  }
+
+  /** Stereo position of a point on the ground, from where the camera draws it. */
+  private soundPan(x: number, z: number): number {
+    const ndc = this.soundPoint.set(x, SOUND_HEIGHT, z).project(this.rig.camera).x;
+    return Number.isFinite(ndc) ? clamp(ndc, -1, 1) * SOUND_PAN_SPREAD : 0;
+  }
+
+  /** Call the sound listener; whatever it does wrong stays out of the frame. */
+  private tellSound(call: (listener: WorldSoundListener) => void): void {
+    const sound = this.sound;
+    if (!sound || this.disposed) return;
+    try {
+      call(sound);
+    } catch {
+      // A garnish: a broken listener must never cost a frame.
+    }
+  }
+
+  /** Pass the lighting's time of day on to the sound listener when it has moved noticeably. */
+  private reportDusk(): void {
+    if (!this.sound?.onDusk) return;
+    const dusk = this.lightingState.duskAmount;
+    const last = this.reportedDusk;
+    const atEnd = (dusk === 0 || dusk === 1) && dusk !== last;
+    if (!atEnd && Math.abs(dusk - last) < DUSK_REPORT_STEP) return;
+    this.reportedDusk = dusk;
+    this.tellSound((sound) => sound.onDusk?.(dusk));
+  }
+
   // ── Size ──────────────────────────────────────────────────────────────────
 
   private applySize(width: number, height: number): void {
@@ -502,6 +569,7 @@ class World {
     this.elapsed += dt;
 
     this.runner.update(dt, this.elapsed);
+    this.reportDusk();
     // The camera and the highlights move last, so they see where everything ended up this frame.
     try {
       this.rig.update(dt);

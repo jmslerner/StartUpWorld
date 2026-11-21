@@ -125,7 +125,7 @@ export class Interaction implements InteractableRegistry {
     this.gestures = new GestureRecognizer({
       onTap: (point, kind) => this.handleTap(point, kind),
       onPan: (dx, dy) => this.rig.panByPixels(dx, dy),
-      onZoom: (factor, at) => this.rig.zoomAt(factor, at),
+      onZoom: (factor, at) => this.zoomAt(factor, at),
       onDragStart: () => this.handleDragStart(),
       onDragEnd: () => this.handleDragEnd(),
     });
@@ -344,7 +344,7 @@ export class Interaction implements InteractableRegistry {
     delta = clamp(delta, -MAX_WHEEL_STEP_PX, MAX_WHEEL_STEP_PX);
     if (delta === 0) return;
     const speed = event.ctrlKey ? PINCH_WHEEL_ZOOM_SPEED : WHEEL_ZOOM_SPEED;
-    this.rig.zoomAt(Math.exp(-delta * speed), this.toCanvas(event));
+    this.zoomAt(Math.exp(-delta * speed), this.toCanvas(event));
     this.hoverDirty = true;
   };
 
@@ -359,10 +359,18 @@ export class Interaction implements InteractableRegistry {
     // On iOS the same pinch also arrives as two touch pointers, which the
     // recognizer is already turning into zoom; acting on both would double it.
     if (this.gestures.pressed || !(gesture.scale > 0)) return;
-    this.rig.zoomAt(gesture.scale / this.gestureScale, this.toCanvas(gesture));
+    this.zoomAt(gesture.scale / this.gestureScale, this.toCanvas(gesture));
     this.gestureScale = gesture.scale;
     this.hoverDirty = true;
   };
+
+  /** The player zoomed (wheel, pinch): move the camera and say by how much it really moved. */
+  private zoomAt(factor: number, at: ScreenPoint): void {
+    const before = this.rig.zoom;
+    this.rig.zoomAt(factor, at);
+    const after = this.rig.zoom;
+    if (after !== before && before > 0) this.callbacks.onZoom?.(after / before);
+  }
 
   // ── Gestures ──────────────────────────────────────────────────────────────
 

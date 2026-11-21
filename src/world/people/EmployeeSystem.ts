@@ -27,6 +27,7 @@ import { createCharacter } from "./Character";
 import type { CharacterHandle, CharacterPose, PoseOptions } from "./Character";
 import { Crew, MAX_GROUP_BUBBLES } from "./crew";
 import type { CrewHost } from "./crew";
+import { Footfall } from "./footfall";
 
 /** The inspector card hangs just above the head anchor (which already sits over the hair). */
 const CARD_LIFT = 0.15;
@@ -90,6 +91,8 @@ export class EmployeeSystem implements WorldSystem, CrewHost {
   private vacated: ReadonlySet<string> = new Set<string>();
   /** The roster of the latest snapshot. */
   private people: readonly PersonView[] = [];
+  /** Footsteps and chairs for the app's sound listener; null when nobody listens. */
+  private readonly footfall: Footfall | null;
 
   constructor(ctx: WorldContext) {
     this.ctx = ctx;
@@ -97,6 +100,7 @@ export class EmployeeSystem implements WorldSystem, CrewHost {
     ctx.scene.add(this.root);
     ctx.signals.chairsOut = this.chairsOut;
     ctx.signals.vacated = this.vacated;
+    this.footfall = ctx.sound ? new Footfall(ctx.sound) : null;
     this.crew = new Crew(this, ctx.getLayout(), {
       reducedMotion: ctx.reducedMotion,
       // "low" quality means a phone-sized view: half as many bubbles keeps them from piling up.
@@ -194,13 +198,16 @@ export class EmployeeSystem implements WorldSystem, CrewHost {
   private syncAll(dt: number, elapsed: number): void {
     const { cast, departing } = this.crew;
     const { door, floor } = this.ctx.getLayout();
+    const { footfall } = this;
     let atDoor = 0;
     for (let i = 0; i < cast.length; i += 1) {
       this.sync(cast[i], dt, elapsed);
+      footfall?.observe(cast[i], door);
       if (isInDoorway(cast[i], door, floor)) atDoor += 1;
     }
     for (let i = 0; i < departing.length; i += 1) {
       this.sync(departing[i], dt, elapsed);
+      footfall?.observe(departing[i], door);
       if (isInDoorway(departing[i], door, floor)) atDoor += 1;
     }
     // The office holds the front door open for whoever is walking through it.

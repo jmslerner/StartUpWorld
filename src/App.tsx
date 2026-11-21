@@ -163,6 +163,10 @@ const App = () => {
         Boolean(target?.closest?.("button, a[href], summary, [role=button], [role=tab], [role=menuitem], [role=checkbox], [role=switch]"));
       if (pressesControl) return;
 
+      // A popover that manages its own focus (the Sound menu) answers Escape itself: it
+      // closes and hands focus back to the button that opened it.
+      if (event.key === "Escape" && target?.closest?.("[data-own-escape]")) return;
+
       // If the user starts typing anywhere, route focus back to the terminal.
       const shouldFocus = event.key === "Escape" || event.key === "Enter" || event.key === "Backspace" || event.key.length === 1;
       if (!shouldFocus) return;

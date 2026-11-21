@@ -1,4 +1,5 @@
 import type { MouseEvent } from "react";
+import { playSound } from "../../audio/engine";
 import { getEffectiveMaxAp } from "../../engine/economy";
 import type { GameState } from "../../types/game";
 import { titleCase } from "./format";
@@ -92,7 +93,12 @@ export const WorldHud = ({ state, showHint, finePointer, compact = false, onEndW
         title={endBlocker ?? "Runs: end"}
         onMouseDown={keepTerminalFocus}
         onClick={() => {
-          if (!endBlocker) onEndWeek();
+          if (endBlocker) {
+            playSound("ui-denied");
+            return;
+          }
+          playSound("ui-press");
+          onEndWeek();
         }}
         className={`pointer-events-auto absolute right-2 top-2 flex items-center gap-2 rounded-lg border px-2.5 py-1 text-[0.7rem] font-semibold shadow-lg backdrop-blur-sm transition-colors ${FOCUS_RING} ${
           endBlocker

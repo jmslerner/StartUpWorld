@@ -35,6 +35,8 @@ export interface FxDeps {
   shakeCamera(strength: number): void;
   /** Injectable for deterministic tests. */
   random?: () => number;
+  /** Optional: a bubble popped up; `at` is where (world space; only valid during the call). */
+  onBubble?(at: THREE.Vector3): void;
 }
 
 export interface ParticleBudget {
@@ -117,6 +119,8 @@ export class FxSystem implements WorldSystem, FxApi {
   private readonly renderer: ParticleRenderer;
   private readonly floats: FloatTextLayer;
   private readonly bubbles: BubbleLayer;
+  /** Scratch for the position handed to deps.onBubble. */
+  private readonly bubbleAt = new THREE.Vector3();
   private readonly scheduled: ScheduledBurst[] = [];
   private readonly spareSchedule: ScheduledBurst[] = [];
   private readonly pointA: Vec3Like = { x: 0, y: 0, z: 0 };
@@ -164,7 +168,8 @@ export class FxSystem implements WorldSystem, FxApi {
     seconds = DEFAULT_BUBBLE_SECONDS,
     heightOffset = DEFAULT_BUBBLE_HEIGHT
   ): void {
-    this.bubbles.show(anchor, icon, seconds, heightOffset);
+    if (!this.bubbles.show(anchor, icon, seconds, heightOffset) || !this.deps.onBubble) return;
+    this.deps.onBubble(anchor.getWorldPosition(this.bubbleAt));
   }
 
   shake(strength: number): void {

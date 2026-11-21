@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { playSound } from "../../audio/engine";
 import type { InteractableTarget, WorldHandle } from "../types";
 import type { Stage } from "./stage";
 
@@ -31,7 +32,8 @@ const successorOf = (target: InteractableTarget, handle: WorldHandle): Interacta
  * Keeps the selection honest while a card is open:
  *   • the card has nothing to say any more (`describable` is false) → close;
  *   • the target left the scene for longer than a moment → move on or close;
- *   • Escape → close, unless the terminal used that key press itself.
+ *   • Escape → close (with the UI close sound), unless the terminal used that key press itself.
+ * The automatic closes and hand-overs are silent: only the player's own gestures make UI sounds.
  */
 export const useSelectionKeeper = (stage: Stage, selected: InteractableTarget | null, describable: boolean): void => {
   useEffect(() => {
@@ -73,6 +75,7 @@ export const useSelectionKeeper = (stage: Stage, selected: InteractableTarget | 
       // The terminal handles Escape first (it dismisses its suggestion list and
       // marks the event handled). Only an unclaimed Escape closes the card.
       if (event.key !== "Escape" || event.defaultPrevented) return;
+      playSound("ui-close");
       stage.select(null);
     };
     window.addEventListener("keydown", onKeyDown);
