@@ -54,7 +54,7 @@ export class ErrorBoundary extends Component<Props, State> {
             onClick={this.handleReset}
             className="rounded-lg bg-neon/10 px-4 py-2 text-sm font-semibold text-neon hover:bg-neon/20"
           >
-            Try Again (New Game)
+            {this.props.onReset ? "Try Again (New Game)" : "Reload"}
           </button>
         </div>
       </div>
