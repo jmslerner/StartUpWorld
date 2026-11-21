@@ -115,6 +115,13 @@ export const energyFor = (kind: PersonView["kind"], morale: number, stress: numb
 };
 
 /**
+ * A named person's own energy (0–100) caps how lively they look: a crunching crew slouches and
+ * slows down whatever the company's morale is. Unknown (unlisted heads, founders): no cap.
+ */
+export const personalEnergyCap = (energy: number | undefined): number =>
+  energy === undefined ? 1 : 0.2 + 0.8 * Math.min(1, Math.max(0, energy / 100));
+
+/**
  * Up to `max` indices out of `count`, evenly spread and always including the
  * first: which members of a big team get a bubble when all of them cannot.
  */
@@ -248,6 +255,8 @@ export class Crew implements ActorStage {
   private readonly pool: Actor[] = [];
 
   private time = 0;
+  /** Named people's own energy, by id (from the snapshot's staff). */
+  private personal: ReadonlyMap<string, number> = new Map();
   private morale = 60;
   private stress = 0;
   private setupComplete = false;
@@ -315,6 +324,7 @@ export class Crew implements ActorStage {
     this.layout = layout;
     this.morale = next.morale;
     this.stress = next.stress;
+    this.personal = new Map((next.staff ?? []).map((view) => [view.id, view.energy]));
     this.setupComplete = next.setupComplete;
     const outcome = outcomeOf(next.gameOver);
     const outcomeChanged = outcome !== this.outcome;
@@ -477,7 +487,7 @@ export class Crew implements ActorStage {
     const dozing = routine === "work" && this.morale < LOW_MORALE;
     for (const actor of this.order) {
       actor.routine = routine;
-      actor.energy = energyFor(actor.kind, this.morale, this.stress);
+      actor.energy = Math.min(energyFor(actor.kind, this.morale, this.stress), personalEnergyCap(this.personal.get(actor.id)));
       if (!dozing) actor.mood = "work";
       // Morale has just been seen to be low: do not make the room wait a whole mood cycle to show it.
       else if (actor.mood === "work") actor.moodTimer = Math.min(actor.moodTimer, actor.rng.range(0.3, 3.5));
@@ -590,6 +600,55 @@ export class Crew implements ActorStage {
         case "easter-egg":
           if (event.command === "coffee") this.coffeeRun();
           break;
+        // ── People and product builds ──
+        case "released":
+          this.quietUntil = this.time + REACTION_QUIET;
+          this.gather(BUILDER_ROLES);
+          if (event.tier === "breakout") {
+            this.ripple({ bubble: "rocket", bubbleSeconds: 1.6 }, 0.2, true);
+            this.ripple({ emote: "cheer", emoteSeconds: 2 }, 0.9, false);
+            cheered = true;
+          } else if (event.tier === "solid") {
+            this.ripple({ stream: "ship" }, 0.3, true);
+            this.ripple({ emote: "cheer", emoteSeconds: 1.3 }, 0.9, false);
+          } else if (event.tier === "shrug") {
+            this.ripple({ bubble: "question", bubbleSeconds: 1.6 }, 0.6, true);
+          } else {
+            this.ripple({ bubble: "bug", bubbleSeconds: 2 }, 0.3, true);
+            this.ripple({ emote: "slump", emoteSeconds: 2.4 }, 0.5, false);
+          }
+          break;
+        case "build-started":
+          this.gather(BUILDER_ROLES);
+          this.ripple({ bubble: "idea", bubbleSeconds: 1.4 }, 0.1, true);
+          break;
+        case "surprise":
+          this.gather(BUILDER_ROLES);
+          this.ripple({ bubble: "question", bubbleSeconds: 1.8 }, 0.2, true);
+          break;
+        case "crunch-changed":
+          if (event.on) {
+            this.gather(BUILDER_ROLES);
+            this.ripple({ bubble: "coffee", bubbleSeconds: 1.6 }, 0.1, true);
+          }
+          break;
+        case "offer-landed": {
+          const person = this.actors.get(event.personId);
+          if (person?.present) this.cue(person, 0.3, { bubble: event.kind === "burnout" ? "stress" : "phone", bubbleSeconds: 2 });
+          break;
+        }
+        case "retained": {
+          const person = this.actors.get(event.personId);
+          if (person?.present) this.cue(person, 0.1, { bubble: "heart", bubbleSeconds: 1.6, emote: "cheer", emoteSeconds: 1 });
+          break;
+        }
+        case "energy-band": {
+          const person = this.actors.get(event.personId);
+          if (!person?.present) break;
+          if (event.band === "burnt-out") this.cue(person, 0.4, { bubble: "zzz", bubbleSeconds: 2.2, emote: "slump", emoteSeconds: 2.4 });
+          else if (event.band === "fumes") this.cue(person, 0.4, { bubble: "coffee", bubbleSeconds: 1.8 });
+          break;
+        }
         default:
           // Arrivals, departures and the end of the run are handled from the roster and the
           // snapshot itself; the remaining events belong to other systems.

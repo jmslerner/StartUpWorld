@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { GameState, TeamRole, TeamRoster } from "../types/game";
 import { createInitialState, executeCommand } from "../engine";
 import { calcNetBurn, calcRunwayWeeks } from "../engine/economy";
-import { makeState } from "../engine/testHelpers";
+import { makeState, makeTycoonState } from "../engine/testHelpers";
 import { hashText32, mix32 } from "./hash";
 import { employeeName } from "./names";
 import {
@@ -12,7 +12,9 @@ import {
   ROLE_ORDER,
   buildWorldSnapshot,
   employeeId,
+  energyBandOf,
   headcount,
+  isNamedEmployeeId,
   parseEmployeeId,
 } from "./snapshot";
 
@@ -438,18 +440,13 @@ describe("buildWorldSnapshot", () => {
       const start = buildWorldSnapshot(state);
       expect(start.setupComplete).toBe(true);
       expect(start.runId).toBe(state.seed);
-      expect(start.people.map((person) => person.id)).toEqual(["founder", "cofounder", "engineering-0"]);
+      // A real run carries the engine's roster: the starting engineer is a named person, "e1".
+      expect(start.people.map((person) => person.id)).toEqual(["founder", "cofounder", "e1"]);
 
       state = play(state, "hire ux 1", "hire eng 2");
       const later = buildWorldSnapshot(state);
-      expect(later.people.map((person) => person.id)).toEqual([
-        "founder",
-        "cofounder",
-        "engineering-0",
-        "engineering-1",
-        "engineering-2",
-        "design-0",
-      ]);
+      // e2 is the designer (hired first); department order puts the engineers first.
+      expect(later.people.map((person) => person.id)).toEqual(["founder", "cofounder", "e1", "e3", "e4", "e2"]);
       // The first engineer is still the same person.
       expect(later.people[2]).toEqual(start.people[2]);
       expect(later.ap).toBe(start.ap - 2);
@@ -457,5 +454,81 @@ describe("buildWorldSnapshot", () => {
       const roles: Array<TeamRole | null> = later.people.map((person) => person.role);
       expect(roles).toEqual([null, null, "engineering", "engineering", "engineering", "design"]);
     });
+  });
+});
+
+describe("named people and product builds", () => {
+  const tycoon = (counts: Partial<TeamRoster>, overrides: Partial<GameState> = {}): GameState =>
+    executeCommand(makeTycoonState({ team: team(counts), ...overrides }), "status").state;
+
+  it("uses the engine's employee ids, department by department", () => {
+    const snapshot = buildWorldSnapshot(tycoon({ engineering: 3 }));
+    expect(snapshot.people.map((person) => person.id)).toEqual(["founder", "cofounder", "e1", "e2", "e3"]);
+    // The name on the character is the name the terminal uses.
+    const state = tycoon({ engineering: 3 });
+    const e2 = state.people!.roster.find((e) => e.id === "e2")!;
+    expect(buildWorldSnapshot(state).people[3].name).toBe(e2.name);
+    expect(snapshot.staff.map((view) => view.id)).toEqual(["e1", "e2", "e3"]);
+    expect(isNamedEmployeeId("e17")).toBe(true);
+    expect(isNamedEmployeeId("engineering-0")).toBe(false);
+  });
+
+  it("firing somebody keeps everyone else's id, name and look", () => {
+    const before = tycoon({ engineering: 3 });
+    const after = executeCommand(before, "fire e2").state;
+    const keep = (state: GameState) => buildWorldSnapshot(state).people.filter((person) => person.id !== "e2");
+    expect(buildWorldSnapshot(after).people.map((person) => person.id)).toEqual(["founder", "cofounder", "e1", "e3"]);
+    expect(keep(after)).toEqual(keep(before));
+  });
+
+  it("a recruit appears with their new id", () => {
+    const looked = executeCommand(tycoon({ engineering: 1 }), "recruit eng").state;
+    expect(buildWorldSnapshot(looked).candidates.engineering).toHaveLength(3);
+    const signed = executeCommand(looked, "recruit eng 2").state;
+    const snapshot = buildWorldSnapshot(signed);
+    // Engaged people are listed first (so they are never the ones past the render cap); the
+    // seating plan does not move anyone for a change of order.
+    expect(snapshot.people.map((person) => person.id)).toEqual(["founder", "cofounder", "e2", "e1"]);
+    // A signing engages them.
+    expect(snapshot.staff.find((view) => view.id === "e2")?.engaged).toBe(true);
+  });
+
+  it("past the roster cap: 120 named, the rest unlisted, 64 on screen and the remainder hidden", () => {
+    const snapshot = buildWorldSnapshot(tycoon({ engineering: 130 }));
+    expect(snapshot.people).toHaveLength(MAX_WORLD_PEOPLE);
+    expect(snapshot.people.slice(2).every((person) => isNamedEmployeeId(person.id))).toBe(true);
+    expect(snapshot.hiddenPeople).toBe(130 - (MAX_WORLD_PEOPLE - 2));
+    expect(snapshot.staff).toHaveLength(MAX_WORLD_PEOPLE - 2);
+  });
+
+  it("unlisted heads keep the role-index ids", () => {
+    // A fractional hire has no record for the half; a whole head past the cap has none either.
+    const state = tycoon({ engineering: 2 });
+    const legacy = { ...state, people: undefined, product: undefined };
+    expect(buildWorldSnapshot(legacy).people.map((person) => person.id)).toEqual(["founder", "cofounder", "engineering-0", "engineering-1"]);
+    expect(buildWorldSnapshot(legacy).staff).toEqual([]);
+    expect(buildWorldSnapshot(legacy).builds).toEqual([]);
+    expect(buildWorldSnapshot(legacy).product).toEqual({ cruft: 0, moat: 0, shippedCount: 0, slots: 1, recent: [] });
+  });
+
+  it("shows builds with their progress, forecast tier and crew", () => {
+    const kicked = executeCommand(tycoon({ engineering: 2, design: 1 }), "build feature s Atlas").state;
+    const snapshot = buildWorldSnapshot(kicked);
+    expect(snapshot.builds).toEqual([
+      expect.objectContaining({ id: "b1", name: "Atlas", slug: "atlas", type: "feature", size: "s", pct: 0, built: false, crunch: false, shippable: false }),
+    ]);
+    expect(snapshot.builds[0].staffIds.length).toBeGreaterThan(0);
+    expect(["flop", "shrug", "solid", "breakout"]).toContain(snapshot.builds[0].tierNow);
+    const onIt = snapshot.staff.filter((view) => view.buildId === "b1").map((view) => view.id);
+    expect(onIt).toEqual(snapshot.builds[0].staffIds.slice().sort((a, b) => snapshot.staff.findIndex((v) => v.id === a) - snapshot.staff.findIndex((v) => v.id === b)));
+    expect(snapshot.staff.filter((view) => view.isLead).map((view) => view.id)).toEqual([snapshot.builds[0].leadId]);
+    // Structurally equal for equal states.
+    expect(buildWorldSnapshot(kicked)).toEqual(snapshot);
+  });
+
+  it("names energy in the engine's bands", () => {
+    expect([100, 85, 84, 60, 59, 45, 44, 30, 29, 0].map(energyBandOf)).toEqual([
+      "fresh", "fresh", "fine", "fine", "tired", "tired", "fumes", "fumes", "burnt-out", "burnt-out",
+    ]);
   });
 });

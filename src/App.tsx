@@ -13,6 +13,7 @@ import { Analytics } from "@vercel/analytics/react";
 import { stageRaiseCaps } from "./engine/investors";
 import { ASSET_CATALOG, ALL_ASSET_IDS, phaseAtLeast } from "./engine/assets";
 import { useUiStore } from "./state/useUiStore";
+import { buildTycoonHints } from "./ui/terminal/tycoonComplete";
 import { WorldBoundary, WorldPlaceholder, WorldUnavailableNote } from "./world/ui/WorldShell";
 
 // The 3D world (three.js and all scene code) is its own chunk: the terminal is
@@ -106,6 +107,9 @@ const App = () => {
       }),
     [state.assets, state.companyPhase]
   );
+
+  // Live names for the people and build commands' autocomplete (people, candidates, builds).
+  const tycoonHints = useMemo(() => buildTycoonHints(state), [state]);
 
   const onboardingComplete = Boolean(
     state.founder.name.trim() && state.companyName.trim() && state.founder.archetype && state.cofounder.archetype
@@ -249,7 +253,7 @@ const App = () => {
               <div className="shrink-0">
                 {/* Enter while output is typing skips to the end of it (all of it: a week's
                     close is a dozen lines, one Enter each was a chore); it never submits. */}
-                <TerminalInput ref={terminalInputRef} onSubmit={runCommand} isTyping={isTyping} fastForward={flushAll} commandHistory={commandHistory} boardMembers={boardMembers} raiseAmountHints={raiseAmountHints} availableAssets={availableAssets} />
+                <TerminalInput ref={terminalInputRef} onSubmit={runCommand} isTyping={isTyping} fastForward={flushAll} commandHistory={commandHistory} boardMembers={boardMembers} raiseAmountHints={raiseAmountHints} availableAssets={availableAssets} tycoon={tycoonHints} />
               </div>
               <TerminalLog log={typedLog} isTyping={isTyping} />
             </div>

@@ -301,6 +301,50 @@ export class FxSystem implements WorldSystem, FxApi {
         if (isWinEnding(event.ending)) this.celebrateAcrossFloor(layout, 12, 1.8, 1.4);
         else this.smokeOut(layout);
         break;
+      // ── People and product builds ──
+      case "released":
+        this.reactToRelease(event.tier, event.reception, layout);
+        break;
+      case "build-started":
+        this.burst("sparkle", this.station(layout, "ship", STATION_BURST_Y), 0.6);
+        this.floatText("Kickoff", this.station(layout, "ship", STATION_TEXT_Y), "neutral");
+        break;
+      case "build-cancelled":
+        // The column peels off the wall and goes in the bin.
+        this.burst("dust", this.station(layout, "ship", STATION_BURST_Y), 1.4);
+        this.floatText("Cancelled", this.station(layout, "ship", STATION_TEXT_Y), "bad");
+        break;
+      case "surprise":
+        this.burst("bugs", this.station(layout, "ship", STATION_BURST_Y - 0.2), 0.7);
+        this.floatText("Surprise scope", this.station(layout, "ship", STATION_TEXT_Y), "bad");
+        this.shake(0.15);
+        break;
+      case "crunch-changed":
+        if (event.on) this.floatText("Crunch", this.station(layout, "ship", STATION_TEXT_Y), "bad");
+        break;
+      case "resigned":
+        this.floatText(event.kind === "burnout" ? "Burnt out" : "Poached", this.door(layout, DOOR_TEXT_Y + 0.45), "bad");
+        if (event.buildAtRisk) {
+          // The lead took a quarter of the build with them: notes fall off the wall.
+          this.burst("dust", this.station(layout, "ship", STATION_BURST_Y), 1.2);
+          this.floatText("Lost its lead", this.station(layout, "ship", STATION_TEXT_Y), "bad");
+        }
+        break;
+      case "cruft-band":
+        if (event.rising && event.band === "sparking") this.burst("smoke", this.station(layout, "servers", STATION_BURST_Y), 0.8);
+        break;
+      case "moat-band":
+        if (event.rising) this.burst("sparkle", this.station(layout, "ship", 0.4), 0.6);
+        break;
+      case "offer-landed":
+      case "retained":
+      case "staffed":
+      case "experience":
+      case "energy-band":
+      case "candidates-shown":
+      case "build-progress":
+        // Over people's heads and on their desks: the people system's job.
+        break;
       // Reactions to these belong to the office and the characters (see the spec's table).
       case "run-reset":
       case "event-opened":
@@ -323,6 +367,38 @@ export class FxSystem implements WorldSystem, FxApi {
     // The number speaks for itself: a shipped feature can still cost reputation.
     const gained = reputationDelta !== 0 ? reputationDelta > 0 : ok;
     this.floatText(text, this.station(layout, "ship", STATION_TEXT_Y), gained ? "good" : "bad");
+  }
+
+  /** A release, sized by its tier: a gold rain for a breakout down to smoke and bugs for a flop. */
+  private reactToRelease(tier: "flop" | "shrug" | "solid" | "breakout", reception: number, layout: OfficeLayout): void {
+    const at = (y: number): Vec3Like => this.station(layout, "ship", y);
+    const label = `${tier.toUpperCase()} ${Math.round(reception)}`;
+    switch (tier) {
+      case "breakout":
+        this.burst("confetti", at(STATION_BURST_Y), 2.6);
+        this.burst("sparkle", at(STATION_BURST_Y), 1.8);
+        this.celebrateAcrossFloor(layout, 5, 1.1, 1.1);
+        this.streamUsers(layout, 14);
+        this.floatText(label, at(STATION_TEXT_Y), "good");
+        this.shake(0.2);
+        break;
+      case "solid":
+        this.burst("sparkle", at(STATION_BURST_Y), 1.7);
+        this.burst("confetti", at(STATION_BURST_Y), 0.9);
+        this.floatText(label, at(STATION_TEXT_Y), "good");
+        break;
+      case "shrug":
+        // One party popper, politely.
+        this.burst("confetti", at(STATION_BURST_Y), 0.3);
+        this.floatText(label, at(STATION_TEXT_Y), "neutral");
+        break;
+      case "flop":
+        this.burst("smoke", at(STATION_BURST_Y), 1.8);
+        this.burst("bugs", at(STATION_BURST_Y - 0.4), 1.4);
+        this.floatText(label, at(STATION_TEXT_Y), "bad");
+        this.shake(0.3);
+        break;
+    }
   }
 
   private reactToLaunch(ok: boolean, usersDelta: number, layout: OfficeLayout): void {

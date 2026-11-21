@@ -20,6 +20,8 @@ interface InspectorPanelProps {
 
 /** Cards with this many actions or more (the empty desk's ten roles) use one-line rows and a wider card. */
 const DENSE_FROM = 5;
+/** In a one-line row, a refusal longer than this gets a line of its own under the label. */
+const DENSE_REASON_INLINE = 26;
 const NOTCH_SIZE = 10;
 /** Key facts a docked (phone) card shows before "More". */
 const DOCKED_LINES = 3;
@@ -133,14 +135,23 @@ const ActionButton = ({ action, dense, compact = false, onRun, onPrefill }: Acti
       onClick={press}
       className={`w-full rounded-lg text-left text-xs transition-colors ${ACTION_TONES[tone]} ${FOCUS_RING} ${
         disabled ? "cursor-not-allowed opacity-60" : ACTION_HOVER[tone]
-      } ${dense ? "flex items-baseline gap-2 px-2 py-[3px]" : "flex flex-col gap-0.5 px-2 py-1.5"}`}
+      } ${dense ? "flex flex-wrap items-baseline gap-x-2 px-2 py-[3px]" : "flex flex-col gap-0.5 px-2 py-1.5"}`}
     >
       {dense ? (
         <>
-          <span className="min-w-0 flex-1 truncate font-medium leading-snug">{action.label}</span>
+          {/* The label wins the room; the command gives way (it is in the tooltip as well). */}
+          <span className="min-w-0 max-w-[64%] shrink-0 truncate font-medium leading-snug">{action.label}</span>
           {/* A locked row needs the room for its reason; the command is still in the tooltip. */}
-          {disabled ? null : command}
-          {aside ? <span className={`shrink-0 text-right text-[0.65rem] leading-snug ${disabled ? "" : "w-[4.75rem]"} ${asideClass}`}>{aside}</span> : null}
+          {disabled ? <span className="flex-1" /> : <span className="flex min-w-0 flex-1 justify-end">{command}</span>}
+          {aside ? (
+            <span
+              className={`text-[0.65rem] leading-snug ${
+                disabled && aside.length > DENSE_REASON_INLINE ? "basis-full text-left" : `shrink-0 text-right ${disabled ? "" : "w-[4.75rem]"}`
+              } ${asideClass}`}
+            >
+              {aside}
+            </span>
+          ) : null}
         </>
       ) : (
         <>
@@ -162,6 +173,17 @@ interface CardBodyProps extends Omit<InspectorPanelProps, "stage" | "docked" | "
   /** Extra header control, next to Close. */
   headerAction?: ReactNode;
 }
+
+/** Consecutive actions that share a `row` key, as groups (an action without one is a group of its own). */
+const groupRows = (actions: readonly InspectorAction[]): InspectorAction[][] => {
+  const groups: InspectorAction[][] = [];
+  for (const action of actions) {
+    const last = groups[groups.length - 1];
+    if (action.row !== undefined && last && last[0].row === action.row) last.push(action);
+    else groups.push([action]);
+  }
+  return groups;
+};
 
 const CloseButton = ({ onClose }: { onClose: () => void }) => (
   <button
@@ -207,9 +229,21 @@ const CardBody = ({ card, onRun, onPrefill, onClose, className, headerAction }: 
 
         {card.actions.length > 0 ? (
           <div className={`flex flex-col ${dense ? "gap-0.5" : "gap-1.5"}`}>
-            {card.actions.map((action) => (
-              <ActionButton key={action.command} action={action} dense={dense} onRun={onRun} onPrefill={onPrefill} />
-            ))}
+            {groupRows(card.actions).map((group) =>
+              group.length === 1 ? (
+                <ActionButton key={group[0].command} action={group[0]} dense={dense} onRun={onRun} onPrefill={onPrefill} />
+              ) : (
+                // One row, several buttons: the first in full, the rest as chips beside it.
+                <div key={group[0].command} className="flex items-stretch gap-1">
+                  <div className="min-w-0 flex-1">
+                    <ActionButton action={group[0]} dense={dense} onRun={onRun} onPrefill={onPrefill} />
+                  </div>
+                  {group.slice(1).map((action) => (
+                    <ActionButton key={action.command} action={action} dense={false} compact onRun={onRun} onPrefill={onPrefill} />
+                  ))}
+                </div>
+              )
+            )}
           </div>
         ) : null}
       </div>
@@ -403,7 +437,7 @@ export const InspectorPanel = ({ stage, target, card, docked, onRun, onPrefill, 
       role="dialog"
       aria-label={card.title}
       className={`pointer-events-auto invisible absolute left-0 top-0 z-20 flex max-h-[calc(100%-16px)] flex-col will-change-transform data-[placed=true]:visible ${
-        card.actions.length >= DENSE_FROM ? "w-[22rem]" : "w-[17.5rem]"
+        card.wide ? "w-[26rem]" : card.actions.length >= DENSE_FROM ? "w-[22rem]" : "w-[17.5rem]"
       }`}
     >
       <CardBody card={card} onRun={onRun} onPrefill={onPrefill} onClose={onClose} className="w-full" />

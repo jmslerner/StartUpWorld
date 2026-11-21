@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import type { BoardState, GameState, PendingEvent, SoundHint, TeamRoster } from "../types/game";
+import type { BoardState, Build, Employee, GameState, PendingEvent, SoundHint, TeamRoster } from "../types/game";
 import { executeCommand } from "../engine";
 import commandsSource from "../engine/commands.ts?raw";
-import { makeState } from "../engine/testHelpers";
+import { makeState, makeTycoonState } from "../engine/testHelpers";
 import {
   CASH_EVENT_THRESHOLD,
   EASTER_EGG_COMMANDS,
@@ -857,6 +857,21 @@ describe("coverage of the WorldEvent union", () => {
       "easter-egg": false,
       "command-failed": false,
       "game-over": false,
+      "offer-landed": false,
+      retained: false,
+      resigned: false,
+      staffed: false,
+      experience: false,
+      "energy-band": false,
+      "candidates-shown": false,
+      "build-started": false,
+      "build-cancelled": false,
+      released: false,
+      "build-progress": false,
+      surprise: false,
+      "crunch-changed": false,
+      "cruft-band": false,
+      "moat-band": false,
     };
     const record = (events: WorldEvent[]): void => {
       for (const event of events) produced[event.type] = true;
@@ -893,10 +908,178 @@ describe("coverage of the WorldEvent union", () => {
     record(deriveWorldEvents(same, same, signalFor("pricing prosumer", "warning", false)));
     record(deriveWorldEvents(same, same, signalFor("coffee", null, false)));
     record(deriveWorldEvents(same, same, signalFor("hire", null, true)));
+    for (const events of tycoonEventSamples()) record(events);
 
     const missing = Object.entries(produced)
       .filter(([, seen]) => !seen)
       .map(([type]) => type);
     expect(missing).toEqual([]);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// People and product builds (the tycoon layer), driven through the real engine
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** A run with named people: e1, e3, e4 engineers and e2 a designer (the job-ad roster of makeTycoonState). */
+const tycoon = (overrides: Partial<GameState> = {}): GameState =>
+  executeCommand(makeTycoonState({ team: team({ engineering: 3, design: 1 }), ...overrides }), "status").state;
+
+const editRoster = (state: GameState, id: string, changes: Partial<Employee>): GameState => ({
+  ...state,
+  people: { ...state.people!, roster: state.people!.roster.map((e) => (e.id === id ? { ...e, ...changes } : e)) },
+});
+
+const editBuilds = (state: GameState, changes: Partial<Build>): GameState => ({
+  ...state,
+  product: { ...state.product!, active: state.product!.active.map((b) => ({ ...b, ...changes })) },
+});
+
+/** Kick off Atlas (Feature S) and staff it: e1 (its lead) and e2 are on it. */
+const withAtlas = (): GameState => step(tycoon(), "build feature s Atlas").state;
+/** Atlas a week later: the crew has worked on it (so a release credits them). */
+const workedAtlas = (): GameState => step(withAtlas(), "end").state;
+
+const diff = (before: GameState, after: GameState): WorldEvent[] =>
+  deriveWorldEvents(buildWorldSnapshot(before), buildWorldSnapshot(after), noAction);
+
+function tycoonEventSamples(): WorldEvent[][] {
+  const atlas = withAtlas();
+  const offered = editRoster(atlas, "e1", { offerDueWeek: atlas.week + 1, offerKind: "recruiter", leadOnNotice: "b1" });
+  const lookedState = step(atlas, "recruit eng").state;
+  return [
+    step(tycoon(), "build feature s Atlas").events,
+    step(atlas, "build crunch atlas on").events,
+    step(atlas, "build cancel atlas").events,
+    step(editBuilds(workedAtlas(), { progress: 5, scope: 5, readyWeek: 2 }), "ship atlas").events,
+    diff(atlas, offered),
+    step(offered, "retain e1").events,
+    step(offered, "end").events,
+    diff(atlas, editBuilds(atlas, { surprises: 1 })),
+    diff(atlas, editRoster(atlas, "e2", { energy: 40 })),
+    step(atlas, "recruit eng").events,
+    diff(atlas, { ...atlas, product: { ...atlas.product!, cruft: 61, moat: 12 } }),
+    step(lookedState, "status").events,
+  ];
+}
+
+describe("deriveWorldEvents — named people", () => {
+  it("names employees by their engine id, so ids survive anyone else leaving", () => {
+    const before = buildWorldSnapshot(tycoon());
+    expect(before.people.map((person) => person.id)).toEqual(["founder", "cofounder", "e1", "e3", "e4", "e2"]);
+    const fired = step(tycoon(), "fire e3");
+    expect(fired.types).toContain("departed");
+    expect(findWorldEvent(fired.events, "departed")).toEqual({ type: "departed", role: "engineering", personIds: ["e3"] });
+    // Everyone else is exactly who they were.
+    const keep = (snapshot: WorldSnapshot) => snapshot.people.filter((person) => person.id !== "e3");
+    expect(keep(fired.next)).toEqual(keep(before));
+    // Being let go is not resigning.
+    expect(fired.types).not.toContain("resigned");
+  });
+
+  it("a hire names the newcomers by their new ids", () => {
+    const hired = step(tycoon(), "hire eng 2");
+    expect(findWorldEvent(hired.events, "hired")).toEqual({ type: "hired", role: "engineering", personIds: ["e5", "e6"] });
+  });
+
+  it("an offer landing, being retained, and being taken", () => {
+    const atlas = withAtlas();
+    const offered = editRoster(atlas, "e1", { offerDueWeek: atlas.week + 1, offerKind: "recruiter", leadOnNotice: "b1" });
+    expect(diff(atlas, offered)).toEqual([{ type: "offer-landed", personId: "e1", kind: "recruiter", buildAtRisk: "atlas" }]);
+
+    const retained = step(offered, "retain e1");
+    expect(retained.types).toEqual(["retained", "cash-changed"]);
+
+    const gone = step(offered, "end");
+    const departed = findWorldEvent(gone.events, "departed");
+    expect(departed?.personIds).toEqual(["e1"]);
+    expect(findWorldEvent(gone.events, "resigned")).toEqual({ type: "resigned", personId: "e1", role: "engineering", kind: "recruiter", buildAtRisk: "atlas" });
+    // Resigned follows the departures and comes before any hire.
+    expect(gone.types.indexOf("resigned")).toBe(gone.types.indexOf("departed") + 1);
+  });
+
+  it("staffing, energy bands, candidates", () => {
+    const atlas = withAtlas();
+    const off = step(atlas, "staff off e1");
+    expect(off.events).toEqual([{ type: "staffed", personId: "e1", buildId: null }]);
+    expect(diff(atlas, editRoster(atlas, "e2", { energy: 40 }))).toEqual([{ type: "energy-band", personId: "e2", band: "fumes" }]);
+    const looked = step(atlas, "recruit eng");
+    expect(looked.events).toEqual([{ type: "candidates-shown", role: "engineering" }]);
+    expect(looked.next.candidates.engineering).toHaveLength(3);
+    // Looking again the same week shows the same pool: nothing new.
+    expect(step(looked.state, "recruit eng").events).toEqual([]);
+  });
+});
+
+describe("deriveWorldEvents — product builds", () => {
+  it("a kickoff starts a build, staffs its crew and pays for it", () => {
+    const kicked = step(tycoon(), "build feature s Atlas");
+    expect(kicked.types).toEqual(["build-started", "staffed", "staffed", "cash-changed"]);
+    expect(kicked.next.builds).toHaveLength(1);
+    expect(kicked.next.builds[0]).toMatchObject({ id: "b1", slug: "atlas", pct: 0, staffIds: ["e1", "e2"], shippable: false });
+  });
+
+  it("a release is a `released` with its tier — never a `ship` — and credits the crew", () => {
+    const ready = editBuilds(workedAtlas(), { progress: 5, scope: 5, readyWeek: 2 });
+    const shipped = step(ready, "ship atlas");
+    const released = findWorldEvent(shipped.events, "released");
+    expect(released).toMatchObject({ type: "released", buildId: "b1", name: "Atlas" });
+    expect(["flop", "shrug", "solid", "breakout"]).toContain(released?.tier);
+    expect(released?.reception).toBe(shipped.next.product.recent[0].reception);
+    expect(shipped.types).not.toContain("ship");
+    expect(findWorldEvent(shipped.events, "experience")?.personIds).toEqual(["e1", "e2"]);
+    // A patch is still a patch.
+    expect(stepUntil(tycoon(), "ship dark mode", (attempt) => attempt.action.sound === "success").types).toContain("ship");
+  });
+
+  it("every tier of release reads as itself, whatever its sound", () => {
+    const ready = editBuilds(withAtlas(), { progress: 5, scope: 5, readyWeek: 1 });
+    const seen = new Set<string>();
+    for (let i = 1; i <= 200 && seen.size < 2; i += 1) {
+      const attempt = step({ ...ready, product: { ...ready.product!, rng: mix32(i) || 1 } }, "ship atlas");
+      const released = findWorldEvent(attempt.events, "released");
+      expect(released, `seed ${i}`).toBeDefined();
+      expect(attempt.types).not.toContain("ship");
+      expect(attempt.types).not.toContain("command-failed");
+      seen.add(released!.tier);
+    }
+    expect(seen.size).toBeGreaterThan(1);
+  });
+
+  it("a cancel, crunch, the week's work, a surprise, cruft and moat", () => {
+    const atlas = withAtlas();
+    expect(step(atlas, "build cancel atlas").types).toEqual(["build-cancelled", "staffed", "staffed"]);
+    expect(step(atlas, "build crunch atlas on").events).toEqual([{ type: "crunch-changed", buildId: "b1", on: true }]);
+    const week = step(atlas, "end");
+    expect(findWorldEvent(week.events, "build-progress")).toMatchObject({ buildId: "b1", from: 0 });
+    expect(diff(atlas, editBuilds(atlas, { surprises: 1 }))).toEqual([{ type: "surprise", buildId: "b1" }]);
+    const messy = { ...atlas, product: { ...atlas.product!, cruft: 61, moat: 12 } };
+    expect(diff(atlas, messy)).toEqual([
+      { type: "cruft-band", band: "sparking", rising: true },
+      { type: "moat-band", band: "ditch", rising: true },
+    ]);
+  });
+
+  it("a lead who leaves takes a quarter of the build with them", () => {
+    // Let go: the progress drops in the same command.
+    const fired = step(editBuilds(workedAtlas(), { progress: 3 }), "fire e1");
+    const progress = findWorldEvent(fired.events, "build-progress");
+    expect(progress && progress.to < progress.from).toBe(true);
+    // Walking out after notice: the week's work can outweigh the loss, so `resigned` says which build paid for it.
+    const atlas = workedAtlas();
+    const leaving = editRoster(atlas, "e1", { offerDueWeek: atlas.week + 1, offerKind: "recruiter", leadOnNotice: "b1" });
+    expect(findWorldEvent(step(leaving, "end").events, "resigned")).toEqual({
+      type: "resigned",
+      personId: "e1",
+      role: "engineering",
+      kind: "recruiter",
+      buildAtRisk: "atlas",
+    });
+  });
+
+  it("bare `fire` stays an easter egg; `fire <who>` never is", () => {
+    expect(step(tycoon(), "fire").types).toEqual(["easter-egg"]);
+    expect(step(tycoon(), "fire e3").types).not.toContain("easter-egg");
+    expect(step(tycoon(), "fire nobody").types).toEqual(["command-failed"]);
   });
 });

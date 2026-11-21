@@ -44,7 +44,7 @@ const mountWorld = (canvas: HTMLCanvasElement, viewport: HTMLElement, stage: Sta
   const bubbles = createBubbleGate();
   /** Would selecting this open an inspector card (so the click plays `open`, not `select`)? */
   const opensCard = (target: InteractableTarget): boolean =>
-    describeTarget(target, useGameStore.getState().state, { hiddenCount: handle.hiddenCount() }) !== null;
+    describeTarget(target, useGameStore.getState().state, { hiddenCount: handle.hiddenCount(), gate: false }) !== null;
 
   let handle: WorldHandle;
   try {

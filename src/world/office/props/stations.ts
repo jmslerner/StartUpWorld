@@ -95,6 +95,28 @@ const _colorA = new THREE.Color();
 // ship — the product wall
 // ─────────────────────────────────────────────────────────────────────────────
 
+/** One active build, as the product wall shows it (a lane of the board). */
+export interface WallBuild {
+  name: string;
+  slug: string;
+  /** "Feature M". */
+  label: string;
+  /** 0–100. */
+  pct: number;
+  built: boolean;
+  /** At least 60%: it could be shipped (early) now. */
+  shippable: boolean;
+  tier: "flop" | "shrug" | "solid" | "breakout";
+  /** Reception a release shipped now would most likely get. */
+  forecast: number;
+  /** Weeks until the due week; negative = that many weeks late. */
+  dueIn: number;
+  crunch: boolean;
+  crunchWeeks: number;
+  crew: number;
+  seats: number;
+}
+
 export interface ProductWallHandle extends StationHandle {
   /** How many sticky notes the board can hold in this phase. */
   readonly maxNotes: number;
@@ -102,7 +124,168 @@ export interface ProductWallHandle extends StationHandle {
   setNoteCount(count: number): void;
   /** Flash the frame: "good" = a clean ship (green glow, the notes jump), "bad" = a red flicker. */
   pulse(kind: "good" | "bad"): void;
+  /**
+   * The build board: one lane per active build (progress, forecast lamp, due date, crunch),
+   * empty lanes for free slots. With no builds the classic sticky notes come back.
+   * A built build glows gold and the frame pulses until it ships.
+   */
+  setBuilds(builds: readonly WallBuild[], slots: number): void;
 }
+
+/** Forecast lamp colours: flop red, shrug grey, solid green, breakout gold. */
+export const TIER_COLORS: Record<WallBuild["tier"], number> = {
+  flop: 0xe4574a,
+  shrug: 0x9aa3ad,
+  solid: 0x4ade80,
+  breakout: 0xfbbf24,
+};
+const READY_GOLD = 0xfbbf24;
+/** Canvas pixels per metre of board: enough for the build name to read at the default zoom. */
+const BOARD_PX_PER_M = 420;
+
+const roundRect = (ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number): void => {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+};
+
+/** Fit `text` to `maxWidth` by shrinking the font from `size` (px), never below 60% of it. */
+const fitText = (ctx: CanvasRenderingContext2D, text: string, weight: number, size: number, maxWidth: number): void => {
+  let px = size;
+  ctx.font = `${weight} ${px}px ${LABEL_FONT}`;
+  while (px > size * 0.6 && ctx.measureText(text).width > maxWidth) {
+    px -= 2;
+    ctx.font = `${weight} ${px}px ${LABEL_FONT}`;
+  }
+};
+
+/** The build board's picture: lanes on the board's own face colour. */
+const drawBuildBoard =
+  (builds: readonly WallBuild[], slots: number, face: number): CanvasDraw =>
+  (ctx, w, h) => {
+    ctx.fillStyle = cssColor(face);
+    ctx.fillRect(0, 0, w, h);
+    const lanes = Math.max(1, Math.min(3, Math.max(builds.length, slots)));
+    const laneW = w / lanes;
+    const pad = Math.round(h * 0.035);
+    ctx.textBaseline = "alphabetic";
+    for (let i = 0; i < lanes; i += 1) {
+      const x = i * laneW + pad;
+      const y = pad;
+      const cw = laneW - pad * 2;
+      const ch = h - pad * 2;
+      const build = builds[i];
+      if (!build) {
+        // A free slot: a dashed outline and the command that fills it.
+        ctx.setLineDash([18, 14]);
+        ctx.strokeStyle = "rgba(60, 70, 85, 0.45)";
+        ctx.lineWidth = 6;
+        roundRect(ctx, x + 6, y + 6, cw - 12, ch - 12, 22);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle = "rgba(60, 70, 85, 0.6)";
+        ctx.textAlign = "center";
+        fitText(ctx, "free slot", 600, 54, cw - 40);
+        ctx.fillText("free slot", x + cw / 2, y + ch / 2 - 6);
+        fitText(ctx, "> build", 600, 44, cw - 40);
+        ctx.fillText("> build", x + cw / 2, y + ch / 2 + 50);
+        continue;
+      }
+      const tier = TIER_COLORS[build.tier];
+      // The card.
+      ctx.fillStyle = cssColor(INK);
+      roundRect(ctx, x, y, cw, ch, 22);
+      ctx.fill();
+      if (build.built) {
+        ctx.strokeStyle = cssColor(READY_GOLD);
+        ctx.lineWidth = 14;
+        roundRect(ctx, x + 7, y + 7, cw - 14, ch - 14, 18);
+        ctx.stroke();
+      }
+      // Header stripe in the forecast's colour.
+      ctx.fillStyle = cssColor(tier);
+      roundRect(ctx, x + 18, y + 18, cw - 36, 16, 8);
+      ctx.fill();
+
+      const left = x + 34;
+      const inner = cw - 68;
+      ctx.textAlign = "left";
+      ctx.fillStyle = "#ffffff";
+      // Big and few: the wall is seen from across the room, at an angle.
+      fitText(ctx, build.name, 700, 100, inner);
+      ctx.fillText(build.name, left, y + 128);
+
+      // Progress bar.
+      const barY = y + 156;
+      const barH = 84;
+      ctx.fillStyle = "rgba(255, 255, 255, 0.14)";
+      roundRect(ctx, left, barY, inner, barH, 14);
+      ctx.fill();
+      const fill = Math.max(0, Math.min(1, build.pct / 100));
+      if (fill > 0) {
+        ctx.fillStyle = cssColor(build.built ? READY_GOLD : build.shippable ? C.good : NEON);
+        roundRect(ctx, left, barY, Math.max(28, inner * fill), barH, 14);
+        ctx.fill();
+      }
+      // The 60% line: under it a release is refused.
+      ctx.fillStyle = "rgba(255, 255, 255, 0.6)";
+      ctx.fillRect(left + inner * 0.6 - 3, barY - 8, 6, barH + 16);
+      ctx.fillStyle = fill > 0.55 ? cssColor(INK) : "#ffffff";
+      ctx.textAlign = "center";
+      fitText(ctx, `${Math.round(build.pct)}%`, 700, 62, inner);
+      ctx.fillText(`${Math.round(build.pct)}%`, left + inner / 2, barY + barH - 20);
+
+      // Forecast lamp.
+      const lampY = barY + barH + 86;
+      ctx.beginPath();
+      ctx.arc(left + 32, lampY - 20, 30, 0, Math.PI * 2);
+      ctx.fillStyle = cssColor(tier);
+      ctx.fill();
+      ctx.textAlign = "left";
+      ctx.fillStyle = cssColor(tier);
+      const verdict = `${build.tier.toUpperCase()} ≈${build.forecast}`;
+      fitText(ctx, verdict, 700, 64, inner - 80);
+      ctx.fillText(verdict, left + 80, lampY);
+
+      // Due date (or how late), and the crunch light.
+      const footY = y + ch - 34;
+      const late = build.dueIn < 0;
+      const due = build.built ? "READY · > ship" : late ? `${-build.dueIn}w LATE` : build.dueIn === 0 ? "due this week" : `due in ${build.dueIn}w`;
+      ctx.fillStyle = build.built ? cssColor(READY_GOLD) : late ? cssColor(C.alarm) : cssColor(MIST);
+      fitText(ctx, due, 700, 50, build.crunch ? inner * 0.5 : inner);
+      ctx.fillText(due, left, footY);
+      if (build.crunch) {
+        const label = "CRUNCH";
+        ctx.font = `700 44px ${LABEL_FONT}`;
+        const tw = ctx.measureText(label).width + 28;
+        const bx = x + cw - 34 - tw;
+        ctx.fillStyle = cssColor(EMBER);
+        roundRect(ctx, bx, footY - 42, tw, 56, 10);
+        ctx.fill();
+        ctx.fillStyle = cssColor(INK);
+        ctx.fillText(label, bx + 14, footY);
+        // One pizza slice per crunched week (up to five), above the light.
+        const slices = Math.min(5, build.crunchWeeks);
+        for (let k = 0; k < slices; k += 1) {
+          const sx = x + cw - 52 - k * 40;
+          const sy = footY - 58;
+          ctx.beginPath();
+          ctx.moveTo(sx - 15, sy - 30);
+          ctx.lineTo(sx + 15, sy - 30);
+          ctx.lineTo(sx, sy);
+          ctx.closePath();
+          ctx.fillStyle = "#f6c66b";
+          ctx.fill();
+          ctx.fillStyle = "#c2410c";
+          ctx.fillRect(sx - 15, sy - 34, 30, 6);
+        }
+      }
+    }
+  };
 
 const BOARD_BOTTOM = 0.82;
 const BOARD_HEIGHT = 1.2;
@@ -224,6 +407,34 @@ export const createProductWall = (phase: CompanyPhase = "office"): ProductWallHa
   // Flat against the wall: a tilted plate would dig its top edge into the plaster.
   addCommandPlate(kit, STATION_COMMAND.ship, 0, BOARD_BOTTOM + BOARD_HEIGHT + 0.1, wall + 0.045, 0.2, 0);
 
+  // The build board: a canvas over the board face, shown while there are active builds.
+  const boardW = Math.min(2048, Math.round(width * BOARD_PX_PER_M));
+  let boardKey = "";
+  let ready = false;
+  const boardTexture = createDynamicTexture(boardW, Math.round(BOARD_HEIGHT * BOARD_PX_PER_M), drawBuildBoard([], 1, faceColor));
+  let boardFace: THREE.Mesh | null = null;
+  if (boardTexture) {
+    kit.own(boardTexture);
+    const boardMaterial = kit.own(
+      new THREE.MeshLambertMaterial({
+        color: 0x8a8a8a,
+        map: boardTexture.texture,
+        emissive: 0xffffff,
+        emissiveMap: boardTexture.texture,
+        emissiveIntensity: 0.62,
+      })
+    );
+    boardFace = new THREE.Mesh(unitPlane(), boardMaterial);
+    boardFace.name = "build-board";
+    boardFace.castShadow = false;
+    boardFace.scale.set(width - 0.05, BOARD_HEIGHT - 0.05, 1);
+    boardFace.position.set(0, BOARD_BOTTOM + BOARD_HEIGHT / 2, face + 0.024);
+    if (tier === 0) boardFace.rotation.z = 0.012;
+    boardFace.visible = false;
+    kit.add(boardFace);
+  }
+  const readyColor = new THREE.Color(READY_GOLD);
+
   const flash = new Pulse(0.9);
   let flashKind: "good" | "bad" = "good";
   // Starts with a few notes up so a freshly built board is not bare; the office sets the real count.
@@ -236,6 +447,11 @@ export const createProductWall = (phase: CompanyPhase = "office"): ProductWallHa
     const flicker = flashKind === "bad" && Math.sin(elapsed * 55) > 0 ? 0.25 : 1;
     frameMaterial.emissive.copy(idleColor).lerp(_colorA.setHex(flashKind === "good" ? C.good : C.alarm), Math.min(1, p * 2));
     frameMaterial.emissiveIntensity = kit.glowAmount * 0.55 + p * 1.6 * flicker;
+    if (ready && p < 0.05) {
+      // Something is built and waiting: the frame breathes gold until it ships.
+      frameMaterial.emissive.copy(readyColor);
+      frameMaterial.emissiveIntensity = 0.5 + 0.45 * (0.5 + 0.5 * Math.sin(elapsed * 3.2));
+    }
     // A good ship makes the notes jump off the board and the frame swell for a moment.
     const hop = flashKind === "good" ? Math.sin(Math.min(1, p) * Math.PI) * 0.03 : 0;
     notes.position.z = hop;
@@ -254,6 +470,17 @@ export const createProductWall = (phase: CompanyPhase = "office"): ProductWallHa
     pulse: (kind: "good" | "bad") => {
       flashKind = kind;
       flash.trigger();
+    },
+    setBuilds: (builds: readonly WallBuild[], slots: number) => {
+      ready = builds.some((build) => build.built);
+      const key = builds.length === 0 ? "" : JSON.stringify([builds, slots]);
+      if (key === boardKey) return;
+      boardKey = key;
+      const show = builds.length > 0 && boardFace !== null;
+      if (boardFace) boardFace.visible = show;
+      // The sticky notes are under the board while it is up: no point drawing them.
+      notes.visible = !show;
+      if (show) boardTexture?.redraw(drawBuildBoard(builds, slots, faceColor));
     },
   });
 };

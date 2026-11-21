@@ -39,6 +39,10 @@ const BASE_SNAPSHOT = {
   teamSize: 8,
   people: [],
   hiddenPeople: 0,
+  staff: [],
+  builds: [],
+  product: { cruft: 0, moat: 0, shippedCount: 0, slots: 1, recent: [] },
+  candidates: {},
   ownedAssets: [],
   availableAssets: [],
   pendingEventTitle: null,
@@ -50,6 +54,10 @@ export const makeSnapshot = (overrides: Partial<WorldSnapshot> = {}): WorldSnaps
   ...BASE_SNAPSHOT,
   team: { ...BASE_SNAPSHOT.team },
   people: [],
+  staff: [],
+  builds: [],
+  product: { cruft: 0, moat: 0, shippedCount: 0, slots: 1, recent: [] },
+  candidates: {},
   ownedAssets: [],
   availableAssets: [],
   ...overrides,
@@ -123,6 +131,43 @@ export const SAMPLE_EVENTS: Record<WorldEventType, readonly WorldEvent[]> = {
     { type: "game-over", ending: "zombie-saas" },
     { type: "game-over", ending: "forced-acquisition" },
   ],
+  "offer-landed": [{ type: "offer-landed", personId: "e7", kind: "recruiter", buildAtRisk: "tuesday" }],
+  retained: [{ type: "retained", personId: "e7" }],
+  resigned: [{ type: "resigned", personId: "e7", role: "engineering", kind: "recruiter", buildAtRisk: "tuesday" }],
+  staffed: [
+    { type: "staffed", personId: "e3", buildId: "b2" },
+    { type: "staffed", personId: "e3", buildId: null },
+  ],
+  experience: [{ type: "experience", personIds: ["e1", "e3"] }],
+  "energy-band": [
+    { type: "energy-band", personId: "e3", band: "fumes" },
+    { type: "energy-band", personId: "e3", band: "burnt-out" },
+    { type: "energy-band", personId: "e3", band: "fine" },
+  ],
+  "candidates-shown": [{ type: "candidates-shown", role: "engineering" }],
+  "build-started": [{ type: "build-started", buildId: "b2" }],
+  "build-cancelled": [{ type: "build-cancelled", buildId: "b2" }],
+  released: [
+    { type: "released", buildId: "b2", name: "Halo", tier: "breakout", reception: 96 },
+    { type: "released", buildId: "b2", name: "Halo", tier: "solid", reception: 72 },
+    { type: "released", buildId: "b2", name: "Halo", tier: "shrug", reception: 48 },
+    { type: "released", buildId: "b2", name: "Halo", tier: "flop", reception: 21 },
+  ],
+  "build-progress": [
+    { type: "build-progress", buildId: "b2", from: 40, to: 58 },
+    { type: "build-progress", buildId: "b2", from: 88, to: 100 },
+    { type: "build-progress", buildId: "b2", from: 58, to: 44 },
+  ],
+  surprise: [{ type: "surprise", buildId: "b2" }],
+  "crunch-changed": [
+    { type: "crunch-changed", buildId: "b2", on: true },
+    { type: "crunch-changed", buildId: "b2", on: false },
+  ],
+  "cruft-band": [
+    { type: "cruft-band", band: "sparking", rising: true },
+    { type: "cruft-band", band: "taped", rising: false },
+  ],
+  "moat-band": [{ type: "moat-band", band: "ditch", rising: true }],
 };
 
 export const WORLD_EVENT_TYPES = Object.keys(SAMPLE_EVENTS) as WorldEventType[];
@@ -149,6 +194,18 @@ export const describeEvent = (event: WorldEvent): string => {
       return `easter-egg ${event.command}`;
     case "game-over":
       return `game-over ${event.ending}`;
+    case "released":
+      return `released ${event.tier}`;
+    case "staffed":
+      return `staffed ${event.buildId ? "on a build" : "off"}`;
+    case "energy-band":
+      return `energy-band ${event.band}`;
+    case "build-progress":
+      return `build-progress ${event.from}→${event.to}`;
+    case "crunch-changed":
+      return `crunch ${event.on ? "on" : "off"}`;
+    case "cruft-band":
+      return `cruft-band ${event.band} ${event.rising ? "rising" : "falling"}`;
     default:
       return event.type;
   }

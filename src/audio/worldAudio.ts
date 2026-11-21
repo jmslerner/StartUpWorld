@@ -40,9 +40,32 @@
  *   command-failed    —                                      the UI "denied" thud (the only sound a refusal gets)
  *   game-over         gameOver(ending) at +200 ms            win: confetti + cheering (no pitch);
  *                                                            loss: power-down + smoke, once the sting has finished
+ *   ── people and product builds (the tycoon layer) ──
+ *   released          opportunity | success | click | fail   keyboard flurry → breakout: confetti + cheer · solid:
+ *                     (breakout | solid | shrug | flop)      confetti · shrug: one party popper · flop: fizzle + puff
+ *   build-started     click                                  `project-started`, after the click (a click is not a stinger)
+ *   build-cancelled   warning                                a puff as the column goes in the bin
+ *   crunch-changed    warning (on) | click (off)             on: the coffee machine starts pouring; off: —
+ *   retained          success                                the bonus: notes flutter
+ *   staffed           click / a release's / a cancel's       —
+ *   experience        the release's                          —  (the release already said it)
+ *   resigned          tick (sometimes)                       —  (their `departed` walks them out)
+ *   offer-landed      tick (sometimes)                       at a week's end, after the sunrise: `resignation` (a letter lands)
+ *   build-progress    tick / warning (`fire` on its lead)    at a week's end: reaches 100% `project-progress`; went
+ *                                                            down `negative-small`
+ *   surprise          tick (sometimes)                       at a week's end: `negative-small`
+ *   energy-band       tick (sometimes)                       at a week's end, into fumes / burnt out: `negative-small`
+ *                     (tick-driven moments that arrive any other way come with a store stinger: silent then)
+ *   candidates-shown  —                                      `neutral` (résumés on the desk)
+ *   cruft-band        tick / a release's (sometimes)         rising into sparks: a puff; otherwise —
+ *   moat-band         tick / a release's (sometimes)         —
  *
  * Rules that make this hold (tested in worldAudio.test.ts):
- *   1. The world layer never plays a stinger (nothing from the `outcome` bus).
+ *   1. The world layer never plays a stinger (nothing from the `outcome` bus) — with one exception:
+ *      the generic mechanics stingers (MECHANICS_STINGERS) voice tycoon moments that no command
+ *      answers with a stinger of its own (the store plays at most a `tick` or a `click` then, and
+ *      those are clicks, not stingers; see CLICK_LIKE). At most MAX_MECHANICS_PER_BATCH of them
+ *      sound per batch, MECHANICS_SPACING apart, so a bad week is a sigh, not a fanfare of woe.
  *   2. Where a store stinger can coincide, nothing pitched in the world layer is heard during
  *      the first STINGER_CLEARANCE seconds — only noise, steps, doors, keys.
  *   3. Under the game-over sting the world layer is entirely unpitched — including whatever
@@ -70,7 +93,7 @@ import { clamp } from "./synth";
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** Methods of the `SFX` facade the store calls. */
-export type StoreStinger = "success" | "fail" | "cashIn" | "warning" | "tick" | "alert" | "gameOver";
+export type StoreStinger = "success" | "fail" | "cashIn" | "warning" | "tick" | "alert" | "gameOver" | "opportunity" | "click" | "crisis";
 
 export interface StingerOverlap {
   /** Does the store play a stinger at the moment of this event? */
@@ -102,7 +125,49 @@ export const STORE_STINGERS: Record<WorldEventType, StingerOverlap> = {
   "easter-egg": { when: "never", which: [] },
   "command-failed": { when: "never", which: [] },
   "game-over": { when: "always", which: ["gameOver"] },
+  // ── People and product builds ──
+  // The weekly tick (and an event choice now and then) is what moves these; no command does.
+  "offer-landed": { when: "sometimes", which: ["tick"] },
+  resigned: { when: "sometimes", which: ["tick"] },
+  surprise: { when: "sometimes", which: ["tick"] },
+  "energy-band": { when: "sometimes", which: ["tick"] },
+  // The week's work, or `fire` on a build's lead (warning).
+  "build-progress": { when: "sometimes", which: ["tick", "warning"] },
+  // `retain`.
+  retained: { when: "always", which: ["success"] },
+  // `staff …` (click), or the crew coming off a build that shipped / was cancelled.
+  staffed: { when: "sometimes", which: ["click", "opportunity", "success", "fail", "warning", "tick"] },
+  // `ship <build>`: the tier's sound (breakout opportunity · solid success · shrug click · flop fail).
+  released: { when: "always", which: ["opportunity", "success", "click", "fail"] },
+  experience: { when: "always", which: ["opportunity", "success", "click", "fail"] },
+  "build-started": { when: "always", which: ["click"] },
+  "build-cancelled": { when: "always", which: ["warning"] },
+  "crunch-changed": { when: "always", which: ["warning", "click"] },
+  // `recruit <role>` (looking) answers with no sound at all.
+  "candidates-shown": { when: "never", which: [] },
+  "cruft-band": { when: "sometimes", which: ["tick", "opportunity", "success", "click", "fail"] },
+  "moat-band": { when: "sometimes", which: ["tick", "opportunity", "success", "click", "fail"] },
 };
+
+/** Store sounds that are clicks, not stingers: the world layer may speak over them (after STINGER_CLEARANCE). */
+export const CLICK_LIKE: ReadonlySet<StoreStinger> = new Set<StoreStinger>(["tick", "click"]);
+
+/**
+ * The generic mechanics stingers the world layer may use (rule 1's exception), only for events
+ * whose store sounds are all CLICK_LIKE.
+ */
+export const MECHANICS_STINGERS: ReadonlySet<SoundName> = new Set<SoundName>([
+  "resignation",
+  "negative-small",
+  "project-started",
+  "project-progress",
+  "neutral",
+]);
+/** Most mechanics stingers in one batch, and the least time between two of them. */
+export const MAX_MECHANICS_PER_BATCH = 2;
+export const MECHANICS_SPACING = 0.7;
+/** In a batch with a new week, tick-driven mechanics cues wait for the sunrise chime (at 1.1 s) to have its moment. */
+const AFTER_SUNRISE = 1.9;
 
 /** Seconds after an event during which the world layer stays unpitched if a stinger may be playing. */
 export const STINGER_CLEARANCE = 0.25;
@@ -127,6 +192,11 @@ export const SUPPORTING_EVENTS: ReadonlySet<WorldEventType> = new Set<WorldEvent
   "asset-acquired",
   "event-opened",
   "game-over",
+  "retained",
+  "released",
+  "experience",
+  "build-cancelled",
+  "crunch-changed",
 ]);
 /** When the store's game-over sting starts, after the command. */
 export const STING_DELAY = 0.2;
@@ -209,7 +279,15 @@ export const cuesForEvent = (event: WorldEvent, batch: readonly WorldEvent[] = [
   const bought = batch.some((e) => e.type === "asset-acquired");
   const launched = batch.some((e) => e.type === "launch");
   // Commands whose cost is the cash change: the money is already part of their story.
-  const paidFor = batch.some((e) => e.type === "hired" || e.type === "launch" || e.type === "board-action");
+  const paidFor = batch.some(
+    (e) => e.type === "hired" || e.type === "launch" || e.type === "board-action" || e.type === "retained" || e.type === "build-started",
+  );
+  /**
+   * Tick-driven moments get a mechanics cue only at a week's end, after the sunrise (the store's
+   * tick is a click; a new event's alert has long finished by then). The same news arriving any
+   * other way (an event choice, a fired lead) comes with a store stinger, so the world stays quiet.
+   */
+  const weekly = (sound: SoundName): Cue[] => (inWeek ? [cue(sound, AFTER_SUNRISE)] : []);
 
   switch (event.type) {
     case "run-reset":
@@ -335,6 +413,65 @@ export const cuesForEvent = (event: WorldEvent, batch: readonly WorldEvent[] = [
       return [cue("power-down", after), cue("smoke-puff", after + 0.4)];
     }
 
+    // ── People and product builds ──
+
+    case "released": {
+      // The notes stream to the LIVE sign under the store's tier sound; the room answers after it.
+      const flurry = cue("keyboard-flurry", 0, { intensity: event.tier === "flop" ? 0.35 : 0.6 });
+      switch (event.tier) {
+        case "breakout":
+          return [flurry, cue("confetti-pops", 0.55, { intensity: 1 }), cue("crowd-cheer", 0.75)];
+        case "solid":
+          return [flurry, cue("confetti-pops", 0.55, { intensity: 0.5 })];
+        case "shrug":
+          return [flurry, cue("confetti-pops", 0.5, { intensity: 0.12 })];
+        case "flop":
+          return [flurry, cue("ship-fail", 0.28), cue("smoke-puff", 0.52)];
+        default:
+          return [flurry];
+      }
+    }
+
+    case "build-started":
+      // The store's click is a click: the kickoff's own little "off we go" follows it.
+      return ordinal === 0 ? [cue("project-started", 0.3)] : [];
+
+    case "build-cancelled":
+      return ordinal === 0 ? [cue("smoke-puff", 0.45, { gain: 0.7 })] : [];
+
+    case "crunch-changed":
+      // Crunch on: somebody puts the coffee on. (Off is just the store's click.)
+      return event.on && ordinal === 0 ? [cue("coffee-pour", 0.5, { pan: COFFEE_PAN })] : [];
+
+    case "retained":
+      return ordinal === 0 ? [cue("money-flutter", 0.4)] : [];
+
+    case "staffed":
+    case "experience":
+    case "resigned":
+    case "moat-band":
+      // The command's own sound, a release or the departure's door already tell these.
+      return [];
+
+    case "offer-landed":
+      return ordinal === 0 ? weekly("resignation") : [];
+
+    case "build-progress":
+      if (event.to < event.from) return weekly("negative-small");
+      return event.to >= 100 && event.from < 100 ? weekly("project-progress") : [];
+
+    case "surprise":
+      return ordinal === 0 ? weekly("negative-small") : [];
+
+    case "energy-band":
+      return ordinal === 0 && (event.band === "fumes" || event.band === "burnt-out") ? weekly("negative-small") : [];
+
+    case "candidates-shown":
+      return ordinal === 0 ? [cue("neutral", 0.1)] : [];
+
+    case "cruft-band":
+      return event.rising && event.band === "sparking" ? [cue("smoke-puff", inWeek ? AFTER_SUNRISE : 0.6, { gain: 0.8 })] : [];
+
     default: {
       // Exhaustive at compile time (a new event type fails the build here); at run time an
       // unknown event from a newer world layer is simply silent rather than an exception
@@ -371,7 +508,30 @@ export const planCues = (events: readonly WorldEvent[]): Cue[] => {
     cues.push(...(ending && event.type !== "game-over" ? own.filter((c) => SOUNDS[c.sound].tonalAt === undefined) : own));
   }
   cues.sort((a, b) => a.delay - b.delay);
-  return cues.slice(0, MAX_CUES_PER_BATCH);
+  return spaceMechanics(cues).slice(0, MAX_CUES_PER_BATCH);
+};
+
+/**
+ * Rule 1's exception, kept small: at most MAX_MECHANICS_PER_BATCH mechanics stingers per batch,
+ * each at least MECHANICS_SPACING after the one before (a later one is moved back, not dropped,
+ * until the cap is reached). Returns the cues in time order.
+ */
+const spaceMechanics = (cues: Cue[]): Cue[] => {
+  let kept = 0;
+  let last = Number.NEGATIVE_INFINITY;
+  const out: Cue[] = [];
+  for (const c of cues) {
+    if (!MECHANICS_STINGERS.has(c.sound)) {
+      out.push(c);
+      continue;
+    }
+    if (kept >= MAX_MECHANICS_PER_BATCH) continue;
+    kept += 1;
+    const delay = Math.max(c.delay, last + MECHANICS_SPACING);
+    last = delay;
+    out.push(delay === c.delay ? c : { ...c, delay });
+  }
+  return out.sort((a, b) => a.delay - b.delay);
 };
 
 /** Seconds after the event at which a cue's first pitched element sounds; null if it has none. */

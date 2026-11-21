@@ -3,16 +3,11 @@ import { Tooltip } from "../components/Tooltip";
 import { SFX } from "../sound";
 import { playSound } from "../../audio/engine";
 import { useUiStore } from "../../state/useUiStore";
+import {
+  EMPTY_TYCOON_HINTS, shipBuildSuggestions, tycoonSuggestions, type Suggestion, type SuggestionKind, type TycoonHints,
+} from "./tycoonComplete";
 
 const INPUT_MAX_CHARS = 160;
-
-type SuggestionKind = "command" | "role" | "founder" | "cofounder" | "raise" | "raise-amount" | "ship" | "launch" | "board" | "asset";
-type Suggestion = {
-  kind: SuggestionKind;
-  label: string;
-  nextValue: string;
-  tooltip?: string;
-};
 
 const commandNames = [
   "help",
@@ -36,6 +31,12 @@ const commandNames = [
   "end",
   "choose",
   "restart",
+  "team",
+  "recruit",
+  "retain",
+  "fire",
+  "build",
+  "staff",
 ] as const;
 
 const commandsWithArgs = new Set([
@@ -52,6 +53,12 @@ const commandsWithArgs = new Set([
   "board",
   "buy",
   "restart",
+  "team",
+  "recruit",
+  "retain",
+  "fire",
+  "build",
+  "staff",
 ]);
 
 const hireRoleOptions: Array<{ token: string; label: string; tooltip: string }> = [
@@ -63,6 +70,13 @@ const hireRoleOptions: Array<{ token: string; label: string; tooltip: string }> 
   { token: "hr", label: "hr", tooltip: "HR. Helps hiring + people issues; increases burn. (1 AP)" },
   { token: "legal", label: "legal", tooltip: "Legal. Reduces legal risk + friction; increases burn. (1 AP)" },
 ] as const;
+
+// Roles that unlock with the stage: offered by `hire` once `recruit` would take them too.
+const hireUnlockOptions: Array<{ token: string; label: string; tooltip: string }> = [
+  { token: "data", label: "data", tooltip: "Data. Reduces churn through analytics; increases burn. (1 AP)" },
+  { token: "product", label: "product", tooltip: "Product manager. Boosts ship success; increases burn. (1 AP)" },
+  { token: "exec", label: "exec", tooltip: "Executive. Reduces overhead, boosts pitches; increases burn. (1 AP)" },
+];
 
 const founderOptions = [
   { token: "visionary", tooltip: "Big bets and narrative. Higher upside, higher variance." },
@@ -95,6 +109,12 @@ const commandTooltips: Record<string, string> = {
   phases: "View company phase progression and unlock requirements",
   buy: "Purchase company assets (1 AP)",
   assets: "List owned company assets",
+  team: "Who works here: pace, craft, energy, pay, offers (free)",
+  recruit: "This week's three candidates for a role; `recruit <role> <n>` signs one (1 AP + hire cost)",
+  retain: "Bonus and a 10% raise so someone stays (1 AP); answers an outside offer",
+  fire: "Let someone go, or `fire <role> <count>` (1 AP, two weeks' severance each)",
+  build: "Product board; `build <type> [size] [name]` starts a build (1 AP + kickoff)",
+  staff: "Put people on a build: `staff <build> auto|<name>`, `staff off <name|build>` (free)",
 };
 
 const shouldSoundForKey = (event: React.KeyboardEvent<HTMLInputElement>) => {
@@ -121,10 +141,12 @@ interface TerminalInputProps {
   boardMembers?: Array<{ name: string; personality: string; confidence: number; role: string }>;
   raiseAmountHints?: Array<{ label: string; value: string; tooltip: string }>;
   availableAssets?: Array<{ id: string; name: string; cost: number; tooltip: string }>;
+  /** Live names for the people and build commands (see ./tycoonComplete). */
+  tycoon?: TycoonHints;
 }
 
 export const TerminalInput = forwardRef<HTMLInputElement, TerminalInputProps>(
-  ({ onSubmit, isTyping = false, fastForward, commandHistory = [], boardMembers = [], raiseAmountHints = [], availableAssets = [] }, forwardedRef) => {
+  ({ onSubmit, isTyping = false, fastForward, commandHistory = [], boardMembers = [], raiseAmountHints = [], availableAssets = [], tycoon = EMPTY_TYCOON_HINTS }, forwardedRef) => {
   const [value, setValue] = useState("");
   const [isFocused, setIsFocused] = useState(false);
   const [dismissedSuggestions, setDismissedSuggestions] = useState(false);
@@ -279,11 +301,15 @@ export const TerminalInput = forwardRef<HTMLInputElement, TerminalInputProps>(
         }));
     }
 
+    // People and builds: team, recruit, retain, fire, build, staff.
+    const tycoonList = tycoonSuggestions(raw, tycoon);
+    if (tycoonList) return tycoonList;
+
     // Token suggestions for known commands.
     const argPrefix = (tokens[1] ?? "").toLowerCase();
     if (cmd === "hire") {
       const prefix = tokens.length >= 2 ? argPrefix : "";
-      return hireRoleOptions
+      return [...hireRoleOptions, ...hireUnlockOptions.filter((r) => tycoon.roleTokens.includes(r.token))]
         .filter((r) => r.token.startsWith(prefix) && r.token !== prefix)
         .slice(0, 10)
         .map((r) => ({
@@ -408,17 +434,22 @@ export const TerminalInput = forwardRef<HTMLInputElement, TerminalInputProps>(
     }
 
     if (cmd === "ship") {
-      // Suggest recently shipped feature names (optional convenience).
+      // Active builds first (`ship <build>` releases one), then recently shipped patch
+      // names (optional convenience: a patch name is always free text).
       if (tokens.length === 1 && !endsWithSpace) return [];
-      return shipHistory
+      const builds = shipBuildSuggestions(remainderLower, tycoon.builds);
+      const buildSlugs = new Set(tycoon.builds.map((b) => b.slug));
+      const recent = shipHistory
         .filter((name) => name.toLowerCase().startsWith(remainderLower) && name.toLowerCase() !== remainderLower)
-        .slice(0, 8)
+        .filter((name) => !buildSlugs.has(name.toLowerCase()))
+        .slice(0, Math.max(0, 8 - builds.length))
         .map((name) => ({
-          kind: "ship",
+          kind: "ship" as SuggestionKind,
           label: name,
           nextValue: `ship ${name}`,
           tooltip: "Recent shipped feature (optional suggestion).",
         }));
+      return [...builds, ...recent];
     }
 
     if (cmd === "launch") {
@@ -436,7 +467,7 @@ export const TerminalInput = forwardRef<HTMLInputElement, TerminalInputProps>(
     }
 
     return [];
-  }, [value, shipHistory, launchHistory, boardMembers, raiseAmountHints, availableAssets]);
+  }, [value, shipHistory, launchHistory, boardMembers, raiseAmountHints, availableAssets, tycoon]);
 
   const showSuggestions = isFocused && !dismissedSuggestions && suggestions.length > 0;
 

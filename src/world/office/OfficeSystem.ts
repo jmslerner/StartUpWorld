@@ -176,6 +176,17 @@ export class OfficeSystem implements WorldSystem {
         case "pricing-changed":
           stage.flashPricing();
           break;
+        // The product wall answers its builds: a release by tier, a kickoff, a surprise, a cancel.
+        case "released":
+          stage.stations.ship.pulse(event.tier === "flop" ? "bad" : "good");
+          break;
+        case "build-started":
+          stage.stations.ship.pulse("good");
+          break;
+        case "surprise":
+        case "build-cancelled":
+          stage.stations.ship.pulse("bad");
+          break;
         // The front door needs no cue: it opens for whoever is actually walking
         // through it (ctx.signals.doorTraffic, see OfficeStage.update).
         default:

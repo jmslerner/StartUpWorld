@@ -11,11 +11,16 @@
 import type * as THREE from "three";
 import type {
   AssetId,
+  BuildSize,
+  BuildType,
   CofounderArchetype,
   CompanyPhase,
   EndingType,
   FounderArchetype,
+  OfferKind,
   PricingModel,
+  QuirkId,
+  ReceptionTier,
   SoundHint,
   Stage,
   TeamRole,
@@ -55,7 +60,11 @@ export interface Placement extends Vec2 {
 export type PersonKind = "founder" | "cofounder" | "employee";
 
 export interface PersonView {
-  /** Stable id: "founder", "cofounder", or `${role}-${index}` (index is 0-based within the role). */
+  /**
+   * Stable id: "founder", "cofounder", the engine employee id ("e17") for a named person, or
+   * `${role}-${index}` for an unlisted standard head (index 0-based within that role's unlisted heads:
+   * past the roster cap, a fractional hire, or a legacy state without a roster).
+   */
   id: string;
   kind: PersonKind;
   /** null for founder / cofounder. */
@@ -64,6 +73,84 @@ export interface PersonView {
   name: string;
   /** uint32 driving deterministic look variety (skin, hair, outfit shade, height). */
   look: number;
+}
+
+/** Energy, in the bands the engine names (85 fresh / 60 fine / 45 tired / 30 running on fumes / below: burnt out). */
+export type EnergyBand = "fresh" | "fine" | "tired" | "fumes" | "burnt-out";
+
+/** One visible named employee's working facts (same order as their PersonView in `people`). */
+export interface StaffView {
+  id: string;
+  /** 1–5, 3 = standard. */
+  pace: number;
+  craft: number;
+  quirk: QuirkId | null;
+  /** 0–100. */
+  energy: number;
+  energyBand: EnergyBand;
+  /** The build they are on, or null for the day job. */
+  buildId: string | null;
+  isLead: boolean;
+  engaged: boolean;
+  /** Releases credited to them. */
+  shipped: number;
+  /** An outside offer they are holding (notice handed in), or null. */
+  offer: { kind: OfferKind; weeksLeft: number; buildAtRisk: string | null } | null;
+}
+
+/** One active product build (board order). */
+export interface BuildView {
+  id: string;
+  name: string;
+  slug: string;
+  type: BuildType;
+  size: BuildSize;
+  /** 0–100. */
+  pct: number;
+  /** Reached 100%. */
+  built: boolean;
+  crunch: boolean;
+  crunchWeeks: number;
+  surprises: number;
+  dueWeek: number;
+  weeksLate: number;
+  seats: number;
+  staffIds: string[];
+  leadId: string | null;
+  /** The reception tier a release shipped right now would most likely get. */
+  tierNow: ReceptionTier;
+  forecastNow: number;
+  /** At least 60% built: `ship <slug>` would be accepted on progress. */
+  shippable: boolean;
+}
+
+export interface ReleaseView {
+  id: string;
+  name: string;
+  week: number;
+  tier: ReceptionTier;
+  reception: number;
+}
+
+export interface ProductView {
+  cruft: number;
+  moat: number;
+  /** Lifetime releases. */
+  shippedCount: number;
+  /** Build slots this office has (garage 1 … unicorn 3). */
+  slots: number;
+  /** Most recent first, at most 12. */
+  recent: ReleaseView[];
+}
+
+export interface CandidateView {
+  /** 1–3, what `recruit <role> <n>` takes. */
+  index: number;
+  name: string;
+  shownPace: number;
+  shownCraft: number;
+  vetted: boolean;
+  ask: number;
 }
 
 export interface WorldSnapshot {
@@ -114,6 +201,13 @@ export interface WorldSnapshot {
   people: PersonView[];
   /** Employees beyond the cap that are not in `people`. */
   hiddenPeople: number;
+  /** One per visible named employee, in `people` order. [] for a legacy state. */
+  staff: StaffView[];
+  /** Active product builds, board order. [] for a legacy state. */
+  builds: BuildView[];
+  product: ProductView;
+  /** This week's candidate pools, for the roles someone looked at (`recruit <role>`). */
+  candidates: Partial<Record<TeamRole, CandidateView[]>>;
 
   ownedAssets: AssetId[];
   /** Not owned, and the current company phase allows buying them. */
@@ -173,7 +267,38 @@ export type WorldEvent =
   | { type: "event-resolved" }
   | { type: "easter-egg"; command: string }
   | { type: "command-failed"; command: string }
-  | { type: "game-over"; ending: EndingType };
+  | { type: "game-over"; ending: EndingType }
+  // ── People and product builds ──
+  /** Somebody handed in notice: a recruiter's offer, or burnout. */
+  | { type: "offer-landed"; personId: string; kind: OfferKind; buildAtRisk: string | null }
+  /** A person holding an offer was kept (`retain`). */
+  | { type: "retained"; personId: string }
+  /**
+   * Somebody who was holding an offer walked out (follows their `departed`). `buildAtRisk` is the
+   * slug of the build that lost its lead (and a quarter of its progress) with them.
+   */
+  | { type: "resigned"; personId: string; role: TeamRole; kind: OfferKind; buildAtRisk: string | null }
+  /** Somebody was put on a build (or back on the day job: buildId null). */
+  | { type: "staffed"; personId: string; buildId: string | null }
+  /** Credited on a release. */
+  | { type: "experience"; personIds: string[] }
+  | { type: "energy-band"; personId: string; band: EnergyBand }
+  | { type: "candidates-shown"; role: TeamRole }
+  | { type: "build-started"; buildId: string }
+  | { type: "build-cancelled"; buildId: string }
+  /** A build shipped as a release (replaces the `ship` event for that command). */
+  | { type: "released"; buildId: string; name: string; tier: ReceptionTier; reception: number }
+  /** `to < from`: a lead walked out and took a quarter of the work with them. */
+  | { type: "build-progress"; buildId: string; from: number; to: number }
+  | { type: "surprise"; buildId: string }
+  | { type: "crunch-changed"; buildId: string; on: boolean }
+  | { type: "cruft-band"; band: CruftBand; rising: boolean }
+  | { type: "moat-band"; band: MoatBand; rising: boolean };
+
+/** Cruft at 15 / 35 / 60. */
+export type CruftBand = "clean" | "taped" | "spaghetti" | "sparking";
+/** Moat at 10 / 25 / 50. */
+export type MoatBand = "puddle" | "ditch" | "moat" | "alligator";
 
 export type WorldEventType = WorldEvent["type"];
 

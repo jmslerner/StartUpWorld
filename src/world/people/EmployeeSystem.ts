@@ -14,6 +14,7 @@ import type {
   BubbleIcon,
   OfficeLayout,
   PersonView,
+  StaffView,
   StationKind,
   Vec2,
   WorldContext,
@@ -28,6 +29,7 @@ import type { CharacterHandle, CharacterPose, PoseOptions } from "./Character";
 import { Crew, MAX_GROUP_BUBBLES } from "./crew";
 import type { CrewHost } from "./crew";
 import { Footfall } from "./footfall";
+import { markerFor, PersonMarkers, pizzaPlan } from "./markers";
 
 /** The inspector card hangs just above the head anchor (which already sits over the hair). */
 const CARD_LIFT = 0.15;
@@ -93,6 +95,10 @@ export class EmployeeSystem implements WorldSystem, CrewHost {
   private people: readonly PersonView[] = [];
   /** Footsteps and chairs for the app's sound listener; null when nobody listens. */
   private readonly footfall: Footfall | null;
+  /** Offer envelopes, lead stars and pizza boxes. */
+  private readonly markers: PersonMarkers;
+  private staff = new Map<string, StaffView>();
+  private readonly scratch = new THREE.Vector3();
 
   constructor(ctx: WorldContext) {
     this.ctx = ctx;
@@ -101,6 +107,8 @@ export class EmployeeSystem implements WorldSystem, CrewHost {
     ctx.signals.chairsOut = this.chairsOut;
     ctx.signals.vacated = this.vacated;
     this.footfall = ctx.sound ? new Footfall(ctx.sound) : null;
+    // The pizza boxes live beside the people (not among them: the people root holds only bodies).
+    this.markers = new PersonMarkers(ctx.scene, ctx.reducedMotion);
     this.crew = new Crew(this, ctx.getLayout(), {
       reducedMotion: ctx.reducedMotion,
       // "low" quality means a phone-sized view: half as many bubbles keeps them from piling up.
@@ -116,14 +124,18 @@ export class EmployeeSystem implements WorldSystem, CrewHost {
     // Show the result now rather than on the next frame: a snapshot can arrive while the
     // loop is paused, and a first build must never flash people at the origin.
     this.syncAll(0, 0);
+    this.syncMarkers(next, prev !== null ? events : []);
+    if (prev !== null) this.react(events);
   }
 
   update(dt: number, elapsed: number): void {
     this.crew.update(dt);
     this.syncAll(dt, elapsed);
+    this.markers.update(dt);
   }
 
   dispose(): void {
+    this.markers.dispose();
     this.crew.dispose();
     // The crew has despawned everyone it knew; this is the safety net.
     for (const actor of [...this.bodies.keys()]) this.despawn(actor);
@@ -183,6 +195,49 @@ export class EmployeeSystem implements WorldSystem, CrewHost {
     body.character.headAnchor.getWorldPosition(this.from);
     this.to.set(target.x, STREAM_TARGET_HEIGHT, target.z);
     this.ctx.fx.stream("sparkle", this.from, this.to, STREAM_PARTICLES);
+  }
+
+  // ── Tycoon markers ──────────────────────────────────────────────────────────
+
+  /** Envelopes and stars over heads, pizza boxes on desks: straight from the snapshot. */
+  private syncMarkers(next: WorldSnapshot, events: readonly WorldEvent[]): void {
+    this.staff = new Map(next.staff.map((view) => [view.id, view]));
+    const landed = new Set<string>();
+    for (const event of events) if (event.type === "offer-landed") landed.add(event.personId);
+    const keep = new Set<string>();
+    // After a lost run the staff have gone home: nothing left to badge.
+    const live = next.gameOver === null;
+    for (const actor of this.crew.cast) {
+      const body = this.bodies.get(actor);
+      if (!body) continue;
+      keep.add(actor.id);
+      this.markers.sync(actor.id, body.character.headAnchor, live ? markerFor(this.staff.get(actor.id)) : null, landed.has(actor.id));
+    }
+    this.markers.prune(keep);
+    this.markers.setPizza(live ? pizzaPlan(next, (id) => (this.crew.actor(id) ? this.ctx.seating.seatOf(id) : null)) : []);
+  }
+
+  /** The person-level moments of the tycoon layer: credit for a release, a retention bonus. */
+  private react(events: readonly WorldEvent[]): void {
+    for (const event of events) {
+      if (event.type === "experience") {
+        for (const personId of event.personIds) {
+          const at = this.headOf(personId);
+          if (at) this.ctx.fx.floatText("+1 exp", at, "good");
+        }
+      } else if (event.type === "retained") {
+        const at = this.headOf(event.personId);
+        if (at) this.ctx.fx.burst("sparkle", at, 0.7);
+      }
+    }
+  }
+
+  /** Where somebody's head is right now (a scratch vector), or null if they are not on stage. */
+  private headOf(personId: string): THREE.Vector3 | null {
+    const actor = this.crew.actor(personId);
+    const body = actor ? this.bodies.get(actor) : undefined;
+    if (!actor || !body || !actor.visible) return null;
+    return body.character.headAnchor.getWorldPosition(this.scratch);
   }
 
   // ── Bodies ──────────────────────────────────────────────────────────────────

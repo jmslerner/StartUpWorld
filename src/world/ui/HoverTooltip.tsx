@@ -33,7 +33,7 @@ export const HoverTooltip = ({ stage }: HoverTooltipProps) => {
   const shown = hover !== null && !sameTarget(hover.target, selected) ? hover : null;
   const text = useMemo(() => {
     if (!shown) return null;
-    const card = describeTarget(shown.target, game, { hiddenCount: world?.hiddenCount() });
+    const card = describeTarget(shown.target, game, { hiddenCount: world?.hiddenCount(), gate: false });
     if (!card) return { title: shown.label, detail: null };
     return { title: card.title, detail: shown.target.kind === "person" ? (card.subtitle ?? null) : null };
   }, [shown, game, world]);

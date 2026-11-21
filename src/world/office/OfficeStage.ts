@@ -11,6 +11,7 @@ import type { AssetId, CompanyPhase } from "../../types/game";
 import { addHitBox, addHitProxy } from "../interaction/hitProxy";
 import { isLossEnding } from "../outcomes";
 import type {
+  BuildView,
   InteractableOptions,
   InteractableRegistry,
   InteractableTarget,
@@ -34,7 +35,7 @@ import {
   createStation,
   EVENT_BEACON_HEIGHT,
 } from "./props";
-import type { AlarmLightHandle, OverflowSignHandle, PropHandle, StationHandle, StationHandles } from "./props";
+import type { AlarmLightHandle, OverflowSignHandle, PropHandle, StationHandle, StationHandles, WallBuild } from "./props";
 import { buildShell, ROLL_UP_WIDTH } from "./shell";
 import type { Shell } from "./shell";
 import { StageKit } from "./StageKit";
@@ -85,6 +86,32 @@ const OVERFLOW_SIGN_ASIDE = 1.4;
 const STATION_CLICK_AREA = { minWidth: 0.8, minDepth: 0.6, minHeight: 1.0 } as const;
 
 const _box = new THREE.Box3();
+
+const TYPE_LABELS: Record<BuildView["type"], string> = {
+  feature: "Feature",
+  growth: "Growth",
+  premium: "Premium",
+  plumbing: "Plumbing",
+  moonshot: "Moonshot",
+};
+
+/** The snapshot's builds as the product wall's lanes. */
+export const wallBuilds = (snapshot: WorldSnapshot): WallBuild[] =>
+  snapshot.builds.map((build) => ({
+    name: build.name,
+    slug: build.slug,
+    label: `${TYPE_LABELS[build.type] ?? build.type} ${build.size.toUpperCase()}`,
+    pct: build.pct,
+    built: build.built,
+    shippable: build.shippable,
+    tier: build.tierNow,
+    forecast: build.forecastNow,
+    dueIn: build.weeksLate > 0 ? -build.weeksLate : Math.max(0, build.dueWeek - snapshot.week),
+    crunch: build.crunch,
+    crunchWeeks: build.crunchWeeks,
+    crew: build.staffIds.length,
+    seats: build.seats,
+  }));
 
 /** Height of an object's top above the floor, for anchoring its inspector card. */
 const topOf = (object: THREE.Object3D): number => {
@@ -312,6 +339,7 @@ export class OfficeStage implements Registrar {
     const { stations } = this;
     stations.calendar.setWeek(snapshot.week, animate);
     stations.ship.setNoteCount(Math.round((snapshot.reputation / 100) * stations.ship.maxNotes));
+    stations.ship.setBuilds(wallBuilds(snapshot), snapshot.product.slots);
     const load = Math.log10(Math.max(1, snapshot.users)) / Math.log10(SERVER_FULL_LOAD_USERS);
     stations.servers.setLoad(Math.min(1, Math.max(0.05, load)));
     stations.investors.ring(live && snapshot.pendingEventTitle !== null);

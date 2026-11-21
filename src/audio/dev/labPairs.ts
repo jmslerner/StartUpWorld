@@ -51,7 +51,16 @@ const resultSound = (event: WorldEvent): SoundName | null => {
     case "raise":
       return event.ok ? "cash-in" : "fail";
     case "pricing-changed":
+    case "build-cancelled":
       return "warning";
+    case "retained":
+      return "success";
+    case "build-started":
+      return "click";
+    case "crunch-changed":
+      return event.on ? "warning" : "click";
+    case "released":
+      return event.tier === "breakout" ? "opportunity" : event.tier === "solid" ? "success" : event.tier === "shrug" ? "click" : "fail";
     default:
       return null;
   }
@@ -133,6 +142,18 @@ export const PAIRS: readonly PairSpec[] = [
   pair("board blackmail + success", [{ type: "board-action", action: "blackmail", ok: true }]),
   pair("board blackmail fail + fail", [{ type: "board-action", action: "blackmail", ok: false }]),
   pair("pricing + warning", [{ type: "pricing-changed" }]),
+  pair("release breakout + opportunity", [
+    { type: "released", buildId: "b1", name: "Halo", tier: "breakout", reception: 96 },
+    { type: "experience", personIds: ["e1", "e2"] },
+  ]),
+  pair("release solid + success", [{ type: "released", buildId: "b1", name: "Halo", tier: "solid", reception: 70 }]),
+  pair("release flop + fail", [{ type: "released", buildId: "b1", name: "Halo", tier: "flop", reception: 22 }]),
+  pair("retain + success", [
+    { type: "retained", personId: "e1" },
+    { type: "cash-changed", delta: -7_000 },
+  ]),
+  pair("crunch on + warning", [{ type: "crunch-changed", buildId: "b1", on: true }]),
+  pair("build cancel + warning", [{ type: "build-cancelled", buildId: "b1" }]),
   pair("asset office-upgrade + success", [
     { type: "asset-acquired", assetId: "office-upgrade" },
     { type: "cash-changed", delta: -250_000 },

@@ -8,9 +8,13 @@ import { mulberry32 } from "./synth";
 import { FakeBufferSource, FakeNode, FakeOscillator, makeHarness, reaches, type Harness } from "./testing/fakeAudio";
 import { SAMPLE_EVENTS, WORLD_EVENT_TYPES, describeEvent, makeSnapshot } from "./testing/fixtures";
 import {
+  CLICK_LIKE,
   HEARTBEAT,
   LOW_RUNWAY_WEEKS,
   MAX_CUES_PER_BATCH,
+  MAX_MECHANICS_PER_BATCH,
+  MECHANICS_SPACING,
+  MECHANICS_STINGERS,
   STINGER_CLEARANCE,
   STING_DELAY,
   STING_LENGTH,
@@ -76,6 +80,27 @@ const EXPECTED: Record<WorldEventType, SoundName[][]> = {
     ["power-down", "smoke-puff"],
     ["power-down", "smoke-puff"],
   ],
+  // Tick-driven: heard only in a week's batch (see "a bad week is a sigh…").
+  "offer-landed": [[]],
+  retained: [["money-flutter"]],
+  resigned: [[]],
+  staffed: [[], []],
+  experience: [[]],
+  "energy-band": [[], [], []],
+  "candidates-shown": [["neutral"]],
+  "build-started": [["project-started"]],
+  "build-cancelled": [["smoke-puff"]],
+  released: [
+    ["keyboard-flurry", "confetti-pops", "crowd-cheer"],
+    ["keyboard-flurry", "confetti-pops"],
+    ["keyboard-flurry", "confetti-pops"],
+    ["keyboard-flurry", "ship-fail", "smoke-puff"],
+  ],
+  "build-progress": [[], [], []],
+  surprise: [[]],
+  "crunch-changed": [["coffee-pour"], []],
+  "cruft-band": [["smoke-puff"], []],
+  "moat-band": [[]],
 };
 
 const ALL_SAMPLES: Array<[string, WorldEvent, SoundName[]]> = WORLD_EVENT_TYPES.flatMap((type) =>
@@ -87,7 +112,7 @@ const soundsOf = (events: readonly WorldEvent[]): SoundName[] => planCues(events
 describe("WorldEvent → sounds", () => {
   it("has an expectation for every sample of every event type", () => {
     for (const type of WORLD_EVENT_TYPES) expect(EXPECTED[type], type).toHaveLength(SAMPLE_EVENTS[type].length);
-    expect(WORLD_EVENT_TYPES).toHaveLength(21);
+    expect(WORLD_EVENT_TYPES).toHaveLength(36);
   });
 
   it.each(ALL_SAMPLES)("%s", (_label, event, expected) => {
@@ -144,13 +169,76 @@ describe("no double hits", () => {
     for (const type of ["run-reset", "setup-completed", "easter-egg", "command-failed"] as const) expect(STORE_STINGERS[type].when).toBe("never");
   });
 
-  it.each(ALL_SAMPLES)("%s: the world layer never plays a stinger", (_label, event) => {
+  it.each(ALL_SAMPLES)("%s: the world layer never plays a stinger (bar the mechanics ones, where the store has none)", (_label, event) => {
+    const storeIsQuiet = STORE_STINGERS[event.type].which.every((name) => CLICK_LIKE.has(name));
     for (const cue of planCues([event])) {
       const def = SOUNDS[cue.sound];
+      if (def.bus === "outcome") {
+        // Rule 1's exception: a generic mechanics stinger, for a moment the store meets with a click at most.
+        expect(MECHANICS_STINGERS.has(cue.sound), cue.sound).toBe(true);
+        expect(storeIsQuiet, `${event.type} can come with a real store stinger`).toBe(true);
+        continue;
+      }
       expect(def.kind, cue.sound).not.toBe("stinger");
-      expect(def.bus, cue.sound).not.toBe("outcome");
       expect(["world", "ui"]).toContain(def.bus);
     }
+  });
+
+  it("mechanics stingers only ever voice events the store answers with a tick or a click at most", () => {
+    for (const [, event] of ALL_SAMPLES) {
+      for (const cue of planCues([event])) {
+        if (!MECHANICS_STINGERS.has(cue.sound)) continue;
+        for (const name of STORE_STINGERS[event.type].which) expect(CLICK_LIKE.has(name), `${event.type}: SFX.${name}`).toBe(true);
+      }
+    }
+    for (const name of MECHANICS_STINGERS) expect(SOUNDS[name].bus, name).toBe("outcome");
+  });
+
+  it("a bad week is a sigh, not a fanfare of woe: mechanics stingers are capped and spaced, after the sunrise", () => {
+    const week: WorldEvent[] = [
+      { type: "week-advanced", week: 20 },
+      { type: "build-progress", buildId: "b1", from: 60, to: 45 },
+      { type: "surprise", buildId: "b2" },
+      { type: "offer-landed", personId: "e4", kind: "recruiter", buildAtRisk: null },
+      { type: "energy-band", personId: "e5", band: "fumes" },
+    ];
+    const cues = planCues(week);
+    const mechanics = cues.filter((cue) => MECHANICS_STINGERS.has(cue.sound));
+    expect(mechanics).toHaveLength(MAX_MECHANICS_PER_BATCH);
+    const chime = cues.find((cue) => cue.sound === "week-advance");
+    for (const cue of mechanics) expect(cue.delay).toBeGreaterThan((chime?.delay ?? 0) + 1.1);
+    for (let i = 1; i < mechanics.length; i += 1) expect(mechanics[i].delay - mechanics[i - 1].delay).toBeGreaterThanOrEqual(MECHANICS_SPACING - 1e-9);
+    // The same news arriving any other way comes with a store stinger: the world stays out of its way.
+    expect(planCues([{ type: "surprise", buildId: "b2" }])).toEqual([]);
+  });
+
+  it.each([
+    [{ type: "offer-landed", personId: "e4", kind: "recruiter", buildAtRisk: null }, "resignation"],
+    [{ type: "build-progress", buildId: "b1", from: 88, to: 100 }, "project-progress"],
+    [{ type: "build-progress", buildId: "b1", from: 60, to: 45 }, "negative-small"],
+    [{ type: "surprise", buildId: "b1" }, "negative-small"],
+    [{ type: "energy-band", personId: "e5", band: "burnt-out" }, "negative-small"],
+  ] as Array<[WorldEvent, SoundName]>)("at a week's end: %o → %s", (event, sound) => {
+    const cues = planCues([{ type: "week-advanced", week: 9 }, event]);
+    expect(cues.map((c) => c.sound)).toEqual(["week-advance", sound]);
+    // After the sunrise chime has had its moment.
+    expect(cues[1].delay).toBeGreaterThan(1.5);
+    // A week that only moved a build along is just a week.
+    expect(soundsOf([{ type: "week-advanced", week: 9 }, { type: "build-progress", buildId: "b1", from: 10, to: 30 }])).toEqual(["week-advance"]);
+  });
+
+  it("a release speaks through the store's tier sound; the room adds a size-matched answer", () => {
+    const pops = (tier: "breakout" | "solid" | "shrug") =>
+      planCues([{ type: "released", buildId: "b1", name: "Halo", tier, reception: 70 }]).find((cue) => cue.sound === "confetti-pops")?.options?.intensity ?? 0;
+    expect(pops("breakout")).toBeGreaterThan(pops("solid"));
+    expect(pops("solid")).toBeGreaterThan(pops("shrug"));
+    // Supporting level: the tier stinger is the loudest thing in the moment.
+    for (const cue of planCues([{ type: "released", buildId: "b1", name: "Halo", tier: "breakout", reception: 96 }])) {
+      expect(cue.options?.gain ?? 1, cue.sound).toBeCloseTo(SUPPORT_GAIN, 6);
+    }
+    // A kickoff's or a retention's price is not announced as a cash change.
+    expect(soundsOf([{ type: "build-started", buildId: "b1" }, { type: "cash-changed", delta: -2_000 }])).not.toContain("coins-out");
+    expect(soundsOf([{ type: "retained", personId: "e1" }, { type: "cash-changed", delta: -7_000 }])).not.toContain("coins-out");
   });
 
   it.each(ALL_SAMPLES)("%s: nothing pitched lands on top of the store's stinger", (_label, event) => {
@@ -175,7 +263,7 @@ describe("no double hits", () => {
   it("the world layer of a moment the store always answers with a real stinger plays as a supporting layer", () => {
     for (const type of WORLD_EVENT_TYPES) {
       const overlap = STORE_STINGERS[type];
-      if (overlap.when !== "always" || overlap.which.every((name) => name === "tick")) continue;
+      if (overlap.when !== "always" || overlap.which.every((name) => CLICK_LIKE.has(name))) continue;
       expect(SUPPORTING_EVENTS.has(type), type).toBe(true);
     }
     // The week's tick is a click, not a stinger: the sunrise is the week's own moment.
@@ -186,9 +274,9 @@ describe("no double hits", () => {
     expect(planCues([{ type: "week-advanced", week: 3 }])[0].options?.gain).toBeUndefined();
   });
 
-  it("the only non-diegetic sound the world layer uses is the UI thud for a refused command", () => {
+  it("the only non-diegetic sounds the world layer uses are the UI thud for a refused command and the mechanics stingers", () => {
     const used = new Set(ALL_SAMPLES.flatMap(([, event]) => soundsOf([event])));
-    const nonDiegetic = [...used].filter((name) => SOUNDS[name].kind !== "diegetic");
+    const nonDiegetic = [...used].filter((name) => SOUNDS[name].kind !== "diegetic" && !MECHANICS_STINGERS.has(name));
     expect(nonDiegetic).toEqual(["ui-denied"]);
   });
 });

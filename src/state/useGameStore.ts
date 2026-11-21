@@ -6,41 +6,20 @@ import { pickWeeklyQuote } from "../ui/quotes";
 import { SFX } from "../ui/sound";
 import type { ActionSignal } from "../world/types";
 import { restartSignal, toActionSignal } from "../world/ui/actionSignal";
-
-const SAVE_KEY = "startupworld:save";
-const SAVE_VERSION = 2;
-
-interface SaveData {
-  version: number;
-  state: GameState;
-  log: LogEntry[];
-  commandHistory: string[];
-}
+import { parseSave, SAVE_KEY, serializeSave, type LoadedSave } from "./save";
 
 function saveToDisk(state: GameState, log: LogEntry[], commandHistory: string[]): void {
   try {
-    const data: SaveData = { version: SAVE_VERSION, state, log, commandHistory };
-    window.localStorage.setItem(SAVE_KEY, JSON.stringify(data));
+    window.localStorage.setItem(SAVE_KEY, serializeSave(state, log, commandHistory));
   } catch {
     // Quota exceeded or private browsing — silently ignore.
   }
 }
 
-function loadFromDisk(): SaveData | null {
+/** The stored run, migrated to the current save version (see ./save), or null for a fresh start. */
+function loadFromDisk(): LoadedSave | null {
   try {
-    const raw = window.localStorage.getItem(SAVE_KEY);
-    if (!raw) return null;
-    const data = JSON.parse(raw) as SaveData;
-    if (typeof data.state?.week !== "number" || typeof data.state?.seed !== "number") return null;
-    // Migrate v1 saves: add assets field if missing
-    if (data.version === 1) {
-      if (!data.state.assets) {
-        (data.state as GameState).assets = [];
-      }
-      data.version = 2;
-    }
-    if (data.version !== SAVE_VERSION) return null;
-    return data;
+    return parseSave(window.localStorage.getItem(SAVE_KEY));
   } catch {
     return null;
   }
@@ -96,8 +75,13 @@ const makeClearedLogs = (state: GameState): LogEntry[] => [
 
 const saved = loadFromDisk();
 const initialState = saved?.state ?? createInitialState();
-const initialLog = saved?.log ?? makeIntroLogs(initialState);
+const initialLog = saved && saved.log.length > 0 ? saved.log : makeIntroLogs(initialState);
 const initialHistory = saved?.commandHistory ?? [];
+// A save from an older version is written back once in the current format, so the next
+// load reads it as it is now (migration is idempotent, so this only saves the work).
+if (saved && saved.fromVersion !== saved.version) {
+  queueMicrotask(() => saveToDisk(initialState, initialLog, initialHistory));
+}
 
 export const useGameStore = create<GameStore>((set) => ({
   state: initialState,

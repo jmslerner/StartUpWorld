@@ -5,10 +5,12 @@ import { computeContext } from "../../engine/context";
 import { getEffectiveMaxAp, roleComp } from "../../engine/economy";
 import { eventPool } from "../../engine/events/pool";
 import { toPendingEvent } from "../../engine/events/types";
-import { makeState } from "../../engine/testHelpers";
+import { makeState, makeTycoonState } from "../../engine/testHelpers";
 import type {
   ActionResult,
   BoardState,
+  Build,
+  Employee,
   EndingType,
   FounderArchetype,
   GameState,
@@ -139,6 +141,8 @@ const allTargets = (state: GameState): InteractableTarget[] => [
   { kind: "person", personId: "founder" },
   { kind: "person", personId: "cofounder" },
   ...ROLE_ORDER.map((role): InteractableTarget => ({ kind: "person", personId: `${role}-0` })),
+  // Named people (a run with the engine's roster): the first of each department.
+  ...namedSample(state).map((personId): InteractableTarget => ({ kind: "person", personId })),
   { kind: "empty-desk", slotIndex: 0 },
   { kind: "empty-desk", slotIndex: getOfficeLayout(state.companyPhase).deskSeats.length - 1 },
   ...STATIONS.map((station): InteractableTarget => ({ kind: "station", station })),
@@ -147,6 +151,18 @@ const allTargets = (state: GameState): InteractableTarget[] => [
   { kind: "event-beacon" },
   { kind: "overflow-sign" },
 ];
+
+/** The first named person of each department, if the state carries a roster. */
+function namedSample(state: GameState): string[] {
+  const seen = new Set<string>();
+  const ids: string[] = [];
+  for (const view of buildWorldSnapshot(state).people) {
+    if (view.kind !== "employee" || !/^e\d+$/.test(view.id) || view.role === null || seen.has(view.role)) continue;
+    seen.add(view.role);
+    ids.push(view.id);
+  }
+  return ids;
+}
 
 const station = (state: GameState, kind: StationKind): InspectorCard => {
   const card = describeTarget({ kind: "station", station: kind }, state);
@@ -190,6 +206,10 @@ const fingerprint = (state: GameState): string =>
     state.reputation,
     state.vcReputation,
     state.freeActionUsed,
+    state.product?.active.map((build) => [build.id, build.crunch]) ?? null,
+    state.product?.shippedCount ?? 0,
+    state.people?.roster.map((e) => [e.id, e.buildId, e.offerDueWeek, e.salary]) ?? null,
+    state.people?.candidatesWeek ?? 0,
   ]);
 
 const unchanged = (before: GameState, result: ActionResult): boolean => fingerprint(before) === fingerprint(result.state);
@@ -207,15 +227,21 @@ const complaint = (result: ActionResult): string | null => {
 const refused = (before: GameState, result: ActionResult): boolean => result.sound === undefined && unchanged(before, result);
 
 /** Commands that only print something. The engine answers these even after the run has ended. */
-const READ_ONLY = new Set(["status", "perks", "phases", "board", "raise", "pricing", "assets", "coffee"]);
+const READ_ONLY = new Set(["status", "perks", "phases", "board", "raise", "pricing", "assets", "coffee", "build", "team"]);
 /** Commands that must visibly change the game when they are accepted. */
-const MUTATING = /^(hire |end$|buy |pricing \w|pitch$|choose )/;
+const MUTATING = /^(hire |end$|buy |pricing \w|pitch$|choose |retain |staff |recruit \w+ \d|build (crunch|cancel) |ship [a-z0-9-]+$)/;
 
 const NO_LEADS = "No investor leads — pitch first";
+/** Complete commands the cards only ever put in the terminal, for the player to confirm with Enter. */
+const CONFIRM_PREFILL = /^(fire \S+|build cancel \S+)$/;
 
 /** What a player would plausibly type after a prefill. */
 const completePrefill = (command: string, state: GameState): string => {
+  // A complete command left for the player to confirm (`fire e3`, `build cancel atlas`).
+  if (!command.endsWith(" ")) return command;
   if (command === "ship ") return "ship Dark mode";
+  if (command === "build ") return "build feature s Moonlight";
+  if (command === "build plumbing ") return "build plumbing s Pipes";
   if (command === "launch ") return "launch Spring push";
   if (command === "raise vc ") return "raise vc 100k";
   if (command === "board dinner " || command === "board gift ") {
@@ -242,7 +268,7 @@ const expectCardHonest = (card: InspectorCard, state: GameState, where: string):
     if (entry.mode === "run") {
       expect(entry.command, at).toBe(entry.command.trim());
       expect(entry.command, at).not.toBe("");
-    } else {
+    } else if (!CONFIRM_PREFILL.test(entry.command)) {
       expect(entry.command.endsWith(" "), `${at}: a prefill leaves room for the argument`).toBe(true);
     }
 
@@ -607,8 +633,12 @@ describe("empty desk", () => {
     expect(card.title).toBe("Empty desk");
     expect(lineValue(card, "Cash")).toBe(formatUsd(state.cash));
     expect(lineValue(card, "AP")).toBe("3/3");
-    expect(card.actions.map((entry) => entry.command)).toEqual(ROLE_ORDER.map((role) => `hire ${ROLE_HIRE_TOKENS[role]} 1`));
-    expect(actionFor(card, "hire eng 1")).toEqual({ label: "Engineer", command: "hire eng 1", mode: "run", hint: "1 AP · $3K" });
+    // Per role: the classic job ad, and — for the roles the stage allows — a look at real candidates.
+    expect(card.actions.map((entry) => entry.command)).toEqual(
+      ROLE_ORDER.flatMap((role) => [`hire ${ROLE_HIRE_TOKENS[role]} 1`, ...(ROLE_HIRE_TOKENS[role] && ["data", "product", "executive"].includes(role) ? [] : [`recruit ${ROLE_HIRE_TOKENS[role]}`])])
+    );
+    expect(actionFor(card, "hire eng 1")).toEqual({ label: "Engineer · job ad", command: "hire eng 1", mode: "run", hint: "1 AP · $3K", row: "engineering" });
+    expect(actionFor(card, "recruit eng")).toEqual({ label: "Candidates", command: "recruit eng", mode: "run", hint: "Free", row: "engineering" });
     expect(actionFor(card, "hire legal 1").hint).toBe("1 AP · $5K");
   });
 
@@ -672,6 +702,7 @@ describe("stations", () => {
     expect(lineValue(card, "Reputation")).toBe("50/100");
     expect(card.actions).toEqual([
       { label: "Ship a feature…", command: "ship ", mode: "prefill", hint: "Free this week", tone: "primary" },
+      { label: "Start a build…", command: "build ", mode: "prefill", hint: "1 AP", disabledReason: DISABLED_REASONS.noAp },
     ]);
 
     // The Hacker's free ship is once a week; a Visionary never had one.
@@ -935,5 +966,255 @@ describe("describeTarget is a pure function of its inputs", () => {
       expect(describeTarget(target, state)).toEqual(describeTarget(target, JSON.parse(frozen) as GameState));
     }
     expect(JSON.stringify(state)).toBe(frozen);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Named people and product builds (the tycoon layer)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** A garage run with the engine's roster: e1, e3, e4 engineers, e2 a designer, e5 marketing. */
+const tycoonGarage = (overrides: Partial<GameState> = {}): GameState =>
+  executeCommand(makeTycoonState({ team: team({ engineering: 3, design: 1, marketing: 1 }), ...overrides }), "status").state;
+
+const editRoster = (state: GameState, id: string, changes: Partial<Employee>): GameState => ({
+  ...state,
+  people: { ...state.people!, roster: state.people!.roster.map((e) => (e.id === id ? { ...e, ...changes } : e)) },
+});
+
+const editBuild = (state: GameState, id: string, changes: Partial<Build>): GameState => ({
+  ...state,
+  product: { ...state.product!, active: state.product!.active.map((b) => (b.id === id ? { ...b, ...changes } : b)) },
+});
+
+const run = (state: GameState, ...commands: string[]): GameState =>
+  commands.reduce((current, command) => {
+    const result = executeCommand(current, command);
+    if (isRejected(result)) throw new Error(`fixture command refused: ${command}: ${result.logs.map((l) => l.text).join(" | ")}`);
+    return result.state;
+  }, state);
+
+/** Atlas (a Feature S) kicked off and worked on for a week, e1 leading it with e2. */
+const withAtlas = (overrides: Partial<GameState> = {}): GameState => run(tycoonGarage(overrides), "build feature s Atlas", "end");
+
+/** The office phase (two build slots): Atlas built and ready to ship, Borealis at 40% and crunching. */
+const twoBuilds = (): GameState => {
+  const office = tycoonGarage({ companyPhase: "office", stage: "series-a", users: 12_000, mrr: 70_000, arpu: 6, valuation: 60_000_000, cash: 400_000, ap: 4 });
+  if (office.companyPhase !== "office") throw new Error(`fixture is in the ${office.companyPhase} phase`);
+  let state = run(office, "build feature s Atlas", "build growth s Borealis", "end");
+  state = editBuild(state, "b1", { progress: 5, scope: 5, readyWeek: state.week });
+  state = editBuild(state, "b2", { progress: 2, scope: 5 });
+  return { ...run(state, "build crunch borealis on"), ap: 3 };
+};
+
+const tycoonStates = (): Array<[string, GameState]> => {
+  const atlas = withAtlas();
+  const offered = editRoster(atlas, "e1", { offerDueWeek: atlas.week + 2, offerKind: "recruiter", leadOnNotice: "b1" });
+  const burnt = editRoster(atlas, "e2", { energy: 22, offerDueWeek: atlas.week + 1, offerKind: "burnout" });
+  return [
+    ["fresh roster", tycoonGarage()],
+    ["one build", atlas],
+    ["two builds, one ready, one crunching", twoBuilds()],
+    ["an outside offer", offered],
+    ["burnout notice", burnt],
+    ["no AP", { ...atlas, ap: 0 }],
+    ["no cash", { ...atlas, cash: 0 }],
+    ["candidates shown", run(atlas, "recruit eng")],
+    ["candidates shown, no cash", { ...run(atlas, "recruit eng"), cash: 100 }],
+    ["event pending", withEvent(atlas)],
+    ["run over", gameOver(atlas, "bankruptcy")],
+    ["a build at 70% (ship early)", editBuild(atlas, "b1", { progress: 3.5, scope: 5 })],
+  ];
+};
+
+describe("tycoon cards are honest about what the engine will do", () => {
+  it.each(tycoonStates())("%s", (label, state) => {
+    expect(expectAllCardsHonest(state, label)).toBeGreaterThan(10);
+  });
+
+  it("throughout whole tycoon games played by clicking card buttons", () => {
+    let checked = 0;
+    for (let run = 0; run < 3; run += 1) {
+      let state = tycoonGarage({ seed: 4200 + run, rng: mix32(4200 + run) || 1, cash: 250_000 });
+      let dice = mix32(31 + run);
+      const roll = (sides: number): number => {
+        dice = mix32(dice + 0x9e3779b9);
+        return dice % sides;
+      };
+      for (let step = 0; step < 70 && !state.gameOver; step += 1) {
+        checked += expectAllCardsHonest(state, `tycoon run ${run} step ${step} (week ${state.week})`);
+        const cards = allTargets(state)
+          .map((target) => describeTarget(target, state))
+          .filter((card): card is InspectorCard => card !== null);
+        const enabled = cards.flatMap((card) => card.actions).filter((entry) => entry.disabledReason === undefined);
+        // Prefer the new verbs, so the run actually builds, staffs, crunches, ships and retains.
+        const tycoonish = enabled.filter((entry) => /^(build |staff |ship [a-z0-9-]+$|retain |recruit |fire )/.test(entry.command));
+        const endWeek = enabled.find((entry) => entry.command === "end");
+        const pick =
+          endWeek && (state.ap === 0 || roll(3) === 0) ? endWeek : tycoonish.length > 0 ? tycoonish[roll(tycoonish.length)] : enabled[roll(enabled.length)];
+        if (!pick) break;
+        const typed = pick.mode === "run" ? pick.command : completePrefill(pick.command, state);
+        const result = executeCommand(state, typed);
+        expect(complaint(result), `tycoon run ${run} step ${step}: ${typed}`).toBeNull();
+        state = result.state;
+        if (state.pendingEvent) state = executeCommand(state, "choose 1").state;
+        if (state.cash < 30_000 && !state.gameOver && state.ap > 0) state = executeCommand(state, "raise mortgage").state;
+      }
+    }
+    expect(checked).toBeGreaterThan(1000);
+  });
+});
+
+describe("named person card", () => {
+  it("name, role and id, stats, energy, pay, build and the buttons that matter", () => {
+    const state = withAtlas();
+    const e1 = state.people!.roster.find((e) => e.id === "e1")!;
+    const card = cardFor({ kind: "person", personId: "e1" }, state);
+    expect(card.title).toBe(e1.name);
+    expect(card.subtitle).toBe("Engineer · e1");
+    expect(lineValue(card, "Pace")).toBe("●".repeat(e1.pace) + "○".repeat(5 - e1.pace));
+    expect(lineValue(card, "Craft")).toBe("●".repeat(e1.craft) + "○".repeat(5 - e1.craft));
+    expect(lineValue(card, "Energy")).toMatch(/^\d+ \((fresh|fine|tired|running on fumes|burnt out)\)$/);
+    expect(lineValue(card, "Pay")).toContain("/wk · going ");
+    expect(lineValue(card, "Working on")).toBe("Atlas (lead)");
+    expect(card.actions.map((entry) => [entry.command, entry.mode])).toEqual([
+      ["retain e1", "run"],
+      ["staff off e1", "run"],
+      ["fire e1", "prefill"],
+      ["team e1", "run"],
+      ["hire eng 1", "run"],
+      ["recruit eng", "run"],
+    ]);
+    // Letting go is never one click: it goes to the terminal for the player to confirm.
+    expect(actionFor(card, "fire e1")).toMatchObject({ label: "Let go…", mode: "prefill", tone: "danger", hint: "1 AP · $7K" });
+    expect(actionFor(card, "staff off e1").hint).toBe("Free");
+    // The job ad and this week's candidates share a row (a full garage has no empty desk to click).
+    expect(actionFor(card, "hire eng 1").row).toBe("hire");
+    expect(actionFor(card, "recruit eng")).toMatchObject({ label: "Candidates", row: "hire" });
+  });
+
+  it("once this week's candidates are in, a colleague's card lists them and signs them", () => {
+    const looked = executeCommand(withAtlas(), "recruit eng").state;
+    const card = cardFor({ kind: "person", personId: "e1" }, looked);
+    const pool = buildWorldSnapshot(looked).candidates.engineering ?? [];
+    expect(pool.length).toBe(3);
+    // No second look: the list is the one on the desk already.
+    expect(card.actions.some((entry) => entry.command === "recruit eng")).toBe(false);
+    for (const candidate of pool) {
+      expect(lineValue(card, candidate.name)).toMatch(/^pace \d · craft \d[?✓] · \$[\d.,]+K?\/wk$/);
+      const sign = actionFor(card, `recruit eng ${candidate.index}`);
+      expect(sign).toMatchObject({ label: `Sign ${candidate.name.split(" ")[0]}`, mode: "run" });
+      expect(sign.disabledReason).toBeUndefined();
+      expect(executeCommand(looked, sign.command).logs.some((log) => log.kind === "error")).toBe(false);
+    }
+  });
+
+  it("an outside offer: the deadline, the build at risk, the price of keeping them, Retain first", () => {
+    const atlas = withAtlas();
+    const state = editRoster(atlas, "e1", { offerDueWeek: atlas.week + 2, offerKind: "recruiter", leadOnNotice: "b1" });
+    const card = cardFor({ kind: "person", personId: "e1" }, state);
+    expect(card.lines).toEqual(
+      expect.arrayContaining([
+        { label: "Outside offer", value: "Leaves in 2w", tone: "bad" },
+        { label: "At risk", value: "Atlas loses a quarter", tone: "bad" },
+        { label: "To keep them", value: "$7,000 now, then $3,850/wk" },
+      ])
+    );
+    expect(card.actions[0]).toEqual({ label: "Retain", command: "retain e1", mode: "run", hint: "1 AP · $7K", tone: "primary" });
+    expect(card.note).toMatch(/recruiter/i);
+  });
+
+  it("put on a build: one button per build the role can work on, gated by the engine", () => {
+    const state = twoBuilds();
+    // e4 is an engineer on the day job (or on Borealis): it can go on whichever build it is not on.
+    const card = cardFor({ kind: "person", personId: "e4" }, state);
+    const puts = card.actions.filter((entry) => entry.command.startsWith("staff ") && !entry.command.startsWith("staff off"));
+    expect(puts.length).toBeGreaterThan(0);
+    for (const entry of puts) expect(entry.label).toMatch(/^Put on (Atlas|Borealis)$/);
+    // A full build refuses, and says why in the engine's words.
+    const marketing = cardFor({ kind: "person", personId: "e5" }, state);
+    for (const entry of marketing.actions.filter((a) => a.command.startsWith("staff atlas"))) expect(entry.disabledReason).toBeDefined();
+  });
+
+  it("an unlisted head keeps the classic card", () => {
+    const legacy = garage({ team: team({ engineering: 2 }) });
+    expect(cardFor({ kind: "person", personId: "engineering-1" }, legacy).subtitle).toBe("Engineer");
+  });
+});
+
+describe("product wall with builds", () => {
+  it("lists every build with progress, forecast and due week, and ships the ready one", () => {
+    const state = twoBuilds();
+    const card = station(state, "ship");
+    expect(card.subtitle).toBe("2 builds · 0 slots free");
+    expect(lineValue(card, "Cruft")).toMatch(/^\d+(\.\d)? \(/);
+    expect(lineValue(card, "Atlas")).toMatch(/^Feature S · built · due wk \d+$/);
+    expect(lineValue(card, "Borealis")).toMatch(/^Growth S · 40% · due wk \d+ · crunch$/);
+    expect(lineValue(card, "  ↳ atlas")).toMatch(/^now ≈ \d+ ±\d+ (FLOP|SHRUG|SOLID|BREAKOUT)$/);
+    expect(lineValue(card, "  ↳ borealis")).toMatch(/^now ≈ \d+ ±\d+ (FLOP|SHRUG|SOLID|BREAKOUT) · done ≈ (\d+|\? \(nobody on it\))$/);
+
+    const ship = actionFor(card, "ship atlas");
+    expect(ship).toMatchObject({ label: "Ship Atlas", tone: "primary" });
+    expect(ship.disabledReason).toBeUndefined();
+    // Under 60%: refused, in the engine's words.
+    expect(actionFor(card, "ship borealis").disabledReason).toBe("Borealis is 40% built. Shipping it now would be a crime.");
+    expect(actionFor(card, "build crunch borealis off").label).toBe("Stop crunching Borealis");
+    expect(actionFor(card, "build cancel borealis")).toMatchObject({ mode: "prefill", tone: "danger" });
+    // Both slots are taken.
+    expect(actionFor(card, "build ").disabledReason).toBe("All 2 build slots taken");
+    expect(actionFor(card, "build").disabledReason).toBeUndefined();
+  });
+
+  it("ship early: danger tone and the cruft it costs", () => {
+    const state = editBuild(withAtlas(), "b1", { progress: 3.5, scope: 5 });
+    const ship = actionFor(station(state, "ship"), "ship atlas");
+    expect(ship.label).toBe("Ship Atlas early");
+    expect(ship.tone).toBe("danger");
+    expect(ship.hint).toMatch(/^\+\d+(\.\d)? cruft$/);
+    expect(ship.disabledReason).toBeUndefined();
+  });
+
+  it("says what it last shipped, and how that went", () => {
+    const before = station(withAtlas(), "ship");
+    expect(lineValue(before, "Last release")).toBeUndefined();
+    const shipped = run(editBuild(withAtlas(), "b1", { progress: 5, scope: 5 }), "ship atlas");
+    const release = shipped.product!.shipped[0]!;
+    expect(lineValue(station(shipped, "ship"), "Last release")).toBe(
+      `Atlas · wk ${release.week} · ${release.reception} ${release.tier.toUpperCase()}`
+    );
+  });
+
+  it("during an event only the board is open", () => {
+    const card = station(withEvent(withAtlas()), "ship");
+    expect(actionFor(card, "build").disabledReason).toBeUndefined();
+    for (const entry of card.actions.filter((a) => a.command !== "build")) expect(entry.disabledReason).toBe(DISABLED_REASONS.event);
+  });
+});
+
+describe("empty desk with candidates", () => {
+  it("lists this week's candidates and signs them by number", () => {
+    const state = run(withAtlas(), "recruit eng");
+    const card = cardFor({ kind: "empty-desk", slotIndex: getOfficeLayout(state.companyPhase).deskSeats.length - 1 }, state);
+    const pool = buildWorldSnapshot(state).candidates.engineering!;
+    expect(card.subtitle).toBe("This week's candidates are in");
+    for (const candidate of pool) {
+      expect(lineValue(card, candidate.name)).toMatch(/^pace \d · craft \d[?✓] · \$[\d.]+K\/wk$/);
+      const sign = actionFor(card, `recruit eng ${candidate.index}`);
+      expect(sign.label).toBe(`Sign ${candidate.name.split(" ")[0]} (Engineer)`);
+      expect(sign.hint).toBe("1 AP · $3K");
+    }
+  });
+});
+
+describe("refusal reasons", () => {
+  it("keep the engine's voice, lose the asides, and stay short", async () => {
+    const { refusalReason } = await import("./inspector");
+    expect(refusalReason("Tuesday is 46% built. Shipping it now would be a crime. (Needs 60%. Or `build cancel tuesday`.)")).toBe(
+      "Tuesday is 46% built. Shipping it now would be a crime."
+    );
+    expect(refusalReason("No AP left. End the week to refresh.")).toBe(DISABLED_REASONS.noAp);
+    expect(refusalReason("Resolve the pending event first with `choose <n>`.")).toBe(DISABLED_REASONS.event);
+    expect(refusalReason("Game over. Click 'Play Again' or refresh to start a new run.")).toBe(DISABLED_REASONS.runOver);
+    expect(refusalReason("x".repeat(200)).length).toBeLessThanOrEqual(72);
   });
 });

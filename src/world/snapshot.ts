@@ -10,9 +10,13 @@ import type { AssetId, GameState, TeamRole, TeamRoster } from "../types/game";
 import { calcNetBurn, calcRunwayWeeks, getEffectiveMaxAp } from "../engine/economy";
 import { computeTeamSize } from "../engine/context";
 import { ALL_ASSET_IDS, ASSET_CATALOG, phaseAtLeast } from "../engine/assets";
+import { isSetupComplete } from "../engine/founders";
+import { listCandidates, rosterForWorld } from "../engine/people";
+import type { PersonFacts } from "../engine/people";
+import { listBuilds, productSummary } from "../engine/projects";
 import { hashText32 } from "./hash";
 import { employeeName } from "./names";
-import type { PersonView, WorldSnapshot } from "./types";
+import type { BuildView, CandidateView, CruftBand, EnergyBand, MoatBand, PersonView, ProductView, StaffView, WorldSnapshot } from "./types";
 
 /**
  * Hard cap on characters in the scene (founder and cofounder included). It is a
@@ -33,7 +37,10 @@ export const ROLE_ORDER: TeamRole[] = [
 export const FOUNDER_ID = "founder";
 export const COFOUNDER_ID = "cofounder";
 
-/** Stable id of the `index`-th (0-based) employee in a role. */
+/**
+ * Stable id of the `index`-th (0-based) unlisted head in a role: one the engine has no named record
+ * for (past the roster cap, a fractional hire, a legacy state). Named people use their engine id ("e17").
+ */
 export const employeeId = (role: TeamRole, index: number): string => `${role}-${index}`;
 
 const ROLE_SET: ReadonlySet<string> = new Set(ROLE_ORDER);
@@ -60,16 +67,36 @@ export const headcount = (team: TeamRoster, role: TeamRole): number => {
   return Number.isFinite(raw) ? Math.max(0, Math.floor(raw)) : 0;
 };
 
-/** Mirrors `isSetupComplete` in src/engine/commands.ts (not exported there). */
-const isSetupComplete = (state: GameState): boolean =>
-  Boolean(
-    state.founder.name.trim() &&
-      state.companyName.trim() &&
-      state.founder.archetype &&
-      state.cofounder.archetype
-  );
+/** Is this the engine id of a named employee ("e17")? */
+export const isNamedEmployeeId = (id: string): boolean => /^e\d+$/.test(id);
 
-const buildPeople = (state: GameState): { people: PersonView[]; hiddenPeople: number } => {
+/** The engine's energy words, as bands (85 / 60 / 45 / 30). */
+export const energyBandOf = (energy: number): EnergyBand =>
+  energy >= 85 ? "fresh" : energy >= 60 ? "fine" : energy >= 45 ? "tired" : energy >= 30 ? "fumes" : "burnt-out";
+
+/** Cruft bands for the server rack: tape at 15, spaghetti at 35, sparks at 60. */
+export const cruftBandOf = (cruft: number): CruftBand =>
+  cruft >= 60 ? "sparking" : cruft >= 35 ? "spaghetti" : cruft >= 15 ? "taped" : "clean";
+
+/** Moat bands round the product wall: 10 / 25 / 50. */
+export const moatBandOf = (moat: number): MoatBand =>
+  moat >= 50 ? "alligator" : moat >= 25 ? "moat" : moat >= 10 ? "ditch" : "puddle";
+
+const staffViewOf = (facts: PersonFacts): StaffView => ({
+  id: facts.id,
+  pace: facts.pace,
+  craft: facts.craft,
+  quirk: facts.quirk,
+  energy: facts.energy,
+  energyBand: energyBandOf(facts.energy),
+  buildId: facts.buildId,
+  isLead: facts.isLead,
+  engaged: facts.engaged,
+  shipped: facts.shipped,
+  offer: facts.offer ? { kind: facts.offer.kind, weeksLeft: facts.offer.weeksLeft, buildAtRisk: facts.offer.buildAtRisk } : null,
+});
+
+const buildPeople = (state: GameState): { people: PersonView[]; hiddenPeople: number; staff: StaffView[] } => {
   const seed = state.seed;
   const people: PersonView[] = [
     {
@@ -93,12 +120,24 @@ const buildPeople = (state: GameState): { people: PersonView[]; hiddenPeople: nu
     });
   }
 
-  let hiddenPeople = 0;
+  // Named people first (engaged ones are always among them), department by department, then the
+  // unlisted standard heads in whatever room is left. For a legacy state (no roster) `named.people` is
+  // empty and `named.unlisted[role]` is the role's whole head count, so the second loop is the old one.
+  const named = rosterForWorld(state, MAX_WORLD_PEOPLE - people.length);
+  const staff: StaffView[] = [];
+  let hiddenPeople = named.hidden;
   for (const role of ROLE_ORDER) {
-    const count = headcount(state.team, role);
-    // Bound the loop by the remaining budget, not by `count`: a head count is
+    for (const facts of named.people) {
+      if (facts.role !== role) continue;
+      people.push({ id: facts.id, kind: "employee", role, name: facts.name, look: hashText32(seed, facts.id) });
+      staff.push(staffViewOf(facts));
+    }
+  }
+  for (const role of ROLE_ORDER) {
+    const extra = Math.max(0, Math.floor(named.unlisted[role] ?? 0));
+    // Bound the loop by the remaining budget, not by the count: a head count is
     // player input and can be arbitrarily large.
-    const visible = Math.min(count, MAX_WORLD_PEOPLE - people.length);
+    const visible = Math.max(0, Math.min(extra, MAX_WORLD_PEOPLE - people.length));
     for (let index = 0; index < visible; index += 1) {
       const id = employeeId(role, index);
       people.push({
@@ -109,14 +148,73 @@ const buildPeople = (state: GameState): { people: PersonView[]; hiddenPeople: nu
         look: hashText32(seed, id),
       });
     }
-    hiddenPeople += count - visible;
+    hiddenPeople += extra - visible;
   }
 
-  return { people, hiddenPeople };
+  return { people, hiddenPeople, staff };
+};
+
+const buildBuilds = (state: GameState): BuildView[] =>
+  listBuilds(state).map((b) => ({
+    id: b.id,
+    name: b.name,
+    slug: b.slug,
+    type: b.type,
+    size: b.size,
+    pct: b.pct,
+    built: b.built,
+    crunch: b.crunch,
+    crunchWeeks: b.crunchWeeks,
+    surprises: b.surprises,
+    dueWeek: b.dueWeek,
+    weeksLate: b.weeksLate,
+    seats: b.seats,
+    staffIds: [...b.staffIds],
+    leadId: b.leadId,
+    tierNow: b.forecast.tierNow,
+    forecastNow: b.forecast.now,
+    shippable: b.forecast.shippable,
+  }));
+
+const buildProduct = (state: GameState): ProductView => {
+  const summary = productSummary(state);
+  return {
+    cruft: summary.cruft,
+    moat: summary.moat,
+    shippedCount: summary.shippedCount,
+    slots: summary.slots,
+    recent: summary.recent.map((release) => ({
+      id: release.id,
+      name: release.name,
+      week: release.week,
+      tier: release.tier,
+      reception: release.reception,
+    })),
+  };
+};
+
+const buildCandidates = (state: GameState): Partial<Record<TeamRole, CandidateView[]>> => {
+  const out: Partial<Record<TeamRole, CandidateView[]>> = {};
+  const people = state.people;
+  if (!people || people.candidatesWeek !== state.week) return out;
+  for (const role of ROLE_ORDER) {
+    if (!people.candidates[role]) continue;
+    const pool = listCandidates(state, role);
+    if (!pool) continue;
+    out[role] = pool.map((c) => ({
+      index: c.index,
+      name: c.name,
+      shownPace: c.shownPace,
+      shownCraft: c.shownCraft,
+      vetted: c.vetted,
+      ask: c.ask,
+    }));
+  }
+  return out;
 };
 
 export const buildWorldSnapshot = (state: GameState): WorldSnapshot => {
-  const { people, hiddenPeople } = buildPeople(state);
+  const { people, hiddenPeople, staff } = buildPeople(state);
 
   const ownedAssets: AssetId[] = state.assets.map((asset) => asset.id);
   const availableAssets = ALL_ASSET_IDS.filter(
@@ -155,6 +253,10 @@ export const buildWorldSnapshot = (state: GameState): WorldSnapshot => {
     teamSize: computeTeamSize(state),
     people,
     hiddenPeople,
+    staff,
+    builds: buildBuilds(state),
+    product: buildProduct(state),
+    candidates: buildCandidates(state),
 
     ownedAssets,
     availableAssets,

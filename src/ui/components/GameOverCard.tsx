@@ -4,6 +4,7 @@ import { generateEndingSummary, type EndingSummary } from "../../engine/endingSu
 import { generateEpitaph } from "../../engine/epitaphs";
 import { submitScore, submitGraveyardEntry } from "../../api/client";
 import { LeaderboardOverlay } from "./LeaderboardOverlay";
+import { listBuilds, productSummary } from "../../engine/projects";
 
 interface GameOverCardProps {
   state: GameState;
@@ -17,10 +18,12 @@ const MAX_NAME_LENGTH = 32;
 
 const fmt = (v: number): string => v.toLocaleString();
 const fmtUsd = (v: number): string => {
+  // A bankrupt run ends below zero: "-$5.1M", not "$-5064494".
+  if (v < 0) return `-${fmtUsd(-v)}`;
   if (v >= 1_000_000_000) return `$${(v / 1_000_000_000).toFixed(1)}B`;
   if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(1)}M`;
   if (v >= 1_000) return `$${(v / 1_000).toFixed(0)}K`;
-  return `$${v}`;
+  return `$${Math.round(v)}`;
 };
 
 const accentColor: Record<EndingType, string> = {
@@ -122,6 +125,13 @@ export const GameOverCard = ({ state, onPlayAgain, canPeek = false }: GameOverCa
   if (!summary) return null;
 
   const accent = accentColor[summary.ending];
+  // Product slices are optional (a legacy save has none): both views return empty data then.
+  const product = productSummary(state);
+  const unfinished = listBuilds(state);
+  const best = product.recent.reduce<(typeof product.recent)[number] | null>(
+    (top, r) => (top === null || r.reception > top.reception ? r : top),
+    null,
+  );
 
   if (showLeaderboard) {
     return <LeaderboardOverlay onClose={() => setShowLeaderboard(false)} currentSeed={state.seed} />;
@@ -192,7 +202,29 @@ export const GameOverCard = ({ state, onPlayAgain, canPeek = false }: GameOverCa
           <Stat label="Ownership" value={`${summary.stats.founderOwnership}%`} />
           <Stat label="Total Raised" value={fmtUsd(summary.stats.totalRaised)} />
           <Stat label="Team Size" value={String(summary.stats.teamSize)} />
+          {product.shippedCount > 0 ? <Stat label="Releases" value={String(product.shippedCount)} /> : null}
         </div>
+
+        {/* Builds: the best release on file, and whatever was still on the whiteboard when the run ended. */}
+        {best || unfinished.length > 0 ? (
+          <div className="mb-4 space-y-1 text-xs leading-relaxed text-mist/70">
+            {best ? (
+              <div>
+                Best release: <span className="text-slate-100/90">{best.name}</span>, week {best.week},{" "}
+                {best.reception} {best.tier.toUpperCase()}.
+              </div>
+            ) : null}
+            {unfinished.length > 0 ? (
+              <div>
+                Left on the whiteboard:{" "}
+                <span className="text-slate-100/90">
+                  {unfinished.map((b) => `${b.name} (${b.pct}%)`).join(", ")}
+                </span>
+                . {unfinished.length === 1 ? "It lives" : "They live"} on the roadmap slide now. Forever.
+              </div>
+            ) : null}
+          </div>
+        ) : null}
 
         {/* Achievements */}
         {summary.achievements.length > 0 && (

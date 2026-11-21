@@ -10,6 +10,9 @@
  *   src/engine/commands.ts  executeCommand — pending event, then setup order
  *   src/engine/actions.ts   ensurePlayable — game over, then the per-action
  *                           checks (AP, stage lock, cash)
+ * The people and product-build buttons (retain, staff, ship <build>, crunch…)
+ * ask the engine itself: `preflight` dry-runs the command on the live state and
+ * reports whether it would be refused, why, and what it would cost.
  * inspector.test.ts feeds every enabled command to the real engine, and every
  * disabled one too, to keep the two from drifting apart.
  */
@@ -18,12 +21,18 @@ import { PERSONALITY_PROFILES } from "../../engine/board";
 import { calcNetBurn, calcRunwayWeeks, getApCost, getEffectiveMaxAp, roleComp } from "../../engine/economy";
 import { stageRaiseCaps } from "../../engine/investors";
 import { PRICING_MODELS } from "../../engine/pricing";
+import { isSetupComplete } from "../../engine/founders";
+import { describeEmployee } from "../../engine/people";
+import type { PersonFacts } from "../../engine/people";
+import { listBuilds, productSummary, startOptions } from "../../engine/projects";
+import type { BuildFacts, ProductFacts } from "../../engine/projects";
 import { canHireRole, ROLE_MIN_STAGE } from "../../engine/stagePerks";
+import { preflight } from "../../engine/tycoon/preflight";
 import type { AssetId, CompanyPhase, GameState, PricingModel, TeamRole } from "../../types/game";
 import { stripTypewriterTokens } from "../../ui/terminal/tokens";
 import { ROLE_HIRE_TOKENS, roleBlurb, roleTitle } from "../names";
 import { getOfficeLayout } from "../office/layouts";
-import { buildWorldSnapshot, headcount, ROLE_ORDER } from "../snapshot";
+import { buildWorldSnapshot, headcount, isNamedEmployeeId, ROLE_ORDER } from "../snapshot";
 import type { InteractableTarget, PersonView, StationKind } from "../types";
 import { formatCount, formatCountDelta, formatUsd, formatUsdDelta, titleCase } from "./format";
 
@@ -42,6 +51,11 @@ export interface InspectorAction {
   /** Present → the button is disabled and this says why. */
   disabledReason?: string;
   tone?: "primary" | "default" | "danger";
+  /**
+   * Actions that share a row key (and sit next to each other) are drawn side by side: the first
+   * one in full, the others as small chips (the empty desk's "job ad | candidates" per role).
+   */
+  row?: string;
 }
 
 export type InspectorLineTone = "good" | "bad" | "warn";
@@ -58,6 +72,8 @@ export interface InspectorCard {
   lines: InspectorLine[];
   note?: string;
   actions: InspectorAction[];
+  /** Long read-outs (the product wall's builds): the card is drawn wider. */
+  wide?: boolean;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -73,21 +89,22 @@ export const DISABLED_REASONS = {
   noCash: "Not enough cash",
 } as const;
 
-/** The only commands a card uses that executeCommand lets through while an event is pending. */
-const ALLOWED_DURING_EVENT: ReadonlySet<string> = new Set(["choose", "status"]);
+/** The only commands a card uses that executeCommand lets through while an event is pending… */
+const ALLOWED_DURING_EVENT: ReadonlySet<string> = new Set(["choose", "status", "team"]);
 /** …and while the founder is still being set up. */
 const ALLOWED_DURING_SETUP: ReadonlySet<string> = new Set(["status"]);
 
-/** Mirrors `isSetupComplete` in src/engine/commands.ts (not exported there). */
-const isSetupComplete = (state: GameState): boolean =>
-  Boolean(
-    state.founder.name.trim() &&
-      state.companyName.trim() &&
-      state.founder.archetype &&
-      state.cofounder.archetype
-  );
-
 const verbOf = (command: string): string => command.trim().split(/\s+/)[0]?.toLowerCase() ?? "";
+
+/** The read-only forms of the tycoon commands, which work while an event is pending: the board, a look at candidates. */
+const readOnlyDuringEvent = (command: string): boolean => {
+  // A trailing space is a prefill waiting for its arguments ("build " starts a build): it counts as one more token.
+  const tokens = command.trimStart().toLowerCase().split(/\s+/);
+  const verb = tokens[0] ?? "";
+  if (ALLOWED_DURING_EVENT.has(verb)) return true;
+  if (verb === "build") return tokens.length === 1 || (tokens.length === 2 && tokens[1] === "list");
+  return verb === "recruit" && tokens.length === 2 && tokens[1] !== "";
+};
 
 /**
  * Why the engine would refuse `command` before even looking at what it costs,
@@ -96,7 +113,7 @@ const verbOf = (command: string): string => command.trim().split(/\s+/)[0]?.toLo
 export const commandBlocker = (state: GameState, command: string): string | undefined => {
   const verb = verbOf(command);
   if (state.gameOver) return DISABLED_REASONS.runOver;
-  if (state.pendingEvent && !ALLOWED_DURING_EVENT.has(verb)) return DISABLED_REASONS.event;
+  if (state.pendingEvent && !readOnlyDuringEvent(command)) return DISABLED_REASONS.event;
   if (!isSetupComplete(state) && !ALLOWED_DURING_SETUP.has(verb)) return DISABLED_REASONS.setup;
   return undefined;
 };
@@ -158,6 +175,70 @@ const action = (state: GameState, spec: ActionSpec): InspectorAction => {
 /** AP cost of ship / launch / pitch, with the archetype's free weekly action called out. */
 const perkAwareHint = (ap: number, cash = 0): string =>
   [ap === 0 ? "Free this week" : `${ap} AP`, ...(cash ? [formatUsd(cash)] : [])].join(" · ");
+
+/** Longest refusal shown where a price would go; longer ones keep their first sentence. */
+const REASON_MAX = 72;
+
+/**
+ * An engine refusal, fit for a button: the run-level ones in the cards' own words, anything
+ * else in the engine's (it is the same voice as the terminal), without the trailing aside and
+ * the backticks, cut to its first sentence when it runs long.
+ */
+export const refusalReason = (text: string): string => {
+  if (text.startsWith("Game over")) return DISABLED_REASONS.runOver;
+  if (text.startsWith("Resolve the pending event")) return DISABLED_REASONS.event;
+  if (text.startsWith("No AP left")) return DISABLED_REASONS.noAp;
+  let reason = text.replace(/`([^`]*)`/g, "$1").trim();
+  // "… would be a crime. (Needs 60%. Or build cancel x.)" → "… would be a crime."
+  const aside = reason.lastIndexOf(" (");
+  if (aside > 0 && reason.endsWith(")")) reason = reason.slice(0, aside).trim();
+  if (reason.length > REASON_MAX) {
+    const end = reason.search(/[.!?](\s|$)/);
+    reason = end > 0 && end < REASON_MAX ? reason.slice(0, end + 1) : `${reason.slice(0, REASON_MAX - 1).trimEnd()}…`;
+  }
+  return reason || "Not now";
+};
+
+/** How much a card may ask the engine: `false` for a quick read (a hover chip only needs the title). */
+type Gate = boolean;
+
+interface CheckedSpec {
+  label: string;
+  command: string;
+  mode?: InspectorAction["mode"];
+  tone?: InspectorAction["tone"];
+  /** Replaces the hint derived from the dry run's cost. */
+  hint?: string;
+  /** A refusal of this card's own (checked before asking the engine). */
+  lock?: string;
+  row?: string;
+  /** Show the archetype's free weekly action ("Free this week") rather than "Free". */
+  perk?: boolean;
+}
+
+/**
+ * An action gated by the engine itself: run-level blockers first (as every card does), then a
+ * dry run of the very command (`preflight`), which knows every rule — AP, cash, seats, roles,
+ * who is holding notice, how far a build is. Its price comes from the same dry run.
+ */
+const checked = (state: GameState, gate: Gate, spec: CheckedSpec): InspectorAction => {
+  let disabledReason = commandBlocker(state, spec.command) ?? spec.lock;
+  let hint = spec.hint;
+  if (disabledReason === undefined && gate) {
+    const dry = preflight(state, spec.command);
+    if (!dry.allowed) disabledReason = refusalReason(dry.reason ?? "");
+    else if (hint === undefined) hint = spec.perk ? perkAwareHint(dry.apCost, dry.cashCost) : costHint({ ap: dry.apCost, cash: dry.cashCost });
+  }
+  return {
+    label: spec.label,
+    command: spec.command,
+    mode: spec.mode ?? "run",
+    ...(hint ? { hint } : {}),
+    ...(disabledReason ? { disabledReason } : {}),
+    ...(spec.tone ? { tone: spec.tone } : {}),
+    ...(spec.row ? { row: spec.row } : {}),
+  };
+};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Shared read-outs
@@ -272,24 +353,161 @@ const employeeCard = (state: GameState, person: PersonView, role: TeamRole): Ins
   };
 };
 
-const personCard = (state: GameState, personId: string): InspectorCard | null => {
+/** 3 → "●●●○○". */
+const dots = (value: number): string => {
+  const filled = Math.max(0, Math.min(5, Math.round(value)));
+  return "●".repeat(filled) + "○".repeat(5 - filled);
+};
+
+/** Weekly pay to the dollar ("$3,850"): the compact style would round a raise away. */
+const usdExact = (value: number): string => (value < 0 ? `-$${formatCount(-value)}` : `$${formatCount(value)}`);
+
+const energyTone = (energy: number): InspectorLineTone | undefined => (energy < 30 ? "bad" : energy < 60 ? "warn" : undefined);
+
+const plural = (count: number, one: string, many: string): string => (count === 1 ? one : many);
+
+const OFFER_NOTES = {
+  recruiter: "A recruiter found them. Recruiters always do. Retain them, or start shopping for a farewell card.",
+  burnout: "Burnt out and quietly updating their CV. A bonus and a raise will paper over it for a while.",
+} as const;
+
+/** A named employee: their stats, their build, any outside offer, and what can be done about them. */
+const namedPersonCard = (state: GameState, person: PersonView, facts: PersonFacts, gate: Gate): InspectorCard => {
+  const builds = listBuilds(state);
+  const buildName = (id: string | null): string | null => builds.find((b) => b.id === id)?.name ?? null;
+  const atRisk = facts.offer?.buildAtRisk ? (builds.find((b) => b.slug === facts.offer?.buildAtRisk)?.name ?? facts.offer.buildAtRisk) : null;
+  const current = buildName(facts.buildId);
+
+  const lines: InspectorLine[] = [
+    { label: "Pace", value: dots(facts.pace) },
+    { label: "Craft", value: dots(facts.craft) },
+    { label: "Works like", value: `${facts.effectiveness.toFixed(2)} ${plural(Math.round(facts.effectiveness * 100) / 100, "hire", "hires")}` },
+    { label: "Energy", value: `${facts.energy} (${facts.energyWord})`, ...(energyTone(facts.energy) ? { tone: energyTone(facts.energy) } : {}) },
+    {
+      label: "Pay",
+      value: `${usdExact(facts.salary)}/wk · going ${usdExact(facts.marketSalary)}`,
+    },
+    { label: "Working on", value: current ? `${current}${facts.isLead ? " (lead)" : ""}` : "The day job" },
+  ];
+  if (facts.quirk) lines.push({ label: "Quirk", value: titleCase(facts.quirk) });
+  if (facts.shipped > 0) lines.push({ label: "Credited on", value: `${facts.shipped} ${plural(facts.shipped, "release", "releases")}`, tone: "good" });
+  if (facts.offer) {
+    lines.push({
+      label: facts.offer.kind === "burnout" ? "Burnt out" : "Outside offer",
+      value: `Leaves in ${facts.offer.weeksLeft}w`,
+      tone: "bad",
+    });
+    if (atRisk) lines.push({ label: "At risk", value: `${atRisk} loses a quarter`, tone: "bad" });
+    lines.push({ label: "To keep them", value: `${usdExact(facts.retainQuote.bonus)} now, then ${usdExact(facts.retainQuote.newSalary)}/wk` });
+  }
+
+  const actions: InspectorAction[] = [
+    checked(state, gate, {
+      label: facts.offer ? "Retain" : "Retain (raise)",
+      command: `retain ${facts.id}`,
+      ...(facts.offer ? { tone: "primary" as const } : {}),
+    }),
+  ];
+  for (const buildId of facts.fitBuildIds) {
+    if (buildId === facts.buildId) continue;
+    const build = builds.find((b) => b.id === buildId);
+    if (!build) continue;
+    actions.push(checked(state, gate, { label: `Put on ${build.name}`, command: `staff ${build.slug} ${facts.id}` }));
+  }
+  if (facts.buildId !== null) actions.push(checked(state, gate, { label: "Back to the day job", command: `staff off ${facts.id}` }));
+  actions.push(
+    checked(state, gate, { label: "Let go…", command: `fire ${facts.id}`, mode: "prefill", tone: "danger" }),
+    checked(state, gate, { label: "Their file", command: `team ${facts.id}` }),
+    // A small office has no empty desk to click (the garage seats three), so a colleague's card
+    // is where the next hire starts too: the job ad, this week's candidates, and signing one.
+    { ...hireAction(state, facts.role, "Hire another"), row: "hire" }
+  );
+  if (canHireRole(facts.role, state.stage)) {
+    const token = ROLE_HIRE_TOKENS[facts.role];
+    const pool = buildWorldSnapshot(state).candidates[facts.role];
+    if (!pool) actions.push(checked(state, gate, { label: "Candidates", command: `recruit ${token}`, row: "hire" }));
+    for (const candidate of pool ?? []) {
+      lines.push({
+        label: candidate.name,
+        value: `${candidateStats(candidate.shownPace, candidate.shownCraft, candidate.vetted)} · ${formatUsd(candidate.ask)}/wk`,
+      });
+      actions.push(
+        checked(state, gate, { label: `Sign ${candidate.name.split(" ")[0]}`, command: `recruit ${token} ${candidate.index}` })
+      );
+    }
+  }
+
+  return {
+    title: person.name,
+    subtitle: `${roleTitle(facts.role)} · ${facts.id}`,
+    lines,
+    note: [
+      facts.offer ? OFFER_NOTES[facts.offer.kind] : null,
+      facts.quirk && facts.quirkBlurb ? `${titleCase(facts.quirk)}: ${facts.quirkBlurb}.` : null,
+      facts.offer || facts.quirk ? null : roleBlurb(facts.role),
+    ]
+      .filter((part): part is string => part !== null)
+      .join(" "),
+    actions,
+  };
+};
+
+const personCard = (state: GameState, personId: string, gate: Gate): InspectorCard | null => {
   // The snapshot is the single source of who exists and what they are called,
   // so the card always agrees with the label floating over the character.
   const person = buildWorldSnapshot(state).people.find((entry) => entry.id === personId);
   if (!person) return null;
   if (person.kind === "founder") return founderCard(state, person);
   if (person.kind === "cofounder") return cofounderCard(state, person);
-  return person.role ? employeeCard(state, person, person.role) : null;
+  if (!person.role) return null;
+  // A named person (the engine's "e17") has a file; an unlisted head (`${role}-k`) is the classic card.
+  const facts = isNamedEmployeeId(person.id) ? describeEmployee(state, person.id) : null;
+  return facts ? namedPersonCard(state, person, facts, gate) : employeeCard(state, person, person.role);
 };
 
-const emptyDeskCard = (state: GameState, slotIndex: number): InspectorCard | null => {
+/** "pace 3 · craft 4 ✓" (vetted by HR) or "pace 3 · craft 4?" (what the résumé claims). */
+const candidateStats = (pace: number, craft: number, vetted: boolean): string => `pace ${pace} · craft ${craft}${vetted ? " ✓" : "?"}`;
+
+const emptyDeskCard = (state: GameState, slotIndex: number, gate: Gate): InspectorCard | null => {
   const desks = getOfficeLayout(state.companyPhase).deskSeats.length;
   if (!Number.isInteger(slotIndex) || slotIndex < 0 || slotIndex >= desks) return null;
+  const snapshot = buildWorldSnapshot(state);
+  const lines: InspectorLine[] = [cashLine(state), apLine(state)];
+  const signing: InspectorAction[] = [];
+  for (const role of ROLE_ORDER) {
+    const pool = snapshot.candidates[role];
+    if (!pool) continue;
+    for (const candidate of pool) {
+      lines.push({
+        label: candidate.name,
+        value: `${candidateStats(candidate.shownPace, candidate.shownCraft, candidate.vetted)} · ${formatUsd(candidate.ask)}/wk`,
+      });
+      signing.push(
+        checked(state, gate, {
+          label: `Sign ${candidate.name.split(" ")[0]} (${roleTitle(role)})`,
+          command: `recruit ${ROLE_HIRE_TOKENS[role]} ${candidate.index}`,
+          tone: "primary",
+        })
+      );
+    }
+  }
+  const actions: InspectorAction[] = [...signing];
+  for (const role of ROLE_ORDER) {
+    actions.push({ ...hireAction(state, role, `${roleTitle(role)} · job ad`), row: role });
+    // Candidates only for the roles the company may hire (a locked role's job ad already says when it unlocks).
+    if (canHireRole(role, state.stage)) {
+      actions.push(checked(state, gate, { label: "Candidates", command: `recruit ${ROLE_HIRE_TOKENS[role]}`, row: role }));
+    }
+  }
   return {
     title: "Empty desk",
-    subtitle: "Hire someone to fill it",
-    lines: [cashLine(state), apLine(state)],
-    actions: ROLE_ORDER.map((role) => hireAction(state, role, roleTitle(role))),
+    subtitle: signing.length > 0 ? "This week's candidates are in" : "Hire someone to fill it",
+    lines,
+    note:
+      signing.length > 0
+        ? "Résumés marked ? are the candidate's own account of themselves. HR would check. You do not have HR."
+        : "A job ad brings a standard hire today. Candidates shows three real people with real stats, for a signing fee.",
+    actions,
   };
 };
 
@@ -297,29 +515,148 @@ const emptyDeskCard = (state: GameState, slotIndex: number): InspectorCard | nul
 // Stations
 // ─────────────────────────────────────────────────────────────────────────────
 
-const shipCard = (state: GameState): InspectorCard => {
-  const engineers = headcount(state.team, "engineering");
-  const designers = headcount(state.team, "design");
+/** Why "Start a build…" is off: every build slot of this office is in use. */
+const slotsTaken = (slots: number): string => (slots === 1 ? "The only build slot is taken" : `All ${slots} build slots taken`);
+
+/** The cheapest kickoff the company could start right now (of one type, or any): a prefill cannot be cheaper. */
+const cheapestKickoff = (state: GameState, type?: BuildFacts["type"]): number => {
+  const fees = startOptions(state)
+    .options.filter((option) => option.unlocked && (type === undefined || option.type === type))
+    .map((option) => option.kickoff);
+  return fees.length > 0 ? Math.min(...fees) : 0;
+};
+
+const TIER_LABEL = { flop: "FLOP", shrug: "SHRUG", solid: "SOLID", breakout: "BREAKOUT" } as const;
+
+const TYPE_SHORT: Record<BuildFacts["type"], string> = {
+  feature: "Feature",
+  growth: "Growth",
+  premium: "Premium",
+  plumbing: "Plumbing",
+  moonshot: "Moonshot",
+};
+
+/**
+ * One build on the board, two lines: "Atlas — Feature M · 46% · due wk 34 · crunch" and
+ * "  ship now ≈ 62 ±6 SOLID · done ≈ 82" (or "done ≈ ? (nobody on it)").
+ */
+const buildLines = (build: BuildFacts): InspectorLine[] => {
+  const late = build.weeksLate > 0;
+  const status = build.built ? "built" : `${build.pct}%`;
+  const due = late ? `${build.weeksLate}w late` : `due wk ${build.dueWeek}`;
+  const tone: InspectorLineTone | undefined = build.built ? "good" : late ? "bad" : build.crunch ? "warn" : undefined;
+  const { forecast } = build;
+  const done = forecast.eta === null ? "done ≈ ? (nobody on it)" : `done ≈ ${forecast.finished}`;
+  return [
+    {
+      label: build.name,
+      value: `${TYPE_SHORT[build.type] ?? build.typeLabel} ${build.sizeLabel} · ${status} · ${due}${build.crunch ? " · crunch" : ""}`,
+      ...(tone ? { tone } : {}),
+    },
+    {
+      // Labels are keys: the second line of a build is labelled by its slug, indented.
+      label: `  ↳ ${build.slug}`,
+      value: `now ≈ ${forecast.now} ±${forecast.spread} ${TIER_LABEL[forecast.tierNow]}${build.built ? "" : ` · ${done}`}`,
+      ...(forecast.tierNow === "flop" ? { tone: "bad" as const } : forecast.tierNow === "breakout" ? { tone: "good" as const } : {}),
+    },
+  ];
+};
+
+/** "Atlas · wk 7 · 58 SHRUG": what the wall last sent out, and how it went. */
+const lastReleaseLine = (release: ProductFacts["recent"][number] | undefined): InspectorLine[] =>
+  release
+    ? [
+        {
+          label: "Last release",
+          value: `${release.name} · wk ${release.week} · ${release.reception} ${TIER_LABEL[release.tier]}`,
+          ...(release.tier === "flop" ? { tone: "bad" as const } : release.tier === "breakout" ? { tone: "good" as const } : {}),
+        },
+      ]
+    : [];
+
+/** Ship / crunch / fill seats / cancel for one build, each gated by the engine's own dry run. */
+const buildActions = (state: GameState, build: BuildFacts, gate: Gate): InspectorAction[] => {
+  const early = build.forecast.shippable && !build.built;
+  const actions: InspectorAction[] = [
+    checked(state, gate, {
+      label: early ? `Ship ${build.name} early` : `Ship ${build.name}`,
+      command: `ship ${build.slug}`,
+      tone: build.built ? "primary" : early ? "danger" : "default",
+      perk: true,
+      ...(early && build.forecast.rushCruft > 0 ? { hint: `+${build.forecast.rushCruft} cruft` } : {}),
+    }),
+  ];
+  if (!build.built || build.crunch) {
+    actions.push(
+      checked(state, gate, {
+        label: build.crunch ? `Stop crunching ${build.name}` : `Crunch ${build.name}`,
+        command: `build crunch ${build.slug} ${build.crunch ? "off" : "on"}`,
+      })
+    );
+  }
+  if (build.staffIds.length < build.seats) {
+    actions.push(checked(state, gate, { label: `Fill ${build.name}'s seats`, command: `staff ${build.slug} auto` }));
+  }
+  actions.push(checked(state, gate, { label: `Cancel ${build.name}…`, command: `build cancel ${build.slug}`, mode: "prefill", tone: "danger" }));
+  return actions;
+};
+
+const shipCard = (state: GameState, gate: Gate): InspectorCard => {
   const ap = getApCost(state, "ship");
+  const builds = listBuilds(state);
+  const product = productSummary(state);
+  const { slotsFree } = startOptions(state);
+  const patch = action(state, {
+    label: builds.length > 0 ? "Ship a patch…" : "Ship a feature…",
+    command: "ship ",
+    mode: "prefill",
+    ...(builds.length > 0 ? {} : { tone: "primary" as const }),
+    ap,
+    hint: perkAwareHint(ap),
+  });
+  const start = action(state, {
+    label: "Start a build…",
+    command: "build ",
+    mode: "prefill",
+    ap: getApCost(state, "build"),
+    cash: cheapestKickoff(state),
+    hint: `${getApCost(state, "build")} AP`,
+    lock: slotsFree === 0 ? slotsTaken(product.slots) : undefined,
+  });
+
+  if (builds.length === 0 && product.shippedCount === 0) {
+    const engineers = headcount(state.team, "engineering");
+    const designers = headcount(state.team, "design");
+    return {
+      title: "Product wall",
+      subtitle: "Where features ship",
+      lines: [
+        { label: "Engineers", value: formatCount(engineers) },
+        { label: "Designers", value: formatCount(designers) },
+        { label: "Reputation", value: outOf100(state.reputation), tone: earned(state.reputation) },
+        { label: "ARPU", value: formatUsd(state.arpu) },
+      ],
+      note: "A patch ships today. A build takes weeks, a crew and a kickoff fee, and lands as a release — FLOP to BREAKOUT.",
+      actions: [patch, start],
+    };
+  }
+
   return {
     title: "Product wall",
-    subtitle: "Where features ship",
+    subtitle:
+      builds.length > 0
+        ? `${builds.length} ${plural(builds.length, "build", "builds")} · ${slotsFree} ${plural(slotsFree, "slot", "slots")} free`
+        : "Nothing in the works",
     lines: [
-      { label: "Engineers", value: formatCount(engineers) },
-      { label: "Designers", value: formatCount(designers) },
-      { label: "Reputation", value: outOf100(state.reputation), tone: earned(state.reputation) },
-      { label: "ARPU", value: formatUsd(state.arpu) },
+      { label: "Cruft", value: `${product.cruft} (${product.cruftWord})`, ...(product.cruft >= 40 ? { tone: "bad" as const } : product.cruft >= 15 ? { tone: "warn" as const } : {}) },
+      { label: "Moat", value: `${product.moat} (${product.moatWord})` },
+      { label: "Shipped", value: `${product.shippedCount} ${plural(product.shippedCount, "release", "releases")}` },
+      ...lastReleaseLine(product.recent[0]),
+      ...builds.flatMap((build) => buildLines(build)),
     ],
-    actions: [
-      action(state, {
-        label: "Ship a feature…",
-        command: "ship ",
-        mode: "prefill",
-        tone: "primary",
-        ap,
-        hint: perkAwareHint(ap),
-      }),
-    ],
+    ...(builds.length === 0 ? { note: "The board is empty. The roadmap says otherwise." } : {}),
+    wide: true,
+    actions: [...builds.flatMap((build) => buildActions(state, build, gate)), start, action(state, { label: "The board", command: "build" }), patch],
   };
 };
 
@@ -477,10 +814,40 @@ const serversCard = (state: GameState): InspectorCard => {
       },
       { label: "MRR", value: `${formatUsd(state.mrr)} (${formatUsdDelta(mrrDelta)})`, tone: deltaTone(mrrDelta) },
       { label: "ARPU", value: formatUsd(state.arpu) },
+      ...cruftLine(state),
     ],
     note: "Changes are since the start of last week.",
-    actions: [action(state, { label: "Company status", command: "status" })],
+    actions: [
+      action(state, { label: "Company status", command: "status" }),
+      ...(state.product && state.product.cruft >= 15
+        ? [
+            action(state, {
+              label: "Start plumbing…",
+              command: "build plumbing ",
+              mode: "prefill",
+              ap: getApCost(state, "build"),
+              cash: cheapestKickoff(state, "plumbing"),
+              hint: `${getApCost(state, "build")} AP`,
+              lock: startOptions(state).slotsFree === 0 ? slotsTaken(productSummary(state).slots) : undefined,
+            }),
+          ]
+        : []),
+    ],
   };
+};
+
+const CRUFT_RACK: ReadonlyArray<readonly [number, string]> = [
+  [60, "sparking, gently"],
+  [35, "cable spaghetti"],
+  [15, "held together with tape"],
+];
+
+/** The rack shows the product's cruft once there is any worth mentioning. */
+const cruftLine = (state: GameState): InspectorLine[] => {
+  const cruft = state.product?.cruft ?? 0;
+  const band = CRUFT_RACK.find(([at]) => cruft >= at);
+  if (!band) return [];
+  return [{ label: "Cruft", value: `${cruft} — ${band[1]}`, tone: cruft >= 40 ? "bad" : "warn" }];
 };
 
 const PRICING_ORDER: readonly PricingModel[] = ["consumer", "prosumer", "enterprise"];
@@ -509,7 +876,7 @@ const pricingCard = (state: GameState): InspectorCard => {
   };
 };
 
-const STATION_CARDS: Record<StationKind, (state: GameState) => InspectorCard> = {
+const STATION_CARDS: Record<StationKind, (state: GameState, gate: Gate) => InspectorCard> = {
   ship: shipCard,
   launch: launchCard,
   investors: investorsCard,
@@ -606,6 +973,11 @@ const eventBeaconCard = (state: GameState): InspectorCard | null => {
 export interface WorldReadout {
   /** WorldHandle.hiddenCount(): people the office has no visible spot for. */
   hiddenCount?: number;
+  /**
+   * False for a quick read — a hover chip or "would a click open a card?" — where only the title
+   * matters: the engine-gated buttons then skip their dry runs (and carry no gating). Default true.
+   */
+  gate?: boolean;
 }
 
 /**
@@ -657,13 +1029,14 @@ export const describeTarget = (
   state: GameState,
   readout: WorldReadout = {}
 ): InspectorCard | null => {
+  const gate = readout.gate ?? true;
   switch (target.kind) {
     case "person":
-      return personCard(state, target.personId);
+      return personCard(state, target.personId, gate);
     case "empty-desk":
-      return emptyDeskCard(state, target.slotIndex);
+      return emptyDeskCard(state, target.slotIndex, gate);
     case "station":
-      return STATION_CARDS[target.station]?.(state) ?? null;
+      return STATION_CARDS[target.station]?.(state, gate) ?? null;
     case "asset":
       return assetCard(state, target.assetId);
     case "door":
