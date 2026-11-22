@@ -554,7 +554,8 @@ describe("every card is honest about what the engine will do", () => {
       }
     }
     expect(checked).toBeGreaterThan(4000);
-  });
+    // Plays several whole games: about 2.5 s on an 8-core Mac, over the 5 s default on a GitHub runner.
+  }, 20_000);
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
