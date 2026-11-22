@@ -815,6 +815,14 @@ export const createCharacter = (view: PersonView): CharacterHandle => {
       applyChannels();
     },
     dispose() {
+      // L5 — shared-cache ownership contract: a character owns NO GPU
+      // resources of its own. Every geometry and material used above comes
+      // from the shared palette caches (bakeModel / mat / vertexMat), which
+      // are freed exactly once by disposeSharedResources() at world
+      // teardown. Disposing them here would break every other character
+      // still using them, so disposal is deliberately just detaching the
+      // group. If a character ever gains a unique resource (a cloned
+      // material, a dynamic texture), dispose THAT here — and only that.
       group.removeFromParent();
     },
   };
