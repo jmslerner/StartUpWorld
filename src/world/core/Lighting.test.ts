@@ -262,6 +262,34 @@ describe("Lighting shadows", () => {
     expect(makeLighting("low").sun.castShadow).toBe(false);
   });
 
+  it("setShadowsEnabled(false) stops casting and frees the shadow map; true turns it back on", () => {
+    const { lighting, sun } = makeLighting("high");
+    // Stand-in for the render target WebGLShadowMap creates on the first shadowed render.
+    const map = new THREE.WebGLRenderTarget(4, 4);
+    let disposed = 0;
+    map.addEventListener("dispose", () => disposed++);
+    sun.shadow.map = map;
+
+    lighting.setShadowsEnabled(false);
+    expect(sun.castShadow).toBe(false);
+    expect(disposed).toBe(1);
+    // null makes WebGLShadowMap build a fresh one if shadows come back.
+    expect(sun.shadow.map).toBeNull();
+
+    lighting.setShadowsEnabled(false);
+    expect(disposed).toBe(1);
+
+    lighting.setShadowsEnabled(true);
+    expect(sun.castShadow).toBe(true);
+    expect(sun.shadow.mapSize.x).toBeGreaterThan(0);
+  });
+
+  it("setShadowsEnabled is a no-op on a low world, which never casts", () => {
+    const { lighting, sun } = makeLighting("low");
+    lighting.setShadowsEnabled(true);
+    expect(sun.castShadow).toBe(false);
+  });
+
   it("only ever has one shadow-casting light", () => {
     const { lighting } = makeLighting("high");
     const casters = lighting.root.children.filter((child) => (child as THREE.Light).castShadow === true);

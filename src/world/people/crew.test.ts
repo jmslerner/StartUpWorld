@@ -6,6 +6,7 @@ import { POP_SECONDS } from "./actor";
 import type { Actor } from "./actor";
 import {
   Crew,
+  DOOR_QUEUE_GAP,
   energyFor,
   ENTRY_STAGGER,
   MAX_GROUP_BUBBLES,
@@ -1009,6 +1010,52 @@ describe("Crew: the end of the run", () => {
     expect(closest).toBeGreaterThan(0.4);
     expect(r.crew.departing).toHaveLength(0);
     expect(r.host.alive.size).toBe(2);
+  });
+
+  it("layoffs file out a step apart: nobody walks up to the leaver ahead, or waits behind one fading out at the door", () => {
+    // Rounds of layoffs a moment apart, so a new round gets up while the last one is
+    // still filing out. Every queue decision is checked against the cast as it stands
+    // at that moment, not as it stood at the top of the frame: leavers ahead may have
+    // set off, re-pathed or reached the door earlier in the same frame.
+    const layoffs = [
+      { phase: "office" as const, staff: 16, round: 4, every: 2 },
+      { phase: "public" as const, staff: 32, round: 8, every: 1 },
+    ];
+    let decisions = 0;
+    const wrong: string[] = [];
+    for (const { phase, staff, round, every } of layoffs) {
+      const team = (engineering: number) => ({ engineering, sales: 6, design: 4 });
+      for (let seed = 1; seed <= 4; seed += 1) {
+        const r = office({ phase, team: team(staff) }, { seed });
+        const queueBehind = r.crew.queueBehind.bind(r.crew);
+        r.crew.queueBehind = (actor: Actor): boolean => {
+          const waits = queueBehind(actor);
+          decisions += 1;
+          const ahead = r.crew.departing.find(
+            (other) =>
+              other !== actor &&
+              other.mode === "walking" &&
+              other.visible &&
+              other.distanceLeft < actor.distanceLeft &&
+              Math.hypot(other.x - actor.x, other.z - actor.z) < DOOR_QUEUE_GAP,
+          );
+          if (waits !== (ahead !== undefined)) {
+            wrong.push(`${phase} seed ${seed}: ${actor.id} ${waits ? "waited with nobody walking just ahead" : `walked up to ${ahead?.id ?? "?"}`}`);
+          }
+          return waits;
+        };
+        run(r.crew, 2 + seed);
+        for (let left = staff; left > 0; left -= round) {
+          const out = Array.from({ length: round }, (_, index) => left - round + index);
+          r.apply(company({ phase, team: team(left - round) }), [departed("engineering", ...out)]);
+          run(r.crew, every);
+        }
+        run(r.crew, 40);
+        expect(r.crew.departing, `${phase} seed ${seed}`).toHaveLength(0);
+      }
+    }
+    expect(decisions).toBeGreaterThan(10_000);
+    expect(wrong.slice(0, 5)).toEqual([]);
   });
 
   it("a newcomer waits outside while somebody is walking out, and a leaver waits for a newcomer to get in", () => {

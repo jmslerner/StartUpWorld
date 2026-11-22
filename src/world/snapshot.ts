@@ -15,8 +15,8 @@ import { listCandidates, rosterForWorld } from "../engine/people";
 import type { PersonFacts } from "../engine/people";
 import { listBuilds, productSummary } from "../engine/projects";
 import { hashText32 } from "./hash";
-import { officeLayoutKey } from "./office/layouts";
 import { employeeName } from "./names";
+import { worldPhaseOf } from "./phase";
 import type { BuildView, CandidateView, CruftBand, EnergyBand, MoatBand, PersonView, ProductView, StaffView, WorldSnapshot } from "./types";
 
 /**
@@ -221,17 +221,20 @@ const buildCandidates = (state: GameState): Partial<Record<TeamRole, CandidateVi
   return out;
 };
 
-export const buildWorldSnapshot = (state: GameState): WorldSnapshot => {
+export const buildWorldSnapshot = (saved: GameState): WorldSnapshot => {
+  // A save can carry a phase that is not one of the five (nothing validates it
+  // on load). The world shows such a company in the garage (see ./phase), and
+  // every engine read below sees that phase too, so phase-keyed engine tables
+  // (build slots, …) give garage values rather than undefined.
+  const phase = worldPhaseOf(saved.companyPhase);
+  const state = phase === saved.companyPhase ? saved : { ...saved, companyPhase: phase };
   const { people, hiddenPeople, staff } = buildPeople(state);
 
   const ownedAssets: AssetId[] = state.assets.map((asset) => asset.id);
   const ownedSet = new Set<AssetId>(ownedAssets);
   const availableAssets = ALL_ASSET_IDS.filter(
-    (id) => !ownedSet.has(id) && phaseAtLeast(state.companyPhase, ASSET_CATALOG[id].minPhase)
+    (id) => !ownedSet.has(id) && phaseAtLeast(phase, ASSET_CATALOG[id].minPhase)
   );
-  // M3: the layout this snapshot needs, keyed once here so the World does not
-  // re-derive the layout cache key on every store change.
-  const layoutKey = officeLayoutKey(state.companyPhase, ownedAssets);
 
   return {
     runId: state.seed,
@@ -244,7 +247,7 @@ export const buildWorldSnapshot = (state: GameState): WorldSnapshot => {
     week: state.week,
     ap: state.ap,
     maxAp: getEffectiveMaxAp(state),
-    phase: state.companyPhase,
+    phase,
     stage: state.stage,
 
     cash: state.cash,
@@ -272,7 +275,6 @@ export const buildWorldSnapshot = (state: GameState): WorldSnapshot => {
 
     ownedAssets,
     availableAssets,
-    layoutKey,
 
     pendingEventTitle: state.pendingEvent?.title ?? null,
     gameOver: state.gameOver?.ending ?? null,

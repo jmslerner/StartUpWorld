@@ -32,6 +32,7 @@ import type { AssetId, CompanyPhase, GameState, PricingModel, TeamRole } from ".
 import { stripTypewriterTokens } from "../../ui/terminal/tokens";
 import { ROLE_HIRE_TOKENS, roleBlurb, roleTitle } from "../names";
 import { getOfficeLayout } from "../office/layouts";
+import { COMPANY_PHASES, worldPhaseOf } from "../phase";
 import { buildWorldSnapshot, headcount, isNamedEmployeeId, ROLE_ORDER } from "../snapshot";
 import type { InteractableTarget, PersonView, StationKind } from "../types";
 import { formatCount, formatCountDelta, formatUsd, formatUsdDelta, titleCase } from "./format";
@@ -244,7 +245,9 @@ const checked = (state: GameState, gate: Gate, spec: CheckedSpec): InspectorActi
 // Shared read-outs
 // ─────────────────────────────────────────────────────────────────────────────
 
-const PHASE_ORDER: readonly CompanyPhase[] = ["garage", "coworking", "office", "unicorn", "public"];
+/** The phase after the one the world shows this company in (undefined at the top). */
+const nextPhase = (state: GameState): CompanyPhase | undefined =>
+  COMPANY_PHASES[COMPANY_PHASES.indexOf(worldPhaseOf(state.companyPhase)) + 1];
 
 const outOf100 = (value: number): string => `${Math.round(value)}/100`;
 
@@ -940,7 +943,7 @@ const assetCard = (state: GameState, assetId: AssetId): InspectorCard | null => 
 };
 
 const doorCard = (state: GameState): InspectorCard => {
-  const next = PHASE_ORDER[PHASE_ORDER.indexOf(state.companyPhase) + 1];
+  const next = nextPhase(state);
   return {
     title: "Company roadmap",
     subtitle: "Where this is all going",
@@ -1000,7 +1003,7 @@ const wholeTeamSize = (state: GameState): number =>
 const overflowCard = (state: GameState, readout: WorldReadout): InspectorCard | null => {
   const hidden = readout.hiddenCount ?? overflowHeadcount(state);
   if (hidden <= 0) return null;
-  const next = PHASE_ORDER[PHASE_ORDER.indexOf(state.companyPhase) + 1];
+  const next = nextPhase(state);
   return {
     title: `+${formatCount(hidden)} more ${hidden === 1 ? "person" : "people"}`,
     subtitle: "Office over capacity",

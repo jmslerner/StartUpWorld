@@ -20,6 +20,7 @@
  */
 import { ASSET_CATALOG, phaseAtLeast } from "../../engine/assets";
 import type { AssetId, CompanyPhase } from "../../types/game";
+import { worldPhaseOf } from "../phase";
 import type { OfficeLayout, Placement, StationKind, Vec2 } from "../types";
 import {
   ASSET_IDS,
@@ -687,20 +688,62 @@ const MAX_CACHED_LAYOUTS = 64;
 const layoutCache = new Map<string, OfficeLayout>();
 const frameCache = new WeakMap<OfficeLayout, LayoutFrame>();
 
+/**
+ * The plan for a phase. An unknown phase (a corrupted save) gets the garage,
+ * the same reading the snapshot gives it (see ../phase), so nothing that asks
+ * for a floor plan can throw on it.
+ */
 const planFor = (phase: CompanyPhase): FloorPlan => {
-  let plan = planCache.get(phase);
+  const known = worldPhaseOf(phase);
+  let plan = planCache.get(known);
   if (!plan) {
-    plan = deepFreeze(PLAN_BUILDERS[phase]());
-    planCache.set(phase, plan);
+    plan = deepFreeze(PLAN_BUILDERS[known]());
+    planCache.set(known, plan);
   }
   return plan;
 };
+
+/** What the owned assets change about a plan's layout, and the cache key that captures it. */
+interface LayoutVariant {
+  key: string;
+  /** Assets outside the building that the default shot keeps in view. */
+  framed: AssetId[];
+  /** Owned assets that add hang-out spots. */
+  hangouts: AssetId[];
+}
+
+const layoutVariant = (plan: FloorPlan, ownedAssets: readonly AssetId[]): LayoutVariant => {
+  const ownedSet = new Set<AssetId>(ownedAssets);
+  // Everything parked outside that the player can see: bought, or on sale in
+  // this phase (and therefore drawn as a blueprint).
+  const framed = ASSET_IDS.filter(
+    (id) =>
+      !isInsideFloor(plan, plan.assetAnchors[id]) &&
+      (ownedSet.has(id) || phaseAtLeast(plan.phase, ASSET_CATALOG[id].minPhase))
+  );
+  const hangouts = ASSET_IDS.filter((id) => ownedSet.has(id) && plan.assetWanderSpots[id] !== undefined);
+  // Key on what actually differs between variants, so e.g. buying the
+  // helicopter in a phase that already frames its blueprint is the same layout.
+  return { key: `${plan.phase}|${framed.join(",")}|${hangouts.join(",")}`, framed, hangouts };
+};
+
+/**
+ * The cache key of getOfficeLayout(phase, ownedAssets): equal keys mean the
+ * same layout. Cheap (a few filters over the asset ids), so the World derives
+ * it from each snapshot and only asks for a layout when it changes. An unknown
+ * phase is keyed as the garage it is drawn as.
+ */
+export const officeLayoutKey = (phase: CompanyPhase, ownedAssets: readonly AssetId[] = []): string =>
+  layoutVariant(planFor(phase), ownedAssets).key;
 
 /**
  * The floor plan for a company phase.
  *
  * Pure and memoised: the same phase and the same set of owned assets (in any
- * order) always return the same, deeply frozen object.
+ * order) always return a deeply frozen layout with the same content. The cache
+ * is bounded, so after many other variants have been asked for, an evicted
+ * layout is rebuilt as a new object: compare layouts by content (as
+ * SeatingPlan does), not by identity.
  *
  * What the company owns changes only two things, and never the furniture:
  *   • `camera` — the default shot keeps every asset that is on show outside
@@ -709,49 +752,18 @@ const planFor = (phase: CompanyPhase): FloorPlan => {
  *     once it has actually been bought.
  * Seats, stations, the door and the anchors are shared by reference between
  * all variants of a phase, so seat assignments and routes survive a purchase.
+ *
+ * `knownKey`, when given, must be officeLayoutKey(phase, ownedAssets): a cache
+ * hit on it skips the derivation. A miss derives the key itself and caches the
+ * new layout under that, never under `knownKey`.
  */
-/**
- * The cache key for a (phase, owned assets) pair, computed the same way
- * getOfficeLayout computes it. Exported so the snapshot builder can stamp the
- * key on the snapshot (M3) and the World can go straight to the cache instead
- * of re-deriving the framed/hangout lists on every state change.
- */
-export const officeLayoutKey = (phase: CompanyPhase, ownedAssets: readonly AssetId[] = []): string => {
-  const plan = planFor(phase);
-  const ownedSet = new Set<AssetId>(ownedAssets);
-  const owned = ASSET_IDS.filter((id) => ownedSet.has(id));
-  const framed = ASSET_IDS.filter(
-    (id) =>
-      !isInsideFloor(plan, plan.assetAnchors[id]) &&
-      (ownedSet.has(id) || phaseAtLeast(phase, ASSET_CATALOG[id].minPhase))
-  );
-  const hangouts = owned.filter((id) => plan.assetWanderSpots[id] !== undefined);
-  // Key on what actually differs between variants, so e.g. buying the
-  // helicopter in a phase that already frames its blueprint is the same layout.
-  return `${phase}|${framed.join(",")}|${hangouts.join(",")}`;
-};
-
 export const getOfficeLayout = (phase: CompanyPhase, ownedAssets: readonly AssetId[] = [], knownKey?: string): OfficeLayout => {
-  // M3: a caller carrying the snapshot's precomputed key skips the
-  // framed/hangout derivation entirely on a cache hit.
   if (knownKey !== undefined) {
     const hit = layoutCache.get(knownKey);
     if (hit) return hit;
   }
   const plan = planFor(phase);
-  const ownedSet = new Set<AssetId>(ownedAssets);
-  const owned = ASSET_IDS.filter((id) => ownedSet.has(id));
-
-  // Everything parked outside that the player can see: bought, or on sale in
-  // this phase (and therefore drawn as a blueprint).
-  const framed = ASSET_IDS.filter(
-    (id) =>
-      !isInsideFloor(plan, plan.assetAnchors[id]) &&
-      (ownedSet.has(id) || phaseAtLeast(phase, ASSET_CATALOG[id].minPhase))
-  );
-  const hangouts = owned.filter((id) => plan.assetWanderSpots[id] !== undefined);
-
-  const key = knownKey ?? `${phase}|${framed.join(",")}|${hangouts.join(",")}`;
+  const { key, framed, hangouts } = layoutVariant(plan, ownedAssets);
   const cached = layoutCache.get(key);
   if (cached) return cached;
 
