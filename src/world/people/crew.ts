@@ -79,7 +79,7 @@ const EXODUS_SPREAD = 8;
  * the way out; within DOOR_QUEUE_RANGE of it they also stop for anybody coming in.
  */
 const DOOR_QUEUE_RANGE = 3.5;
-const DOOR_QUEUE_GAP = 0.65;
+export const DOOR_QUEUE_GAP = 0.65;
 /** After the run ends, people who are away get this long to come back. */
 const OUTCOME_SNAP = 1.5;
 /** Nobody wanders while a ship / launch reaction is playing out. */
