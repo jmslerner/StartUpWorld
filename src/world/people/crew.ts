@@ -249,6 +249,17 @@ export class Crew implements ActorStage {
   private readonly order: Actor[] = [];
   /** People on their way out. They are no longer in `actors`, so their id can be re-used by a new hire. */
   private readonly leavers: Actor[] = [];
+  /**
+   * Door-queue facts for the current tick, computed once in update() before any
+   * actor moves (L2): holdArrival / holdExit / queueBehind used to rescan the
+   * cast for every actor that asked, which is O(cast) per actor and O(cast^2)
+   * when everybody leaves at once. The answers below are exactly the scans'
+   * results, frozen at the start of the tick.
+   */
+  private tickAnyExiting = false;
+  private tickAnyArriving = false;
+  /** Walking, visible leavers this tick, nearest the way out first. */
+  private readonly tickLeaverQueue: Actor[] = [];
   private readonly cues: Cue[] = [];
   private readonly seen = new Set<string>();
   /** Scratch list for picking people. */
@@ -897,6 +908,7 @@ export class Crew implements ActorStage {
   update(dt: number): void {
     this.time += dt;
     if (this.cues.length > 0) this.fireCues();
+    this.prepareDoorQueue();
 
     for (let i = 0; i < this.order.length; i += 1) {
       const actor = this.order[i];
@@ -935,24 +947,54 @@ export class Crew implements ActorStage {
   /** Newcomers wait outside while anybody is on their way out, so the two never meet in the doorway. */
   holdArrival(actor: Actor): boolean {
     void actor;
-    for (const leaver of this.leavers) if (leaver.exiting) return true;
-    return false;
+    return this.tickAnyExiting;
   }
 
   /** Leavers give way to newcomers already on their way in: they stay at their desk, or stop short of the door. */
   holdExit(actor: Actor): boolean {
     if (actor.mode === "walking" && actor.distanceLeft >= DOOR_QUEUE_RANGE) return false;
-    for (const other of this.order) if (other.arriving) return true;
-    return false;
+    return this.tickAnyArriving;
   }
 
   /** Leavers file out in single file, a step behind whoever is nearer the way out. */
   queueBehind(actor: Actor): boolean {
     const left = actor.distanceLeft;
-    for (const other of this.leavers) {
-      if (other === actor || other.mode !== "walking" || !other.visible) continue;
-      if (other.distanceLeft < left && Math.hypot(other.x - actor.x, other.z - actor.z) < DOOR_QUEUE_GAP) return true;
+    // The queue is sorted nearest-the-exit first, so the first leaver ahead of
+    // this actor that is also within the gap settles it; anyone further along
+    // the queue is no nearer the way out than that one.
+    for (const other of this.tickLeaverQueue) {
+      if (other === actor || other.gone) continue;
+      if (other.distanceLeft >= left) break;
+      if (Math.hypot(other.x - actor.x, other.z - actor.z) < DOOR_QUEUE_GAP) return true;
     }
     return false;
+  }
+
+  /**
+   * Freeze this tick's door-queue facts. Called once at the top of update(),
+   * before any actor moves, so every actor asking during the tick sees the
+   * same cast state the old per-actor scans would have seen at tick start.
+   */
+  private prepareDoorQueue(): void {
+    this.tickAnyExiting = false;
+    for (const leaver of this.leavers) {
+      if (leaver.exiting) {
+        this.tickAnyExiting = true;
+        break;
+      }
+    }
+    this.tickAnyArriving = false;
+    for (const other of this.order) {
+      if (other.arriving) {
+        this.tickAnyArriving = true;
+        break;
+      }
+    }
+    const queue = this.tickLeaverQueue;
+    queue.length = 0;
+    for (const leaver of this.leavers) {
+      if (leaver.mode === "walking" && leaver.visible) queue.push(leaver);
+    }
+    queue.sort((a, b) => a.distanceLeft - b.distanceLeft);
   }
 }
