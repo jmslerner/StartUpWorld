@@ -259,6 +259,9 @@ export class OfficeStage implements Registrar {
 
   dispose(): void {
     this.unregisterAll();
+    // M1: free the merged shell geometry (the kit's prop disposal below does
+    // not own it — the merge created it).
+    this.shell.merged?.dispose();
     this.kit.dispose();
     this.beacon = null;
     this.alarm = null;
