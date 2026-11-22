@@ -247,6 +247,16 @@ export class Lighting implements WorldSystem {
     this.apply(1);
   }
 
+  /**
+   * Adaptive quality (M2): turn the sun's shadow casting off under sustained
+   * frame pressure. Only meaningful on "high" (a "low" world never casts);
+   * the World never turns it back on mid-session.
+   */
+  setShadowsEnabled(enabled: boolean): void {
+    if (!this.castShadows) return;
+    this.sun.castShadow = enabled;
+  }
+
   /** The shadow frustum (and the sun's orbit) is fitted around this floor area. */
   setBounds(bounds: GroundBounds): void {
     const width = bounds.maxX - bounds.minX + SHADOW_MARGIN * 2;
