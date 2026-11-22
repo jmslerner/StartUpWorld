@@ -9,6 +9,7 @@
 //   no-retain / retain-lead / retain-all               skilled with a different retention rule
 //   no-recruit   skilled with job-ad hires only         recruit-only  climber that also recruits, no builds
 //   climber-ent / skilled-ent                          pivot to enterprise pricing in week 2
+//   climber-con / skilled-con                          pivot to consumer pricing in week 2
 //   late-staff   skilled, but parks idle people on the other build before a kickoff (so the new build is kicked off
 //                with as few available people as possible, for a long due window) and staffs it right after (T7)
 //   lead-dodge   no-retain, but a lead holding notice is `staff off`'d the week before they leave (T7)
@@ -26,23 +27,27 @@ import { BUILD_SIZES, BUILD_TYPES } from "../../src/engine/tycoon/constants";
 import { craftScore, leadOf, roleFit, rosterInvariantHolds, rosterOf, skillFactorOf, staffOf, standardSalary } from "../../src/engine/tycoon/roster";
 import { completeness, etaWeeks, isBuilt, sizeUnlocked, typeUnlocked } from "../../src/engine/projects/work";
 import { retainBonus } from "../../src/engine/people/rules";
-import type { BuildSize, BuildType, GameState, Stage, TeamRole } from "../../src/types/game";
+import type { BuildSize, BuildType, GameState, PricingModel, Stage, TeamRole } from "../../src/types/game";
 
 export type BotKind =
   | "stock" | "climber" | "skilled" | "naive" | "crunch" | "rush" | "small" | "polish0" | "no-retain" | "retain-lead"
-  | "retain-all" | "no-recruit" | "recruit-only" | "climber-ent" | "skilled-ent" | "late-staff" | "lead-dodge" | "late-staff-cap"
+  | "retain-all" | "no-recruit" | "recruit-only" | "climber-ent" | "skilled-ent" | "climber-con" | "skilled-con" | "late-staff" | "lead-dodge" | "late-staff-cap"
   | "naive-ship60";
 
 export const ALL_BOTS: BotKind[] = [
   "climber", "skilled", "naive", "crunch", "rush", "small", "polish0", "no-retain", "retain-lead", "retain-all",
-  "no-recruit", "recruit-only", "climber-ent", "skilled-ent", "late-staff", "lead-dodge", "late-staff-cap", "naive-ship60",
+  "no-recruit", "recruit-only", "climber-ent", "skilled-ent", "climber-con", "skilled-con", "late-staff", "lead-dodge", "late-staff-cap",
+  "naive-ship60",
 ];
 const BUILDERS: BotKind[] = [
-  "retain-all", "retain-lead", "skilled", "naive", "crunch", "rush", "small", "no-retain", "no-recruit", "skilled-ent", "polish0",
+  "retain-all", "retain-lead", "skilled", "naive", "crunch", "rush", "small", "no-retain", "no-recruit", "skilled-ent", "skilled-con", "polish0",
   "late-staff", "lead-dodge", "late-staff-cap", "naive-ship60",
 ];
 /** Bots that play builds like `naive` (random bet, auto-staff, no recruit / retain / crunch). */
 const isNaive = (kind: BotKind): boolean => kind === "naive" || kind === "naive-ship60";
+/** The pricing model a bot pivots to in week 2 (null: stays on the default prosumer). */
+const pivotOf = (kind: BotKind): PricingModel | null =>
+  kind === "climber-ent" || kind === "skilled-ent" ? "enterprise" : kind === "climber-con" || kind === "skilled-con" ? "consumer" : null;
 const stageSoftCap: Record<Stage, number> = { garage: 250_000, seed: 2_500_000, "series-a": 12_000_000, growth: 60_000_000 };
 
 // ── Command plumbing: every typed command goes through `cmd`; dry runs (event look-ahead) through `probe` ──
@@ -377,7 +382,8 @@ export const playWeek = (state: GameState, kind: BotKind, tally: Tally, r: () =>
   let s = state;
   const stock = kind === "stock";
   if (s.pendingEvent) { s = resolveEvent(s, stock); if (s.gameOver) return s; }
-  if ((kind === "climber-ent" || kind === "skilled-ent") && s.week === 2 && s.pricingModel !== "enterprise") s = cmd(s, "pricing enterprise");
+  const pivot = pivotOf(kind);
+  if (pivot && s.week === 2 && s.pricingModel !== pivot) s = cmd(s, `pricing ${pivot}`);
   if (BUILDERS.includes(kind)) s = productPhase(s, kind, tally, r);
   let guard = 0;
   while (s.ap > 0 && !s.gameOver && guard < 10) {
