@@ -1,7 +1,8 @@
 /** Split from src/world/types.ts (M5): system plumbing: quality, signals, the world context and the sound listener. Re-exported by ../types. */
 
 import type * as THREE from "three";
-import type { WorldEvent, WorldSnapshot } from "./snapshot";
+import type { WorldEvent } from "./events";
+import type { WorldSnapshot } from "./snapshot";
 import type { OfficeLayout } from "./office";
 import type { SeatingApi } from "./seating";
 import type { InteractableRegistry } from "./interaction";

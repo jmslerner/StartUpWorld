@@ -1,7 +1,8 @@
 /** Split from src/world/types.ts (M5): the React-facing WorldHandle and its callbacks. Re-exported by ../types. */
 
 import type { InteractableTarget } from "./interaction";
-import type { WorldEvent, WorldSnapshot } from "./snapshot";
+import type { WorldEvent } from "./events";
+import type { WorldSnapshot } from "./snapshot";
 
 /** CSS pixels relative to the canvas's top-left corner. */
 export interface ScreenPoint {
