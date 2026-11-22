@@ -22,6 +22,7 @@ import type {
   WorldSoundListener,
   WorldSoundSink,
 } from "../types";
+import { detectQuality, prefersReducedMotion } from "../ui/environment";
 import { CameraRig } from "./CameraRig";
 import { layoutBounds } from "./layoutBounds";
 import { clamp } from "./math";
@@ -60,6 +61,18 @@ const FRAME_FILL = 0.85;
 const FOCUS_PADDING_PX = 16;
 /** Spec §5: device-pixel-ratio caps per quality level. */
 const MAX_PIXEL_RATIO: Record<QualityLevel, number> = { high: 2, low: 1.5 };
+/**
+ * M2 adaptive quality: the pixel-ratio ladder a world walks down, one rung at
+ * a time, while frames stay slow. The first rung is the quality's MAX_PIXEL_RATIO
+ * cap and the last is the floor — a world never goes below 1, and a "low" world
+ * starts on its own ladder, so it can only ever reach 1 (it has no shadows to
+ * shed). Steps never go back up mid-session.
+ */
+const PIXEL_RATIO_STEPS: Record<QualityLevel, readonly number[]> = { high: [2, 1.5, 1], low: [1.5, 1] };
+/** Sustained average frame time above this (seconds) triggers a step down. */
+const ADAPTIVE_FRAME_BUDGET = 0.02;
+/** Minimum seconds between adaptive steps, so one hitch cannot cascade. */
+const ADAPTIVE_COOLDOWN_SECONDS = 4;
 const CONTEXT_RELEASE_DELAY_MS = 300;
 const NO_EVENTS: readonly WorldEvent[] = [];
 /**
@@ -125,17 +138,6 @@ const releaseContextWhenOrphaned = (canvas: HTMLCanvasElement, gl: WebGL2Renderi
   pendingContextRelease.set(canvas, timer);
 };
 
-/** Spec §5: touch-first devices and small screens get the cheaper path. */
-const detectQuality = (): QualityLevel => {
-  const coarse = window.matchMedia?.("(pointer: coarse)").matches ?? false;
-  // The device's screen, not the window: a laptop user with a short browser
-  // window still has a laptop's GPU.
-  const small = Math.min(window.screen.width, window.screen.height) < 520;
-  return coarse || small ? "low" : "high";
-};
-
-const prefersReducedMotion = (): boolean => window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
-
 /** Free the GPU resources of an object tree that nobody else is going to clean up. */
 const disposeTree = (root: THREE.Object3D): void => {
   root.traverse((node) => {
@@ -175,10 +177,15 @@ class World {
    */
   private readonly seatingPlan = new SeatingPlan();
   private layout: OfficeLayout = getOfficeLayout("garage", []);
+  /** The layoutKey of the snapshot whose layout is currently applied (M3). */
+  private appliedLayoutKey: string | null = null;
   private previous: WorldSnapshot | null = null;
   /** The building frame the camera was last pointed at. */
   private shot: LayoutFrame | null = null;
   private readonly focusCentre = new THREE.Vector3();
+  /** Scratch for focus(): the rect and the projected centre are read immediately, so they never need to allocate (L6). */
+  private readonly focusRect: ScreenRect = { left: 0, top: 0, right: 0, bottom: 0 };
+  private readonly focusScreen: ScreenPoint = { x: 0, y: 0 };
   private readonly soundPoint = new THREE.Vector3();
   /** The app's optional sound listener (WorldOptions.sound). */
   private readonly sound: WorldSoundListener | null;
@@ -195,11 +202,20 @@ class World {
   private lastFrameTime = 0;
   private skipNextDelta = true;
   private elapsed = 0;
+  /** M2: the pixel-ratio cap currently in force; starts at the quality cap and only ever steps down. */
+  private pixelRatioCap = 2;
+  /** M2: exponential moving average of (clamped) frame time; 0 = no samples yet. */
+  private frameTimeAverage = 0;
+  /** M2: `elapsed` at the last adaptive step; −Infinity before the first. */
+  private lastAdaptiveStepAt = Number.NEGATIVE_INFINITY;
+  /** M2: the final adaptive step (shadows off) has been taken. */
+  private adaptiveShadowsOff = false;
 
   constructor(canvas: HTMLCanvasElement, callbacks: WorldCallbacks, options: WorldOptions) {
     this.canvas = canvas;
     this.callbacks = callbacks;
     this.quality = options.quality ?? detectQuality();
+    this.pixelRatioCap = MAX_PIXEL_RATIO[this.quality];
     this.sound = options.sound ?? null;
     const reducedMotion = options.reducedMotion ?? prefersReducedMotion();
 
@@ -299,9 +315,16 @@ class World {
     }
 
     // If the floor plan cannot be produced the world keeps the one it has.
-    this.runner.run("layout", () => {
-      this.layout = getOfficeLayout(next.phase, next.ownedAssets);
-    });
+    // M3: the snapshot carries the layout key computed when it was built; the
+    // layout is a pure function of (phase, ownedAssets), so an unchanged key
+    // means the layout in hand is already the right one.
+    const layoutKey = next.layoutKey ?? null;
+    if (layoutKey === null || layoutKey !== this.appliedLayoutKey) {
+      const applied = this.runner.run("layout", () => {
+        this.layout = getOfficeLayout(next.phase, next.ownedAssets, next.layoutKey);
+      });
+      if (applied) this.appliedLayoutKey = layoutKey;
+    }
     const layout = this.layout;
     // Until setup is finished the company is just the founder: the engine's starting
     // engineer only "arrives" (with the cofounder) once the run actually begins.
@@ -334,7 +357,7 @@ class World {
   private focus(target: InteractableTarget, options: WorldFocusOptions = {}): void {
     if (this.disposed) return;
     const centre = this.focusCentre;
-    const rect = this.interaction.screenBounds(target, centre);
+    const rect = this.interaction.screenBounds(target, centre, this.focusRect);
     if (!rect) return;
     const { width, height } = this.rig.viewport;
     const visibleBottom = height - clamp(options.avoidBottomPx ?? 0, 0, height * 0.8);
@@ -348,7 +371,7 @@ class World {
     const wantY =
       rectHeight > visibleBottom - visibleTop - 2 * pad ? visibleTop + pad + rectHeight / 2 : (visibleTop + visibleBottom) / 2;
     // Projection is affine, so moving the box's centre by an offset moves its world centre by the same offset.
-    const drawn = this.rig.project(centre);
+    const drawn = this.rig.project(centre, this.focusScreen);
     const at = {
       x: drawn.x + (width / 2 - (rect.left + rect.right) / 2),
       y: drawn.y + (wantY - (rect.top + rect.bottom) / 2),
@@ -399,6 +422,14 @@ class World {
     this.runner.stop();
     this.interaction.dispose();
     // Whatever a system left in the scene still owns GPU memory; take it back.
+    // NOTE (L5): disposeTree() disposes the materials on stage, and the loop
+    // after it disposes the collected set a second time, as does
+    // disposeSharedResources() for cached materials below. That redundancy is
+    // deliberate and safe — Material.dispose() is idempotent (it only emits
+    // the dispose event; three.js drops the GL program on the next render) —
+    // and it guarantees the renderer links noted above are cut even for a
+    // material that left the stage before teardown. Do not "deduplicate" it
+    // without re-proving that every path still cuts those links.
     for (const child of [...this.scene.children]) {
       this.scene.remove(child);
       disposeTree(child);
@@ -517,7 +548,7 @@ class World {
   private applySize(width: number, height: number): void {
     const w = Math.max(1, Math.floor(width));
     const h = Math.max(1, Math.floor(height));
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, MAX_PIXEL_RATIO[this.quality]));
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, this.pixelRatioCap));
     // false: the shell sizes the canvas element with CSS; we only size its backing store.
     this.renderer.setSize(w, h, false);
     this.rig.setViewport(w, h);
@@ -567,6 +598,7 @@ class World {
     else dt = Math.min(Math.max((now - this.lastFrameTime) / 1000, 0), MAX_FRAME_SECONDS);
     this.lastFrameTime = now;
     this.elapsed += dt;
+    this.trackFrameTime(dt);
 
     this.runner.update(dt, this.elapsed);
     this.reportDusk();
@@ -581,6 +613,39 @@ class World {
     // A listener called above may have disposed or paused the world.
     if (this.running) this.render();
   };
+
+  /**
+   * M2: feed one frame time into the adaptive-quality average and, when the
+   * average stays over budget past the cooldown, take one step down the
+   * ladder (pixel ratio first, then shadows). The average resets after a
+   * step, so each rung must earn its own sustained slowness.
+   */
+  private trackFrameTime(dt: number): void {
+    if (dt <= 0) return;
+    this.frameTimeAverage = this.frameTimeAverage === 0 ? dt : this.frameTimeAverage + (dt - this.frameTimeAverage) * 0.04;
+    if (this.frameTimeAverage <= ADAPTIVE_FRAME_BUDGET) return;
+    if (this.elapsed - this.lastAdaptiveStepAt < ADAPTIVE_COOLDOWN_SECONDS) return;
+    if (!this.applyAdaptiveStep()) return;
+    this.lastAdaptiveStepAt = this.elapsed;
+    this.frameTimeAverage = 0;
+  }
+
+  /** One step down the ladder. Returns false when there is nothing left to shed. */
+  private applyAdaptiveStep(): boolean {
+    const steps = PIXEL_RATIO_STEPS[this.quality];
+    const floor = steps[steps.length - 1];
+    if (this.pixelRatioCap > floor) {
+      this.pixelRatioCap = steps.find((cap) => cap < this.pixelRatioCap) ?? floor;
+      this.applySize(this.rig.viewport.width, this.rig.viewport.height);
+      return true;
+    }
+    if (this.quality === "high" && !this.adaptiveShadowsOff) {
+      this.adaptiveShadowsOff = true;
+      this.lighting.setShadowsEnabled(false);
+      return true;
+    }
+    return false;
+  }
 
   private render(): void {
     try {
