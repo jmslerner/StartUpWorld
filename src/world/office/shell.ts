@@ -22,6 +22,8 @@ import {
   WALL_THICKNESS,
 } from "./props";
 import type { DoorHandle, PropHandle, WallStyle } from "./props";
+import { mergeStaticChildren } from "./mergeStatic";
+import type { MergedStatic } from "./mergeStatic";
 import type { StageKit } from "./StageKit";
 
 /** A stretch of wall, as [from, to] along it (x for the −Z wall, z for the −X wall). */
@@ -143,6 +145,12 @@ export interface Shell {
   door: DoorHandle | null;
   /** Height of the top of the door, for the inspector anchor. */
   doorHeight: number;
+  /**
+   * M1: the shell's static geometry merged into a handful of meshes. The
+   * caller disposes it with the stage (its geometries are the only ones the
+   * merge creates; the original props keep owning theirs).
+   */
+  merged: MergedStatic | null;
 }
 
 /** The point where the doorway crosses the edge of the floor (layout.door is a step inside it). */
@@ -277,9 +285,14 @@ export const buildShell = (kit: StageKit): Shell => {
     // (and so to the camera): the room side of anything on an open edge is the side nobody sees.
     plate.group.position.set(0, 1.98, -0.02);
     plate.group.rotation.y = Math.PI;
-    return { doorObject: rollUp.group, door: null, doorHeight: 2.5 };
+    // M1: everything in the structure except the (registered) roll-up door is
+    // static — merge it into one mesh per material.
+    const merged = mergeStaticChildren(kit.structure, new Set([rollUp.group]));
+    return { doorObject: rollUp.group, door: null, doorHeight: 2.5, merged };
   }
 
   const door = kit.build(createDoor(phase), { x: edge.x, z: edge.z, facing: layout.door.facing });
-  return { doorObject: door.group, door, doorHeight: 2.4 };
+  // M1: same merge, keeping the swinging framed door (and its roadmap plate).
+  const merged = mergeStaticChildren(kit.structure, new Set([door.group]));
+  return { doorObject: door.group, door, doorHeight: 2.4, merged };
 };

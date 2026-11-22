@@ -314,6 +314,11 @@ const compileProfiles = (): CompiledProfile[] =>
     return { ...profile, linearColors };
   });
 
+/** Shape name → index into PARTICLE_SHAPES, resolved once at module load (the renderer used to redo this lookup per live particle per frame). */
+export const PARTICLE_SHAPE_INDEX: ReadonlyMap<ParticleShape, number> = new Map(
+  PARTICLE_SHAPES.map((shape, index) => [shape, index] as const)
+);
+
 /**
  * A fixed-capacity ring of particles. Spawning never allocates: when the ring
  * is full the next spawn simply overwrites the oldest particle, so a huge burst
@@ -324,6 +329,8 @@ export class ParticlePool {
 
   readonly state: Uint8Array;
   readonly kind: Uint8Array;
+  /** PARTICLE_SHAPES index per slot, fixed at spawn (mirrors `kind`); the renderer reads it instead of searching by shape name every frame. */
+  readonly shapeIndex: Uint8Array;
   readonly grounded: Uint8Array;
   readonly px: Float32Array;
   readonly py: Float32Array;
@@ -383,6 +390,7 @@ export class ParticlePool {
     const floats = (): Float32Array => new Float32Array(n);
     this.state = new Uint8Array(n);
     this.kind = new Uint8Array(n);
+    this.shapeIndex = new Uint8Array(n);
     this.grounded = new Uint8Array(n);
     this.px = floats();
     this.py = floats();
@@ -423,6 +431,11 @@ export class ParticlePool {
 
   profileOf(index: number): KindProfile {
     return this.profiles[this.kind[index]];
+  }
+
+  /** PARTICLE_SHAPES index for a slot, fixed when the particle was spawned. */
+  shapeIndexOf(index: number): number {
+    return this.shapeIndex[index];
   }
 
   clear(): void {
@@ -555,6 +568,7 @@ export class ParticlePool {
     const random = this.random;
 
     this.kind[i] = kindId;
+    this.shapeIndex[i] = PARTICLE_SHAPE_INDEX.get(profile.shape) ?? 0;
     this.grounded[i] = 0;
     this.life[i] = lerp(profile.life[0], profile.life[1], random());
     this.size[i] = lerp(profile.size[0], profile.size[1], random());

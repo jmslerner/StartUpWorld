@@ -15,6 +15,7 @@ import { listCandidates, rosterForWorld } from "../engine/people";
 import type { PersonFacts } from "../engine/people";
 import { listBuilds, productSummary } from "../engine/projects";
 import { hashText32 } from "./hash";
+import { officeLayoutKey } from "./office/layouts";
 import { employeeName } from "./names";
 import type { BuildView, CandidateView, CruftBand, EnergyBand, MoatBand, PersonView, ProductView, StaffView, WorldSnapshot } from "./types";
 
@@ -126,9 +127,16 @@ const buildPeople = (state: GameState): { people: PersonView[]; hiddenPeople: nu
   const named = rosterForWorld(state, MAX_WORLD_PEOPLE - people.length);
   const staff: StaffView[] = [];
   let hiddenPeople = named.hidden;
+  // Group the named staff by role in one pass, then emit in canonical role
+  // order (this used to re-scan the whole roster once per role).
+  const namedByRole = new Map<TeamRole, PersonFacts[]>();
+  for (const facts of named.people) {
+    const bucket = namedByRole.get(facts.role);
+    if (bucket) bucket.push(facts);
+    else namedByRole.set(facts.role, [facts]);
+  }
   for (const role of ROLE_ORDER) {
-    for (const facts of named.people) {
-      if (facts.role !== role) continue;
+    for (const facts of namedByRole.get(role) ?? []) {
       people.push({ id: facts.id, kind: "employee", role, name: facts.name, look: hashText32(seed, facts.id) });
       staff.push(staffViewOf(facts));
     }
@@ -217,9 +225,13 @@ export const buildWorldSnapshot = (state: GameState): WorldSnapshot => {
   const { people, hiddenPeople, staff } = buildPeople(state);
 
   const ownedAssets: AssetId[] = state.assets.map((asset) => asset.id);
+  const ownedSet = new Set<AssetId>(ownedAssets);
   const availableAssets = ALL_ASSET_IDS.filter(
-    (id) => !ownedAssets.includes(id) && phaseAtLeast(state.companyPhase, ASSET_CATALOG[id].minPhase)
+    (id) => !ownedSet.has(id) && phaseAtLeast(state.companyPhase, ASSET_CATALOG[id].minPhase)
   );
+  // M3: the layout this snapshot needs, keyed once here so the World does not
+  // re-derive the layout cache key on every store change.
+  const layoutKey = officeLayoutKey(state.companyPhase, ownedAssets);
 
   return {
     runId: state.seed,
@@ -260,6 +272,7 @@ export const buildWorldSnapshot = (state: GameState): WorldSnapshot => {
 
     ownedAssets,
     availableAssets,
+    layoutKey,
 
     pendingEventTitle: state.pendingEvent?.title ?? null,
     gameOver: state.gameOver?.ending ?? null,

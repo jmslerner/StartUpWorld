@@ -117,9 +117,17 @@ const mountWorld = (canvas: HTMLCanvasElement, viewport: HTMLElement, stage: Sta
   let previous: WorldSnapshot | null = null;
   // Whatever ran before this world existed is history, not something to animate.
   let lastSeq = useGameStore.getState().lastAction?.seq ?? 0;
+  // M3: the last GameState a snapshot was built from, and that snapshot. Store
+  // updates carrying the same state reference (action-only notifications)
+  // reuse it instead of rebuilding the whole projection; deriveWorldEvents
+  // has a matching same-reference fast path, so behavior is unchanged.
+  let builtForState: GameState | null = null;
+  let builtSnapshot: WorldSnapshot | null = null;
 
   const push = (state: GameState, action: ActionSignal | null): void => {
-    const next = buildWorldSnapshot(state);
+    const next = state === builtForState && builtSnapshot ? builtSnapshot : buildWorldSnapshot(state);
+    builtForState = state;
+    builtSnapshot = next;
     // Each action is handed over once; a later, unrelated store update must not replay it.
     const fresh = action !== null && action.seq !== lastSeq ? action : null;
     if (action !== null) lastSeq = action.seq;
