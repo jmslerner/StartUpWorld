@@ -298,6 +298,15 @@ export const deriveWorldEvents = (
 ): WorldEvent[] => {
   if (prev === null) return [];
 
+  // M3 fast path: the very same snapshot object (the view layer memoizes
+  // snapshot building on the game-state reference) — every diff below is
+  // empty by construction, so only the action outcome can produce an event.
+  // This is exactly what the full diff would return for prev === next.
+  if (prev === next) {
+    const outcome = actionOutcome(prev, next, action);
+    return outcome ? [outcome] : [];
+  }
+
   // A different run, or time running backwards, means `prev` describes another
   // world. Diffing against it would produce nonsense (mass "departures", …).
   if (next.runId !== prev.runId || next.week < prev.week) return [{ type: "run-reset" }];
