@@ -65,6 +65,31 @@ function steady(hz: number, seed = 1): (index: number) => Frame {
   return () => ({ interval: vsync + (random() - 0.5), work: 1 + random() });
 }
 
+/**
+ * Light work on a display at `hz` whose timestamps carry independent jitter of
+ * ±`jitter` ms (Firefox and Safari fuzz them), optionally floored to whole ms.
+ * Every `dropEvery`-th frame (if set) takes one extra vsync.
+ */
+function jitteredTimestamps(hz: number, jitter: number, quantise: boolean, seed: number, dropEvery = 0): () => Frame {
+  const random = rng(seed);
+  const vsync = 1000 / hz;
+  const stamp = (k: number) => {
+    const t = k * vsync + (random() * 2 - 1) * jitter;
+    return quantise ? Math.floor(t) : t;
+  };
+  let k = 0;
+  let index = 0;
+  let previous = stamp(0);
+  return () => {
+    index++;
+    k += dropEvery > 0 && index % dropEvery === 0 ? 2 : 1;
+    const next = stamp(k);
+    const interval = next - previous;
+    previous = next;
+    return { interval, work: 1.5 };
+  };
+}
+
 /** The first frames after mount: a blocking first draw and a few shader compiles. */
 function withMountHitches(base: (index: number) => Frame): (index: number) => Frame {
   const hitches = [400, 250, 120, 90, 60];
@@ -116,6 +141,35 @@ describe("AdaptiveQualityGovernor: light work never steps", () => {
     expect(sim.steps).toEqual([]);
   });
 
+  for (const { jitter, quantise } of [
+    { jitter: 1, quantise: false },
+    { jitter: 0.5, quantise: true },
+    { jitter: 1, quantise: true },
+  ]) {
+    it(`at 240 Hz with ±${jitter} ms timestamp jitter${quantise ? ", rounded to 1 ms" : ""}`, () => {
+      for (let seed = 1; seed <= 5; seed++) {
+        const sim = new Sim().run(60_000, jitteredTimestamps(240, jitter, quantise, seed));
+        expect(sim.steps).toEqual([]);
+      }
+    });
+  }
+
+  it("at 165 Hz with ±1 ms timestamp jitter rounded to 1 ms", () => {
+    for (let seed = 1; seed <= 5; seed++) {
+      const sim = new Sim().run(60_000, jitteredTimestamps(165, 1, true, seed));
+      expect(sim.steps).toEqual([]);
+    }
+  });
+
+  it("through two near-second stalls in an otherwise steady 60 Hz window", () => {
+    const base = steady(60, 11);
+    const sim = new Sim().run(30_000, (index, time) => {
+      const inStall = (time > 6_000 && time < 6_020) || (time > 6_900 && time < 6_920);
+      return inStall ? { interval: 950, work: 900 } : base(index);
+    });
+    expect(sim.steps).toEqual([]);
+  });
+
   it("with the occasional GC pause or long task at 60 Hz", () => {
     const random = rng(99);
     const sim = new Sim().run(60_000, () => {
@@ -155,6 +209,24 @@ describe("AdaptiveQualityGovernor: sustained real overload steps down", () => {
 
   it("below 10 fps, where every frame is a clamped outlier", () => {
     const sim = new Sim().run(30_000, () => ({ interval: 150, work: 5 }));
+    expect(sim.stepNames()).toEqual(["pixel-ratio", "pixel-ratio", "shadows"]);
+  });
+
+  for (const interval of [250, 400, 900]) {
+    it(`below 5 fps (${interval} ms frames), where a 2 s window holds fewer than 10 frames`, () => {
+      const sim = new Sim().run(120_000, () => ({ interval, work: 5 }));
+      expect(sim.stepNames()).toEqual(["pixel-ratio", "pixel-ratio", "shadows"]);
+    });
+  }
+
+  it("below 5 fps on a low world: down to the floor, then nothing", () => {
+    const sim = new Sim({ steps: LOW, shadows: false, dpr: 2 }).run(120_000, () => ({ interval: 400, work: 5 }));
+    expect(sim.stepNames()).toEqual(["pixel-ratio"]);
+    expect(sim.governor.pixelRatioCap).toBe(1);
+  });
+
+  it("GPU-bound on a 240 Hz screen with jittered, rounded timestamps: every third frame drops one vsync", () => {
+    const sim = new Sim().run(30_000, jitteredTimestamps(240, 0.5, true, 3, 3));
     expect(sim.stepNames()).toEqual(["pixel-ratio", "pixel-ratio", "shadows"]);
   });
 

@@ -13,14 +13,21 @@
  *   (or browser cap) rate, not render cost, so it is never compared with a
  *   fixed budget. Instead each window calibrates the display interval as a
  *   low percentile of its own intervals, and a frame "misses" when its
- *   interval is over MISS_FACTOR times that. A sizeable share of misses means
- *   the GPU or compositor is dropping frames.
+ *   interval is over MISS_FACTOR times that (and at least MIN_MISS_SLACK_MS
+ *   longer, so timestamp jitter on very fast displays is not read as missed
+ *   frames). A sizeable share of misses means the GPU or compositor is
+ *   dropping frames.
  *
  * Known limitation: a perfectly uniform slow cadence (every frame exactly two
  * vsyncs) looks the same as a display running at that rate, so a GPU-bound
  * world pinned at a steady 30 fps on a 60 Hz screen is treated as fine. The
  * calibrated interval is capped at MAX_DISPLAY_INTERVAL_MS (no real display or
- * browser cap runs below 30 Hz), so steady cadences slower than that do count.
+ * browser cap runs below 30 Hz), so a steady cadence counts as missing only
+ * once it is slower than that cap times MISS_FACTOR (about 52 ms, under
+ * 19 fps); a uniform 20-29 fps GPU-bound cadence is also treated as fine.
+ * Below 10 fps most frames are clamped outliers, which counts as overload on
+ * its own. Below 1 fps every interval looks like a gap (see GAP_MS), so such
+ * a world is never judged.
  *
  * Steps last for the rest of the session (there is no stepping back up), but
  * they now follow only sustained real overload: samples are ignored for a
@@ -48,7 +55,12 @@ export interface AdaptiveQualityOptions {
 export const WARM_UP_MS = 2000;
 /** Length (ms) of one judging window. */
 export const WINDOW_MS = 2000;
-/** A window needs at least this many frames to be judged at all. */
+/**
+ * A window stays open until it has lasted WINDOW_MS and holds at least this
+ * many frames, so a world below 5 fps is still judged, on a longer window
+ * (dropping such a window instead would leave the slowest devices at full
+ * quality for good).
+ */
 export const MIN_WINDOW_FRAMES = 10;
 /** Window ring-buffer capacity: 2 s at 240 Hz fits; a fuller window is judged early. */
 const WINDOW_CAPACITY = 512;
@@ -62,6 +74,14 @@ const DISPLAY_PERCENTILE = 0.1;
 export const MAX_DISPLAY_INTERVAL_MS = (1000 / 30) * 1.05;
 /** A frame misses vsync when its interval exceeds this multiple of the display interval. */
 export const MISS_FACTOR = 1.5;
+/**
+ * ...and exceeds it by at least this many ms. On 165 Hz and slower displays
+ * MISS_FACTOR alone decides; on 240 Hz, where 1.5x leaves only ~2 ms of
+ * headroom and jittered or 1 ms-rounded timestamps (Firefox, Safari) pull the
+ * low-percentile calibration down, this keeps ordinary frames from counting
+ * as misses. A dropped frame there (one extra vsync, ~8.3 ms) still counts.
+ */
+export const MIN_MISS_SLACK_MS = 3;
 /** Missed vsync on at least this share of a window's frames is GPU/compositor overload. */
 export const MISS_SHARE = 0.25;
 /**
@@ -145,8 +165,9 @@ export class AdaptiveQualityGovernor {
       this.intervals[this.intervalCount++] = intervalMs;
     }
 
-    if (t - this.windowStart < WINDOW_MS && this.frames < WINDOW_CAPACITY) return "none";
-    const overloaded = this.frames >= MIN_WINDOW_FRAMES && this.judgeWindow();
+    const windowOpen = t - this.windowStart < WINDOW_MS || this.frames < MIN_WINDOW_FRAMES;
+    if (windowOpen && this.frames < WINDOW_CAPACITY) return "none";
+    const overloaded = this.judgeWindow();
     this.resetWindow();
     if (!overloaded) return "none";
     const step = this.takeStep(devicePixelRatio);
@@ -163,7 +184,7 @@ export class AdaptiveQualityGovernor {
     const count = this.intervalCount;
     if (count === 0) return false;
     const display = Math.min(selectKth(this.intervals, count, Math.floor((count - 1) * DISPLAY_PERCENTILE)), MAX_DISPLAY_INTERVAL_MS);
-    const limit = display * MISS_FACTOR;
+    const limit = Math.max(display * MISS_FACTOR, display + MIN_MISS_SLACK_MS);
     let missed = 0;
     for (let i = 0; i < count; i++) if (this.intervals[i] > limit) missed++;
     return missed >= n * MISS_SHARE;
