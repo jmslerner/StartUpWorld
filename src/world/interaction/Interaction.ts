@@ -190,12 +190,19 @@ export class Interaction implements InteractableRegistry {
    * around its visible meshes, plus its anchor. Writes the box's world-space
    * centre into `centre` when given. Null when the target is not in the scene.
    */
-  screenBounds(target: InteractableTarget, centre?: THREE.Vector3): ScreenRect | null {
+  screenBounds(target: InteractableTarget, centre?: THREE.Vector3, out?: ScreenRect): ScreenRect | null {
     const entry = this.store.get(target);
     if (!entry || !this.store.isLive(entry)) return null;
     const anchor = this.store.projectEntry(entry, this.measureScreen);
     if (!anchor) return null;
-    const rect: ScreenRect = { left: anchor.x, top: anchor.y, right: anchor.x, bottom: anchor.y };
+    // L6: hot callers (World.focus) pass a scratch rect via `out` so measuring
+    // allocates nothing; the handle-level API keeps the allocating default
+    // because its callers may retain the returned rect.
+    const rect: ScreenRect = out ?? { left: 0, top: 0, right: 0, bottom: 0 };
+    rect.left = anchor.x;
+    rect.top = anchor.y;
+    rect.right = anchor.x;
+    rect.bottom = anchor.y;
     const { object } = entry;
     const bounds = this.measureBounds;
     const corner = this.measureCorner;
