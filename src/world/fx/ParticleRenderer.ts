@@ -101,7 +101,8 @@ export class ParticleRenderer {
       const size = pool.scaleOf(i);
       if (size <= 0) continue;
       const profile = pool.profileOf(i);
-      const shapeIndex = PARTICLE_SHAPES.indexOf(profile.shape);
+      // The shape index was fixed at spawn time; no per-frame name lookup.
+      const shapeIndex = pool.shapeIndexOf(i);
       const mesh = meshes[shapeIndex];
       const slot = counts[shapeIndex];
       counts[shapeIndex] = slot + 1;
