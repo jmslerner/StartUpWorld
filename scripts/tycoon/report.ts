@@ -139,6 +139,31 @@ export const thresholds = (sums: Summary[]): Check[] => {
   return out;
 };
 
+/**
+ * Pricing and founder balance (B1-B3): no pricing model or founder archetype dominates competent play, and each pricing
+ * model keeps the risk its description promises (enterprise "hard to kill", consumer "churn is brutal").
+ */
+export const balanceChecks = (rows: Map<string, Row[]>): Check[] => {
+  const out: Check[] = [];
+  const add = (id: string, label: string, pass: boolean, detail: string) => out.push({ id, label, pass, detail });
+  const climber = rows.get("climber");
+  if (!climber) return out;
+  const base = summarize("climber", climber);
+  for (const [k, model] of [["climber-ent", "enterprise"], ["climber-con", "consumer"]] as const) {
+    const rs = rows.get(k);
+    if (!rs) continue;
+    const s = summarize(k, rs);
+    add("B1", `${model} vs prosumer (climber): IPO within +-5, score within +-3`, Math.abs(s.ipo - base.ipo) <= 5 && Math.abs(s.score - base.score) <= 3, `IPO ${sg(s.ipo - base.ipo)}, score ${sg(s.score - base.score)}`);
+    const safer = model === "enterprise" ? s.bank < base.bank : s.bank > base.bank;
+    add("B2", `${model} vs prosumer (climber): bankruptcy ${model === "enterprise" ? "lower" : "higher"}`, safer, `${f1(s.bank)}% vs ${f1(base.bank)}%`);
+  }
+  const ipoOf = (rs: Row[]) => (100 * rs.filter((r) => r.ipo !== null).length) / Math.max(1, rs.length);
+  const perFounder = FOUNDERS.map((f) => ipoOf(climber.filter((r) => r.founder === f)));
+  const spread = Math.max(...perFounder) - Math.min(...perFounder);
+  add("B3", "climber: founder archetypes' IPO within 10 points of each other", spread <= 10, FOUNDERS.map((f, i) => `${f} ${f1(perFounder[i])}`).join(", "));
+  return out;
+};
+
 export const checkLines = (checks: Check[]): string =>
   checks.map((c) => `${c.info ? "INFO" : c.pass ? "PASS" : "FAIL"}  ${c.id.padEnd(4)} ${c.label.padEnd(66)} ${c.detail}`).join("\n");
 

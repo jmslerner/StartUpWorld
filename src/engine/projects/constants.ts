@@ -129,8 +129,13 @@ export const TYPES: Record<BuildType, TypeConfig> = {
     bonus: 0, luck: 2, fit: { consumer: 0, prosumer: 0, enterprise: 0 }, cruft: 0.5, volatility: 3,
   },
 };
-/** Premium's ARPU gain by pricing model: consumers barely pay for tiers; enterprise is already the strongest legacy line, so no extra. */
+/** Premium's ARPU gain by pricing model: consumers barely pay for tiers. */
 export const PREMIUM_ARPU_BY_PRICING: Record<PricingModel, number> = { consumer: 0.5, prosumer: 1, enterprise: 1 };
+/**
+ * A release's flat user gain (`usersFlat`) by pricing model. Each user is worth about 6x more on enterprise ARPU, so an
+ * enterprise release lands fewer, bigger accounts; a consumer release lands a crowd.
+ */
+export const USERS_FLAT_BY_PRICING: Record<PricingModel, number> = { consumer: 1.5, prosumer: 1, enterprise: 0.4 };
 
 // ── Reception (§5.5) ──
 
@@ -143,6 +148,8 @@ export const FOUNDER_FIT: Record<FounderArchetype, Partial<Record<BuildType, num
   "sales-animal": { premium: 4, growth: 2 },
   philosopher: { feature: 1, growth: 1, premium: 1, plumbing: 1, moonshot: 1 },
 };
+/** The founder's reach on a release's users and ARPU gains, inside the per-release caps: the sales animal sells what ships. */
+export const FOUNDER_REACH: Record<FounderArchetype, number> = { hacker: 1, visionary: 1, "sales-animal": 1.4, philosopher: 1 };
 /** x successPenaltyFromStress (0.05..0.35) → 1..5 reception lost to founder stress. */
 export const STRESS_RECEPTION_FACTOR = 15;
 /** Luck amplitude: ±8 calm to ±20 at volatility 100, x type luck, x1.5 with a powderkeg cofounder. */

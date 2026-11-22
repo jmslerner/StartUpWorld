@@ -4,7 +4,8 @@ import { compareRun, goldenPlan, runFixture, runLegacyBot } from "./__golden__/l
 import type { GoldenFile } from "./__golden__/legacyBots";
 import { withSlices } from "./tycoon/roster";
 
-// Legacy golden master (TYCOON-SPEC §12.2), recorded on the pre-tycoon engine at d641713.
+// Legacy golden master (TYCOON-SPEC §12.2). First recorded on the pre-tycoon engine at d641713; re-recorded for the pricing and
+// founder balance pass (the old values still replay the old recording with 0 mismatches).
 // CI subset: both legacy bots, 16 founder x cofounder pairs x 2 seeds, up to week 60, plus three
 // makeState() fixture sessions. `npm run golden:verify` checks the full recording (12 seeds, 200 weeks).
 const golden = JSON.parse(goldenText) as GoldenFile;

@@ -1,6 +1,7 @@
 // Tycoon balance harness (TYCOON-SPEC §10.3). Imports the engine read-only; every bot move is a typed command.
 //
 //   npm run sim:tycoon -- bots=climber,skilled,... [batches=4] [runs=12] [weeks=200] [out=e4] [from=0]     E4 (+ report)
+//   npm run sim:tycoon -- bots=climber,skilled,climber-ent,skilled-ent,climber-con,skilled-con batches=16  pricing/founder balance (B1-B3)
 //   npm run sim:tycoon -- report [out=e4[,e4b,...]]                                                      re-print E4 from files (pooled)
 //   npx tsx scripts/tycoonSim.ts identity baseline=<dir> [runs=12] [weeks=200] variant=stock|wide           E2
 //   npx tsx scripts/tycoonSim.ts fuzz [seeds=24] [commands=400]                                            E3
@@ -23,7 +24,7 @@ import { ALL_BOTS, keptCommands, newTally, playWeek, seededInitial, setJournal }
 import type { BotKind, Typed } from "./tycoon/bots";
 import { runBatch } from "./tycoon/runs";
 import type { Row } from "./tycoon/runs";
-import { byFounder, checkLines, summarize, table, thresholds } from "./tycoon/report";
+import { balanceChecks, byFounder, checkLines, summarize, table, thresholds } from "./tycoon/report";
 import { runIdentity } from "./tycoon/identity";
 import { runFuzz } from "./tycoon/fuzz";
 import { runMigcheck } from "./tycoon/migcheck";
@@ -59,8 +60,8 @@ const report = (out: string): boolean => {
   }
   const order = [...ALL_BOTS, "stock"].filter((k) => byKind.has(k));
   const sums = order.map((k) => summarize(k, byKind.get(k) ?? []));
-  const checks = thresholds(sums);
-  const founders = byFounder(byKind, ["skilled", "naive", "rush", "naive-ship60"]);
+  const checks = [...thresholds(sums), ...balanceChecks(byKind)];
+  const founders = byFounder(byKind, ["skilled", "naive", "rush", "naive-ship60", "climber-ent", "climber-con"]);
   const text = `${table(sums)}\n\n${checkLines(checks)}\n\n${founders}\n`;
   console.log(text);
   writeFileSync(join(dirs[0], dirs.length > 1 ? `report-${out.replace(/,/g, "+")}.txt` : "report.txt"), text);

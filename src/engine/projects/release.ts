@@ -6,8 +6,8 @@ import { PRICING_MODELS } from "../pricing";
 import { signedUnit } from "../rng";
 import { clamp } from "../utils";
 import {
-  ARPU_PCT_CAP, CRUFT_PER_UNIT, LATE_PENALTY, PREMIUM_ARPU_BY_PRICING, REP_CAP, RUSH_CRUFT_PER_UNIT, SIZES, TIER_SIDE, TYPES, USERS_PCT_CAP,
-  VC_REP_CAP,
+  ARPU_PCT_CAP, CRUFT_PER_UNIT, FOUNDER_REACH, LATE_PENALTY, PREMIUM_ARPU_BY_PRICING, REP_CAP, RUSH_CRUFT_PER_UNIT, SIZES, TIER_SIDE, TYPES,
+  USERS_FLAT_BY_PRICING, USERS_PCT_CAP, VC_REP_CAP,
 } from "./constants";
 import {
   completeFactor, completeness, fitOf, luckAmplitude, payMultiplier, pct, qualityOf, round1, stressPenalty, tierOf, weeksLate,
@@ -103,11 +103,12 @@ export const applyRelease = (state: GameState, build: Build, score: Score): Rele
 
   // Payoff, each capped per release. m = 0 (a flop) pays nothing and takes no users.
   const repGain = m > 0 ? Math.min(REP_CAP, rnd(type.rep * u * m)) : rnd(side.rep * w);
-  const usersGain = m > 0 ? rnd(type.usersFlat * u * m) + rnd(state.users * Math.min(USERS_PCT_CAP, type.usersPct * u * m)) : 0;
+  const reach = state.founder.archetype ? FOUNDER_REACH[state.founder.archetype] : 1;
+  const usersGain = m > 0 ? rnd(type.usersFlat * USERS_FLAT_BY_PRICING[state.pricingModel] * u * m * reach) + rnd(state.users * Math.min(USERS_PCT_CAP, type.usersPct * u * m * reach)) : 0;
   const pm = PRICING_MODELS[state.pricingModel];
   const headroom = pm.arpuMax > pm.arpuDefault ? clamp((pm.arpuMax - state.arpu) / (pm.arpuMax - pm.arpuDefault), 0, 1) : 0;
   const pricingMult = build.type === "premium" ? PREMIUM_ARPU_BY_PRICING[state.pricingModel] : 1;
-  const arpuPct = m > 0 ? Math.min(ARPU_PCT_CAP, type.arpuPct * u * m * pricingMult * headroom) : 0;
+  const arpuPct = m > 0 ? Math.min(ARPU_PCT_CAP, type.arpuPct * u * m * pricingMult * headroom * reach) : 0;
   const carry = product.arpuCarry + state.arpu * arpuPct;
   const arpuWhole = Math.floor(carry + 1e-9);
   const nextArpu = clamp(state.arpu + arpuWhole, pm.arpuMin, pm.arpuMax);
