@@ -61,13 +61,16 @@ const FRAME_FILL = 0.85;
 /** A focused target must be at least this far (CSS px) inside the visible area to count as in view. */
 const FOCUS_PADDING_PX = 16;
 /**
- * M2 adaptive quality: the pixel-ratio ladder a world walks down, one rung at
- * a time, under sustained real overload (see adaptiveQuality.ts for how that
- * is judged). The first rung is the quality's device-pixel-ratio cap (spec §5:
- * 2 on "high", 1.5 on "low") and the last is the floor — a world never goes below 1, and a "low" world starts on its
- * own ladder, so it can only ever reach 1 (it has no shadows to shed). After
- * the pixel ratio, a "high" world can turn its shadows off. Steps never go
- * back up mid-session.
+ * M2 adaptive quality: the pixel-ratio ladder a world walks down under
+ * sustained real overload (see adaptiveQuality.ts for how that is judged),
+ * one effective step at a time: a rung that would not lower
+ * min(devicePixelRatio, cap) is skipped, so a DPR 1.25 or 1.5 screen goes
+ * straight from cap 2 to cap 1 and a DPR 1 screen goes straight to shadows.
+ * The first rung is the quality's device-pixel-ratio cap (spec §5: 2 on
+ * "high", 1.5 on "low") and the last is the floor: a world never goes below
+ * 1, and a "low" world starts on its own ladder, so it can only ever reach 1
+ * (it has no shadows to shed). After the pixel ratio, a "high" world can turn
+ * its shadows off. Steps never go back up mid-session.
  */
 const PIXEL_RATIO_STEPS: Record<QualityLevel, readonly number[]> = { high: [2, 1.5, 1], low: [1.5, 1] };
 const CONTEXT_RELEASE_DELAY_MS = 300;
