@@ -23,6 +23,7 @@ import type {
   WorldSoundSink,
 } from "../types";
 import { detectQuality, prefersReducedMotion } from "../ui/environment";
+import { AdaptiveQualityGovernor } from "./adaptiveQuality";
 import { CameraRig } from "./CameraRig";
 import { layoutBounds } from "./layoutBounds";
 import { clamp } from "./math";
@@ -59,20 +60,16 @@ const PAN_MARGIN = 1.5;
 const FRAME_FILL = 0.85;
 /** A focused target must be at least this far (CSS px) inside the visible area to count as in view. */
 const FOCUS_PADDING_PX = 16;
-/** Spec §5: device-pixel-ratio caps per quality level. */
-const MAX_PIXEL_RATIO: Record<QualityLevel, number> = { high: 2, low: 1.5 };
 /**
  * M2 adaptive quality: the pixel-ratio ladder a world walks down, one rung at
- * a time, while frames stay slow. The first rung is the quality's MAX_PIXEL_RATIO
- * cap and the last is the floor — a world never goes below 1, and a "low" world
- * starts on its own ladder, so it can only ever reach 1 (it has no shadows to
- * shed). Steps never go back up mid-session.
+ * a time, under sustained real overload (see adaptiveQuality.ts for how that
+ * is judged). The first rung is the quality's device-pixel-ratio cap (spec §5:
+ * 2 on "high", 1.5 on "low") and the last is the floor — a world never goes below 1, and a "low" world starts on its
+ * own ladder, so it can only ever reach 1 (it has no shadows to shed). After
+ * the pixel ratio, a "high" world can turn its shadows off. Steps never go
+ * back up mid-session.
  */
 const PIXEL_RATIO_STEPS: Record<QualityLevel, readonly number[]> = { high: [2, 1.5, 1], low: [1.5, 1] };
-/** Sustained average frame time above this (seconds) triggers a step down. */
-const ADAPTIVE_FRAME_BUDGET = 0.02;
-/** Minimum seconds between adaptive steps, so one hitch cannot cascade. */
-const ADAPTIVE_COOLDOWN_SECONDS = 4;
 const CONTEXT_RELEASE_DELAY_MS = 300;
 const NO_EVENTS: readonly WorldEvent[] = [];
 /**
@@ -202,20 +199,19 @@ class World {
   private lastFrameTime = 0;
   private skipNextDelta = true;
   private elapsed = 0;
-  /** M2: the pixel-ratio cap currently in force; starts at the quality cap and only ever steps down. */
-  private pixelRatioCap = 2;
-  /** M2: exponential moving average of (clamped) frame time; 0 = no samples yet. */
-  private frameTimeAverage = 0;
-  /** M2: `elapsed` at the last adaptive step; −Infinity before the first. */
-  private lastAdaptiveStepAt = Number.NEGATIVE_INFINITY;
-  /** M2: the final adaptive step (shadows off) has been taken. */
-  private adaptiveShadowsOff = false;
+  /** M2: decides when to shed pixel ratio, then shadows; owns the pixel-ratio cap in force. */
+  private readonly adaptive: AdaptiveQualityGovernor;
+  /** M2: the layout the governor last saw; a new one means a stage rebuild, so it warms up again. */
+  private adaptiveLayout: OfficeLayout | null = null;
 
   constructor(canvas: HTMLCanvasElement, callbacks: WorldCallbacks, options: WorldOptions) {
     this.canvas = canvas;
     this.callbacks = callbacks;
     this.quality = options.quality ?? detectQuality();
-    this.pixelRatioCap = MAX_PIXEL_RATIO[this.quality];
+    this.adaptive = new AdaptiveQualityGovernor({
+      steps: PIXEL_RATIO_STEPS[this.quality],
+      canDropShadows: this.quality === "high",
+    });
     this.sound = options.sound ?? null;
     const reducedMotion = options.reducedMotion ?? prefersReducedMotion();
 
@@ -470,6 +466,8 @@ class World {
     this.seatingPlan.reset();
     this.runner.forgetFailures();
     this.runner.start(REBUILT_ON_RESET);
+    // M2: a fresh stage compiles its shaders again over the next frames.
+    this.adaptive.warmUp();
   }
 
   /** Point the camera, the pan limits and the shadow frustum at the layout being applied. */
@@ -549,7 +547,7 @@ class World {
   private applySize(width: number, height: number): void {
     const w = Math.max(1, Math.floor(width));
     const h = Math.max(1, Math.floor(height));
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, this.pixelRatioCap));
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, this.adaptive.pixelRatioCap));
     // false: the shell sizes the canvas element with CSS; we only size its backing store.
     this.renderer.setSize(w, h, false);
     this.rig.setViewport(w, h);
@@ -570,6 +568,8 @@ class World {
     if (this.disposed) return;
     // The query matches one exact ratio, so it has to be re-armed for the new one.
     this.watchPixelRatio();
+    // A new backing-store size (and a move between screens) costs a few frames.
+    this.adaptive.warmUp();
     this.applySize(this.rig.viewport.width, this.rig.viewport.height);
   };
 
@@ -581,8 +581,10 @@ class World {
     if (shouldRun === this.running) return;
     this.running = shouldRun;
     if (shouldRun) {
-      // However long we were stopped, the first frame back simulates no time.
+      // However long we were stopped, the first frame back simulates no time,
+      // and the frames right after (re)starting say nothing about steady load.
       this.skipNextDelta = true;
+      this.adaptive.warmUp();
       this.frameRequest = requestAnimationFrame(this.frame);
     } else {
       cancelAnimationFrame(this.frameRequest);
@@ -594,12 +596,17 @@ class World {
     // Scheduled first so that nothing thrown below can end the loop.
     this.frameRequest = requestAnimationFrame(this.frame);
 
+    const workStart = performance.now();
     let dt = 0;
+    // The raw rAF interval (ms), before the clamp: the adaptive governor wants the real cadence.
+    let interval = Number.NaN;
     if (this.skipNextDelta) this.skipNextDelta = false;
-    else dt = Math.min(Math.max((now - this.lastFrameTime) / 1000, 0), MAX_FRAME_SECONDS);
+    else {
+      interval = now - this.lastFrameTime;
+      dt = Math.min(Math.max(interval / 1000, 0), MAX_FRAME_SECONDS);
+    }
     this.lastFrameTime = now;
     this.elapsed += dt;
-    this.trackFrameTime(dt);
 
     this.runner.update(dt, this.elapsed);
     this.reportDusk();
@@ -612,40 +619,31 @@ class World {
       this.runner.reportFailure("interaction.update", error);
     }
     // A listener called above may have disposed or paused the world.
-    if (this.running) this.render();
+    if (!this.running) return;
+    this.render();
+    this.trackQuality(interval, performance.now() - workStart);
   };
 
   /**
-   * M2: feed one frame time into the adaptive-quality average and, when the
-   * average stays over budget past the cooldown, take one step down the
-   * ladder (pixel ratio first, then shadows). The average resets after a
-   * step, so each rung must earn its own sustained slowness.
+   * M2: feed this frame to the adaptive-quality governor and apply the rung
+   * it names, if any. A new layout (phase change, purchase, new run) means the
+   * stage was rebuilt and new shaders compile, so the governor warms up again.
    */
-  private trackFrameTime(dt: number): void {
-    if (dt <= 0) return;
-    this.frameTimeAverage = this.frameTimeAverage === 0 ? dt : this.frameTimeAverage + (dt - this.frameTimeAverage) * 0.04;
-    if (this.frameTimeAverage <= ADAPTIVE_FRAME_BUDGET) return;
-    if (this.elapsed - this.lastAdaptiveStepAt < ADAPTIVE_COOLDOWN_SECONDS) return;
-    if (!this.applyAdaptiveStep()) return;
-    this.lastAdaptiveStepAt = this.elapsed;
-    this.frameTimeAverage = 0;
-  }
-
-  /** One step down the ladder. Returns false when there is nothing left to shed. */
-  private applyAdaptiveStep(): boolean {
-    const steps = PIXEL_RATIO_STEPS[this.quality];
-    const floor = steps[steps.length - 1];
-    if (this.pixelRatioCap > floor) {
-      this.pixelRatioCap = steps.find((cap) => cap < this.pixelRatioCap) ?? floor;
+  private trackQuality(intervalMs: number, workMs: number): void {
+    if (this.layout !== this.adaptiveLayout) {
+      this.adaptiveLayout = this.layout;
+      this.adaptive.warmUp();
+      return;
+    }
+    if (Number.isNaN(intervalMs)) return;
+    const step = this.adaptive.sample(intervalMs, workMs, window.devicePixelRatio || 1);
+    if (step === "pixel-ratio") {
       this.applySize(this.rig.viewport.width, this.rig.viewport.height);
-      return true;
-    }
-    if (this.quality === "high" && !this.adaptiveShadowsOff) {
-      this.adaptiveShadowsOff = true;
+    } else if (step === "shadows") {
+      // The next frame compiles shadow-free shader variants (a one-off
+      // stall); the governor's post-step warm-up keeps it out of the next decision.
       this.lighting.setShadowsEnabled(false);
-      return true;
     }
-    return false;
   }
 
   private render(): void {
