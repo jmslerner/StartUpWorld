@@ -5,6 +5,7 @@ import { calcNetBurn, calcRunwayWeeks } from "../engine/economy";
 import { makeState, makeTycoonState } from "../engine/testHelpers";
 import { hashText32, mix32 } from "./hash";
 import { employeeName } from "./names";
+import { getOfficeLayout, officeLayoutKey } from "./office/layouts";
 import {
   COFOUNDER_ID,
   FOUNDER_ID,
@@ -454,6 +455,55 @@ describe("buildWorldSnapshot", () => {
       const roles: Array<TeamRole | null> = later.people.map((person) => person.role);
       expect(roles).toEqual([null, null, "engineering", "engineering", "engineering", "design"]);
     });
+  });
+
+  describe("a company phase from a corrupted save", () => {
+    // parseSave and migrateState do not validate companyPhase. One base state,
+    // so the seed (and with it every name and look) is the same in each copy.
+    const base = createInitialState();
+    const corrupted = (phase: string, overrides: Partial<GameState> = {}): GameState => ({
+      ...base,
+      ...overrides,
+      companyPhase: phase as never,
+    });
+
+    it("is shown as the garage instead of throwing", () => {
+      for (const phase of ["megacorp", "", "toString", "__proto__"]) {
+        const snapshot = buildWorldSnapshot(corrupted(phase));
+        expect(snapshot.phase, phase).toBe("garage");
+        expect(snapshot.availableAssets, phase).toEqual([]);
+        expect(snapshot).toEqual(buildWorldSnapshot(corrupted("garage")));
+      }
+    });
+
+    it("keeps owned assets, and offers nothing for sale (as the engine does for an unknown phase)", () => {
+      const assets = [
+        { id: "jet" as const, name: "Private Jet", purchaseWeek: 3 },
+        { id: "lounge" as const, name: "Lounge", purchaseWeek: 4 },
+      ];
+      const snapshot = buildWorldSnapshot(corrupted("megacorp", { assets }));
+      expect(snapshot.ownedAssets).toEqual(["jet", "lounge"]);
+      expect(snapshot.availableAssets).toEqual([]);
+      expect(getOfficeLayout(snapshot.phase, snapshot.ownedAssets).phase).toBe("garage");
+    });
+  });
+
+  it("carries no precomputed layout key that a spread copy could leave stale", () => {
+    // `{ ...snapshot, phase }` is how tests and dev sandboxes derive snapshots;
+    // the World derives the layout key from phase and ownedAssets themselves.
+    const snapshot = buildWorldSnapshot(createInitialState());
+    expect(Object.keys(snapshot)).not.toContain("layoutKey");
+    const moved = { ...snapshot, phase: "office" as const };
+    const key = officeLayoutKey(moved.phase, moved.ownedAssets);
+    expect(key).not.toBe(officeLayoutKey(snapshot.phase, snapshot.ownedAssets));
+    expect(getOfficeLayout(moved.phase, moved.ownedAssets, key).phase).toBe("office");
+    expect(getOfficeLayout(moved.phase, moved.ownedAssets, key)).toBe(getOfficeLayout("office", moved.ownedAssets));
+  });
+
+  it("projects every valid phase as itself", () => {
+    for (const phase of ["garage", "coworking", "office", "unicorn", "public"] as const) {
+      expect(buildWorldSnapshot({ ...createInitialState(), companyPhase: phase }).phase).toBe(phase);
+    }
   });
 });
 

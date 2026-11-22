@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { FxSystem } from "../fx/FxSystem";
 import { Interaction } from "../interaction/Interaction";
 import { computeBuildingFrame, type LayoutFrame } from "../office/framing";
-import { getOfficeLayout } from "../office/layouts";
+import { getOfficeLayout, officeLayoutKey } from "../office/layouts";
 import { OfficeSystem } from "../office/OfficeSystem";
 import { EmployeeSystem } from "../people/EmployeeSystem";
 import { SeatingPlan } from "../people/seating";
@@ -177,7 +177,7 @@ class World {
    */
   private readonly seatingPlan = new SeatingPlan();
   private layout: OfficeLayout = getOfficeLayout("garage", []);
-  /** The layoutKey of the snapshot whose layout is currently applied (M3). */
+  /** officeLayoutKey of the layout currently applied (M3). */
   private appliedLayoutKey: string | null = null;
   private previous: WorldSnapshot | null = null;
   /** The building frame the camera was last pointed at. */
@@ -315,16 +315,17 @@ class World {
     }
 
     // If the floor plan cannot be produced the world keeps the one it has.
-    // M3: the snapshot carries the layout key computed when it was built; the
-    // layout is a pure function of (phase, ownedAssets), so an unchanged key
-    // means the layout in hand is already the right one.
-    const layoutKey = next.layoutKey ?? null;
-    if (layoutKey === null || layoutKey !== this.appliedLayoutKey) {
-      const applied = this.runner.run("layout", () => {
-        this.layout = getOfficeLayout(next.phase, next.ownedAssets, next.layoutKey);
-      });
-      if (applied) this.appliedLayoutKey = layoutKey;
-    }
+    // M3: the layout is a pure function of (phase, ownedAssets), so an
+    // unchanged key means the layout in hand is already the right one. The key
+    // is derived from the snapshot itself (a few filters over the asset ids),
+    // so a snapshot spread from another ({ ...snap, phase }) still gets its own
+    // floor plan.
+    this.runner.run("layout", () => {
+      const layoutKey = officeLayoutKey(next.phase, next.ownedAssets);
+      if (layoutKey === this.appliedLayoutKey) return;
+      this.layout = getOfficeLayout(next.phase, next.ownedAssets, layoutKey);
+      this.appliedLayoutKey = layoutKey;
+    });
     const layout = this.layout;
     // Until setup is finished the company is just the founder: the engine's starting
     // engineer only "arrives" (with the cofounder) once the run actually begins.

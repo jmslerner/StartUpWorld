@@ -127,6 +127,7 @@ export interface WorldSnapshot {
   week: number;
   ap: number;
   maxAp: number;
+  /** Always one of the five: buildWorldSnapshot shows an unknown phase from a save as "garage" (see ../phase). */
   phase: CompanyPhase;
   stage: Stage;
 
@@ -173,14 +174,6 @@ export interface WorldSnapshot {
   ownedAssets: AssetId[];
   /** Not owned, and the current company phase allows buying them. */
   availableAssets: AssetId[];
-
-  /**
-   * Cache key for this snapshot's office layout (see office/layouts
-   * officeLayoutKey), computed when the snapshot is built. Optional: snapshots
-   * built by hand (tests, dev sandboxes) omit it and the World derives the
-   * layout the slow way.
-   */
-  layoutKey?: string;
 
   pendingEventTitle: string | null;
   gameOver: EndingType | null;

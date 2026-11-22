@@ -45,6 +45,7 @@ import {
   isWalkable,
   makeFootprint,
   normalizeFacing,
+  officeLayoutKey,
   pathLength,
   segmentHitsFootprint,
   stationFootprint,
@@ -641,6 +642,44 @@ describe("getOfficeLayout", () => {
 
   it("ignores asset ids it does not know", () => {
     expect(getOfficeLayout("office", ["not-an-asset" as AssetId])).toBe(getOfficeLayout("office"));
+  });
+
+  it("draws a phase it does not know (a corrupted save) as the garage instead of throwing", () => {
+    for (const phase of ["megacorp", "", "toString", "constructor", "__proto__"]) {
+      const unknown = phase as CompanyPhase;
+      expect(() => officeLayoutKey(unknown, ["jet"]), phase).not.toThrow();
+      expect(officeLayoutKey(unknown, ["jet"]), phase).toBe(officeLayoutKey("garage", ["jet"]));
+      expect(getOfficeLayout(unknown), phase).toBe(getOfficeLayout("garage"));
+      expect(getOfficeLayout(unknown, ["jet"]), phase).toBe(getOfficeLayout("garage", ["jet"]));
+      expect(getOfficeLayout(unknown).phase, phase).toBe("garage");
+    }
+  });
+
+  it("keys layouts so that equal keys mean the same layout", () => {
+    const variants: [CompanyPhase, AssetId[]][] = PHASES.flatMap((phase) => [
+      [phase, []],
+      [phase, ["helicopter"]],
+      [phase, ["office-upgrade", "lounge"]],
+      [phase, ALL_ASSETS],
+    ]);
+    for (const [phaseA, ownedA] of variants) {
+      for (const [phaseB, ownedB] of variants) {
+        const sameKey = officeLayoutKey(phaseA, ownedA) === officeLayoutKey(phaseB, ownedB);
+        const sameLayout = getOfficeLayout(phaseA, ownedA) === getOfficeLayout(phaseB, ownedB);
+        expect(sameKey, `${phaseA} [${ownedA.join()}] vs ${phaseB} [${ownedB.join()}]`).toBe(sameLayout);
+      }
+    }
+  });
+
+  it("caches a new layout under the key it derives, not the one the caller passed", () => {
+    // A caller carrying a key from some other (phase, assets) pair, e.g. a
+    // snapshot spread from another one, must not poison the cache.
+    const stale = "stale-key-from-another-snapshot";
+    expect(getOfficeLayout("unicorn", ["yacht"], stale)).toBe(getOfficeLayout("unicorn", ["yacht"]));
+    expect(getOfficeLayout("garage", [], stale)).toBe(getOfficeLayout("garage"));
+    expect(getOfficeLayout("garage", [], stale).phase).toBe("garage");
+    // The key officeLayoutKey gives is the one a hit is served from.
+    expect(getOfficeLayout("office", ["lounge"], officeLayoutKey("office", ["lounge"]))).toBe(getOfficeLayout("office", ["lounge"]));
   });
 
   it("varies which way people face", () => {

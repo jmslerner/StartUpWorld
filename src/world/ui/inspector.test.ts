@@ -956,6 +956,21 @@ describe("door, event beacon, overflow sign", () => {
     const shown = Math.min(snapshot.people.filter((person) => person.kind === "employee").length, seats);
     expect(overflowHeadcount(huge)).toBe(430 - shown);
   });
+
+  it("a save with a phase the world does not know: every card still opens, read as the garage it is drawn as", () => {
+    const layout = getOfficeLayout("garage");
+    const capacity = layout.deskSeats.length + layout.overflowSpots.length;
+    // parseSave does not validate companyPhase, so a corrupted save can carry anything.
+    const corrupted = { ...garage({ team: team({ engineering: capacity + 3 }) }), companyPhase: "megacorp" as never };
+    for (const target of allTargets(corrupted)) {
+      expect(() => describeTarget(target, corrupted), JSON.stringify(target)).not.toThrow();
+      expect(() => describeTarget(target, corrupted, { gate: false }), JSON.stringify(target)).not.toThrow();
+    }
+    expect(lineValue(cardFor({ kind: "door" }, corrupted), "Next phase")).toBe("Coworking");
+    expect(overflowHeadcount(corrupted)).toBe(3);
+    expect(cardFor({ kind: "overflow-sign" }, corrupted).note).toMatch(/Coworking phase/);
+    expect(describeTarget({ kind: "empty-desk", slotIndex: layout.deskSeats.length }, corrupted)).toBeNull();
+  });
 });
 
 describe("describeTarget is a pure function of its inputs", () => {
