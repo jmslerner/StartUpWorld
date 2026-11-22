@@ -251,10 +251,20 @@ export class Lighting implements WorldSystem {
    * Adaptive quality (M2): turn the sun's shadow casting off under sustained
    * frame pressure. Only meaningful on "high" (a "low" world never casts);
    * the World never turns it back on mid-session.
+   *
+   * Turning it off also frees the shadow map (2048² of depth, ~32 MiB on a
+   * device just judged too slow): three.js stops rendering shadow maps once no
+   * light casts, so it would otherwise stay allocated for the session. The
+   * method stays reversible: with `map` null, WebGLShadowMap builds a fresh
+   * render target the next time the sun casts.
    */
   setShadowsEnabled(enabled: boolean): void {
-    if (!this.castShadows) return;
+    if (!this.castShadows || this.sun.castShadow === enabled) return;
     this.sun.castShadow = enabled;
+    if (!enabled) {
+      this.sun.shadow.dispose();
+      this.sun.shadow.map = null;
+    }
   }
 
   /** The shadow frustum (and the sun's orbit) is fitted around this floor area. */
