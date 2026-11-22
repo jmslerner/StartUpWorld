@@ -79,14 +79,15 @@ describe("worked example D: a premium tier on enterprise pricing", () => {
       ...overrides,
     });
 
-  it("reception 79, SOLID, m = 0.98; ARPU $130 with $0.64 carried; MRR $52,000; the rest of the payoff", () => {
+  it("reception 79, SOLID, m = 0.98; ARPU $134 with $0.22 carried; MRR $53,600; the rest of the payoff", () => {
     const s = d();
     const score = scoreRelease(s, premium, 0);
     expect(score).toMatchObject({ reception: 79, tier: "solid", fit: 11, stress: 2 });
     const out = applyRelease(s, premium, score);
-    expect(out.state.arpu).toBe(130);
-    expect(out.state.product?.arpuCarry).toBeCloseTo(0.64, 2);
-    expect(out.state.mrr).toBe(52_000);
+    // headroom (500 − 120) / (500 − 60) = 0.864; 0.04 x 2.5 x 0.98 x 0.864 x 1.4 (sales-animal reach) = 11.85% of $120 = $14.22
+    expect(out.state.arpu).toBe(134);
+    expect(out.state.product?.arpuCarry).toBeCloseTo(0.22, 2);
+    expect(out.state.mrr).toBe(53_600);
     expect(out.state.reputation).toBe(s.reputation + 2);
     expect(out.state.vcReputation).toBe(s.vcReputation + 1);
     expect(out.state.product?.moat).toBe(3.7);
@@ -95,7 +96,7 @@ describe("worked example D: a premium tier on enterprise pricing", () => {
     expect(out.state.culture.cohesion).toBe(s.culture.cohesion + 1);
     expect(out.state.board.members[0].confidence).toBe(51);
     expect(out.state.cofounder.trust).toBe(s.cofounder.trust + 1);
-    expect(out.lines[4].text).toBe("Reputation +2. ARPU +$10 → $130. VC rep +1. Moat +3.7 → 3.7. Cruft +2.3 → 2.3. Morale +2. Cohesion +1. Board +1.");
+    expect(out.lines[4].text).toBe("Reputation +2. ARPU +$14 → $134. VC rep +1. Moat +3.7 → 3.7. Cruft +2.3 → 2.3. Morale +2. Cohesion +1. Board +1.");
   });
 
   it("the ARPU gain tapers to nothing near the model's max: $480 → $482", () => {
@@ -116,8 +117,39 @@ describe("worked example D: a premium tier on enterprise pricing", () => {
     expect(scoreRelease(s, premium, 0).fit).toBe(-6 + 4 + 3);
     const score = { ...scoreRelease(s, premium, 0), reception: 79, tier: "solid" as const, m: 0.98 };
     const out = applyRelease(s, premium, score);
-    // headroom (25 − 10) / (25 − 5) = 0.75; 0.04 x 2.5 x 0.98 x 0.5 x 0.75 = 3.675% of $10
-    expect(out.state.product?.arpuCarry).toBeCloseTo(10 * 0.04 * 2.5 * 0.98 * 0.5 * 0.75, 10);
+    // headroom (25 − 10) / (25 − 6) = 0.789; 0.04 x 2.5 x 0.98 x 0.5 x 0.789 x 1.4 (sales-animal reach) = 5.42% of $10
+    expect(out.state.product?.arpuCarry).toBeCloseTo(10 * 0.04 * 2.5 * 0.98 * 0.5 * (15 / 19) * 1.4, 10);
+  });
+});
+
+describe("payoff multipliers by pricing model and founder", () => {
+  // A finished M feature (2.5 units, C = 1) released at m = 1: 40 flat users x 2.5 = 100, plus 2.5% x 2.5 of 1,000 users = 62.5.
+  const feature = worked(80, { type: "feature", size: "m", units: 2.5 });
+  const release = (overrides: ShopOptions) => {
+    const s = shop({ builds: [feature], companyPhase: "coworking", users: 1000, arpu: 20, ...overrides });
+    return { s, out: applyRelease(s, feature, { ...scoreRelease(s, feature, 0), reception: 80, tier: "solid", m: 1 }).state };
+  };
+  const hacker = { name: "F", archetype: "hacker" as const };
+
+  it("flat users x1.5 on consumer, x1 on prosumer, x0.4 on enterprise; the users% part is the same", () => {
+    const gain = (pricingModel: GameState["pricingModel"]) => {
+      const { s, out } = release({ pricingModel, founder: hacker });
+      return out.users - s.users;
+    };
+    expect(gain("prosumer")).toBe(100 + 63);
+    expect(gain("consumer")).toBe(150 + 63);
+    expect(gain("enterprise")).toBe(40 + 63);
+  });
+
+  it("a sales animal's releases reach 1.4x the users and ARPU; other founders 1x", () => {
+    const banked = (archetype: "hacker" | "sales-animal") => {
+      const { s, out } = release({ pricingModel: "prosumer", founder: { name: "F", archetype } });
+      return { users: out.users - s.users, arpu: out.arpu - s.arpu + (out.product?.arpuCarry ?? 0) };
+    };
+    const base = banked("hacker");
+    const sales = banked("sales-animal");
+    expect(sales.users).toBe(140 + 88); // 100 x 1.4 flat, 62.5 x 1.4 = 87.5
+    expect(sales.arpu).toBeCloseTo(base.arpu * 1.4, 6);
   });
 });
 
@@ -129,7 +161,8 @@ describe("payoff caps", () => {
     const s = shop({ companyPhase: "office", users: 1000, reputation: 10, vcReputation: 10 });
     expect(breakout(s, big("feature")).state.reputation).toBe(35);
     const growth = breakout(s, big("growth")).state;
-    expect(growth.users).toBe(1000 + Math.round(80 * 10 * 1.4) + 500);
+    // makeState() is on consumer pricing: flat users x1.5 (USERS_FLAT_BY_PRICING); the 50% share is the cap.
+    expect(growth.users).toBe(1000 + Math.round(80 * 1.5 * 10 * 1.4) + 500);
     expect(breakout(s, big("moonshot")).state.vcReputation).toBe(16);
     expect(breakout(s, big("moonshot")).state.volatility).toBe(s.volatility + 3);
   });

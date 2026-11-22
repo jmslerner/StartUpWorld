@@ -1,8 +1,10 @@
 // Legacy golden master (spec §12.2).
 //   npx tsx scripts/legacyGolden.ts record <file> [bots=stock,wide] [seeds=12] [weeks=200]
 //   npx tsx scripts/legacyGolden.ts verify <file> [bots=stock,wide] [seeds=12] [weeks=200]
-// `record` must only ever run on the untouched (pre-tycoon) engine. Recording a subset of bots merges
-// into an existing file, so the two bots can be recorded as separate batches (<= 192 runs each).
+// First recorded on the untouched pre-tycoon engine (d641713), so the tycoon layer could prove legacy play unchanged. Re-record
+// only for an intended change to legacy play, after checking that the old values replay the old file with 0 mismatches
+// (last: the pricing/founder balance pass). Recording a subset of bots merges into an existing file, so the two bots can be
+// recorded as separate batches (<= 192 runs each).
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import {
   CHECKPOINTS,
@@ -17,6 +19,8 @@ import type { FixtureName, FixtureRun, GoldenFile, GoldenRun, LegacyBotKind } fr
 import { withSlices } from "../src/engine/tycoon/roster";
 
 const FIXTURES: FixtureName[] = ["plain", "fractional", "empty-roster"];
+/** What the recording pins; update it with every re-record. */
+const RECORDED_AT = "pricing/founder balance pass (enterprise, consumer, philosopher and visionary retuned) on 47c5c20";
 
 const [mode, file, ...rest] = process.argv.slice(2);
 const args = new Map<string, string>();
@@ -43,7 +47,7 @@ if (mode === "record") {
   const order: LegacyBotKind[] = ["stock", "wide"];
   runs.sort((a, b) => order.indexOf(a.bot) - order.indexOf(b.bot));
   const fixtures: FixtureRun[] = FIXTURES.map((name) => runFixture(name));
-  const out: GoldenFile = { format: 1, recordedAt: "d641713 (pre-tycoon engine)", seeds, maxWeek: weeks, checkpoints: CHECKPOINTS, runs, fixtures };
+  const out: GoldenFile = { format: 1, recordedAt: RECORDED_AT, seeds, maxWeek: weeks, checkpoints: CHECKPOINTS, runs, fixtures };
   writeFileSync(file, `${JSON.stringify(out, null, 1)}\n`);
   console.log(`recorded ${plan.length} runs (${bots.join(",")}) + ${fixtures.length} fixtures into ${file} in ${((Date.now() - started) / 1000).toFixed(1)}s`);
 } else {
