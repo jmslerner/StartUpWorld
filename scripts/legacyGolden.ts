@@ -3,8 +3,9 @@
 //   npx tsx scripts/legacyGolden.ts verify <file> [bots=stock,wide] [seeds=12] [weeks=200]
 // First recorded on the untouched pre-tycoon engine (d641713), so the tycoon layer could prove legacy play unchanged. Re-record
 // only for an intended change to legacy play, after checking that the old values replay the old file with 0 mismatches
-// (last: the pricing/founder balance pass). Recording a subset of bots merges into an existing file, so the two bots can be
-// recorded as separate batches (<= 192 runs each).
+// (re-recorded for the pricing/founder balance pass, then for The Next Round story pack: with storyConfig.enabled = false
+// the previous file replayed with 0 mismatches). Recording a subset of bots merges into an existing file, so the two bots can
+// be recorded as separate batches (<= 192 runs each).
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import {
   CHECKPOINTS,
@@ -20,7 +21,7 @@ import { withSlices } from "../src/engine/tycoon/roster";
 
 const FIXTURES: FixtureName[] = ["plain", "fractional", "empty-roster"];
 /** What the recording pins; update it with every re-record. */
-const RECORDED_AT = "pricing/founder balance pass (enterprise, consumer, philosopher and visionary retuned) on 47c5c20";
+const RECORDED_AT = "The Next Round story pack (14 story events, later scenes, interludes, news lines) on bcf0d26";
 
 const [mode, file, ...rest] = process.argv.slice(2);
 const args = new Map<string, string>();
