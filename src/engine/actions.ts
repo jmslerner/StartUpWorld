@@ -28,6 +28,7 @@ import { refreshDerivedNoLog } from "./derived";
 import { PRICING_MODELS } from "./pricing";
 import { canHireRole, ROLE_MIN_STAGE, STAGE_PERKS } from "./stagePerks";
 import { createInitialBoard, PERSONALITY_PROFILES } from "./board";
+import { emptyStory } from "./story/state";
 import { ASSET_CATALOG, ALL_ASSET_IDS, phaseAtLeast } from "./assets";
 import { canSpendAp, ensurePlayable, err, spendAp, withLogLines } from "./tycoon/kit";
 import { DISCOVERY_WEEKS } from "./tycoon/constants";
@@ -327,6 +328,8 @@ export const createInitialState = (): GameState => {
     // so a `seed <value>` typed before that still decides every name.
     people: emptyPeople(),
     product: emptyProduct(),
+    // The Next Round story pack: no choices made yet.
+    story: emptyStory(),
   };
 
   return refreshDerivedNoLog(base);
@@ -767,7 +770,7 @@ export const choose = (state: GameState, choiceIndex: number): ActionResult => {
 export const endWeek = (state: GameState): ActionResult => {
   const tick = endWeekTick(state);
 
-  const eventPrefixes = ["EVENT:", "1)", "2)", "3)", "Type `choose"];
+  const eventPrefixes = ["EVENT:", "LATER:", "NEWS:", "1)", "2)", "3)", "Type `choose"];
   const isEventLine = (text: string): boolean => eventPrefixes.some((prefix) => text.startsWith(prefix));
 
   // Heuristically mark EVENT block as event-kind.

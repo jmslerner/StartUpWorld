@@ -172,6 +172,21 @@ export const GameOverCard = ({ state, onPlayAgain, canPeek = false }: GameOverCa
           {summary.narrative.replace(/\[\[beat\]\]/g, "  ...  ")}
         </div>
 
+        {/* Epilogue (The Next Round story pack) */}
+        {summary.epilogue && (
+          <div className="mb-4 border-l border-white/15 pl-3 text-xs leading-relaxed">
+            <div className="mb-1 text-[0.6rem] font-semibold uppercase tracking-widest opacity-70">
+              Epilogue · {summary.epilogue.title}
+            </div>
+            <div className="whitespace-pre-line text-mist/80">
+              {summary.epilogue.lines.join("\n").replace(/\s*\[\[beat\]\]\s*/g, "  ...  ")}
+            </div>
+            <div className="mt-2 whitespace-pre-line text-[0.65rem] font-bold uppercase tracking-wider text-slate-100/90">
+              {summary.epilogue.tagline}
+            </div>
+          </div>
+        )}
+
         {/* Grade + Rank */}
         <div className="mb-4 flex items-center gap-3">
           <div className="flex items-center gap-2">

@@ -9,6 +9,7 @@ import { computeContext } from "./context";
 import { STAGE_PERKS } from "./stagePerks";
 import { addBoardMember } from "./board";
 import { ASSET_CATALOG } from "./assets";
+import { countSeriesRound, isSeriesRound } from "./story/interludes";
 
 const pitchFailMessages = [
   "They pass for now. \"Come back with cleaner growth.\"",
@@ -415,6 +416,13 @@ export const raise = (state: GameState, amount: number): { state: GameState; log
   if (nextStage === "growth" && state.stage !== "growth") {
     s = addBoardMember(s, "independent");
     logs.push("Board expanded: +1 independent director. 6 total.");
+  }
+
+  // The Next Round story pack: a round closed at Series A or later gets its fundraising interlude (story only).
+  if (isSeriesRound(nextStage)) {
+    const interlude = countSeriesRound(s);
+    s = interlude.state;
+    logs.push(...interlude.lines);
   }
 
   return { state: s, logs, ok: true };

@@ -3,6 +3,7 @@ import type { EngineContext } from "../context";
 import { chance, pickWeightedIndex } from "../rng";
 import { eventPool } from "./pool";
 import type { EventDef } from "./types";
+import { withStoryShare } from "../story/share";
 
 const EVENT_COOLDOWN_WEEKS = 7;
 const EVENT_RECENT_PENALTY_COUNT = 10;
@@ -52,12 +53,14 @@ export const maybeSelectEvent = (state: GameState, ctx: EngineContext): EventSel
   const eligibleCooldown = eligible.filter((e) => passesCooldown(e.id));
   const finalEligible = eligibleCooldown.length > 0 ? eligibleCooldown : eligible;
 
-  const weights = finalEligible.map((e) => {
+  const rawWeights = finalEligible.map((e) => {
     const w = e.weight(s1, ctx);
     if (!Number.isFinite(w) || w <= 0) return 0;
     const isRecent = recent.some((h) => h.id === e.id);
     return isRecent ? w * EVENT_RECENT_PENALTY_MULT : w;
   });
+  // The Next Round story pack: a steady share of the pick whenever a story event is eligible (identity when it is off).
+  const weights = withStoryShare(finalEligible.map((e) => e.id), rawWeights);
 
   const pick = pickWeightedIndex(s1.rng, weights);
   const s2 = { ...s1, rng: pick.rng };

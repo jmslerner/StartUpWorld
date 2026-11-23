@@ -20,6 +20,8 @@ import { generateHints } from "./hints";
 import { effTeam, reconcileRoster } from "./tycoon/roster";
 import { adjustChurn, runProjectsWeek } from "./projects";
 import { runPeopleWeek } from "./people";
+import { playDueCallback } from "./story/callbacks";
+import { barkFor } from "./story/barks";
 
 // ── Growth / churn rate constants ──
 const BASE_GROWTH = 0.015;
@@ -272,6 +274,11 @@ export const endWeekTick = (state: GameState): { state: GameState; logs: string[
     logs.push(`Runway: ${ctx.runwayWeeks} weeks. Stress is rising.`);
   }
 
+  // The Next Round story pack: at most one later scene per week, before the week's event is picked (no RNG).
+  const later = playDueCallback(s2, ctx);
+  s2 = later.state;
+  logs.push(...later.logs);
+
   // Select at most one narrative event.
   const pick = maybeSelectEvent(s2, ctx);
   s2 = pick.state;
@@ -284,6 +291,10 @@ export const endWeekTick = (state: GameState): { state: GameState; logs: string[
     logs.push(pending.prompt);
     pending.choices.forEach((c, i) => logs.push(`${i + 1}) ${c.text}`));
     logs.push("Type `choose <n>`.");
+  } else if (!later.fired) {
+    // A news line on some quiet weeks (deterministic from seed and week; no RNG).
+    const bark = barkFor(s2, ctx);
+    if (bark) logs.push("", bark);
   }
 
   // Endings check

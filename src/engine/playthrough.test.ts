@@ -7,13 +7,14 @@
 // uses seed 86, the first seed in 1..200 on which the no-retain bot reaches week 29 with a build lead holding an outside
 // offer (spec §12.7's fallback rule). The spec's worked examples B, C and D stay pinned to the digit by the unit tests,
 // which build their states by hand and do not depend on the streams.
-import { describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { GameState } from "../types/game";
 import { createInitialState } from "./actions";
 import { executeCommand } from "./commands";
 import { refreshDerivedNoLog } from "./derived";
 import { rosterInvariantHolds, rosterOf } from "./tycoon/roster";
 import fixtureRaw from "./__fixtures__/seed86-week29.commands.json?raw";
+import { storyConfig } from "./story/config";
 
 interface Fixture { seed: number; founder: string; cofounder: string; commands: string[] }
 const fixture = JSON.parse(fixtureRaw) as Fixture;
@@ -80,6 +81,16 @@ describe("early game: seed 42, hacker + operator (the §1.4 script)", () => {
 });
 
 describe("mid game: seed 86, hacker + builder, replayed to week 29", () => {
+  // The fixture was recorded on the game before The Next Round story pack and pins exact tycoon numbers (seed 86 is the
+  // first seed with a lead on notice at week 29); the pack's events and news lines would change that game, so it replays
+  // with the pack switched off. The pack has its own tests in src/engine/story/.
+  beforeAll(() => {
+    storyConfig.enabled = false;
+  });
+  afterAll(() => {
+    storyConfig.enabled = true;
+  });
+
   const atWeek29 = () => {
     const g = session(fixture.seed, fixture.founder, fixture.cofounder);
     // The fixture includes the four setup commands, which `session` already ran.

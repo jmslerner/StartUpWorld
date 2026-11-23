@@ -13,9 +13,10 @@ const team = (counts: Partial<TeamRoster>): TeamRoster => ({
   ...counts,
 });
 
-const strip = (s: GameState): Omit<GameState, "people" | "product"> => {
-  const { people: _p, product: _q, ...rest } = s;
-  void _p; void _q;
+/** A state minus the slices the migration adds (the two tycoon slices and the story pack's slice). */
+const strip = (s: GameState): Omit<GameState, "people" | "product" | "story"> => {
+  const { people: _p, product: _q, story: _r, ...rest } = s;
+  void _p; void _q; void _r;
   return rest;
 };
 

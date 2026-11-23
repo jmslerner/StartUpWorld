@@ -179,6 +179,30 @@ export interface GameState {
   // create both; legacy commands never add or remove them.
   people?: PeopleState;
   product?: ProductState;
+
+  // The Next Round story pack (src/engine/story). Optional: created by createInitialState() and the save
+  // migration, and lazily by the story helpers; a state without it plays as if no story choice was ever made.
+  story?: StoryState;
+}
+
+// ── The Next Round story pack ──
+
+export interface StoryChoice {
+  eventId: string; // a story event id, e.g. "gpu-landlord"
+  choiceId: string;
+  week: number;
+}
+
+export interface StoryCallback {
+  key: string; // `${eventId}:${choiceId}`: the later scene this choice earned
+  dueWeek: number; // first week it may play; dropped silently if still unplayed 12 weeks later
+}
+
+export interface StoryState {
+  choices: StoryChoice[]; // most recent first, story events only
+  callbacks: StoryCallback[]; // scheduled later scenes, not yet played
+  rounds: number; // investor rounds closed at Series A or later (drives the Series A-N interludes)
+  spin: number; // "protect the story" choices made
 }
 
 // ── Individual employees (TYCOON-SPEC §2.2) ──

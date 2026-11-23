@@ -4,6 +4,7 @@ import { computeContext } from "../context";
 import { makeBuild, makeState, makeTycoonState } from "../testHelpers";
 import { eventPool } from "./pool";
 import { tycoonEvents } from "./tycoonPool";
+import { storyEvents } from "../story/events";
 
 const IDS = ["scope-creep", "the-date", "post-mortem", "the-rewrite"];
 
@@ -53,10 +54,11 @@ const byId = (id: string) => {
 };
 
 describe("tycoon events: legacy play never sees them", () => {
-  it("are the last four entries of eventPool, in order", () => {
+  it("are the last four entries of eventPool before the story pack, in order", () => {
     expect(tycoonEvents.map((e) => e.id)).toEqual(IDS);
-    expect(eventPool.slice(-4).map((e) => e.id)).toEqual(IDS);
-    expect(eventPool.slice(0, -4).some((e) => IDS.includes(e.id))).toBe(false);
+    const end = eventPool.length - storyEvents.length;
+    expect(eventPool.slice(end - 4, end).map((e) => e.id)).toEqual(IDS);
+    expect(eventPool.slice(0, end - 4).some((e) => IDS.includes(e.id))).toBe(false);
   });
 
   it("every `when` is false on a slice-less state, whatever its team or board", () => {
