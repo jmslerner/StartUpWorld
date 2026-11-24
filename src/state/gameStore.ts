@@ -35,6 +35,8 @@ export interface GameStore {
   setDraft(patch: Partial<Plan>): void;
   endQuarter(): void;
   closeReport(): void;
+  /** Show last quarter's report again. */
+  openReport(): void;
   /** Drop the game and go back to the new-game screen. */
   abandon(): void;
 }
@@ -85,6 +87,10 @@ export const createGameStore = (storage: StorageLike | null, config: GameConfig 
     },
 
     closeReport: () => set({ reportOpen: false }),
+
+    openReport: () => {
+      if (get().lastLog !== null) set({ reportOpen: true });
+    },
 
     abandon: () => set({ seed: null, game: null, draft: null, lastLog: null, reportOpen: false, over: false }),
   }));

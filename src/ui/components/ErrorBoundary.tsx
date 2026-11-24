@@ -36,7 +36,7 @@ export class ErrorBoundary extends Component<Props, State> {
     }
 
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center px-6 py-12 text-slate-100">
+      <div className="flex min-h-screen flex-col items-center justify-center px-6 py-12 text-gray-200">
         <div className="panel-surface mx-auto w-full max-w-lg rounded-xl px-6 py-8">
           <h1 className="mb-2 text-lg font-bold tracking-wide text-red-400">
             === CRASH ===

@@ -85,6 +85,16 @@ describe("game store", () => {
     expect(store.getState().lastLog).not.toBeNull();
   });
 
+  it("reopens last quarter's report, once there is one", () => {
+    const store = started();
+    store.getState().openReport();
+    expect(store.getState().reportOpen).toBe(false);
+    store.getState().endQuarter();
+    store.getState().closeReport();
+    store.getState().openReport();
+    expect(store.getState().reportOpen).toBe(true);
+  });
+
   it("plays the same game for the same seed and plans", () => {
     const play = () => {
       const store = started(null, 5);

@@ -1,14 +1,25 @@
 import { Analytics } from "@vercel/analytics/react";
+import { useGame } from "./state/useGame";
+import { EndScreen } from "./ui/screens/EndScreen";
+import { GameScreen } from "./ui/screens/GameScreen";
+import { NewGameScreen } from "./ui/screens/NewGameScreen";
 
-// Placeholder while the turn-based game is built on this branch (see docs/turn-based-design.md).
+/** Which screen is up: no game yet, a game in progress (with its quarterly report), or a finished one. */
+const Screen = () => {
+  const playing = useGame((state) => state.game !== null && state.draft !== null);
+  const over = useGame((state) => state.over);
+  // The last quarter's report is read first; closing it reveals the ending.
+  const reading = useGame((state) => state.reportOpen && state.lastLog !== null);
+  if (!playing) return <NewGameScreen />;
+  if (over && !reading) return <EndScreen />;
+  return <GameScreen />;
+};
+
 const App = () => (
-  <div className="flex min-h-[100dvh] items-center justify-center px-4">
-    <div className="panel-surface w-full max-w-md rounded-xl px-6 py-8 text-center">
-      <h1 className="text-[0.65rem] font-semibold uppercase tracking-[0.22em] text-neon/80">StartUpWorld</h1>
-      <p className="mt-3 text-sm text-mist/80">The turn-based game is being built.</p>
-    </div>
+  <>
+    <Screen />
     <Analytics />
-  </div>
+  </>
 );
 
 export default App;
