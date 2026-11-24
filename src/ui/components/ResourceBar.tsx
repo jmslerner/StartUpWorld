@@ -25,8 +25,8 @@ const Stat = ({ label, value, sub, tone = "text-gray-100", tip }: StatProps) => 
 
 const CONTROL_TEXT: Record<ResourceView["board"]["control"], string> = {
   founders: "you control it",
-  tied: "tied with investors",
-  investors: "investors control it",
+  tied: "tied",
+  investors: "investor-led",
 };
 
 interface ResourceBarProps {
@@ -88,7 +88,7 @@ export const ResourceBar = ({ view, boardRunwayTurns }: ResourceBarProps) => {
       <Stat
         label="Valuation"
         value={money(view.valuation)}
-        sub={view.climate === null ? "normal funding" : `funding ×${view.climate.multiplier}, ${view.climate.turnsLeft} more`}
+        sub={view.climate === null ? "normal funding" : `×${view.climate.multiplier} for ${view.climate.turnsLeft} ${view.climate.turnsLeft === 1 ? "turn" : "turns"}`}
         tone={view.climate === null ? "text-gray-100" : view.climate.multiplier < 1 ? TONE.caution : TONE.good}
         tip={
           <>

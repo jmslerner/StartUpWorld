@@ -151,7 +151,7 @@ export const QuarterReport = ({ companyName, view, over, onClose }: QuarterRepor
               {view.board !== null && (view.board.usersFell || view.board.lowRunway) && !view.board.fired && (
                 <li className={TONE.caution}>Your investors called this a bad quarter ({view.board.usersFell ? "users fell" : "runway is short"}). They voted, and kept you on.</li>
               )}
-              {view.board?.fired && <li className={TONE.danger}>Your investors called this a bad quarter, voted, and fired you.</li>}
+              {view.board?.fired && <li className={TONE.danger}>Your investors called this a bad quarter ({view.board.usersFell ? "users fell" : "runway is short"}), voted, and fired you.</li>}
               {view.notes.map((note) => (
                 <li key={note}>Plan adjusted. {note}</li>
               ))}
