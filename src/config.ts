@@ -198,7 +198,6 @@ export const CONFIG: GameConfig = {
   // weights. The fixed habits (price, when it raises, whether it poaches) are what a player can read.
   cpu: {
     noise: 0.03,
-    boardRiskPenalty: 3,
     layoffRunway: 1,
     minShareForGrowth: 0.1,
     shortRunwayPenalty: 2,
@@ -215,6 +214,7 @@ export const CONFIG: GameConfig = {
         marketingShares: [0, 0.1, 0.2, 0.35, 0.5],
         productShares: [0.7, 0.5, 0.3, 0.15],
         horizon: 4,
+        boardRiskPenalty: 3,
         weights: { users: 3, quality: 1, team: 1, runway: 0.5, runwayHalf: 1, hype: 0.3, equity: 0 },
       },
       // Protects runway and equity: Premium price, raises only under 2 turns of runway, small team, product first.
@@ -227,6 +227,7 @@ export const CONFIG: GameConfig = {
         marketingShares: [0, 0.03, 0.06],
         productShares: [1, 0.8, 0.6],
         horizon: 6,
+        boardRiskPenalty: 3,
         weights: { users: 1, quality: 2, team: 0.6, runway: 2, runwayHalf: 3, hype: 0.1, equity: 2 },
       },
       // Product-heavy, and poaches whenever it can afford to.
@@ -239,6 +240,7 @@ export const CONFIG: GameConfig = {
         marketingShares: [0, 0.05, 0.1],
         productShares: [0.85, 0.7, 0.55],
         horizon: 5,
+        boardRiskPenalty: 3,
         weights: { users: 1.5, quality: 2.5, team: 0.8, runway: 1, runwayHalf: 2, hype: 0.3, equity: 0.5 },
       },
     },

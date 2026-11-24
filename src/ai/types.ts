@@ -43,14 +43,14 @@ export interface CpuPersonality {
   readonly productShares: readonly number[];
   /** Turns ahead over which product and team growth are valued. */
   readonly horizon: number;
+  /** How much it fears its board: score lost per point of firing risk. Low = reckless once investors hold the seats. */
+  readonly boardRiskPenalty: number;
   readonly weights: CpuWeights;
 }
 
 export interface CpuConfig {
   /** Size of the random nudge added to each plan's score. */
   readonly noise: number;
-  /** Score lost per point of board-firing risk. */
-  readonly boardRiskPenalty: number;
   /** Lays people off only when runway is under this many turns (or to turn a profit for an IPO). */
   readonly layoffRunway: number;
   /** A company with almost no market share still values quality and team as if it had this much. */

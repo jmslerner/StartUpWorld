@@ -147,7 +147,7 @@ const scoreOf = (view: CompanyView, projection: Projection, personality: CpuPers
 
   score += (weights.hype * projection.hype) / 100;
   score += weights.equity * projection.equity;
-  score -= config.cpu.boardRiskPenalty * projection.boardRisk;
+  score -= personality.boardRiskPenalty * projection.boardRisk;
 
   if (listed) {
     score += config.cpu.ipo.win;
