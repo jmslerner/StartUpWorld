@@ -201,14 +201,94 @@ Resolution, in this order:
 
 Added to `src/config.ts` because a rule needed them; all tunable like the rest.
 
-- Poach floor: a target needs at least 2 people.
+- Poach floor: a target needs at least 2 people. (Now 4: see the Tuning log.)
 - Event weights: every card has weight 1.
 - Largest marketing spend the planner accepts: $5M.
 
 ## Tuning log
 
-Every number changed from the design's starting value, with the reason.
+Every number changed from the design's starting value, with the reason. `npm run sim` prints the same list straight
+from the two config files, so it cannot drift from the game.
+
+### Where the starting numbers stood
+
+With the starting numbers, 1,000 simulated games gave: Baseline bot 0%, Blitzscaler 41%, Bootstrapper 0%, Incumbent
+59%. Every game ended in an IPO, the median one on turn 13. All four targets failed. Three things caused it:
+
+- The Incumbent's head start compounds, and at 250K users nothing stops it or the Blitzscaler listing early.
+- Raising 30% at $150 a user every third turn brings in more cash than a company can spend, and cash buys users.
+- On $500K with $40K salaries a startup cannot afford its first hires, so the baseline bot never grew past three
+  people, and Premium was worse than Standard in every way that matters, so the Bootstrapper never won.
+
+### Rules
 
 | Number | Start | Now | Why |
 |---|---|---|---|
-| (none yet) | | | |
+| Users needed to go public | 250,000 | 330,000 | At 250K someone listed by turn 14 in every game. With the smaller market below, 330K is about 40% of all users: a clear lead, reached in about half of games and late. |
+| New users in turn 1 | 20,000 | 16,000 | A smaller market, so that going public takes a real lead rather than an even share. |
+| Market growth per turn | 10% | 9% | Same. |
+| Startup cash | $500K | $900K | So a startup can afford to hire before its first raise. |
+| Salary per person per quarter | $40K | $30K | Same, and so a team of normal size can pass the IPO profit test. |
+| Valuation per user | $150 | $80 | Raises were so large that money stopped being a constraint for anyone who raised. |
+| Marketing coefficient | 0.5 | 0.3 | Cash bought too many users: whoever raised most won. |
+| Quality gain per unit of Product work | 5 | 4.5 | Slows the quality race a little. Three people on Product still launch in the first quarter (quality 10.1). |
+| Budget pull factor | ×1.25 | ×1.05 | Budget was the best tier in everything but revenue. Its edge is now mostly its lower churn. |
+| Premium churn penalty | +4 points | +1 point | Premium was dominated, so the Bootstrapper, which always charges it, could not win. |
+| Incumbent's drag exponent | 0.8 | 0.625 | Its head start (8 people, 10K users, quality 30, $3M) won it 59% of games. A heavier drag keeps the head start and takes away the compounding. |
+| Poach cost | $50K | $75K | The Incumbent poaches whenever it can afford to; at $50K that was almost every turn of the game. |
+| Poach floor: a target needs a team of | 2 | 4 | A three-person startup could lose a third of its team on turn 1, before making a single decision. |
+| Burnout needs a team of | 2 | 4 | The same protection against the burnout card. |
+
+### Computer players
+
+These are weights and limits in how each rival scores its options. The habits the design names are untouched, and
+`src/config.test.ts` fails if tuning changes them: the Blitzscaler prices at Budget, raises 30% the moment it can and
+spends the most on marketing; the Bootstrapper prices at Premium, raises only under 2 turns of runway and keeps the
+smallest team; the Incumbent poaches whenever it can afford to.
+
+| Number | Start | Now | Why |
+|---|---|---|---|
+| Blitzscaler: fear of its board | 3 | 0 | It ignores the board, as a blitzscaler would. Its founder is fired in about a quarter of games, and that is what keeps it under the 40% cap. |
+| Blitzscaler: weight on runway | 0.5 | 0 | Same: it does not play safe. |
+| Blitzscaler: runway it keeps when hiring | 2 turns | 1.5 turns | Same. |
+| Blitzscaler: weight on users | 3 | 3.25 | Found by the search. |
+| Blitzscaler: team cap | 14 | 11 | Keeps it from out-hiring everyone now that marketing does less per dollar. |
+| Blitzscaler: share of cash it may spend on marketing | up to 50% | up to 25% | Marketing does less per dollar, so it stops burning half its cash on it. Still the heaviest spender of the three. |
+| Bootstrapper: team cap | 6 | 7 | Still the smallest of the three. |
+| Bootstrapper: share of cash it may spend on marketing | up to 6% | up to 16% | At 6% it could not grow at all. |
+| Bootstrapper: weight on runway | 2 | 2.25 | Found by the search. |
+| Incumbent: team cap | 16 | 14 | Found by the search. |
+| Incumbent: share of cash it may spend on marketing | up to 10% | up to 15% | Found by the search. |
+| Incumbent: fear of its board | 3 | 2 | Found by the search. |
+| Incumbent: weight on users | 1.5 | 2.5 | Found by the search. |
+| Incumbent: weight on quality | 2.5 | 3 | Found by the search. |
+
+### How the numbers were found
+
+A local search over about 45 numbers against the simulator (300-game batches on two sets of seeds per step), run
+several times from hand-built starting points. The search may move numbers; it may not change a rule, a named habit,
+the baseline bot or the targets. Besides the four targets it was asked to keep every company a working company (no
+team bled down to one person, no 50-person baseline bot) and to stay close to the starting numbers. The chosen set
+was then checked on fresh seeds:
+
+| 1,000 games, seeds | Baseline | Blitzscaler | Bootstrapper | Incumbent | End in an IPO | Median turns |
+|---|---|---|---|---|---|---|
+| 1 to 1,000 (`npm run sim`) | 23.7% | 34.1% | 14.4% | 27.8% | 48.6% | 20 |
+| 100,001 to 101,000 | 19.4% | 35.1% | 17.3% | 28.2% | 47.7% | 20 |
+| 110,001 to 111,000 | 18.2% | 36.5% | 17.1% | 28.2% | 50.3% | 20 |
+| 120,001 to 121,000 | 19.3% | 35.6% | 17.2% | 27.9% | 49.9% | 20 |
+| 130,001 to 131,000 | 21.4% | 35.2% | 16.8% | 26.6% | 49.7% | 20 |
+
+All four targets hold on all five.
+
+### What the balance rests on
+
+- The Blitzscaler wins only by going public, and stays under 40% because its board fires its founder in about a
+  quarter of games. Make it careful (raise its fear of the board) and it wins far more.
+- The baseline bot goes out in about one game in six (bankrupt 10%, fired 7.5%), usually around turn 7: it raises
+  small amounts often, loses its board, and never lays anyone off.
+- Games are long. The median game runs all 20 turns and the median IPO comes on turn 19.
+- The Bootstrapper and the Incumbent almost never go out, so "last one standing" did not happen once in these 5,000
+  games.
+- The balance was found for these bots. A change to how a rival plans, or to a rule, calls for another
+  `npm run sim` and probably another search.

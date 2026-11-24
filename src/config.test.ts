@@ -130,16 +130,23 @@ describe("config", () => {
 describe("what tuning may not change", () => {
   const { blitzscaler, bootstrapper, incumbent } = CONFIG.cpu.personalities;
 
-  it("Blitzscaler: Budget pricing, and a 30% raise the moment it is eligible", () => {
+  /** The largest share of its cash a rival will consider spending on marketing in a quarter. */
+  const heaviest = (shares: readonly number[]): number => Math.max(...shares);
+
+  it("Blitzscaler: Budget pricing, a 30% raise the moment it is eligible, and the heaviest marketing", () => {
     expect(blitzscaler.price).toBe("budget");
     expect(blitzscaler.raise.when).toBe("eligible");
     expect(blitzscaler.raise.percents).toEqual([30]);
+    expect(heaviest(blitzscaler.marketingShares)).toBeGreaterThan(heaviest(bootstrapper.marketingShares));
+    expect(heaviest(blitzscaler.marketingShares)).toBeGreaterThan(heaviest(incumbent.marketingShares));
   });
 
-  it("Bootstrapper: Premium pricing, and it raises only when runway drops under 2 turns", () => {
+  it("Bootstrapper: Premium pricing, raises only when runway drops under 2 turns, and the smallest team", () => {
     expect(bootstrapper.price).toBe("premium");
     expect(bootstrapper.raise.when).toBe("runway");
     expect(bootstrapper.raise.runway).toBe(2);
+    expect(bootstrapper.teamCap).toBeLessThan(blitzscaler.teamCap);
+    expect(bootstrapper.teamCap).toBeLessThan(incumbent.teamCap);
   });
 
   it("Incumbent: poaches when it can afford to", () => {

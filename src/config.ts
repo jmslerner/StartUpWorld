@@ -22,13 +22,13 @@ export const CONFIG: GameConfig = {
   // ── Game length and the win ──
   game: { maxTurns: 20 },
   /** A company with this many users and a profitable quarter goes public and wins. */
-  ipo: { users: 250 * K },
+  ipo: { users: 330 * K },
 
   // ── Starting state ──
   archetypes: {
     // Player, Blitzscaler, Bootstrapper.
     startup: {
-      cash: 500 * K,
+      cash: 900 * K,
       headcount: 3,
       users: 0,
       quality: 0,
@@ -49,7 +49,7 @@ export const CONFIG: GameConfig = {
       founderEquity: 0.6,
       founderSeats: 2,
       investorSeats: 1,
-      workExponent: 0.8,
+      workExponent: 0.625,
       /** +50% product output while it trails the quality leader. */
       catchUpMultiplier: 1.5,
       allocation: { product: 5, growth: 2, recruiting: 1 },
@@ -58,7 +58,7 @@ export const CONFIG: GameConfig = {
 
   // ── Talent ──
   /** Per person per quarter. */
-  salary: 40 * K,
+  salary: 30 * K,
   hiring: {
     candidatesPerTurn: 6,
     /** Hiring capacity = this × Recruiting effective work, rounded. */
@@ -66,39 +66,39 @@ export const CONFIG: GameConfig = {
     fee: 10 * K,
   },
   poach: {
-    cost: 50 * K,
+    cost: 75 * K,
     baseChance: 0.5,
     /** (your hype − their hype) ÷ 2 points = 0.005 per hype point. */
     chancePerHypePoint: 0.005,
     minChance: 0.1,
     maxChance: 0.9,
     /** A target needs at least this many people. Not in the design; see the rulings. */
-    minTargetHeadcount: 2,
+    minTargetHeadcount: 4,
   },
   layoff: { severance: 20 * K, hype: -10 },
 
   // ── Product ──
   quality: {
     /** Gain per turn = this × Product effective work × (1 − quality/100). */
-    gainPerWork: 5,
+    gainPerWork: 4.5,
     decay: 2,
     launchAt: 10,
   },
 
   // ── Market ──
-  market: { newUsersTurn1: 20 * K, growthPerTurn: 0.1 },
+  market: { newUsersTurn1: 16 * K, growthPerTurn: 0.09 },
   /** Pull = quality × (1 + growthCoefficient × Growth work + marketingCoefficient × √(marketing ÷ step)) × price factor × (1 + hype/100). */
   pull: {
     growthCoefficient: 0.3,
-    marketingCoefficient: 0.5,
+    marketingCoefficient: 0.3,
     marketingStep: 25 * K,
     /** Largest spend a plan may carry. Not in the design; a sanity limit only. */
     maxMarketing: 5 * M,
   },
   priceTiers: {
-    budget: { price: 2, pullFactor: 1.25, churnDelta: -0.02 },
+    budget: { price: 2, pullFactor: 1.05, churnDelta: -0.02 },
     standard: { price: 3, pullFactor: 1, churnDelta: 0 },
-    premium: { price: 5, pullFactor: 0.75, churnDelta: 0.04 },
+    premium: { price: 5, pullFactor: 0.75, churnDelta: 0.01 },
   },
   /** Churn per turn = base − perQualityPoint × quality + the tier's churnDelta, never below min. */
   churn: { base: 0.12, perQualityPoint: 0.0008, min: 0.02 },
@@ -106,7 +106,7 @@ export const CONFIG: GameConfig = {
   // ── Money ──
   raise: { minUsers: 1 * K, cooldownTurns: 2, options: [10, 20, 30] },
   /** Valuation = users × perUser × (1 + hype/100) × funding-climate multiplier. */
-  valuation: { perUser: 150 },
+  valuation: { perUser: 80 },
   board: { fireChance: 0.3, runwayTurns: 2 },
 
   // ── Hype ──
@@ -148,7 +148,7 @@ export const CONFIG: GameConfig = {
         name: "Burnout",
         text: "One company loses a person to burnout.",
         weight: 1,
-        target: { pick: "random", minHeadcount: 2 },
+        target: { pick: "random", minHeadcount: 4 },
         effects: [{ kind: "targetHeadcount", delta: -1 }],
       },
       {
@@ -209,39 +209,39 @@ export const CONFIG: GameConfig = {
         price: "budget",
         raise: { when: "eligible", runway: 0, percents: [30] },
         poachRunway: null,
-        teamCap: 14,
-        hireRunway: 2,
-        marketingShares: [0, 0.1, 0.2, 0.35, 0.5],
+        teamCap: 11,
+        hireRunway: 1.5,
+        marketingShares: [0, 0.05, 0.1, 0.175, 0.25],
         productShares: [0.7, 0.5, 0.3, 0.15],
         horizon: 4,
-        boardRiskPenalty: 3,
-        weights: { users: 3, quality: 1, team: 1, runway: 0.5, runwayHalf: 1, hype: 0.3, equity: 0 },
+        boardRiskPenalty: 0,
+        weights: { users: 3.25, quality: 1, team: 1, runway: 0, runwayHalf: 1, hype: 0.3, equity: 0 },
       },
       // Protects runway and equity: Premium price, raises only under 2 turns of runway, small team, product first.
       bootstrapper: {
         price: "premium",
         raise: { when: "runway", runway: 2, percents: [10, 20, 30] },
         poachRunway: null,
-        teamCap: 6,
+        teamCap: 7,
         hireRunway: 5,
-        marketingShares: [0, 0.03, 0.06],
+        marketingShares: [0, 0.081, 0.162],
         productShares: [1, 0.8, 0.6],
         horizon: 6,
         boardRiskPenalty: 3,
-        weights: { users: 1, quality: 2, team: 0.6, runway: 2, runwayHalf: 3, hype: 0.1, equity: 2 },
+        weights: { users: 1, quality: 2, team: 0.6, runway: 2.25, runwayHalf: 3, hype: 0.1, equity: 2 },
       },
       // Product-heavy, and poaches whenever it can afford to.
       incumbent: {
         price: "standard",
         raise: { when: "runway", runway: 3, percents: [10, 20, 30] },
         poachRunway: 3,
-        teamCap: 16,
+        teamCap: 14,
         hireRunway: 4,
-        marketingShares: [0, 0.05, 0.1],
+        marketingShares: [0, 0.075, 0.15],
         productShares: [0.85, 0.7, 0.55],
         horizon: 5,
-        boardRiskPenalty: 3,
-        weights: { users: 1.5, quality: 2.5, team: 0.8, runway: 1, runwayHalf: 2, hype: 0.3, equity: 0.5 },
+        boardRiskPenalty: 2,
+        weights: { users: 2.5, quality: 3, team: 0.8, runway: 1, runwayHalf: 2, hype: 0.3, equity: 0.5 },
       },
     },
   },
