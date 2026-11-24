@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { describeError } from "./_lib/describeError.js";
+import { describeErrorWithoutArguments } from "./_lib/describeError.js";
 import { getRedis, withReplyDeadline } from "./_lib/redis.js";
 import { readBody } from "./_lib/requestBody.js";
 import { parseStoredEntry } from "./_lib/storedEntry.js";
@@ -71,7 +71,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     return res.status(405).json({ error: "Method not allowed" });
   } catch (err) {
-    console.error(`leaderboard: request failed: ${describeError(err)}`);
+    console.error(`leaderboard: request failed: ${describeErrorWithoutArguments(err)}`);
     return res.status(500).json({ error: "Internal server error" });
   }
 }

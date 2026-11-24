@@ -177,6 +177,22 @@ describe("graveyard: a failed request leaves one line in the log", () => {
     for (const sent of ["Acme", "Ran out of runway"]) expect(logged().flat().join("\n")).not.toContain(sent);
   });
 
+  it("answers 500 when the database does not know the command, and leaves out the arguments its reply repeats", async () => {
+    // What redis-server 7 answers when LPUSH has been taken away from it. For this command the argument is the entry.
+    const redis = fakeRedis();
+    redis.lPush.mockRejectedValue(
+      new Error(
+        `ERR unknown command 'LPUSH', with args beginning with: 'graveyard' '{"id":"gv-1795521600000-pk12kv","companyName":"Acme","ending":"bankruptcy","epitaph":"Ran out of runway","gr' `,
+      ),
+    );
+    useRedis(redis);
+    expect(await call("POST", SUBMISSION)).toEqual({ status: 500, body: { error: "Internal server error" } });
+    expect(logged()).toEqual([
+      ["error", "graveyard: request failed: ERR unknown command 'LPUSH', with args beginning with: [not logged]"],
+    ]);
+    for (const sent of ["Acme", "Ran out of runway"]) expect(logged().flat().join("\n")).not.toContain(sent);
+  });
+
   it("answers 500 when a stored entry is not valid JSON, and names its place instead of quoting it", async () => {
     // Node's own message for this entry quotes it: Unexpected token 'P', ...""epitaph":Pivoted to"... is not valid JSON
     const broken = '{"id":"gv-0","companyName":"Hooli","ending":"bankruptcy","epitaph":Pivoted to blockchain,"grade":"F","week":9,"timestamp":0}';

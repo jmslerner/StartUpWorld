@@ -202,6 +202,22 @@ describe("leaderboard: a failed request leaves one line in the log", () => {
     for (const sent of ["Acme", "Ada", "4242"]) expect(logged().flat().join("\n")).not.toContain(sent);
   });
 
+  it("answers 500 when the database does not know the command, and leaves out the arguments its reply repeats", async () => {
+    // What redis-server 7 answers when ZADD has been taken away from it. For this command the arguments are the entry.
+    const redis = fakeRedis();
+    redis.zAdd.mockRejectedValue(
+      new Error(
+        `ERR unknown command 'ZADD', with args beginning with: 'leaderboard' '90' '{"id":"4242-1795521600000","companyName":"Acme","founderName":"Ada","ending":"ipo","grade":"A","sc' `,
+      ),
+    );
+    useRedis(redis);
+    expect(await call("POST", SUBMISSION)).toEqual({ status: 500, body: { error: "Internal server error" } });
+    expect(logged()).toEqual([
+      ["error", "leaderboard: request failed: ERR unknown command 'ZADD', with args beginning with: [not logged]"],
+    ]);
+    for (const sent of ["Acme", "Ada", "4242"]) expect(logged().flat().join("\n")).not.toContain(sent);
+  });
+
   it("answers 500 when a stored entry is not valid JSON, and names its place instead of quoting it", async () => {
     // Node's own message for this entry quotes it: Unexpected token 'G', ..."nderName":Gavin Bels"... is not valid JSON
     const broken = '{"id":"7-1","companyName":"Hooli","founderName":Gavin Belson,"ending":"ipo","score":40}';

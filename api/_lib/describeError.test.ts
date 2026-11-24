@@ -1,7 +1,7 @@
 // Lives under api/_lib on purpose: Vercel turns every other file in api/ into a function, and skips paths that contain
 // "/_".
 import { describe, expect, it } from "vitest";
-import { describeError } from "./describeError.js";
+import { describeError, describeErrorWithoutArguments } from "./describeError.js";
 
 // What describeError builds from an error (its message or name, its code, the causes inside an AggregateError) is
 // pinned through the keep-alive, in keepalive.test.ts, and so is the replacement of two plain connection strings. The
@@ -38,5 +38,30 @@ describe("describeError: no part of a connection string is left", () => {
       code: "ECONNREFUSED",
     });
     expect(describeError(new AggregateError([refused], ""))).toBe("AggregateError; connect to [redis url] was refused (ECONNREFUSED)");
+  });
+});
+
+describe("describeErrorWithoutArguments: a reply that repeats a command's arguments", () => {
+  it("is cut where the arguments begin, however the server quotes them", () => {
+    expect(
+      describeErrorWithoutArguments(
+        new Error("ERR unknown command `LPUSH`, with args beginning with: `graveyard`, `{\"companyName\":\"Acme\",\"epitaph\":\"Ran out of runway\"}`, "),
+      ),
+    ).toBe("ERR unknown command `LPUSH`, with args beginning with: [not logged]");
+  });
+
+  it("is cut to its end, also when an argument holds the words that mark where the arguments begin", () => {
+    expect(
+      describeErrorWithoutArguments(
+        new Error("ERR unknown command 'LPUSH', with args beginning with: 'graveyard' '{\"epitaph\":\"Died with args beginning with: nothing\"}' "),
+      ),
+    ).toBe("ERR unknown command 'LPUSH', with args beginning with: [not logged]");
+  });
+
+  it("is what describeError says when it repeats no arguments, connection strings replaced", () => {
+    expect(describeErrorWithoutArguments(new Error("OOM command not allowed when used memory > 'maxmemory'."))).toBe(
+      "OOM command not allowed when used memory > 'maxmemory'.",
+    );
+    expect(describeErrorWithoutArguments("rejected by rediss://default:s3cret@db.example.com:6379")).toBe("rejected by [redis url]");
   });
 });

@@ -37,8 +37,8 @@ With a connection, a request can still fail: the database refuses a command or d
 stored entry cannot be read, or the request's own body cannot be read. The function then answers 500 and writes one line
 that says why to its log (the Logs tab of the Vercel project), for example `leaderboard: request failed: Redis did not
 reply within 3000 ms`. The reason is the error's own text, as the database or the client worded it, with anything shaped
-like a connection string replaced by `[redis url]`. The function adds nothing to it from the request or from the stored
-entries.
+like a connection string replaced by `[redis url]`, and without the arguments a database repeats when it does not know a
+command. The function adds nothing to it from the request or from the stored entries.
 
 A free Redis database is taken away when nothing uses it: Upstash archives one after 30 days without activity, and its
 terms allow deleting one after a week without requests. To prevent that, `vercel.json` schedules one request a day to
