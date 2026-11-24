@@ -61,21 +61,31 @@ export async function getRedis(): Promise<RedisClient | null> {
   if (!url) return null;
 
   if (!client) {
-    client = createClient({
-      url,
-      socket: {
-        connectTimeout: CONNECT_TIMEOUT_MS,
-        // The default strategy retries forever, which leaves connect() pending
-        // indefinitely when the host is unreachable — the function then hangs
-        // until Vercel kills it and the browser never gets a response.
-        // Returning an Error stops retrying and rejects connect() instead.
-        reconnectStrategy: (retries) =>
-          retries > MAX_RECONNECT_ATTEMPTS
-            ? new Error("redis unreachable")
-            : Math.min(retries * 100, 500),
-      },
-    });
-    client.on("error", () => {});
+    let created: RedisClient;
+    try {
+      created = createClient({
+        url,
+        socket: {
+          connectTimeout: CONNECT_TIMEOUT_MS,
+          // The default strategy retries forever, which leaves connect() pending
+          // indefinitely when the host is unreachable — the function then hangs
+          // until Vercel kills it and the browser never gets a response.
+          // Returning an Error stops retrying and rejects connect() instead.
+          reconnectStrategy: (retries) =>
+            retries > MAX_RECONNECT_ATTEMPTS
+              ? new Error("redis unreachable")
+              : Math.min(retries * 100, 500),
+        },
+      });
+    } catch {
+      // createClient parses the URL and throws when it cannot (a hand-pasted
+      // password with an unescaped "/", "#" or "?", or a mistyped port). Node's
+      // error carries the whole string, password included, so it must not
+      // escape to the platform's logs: treat the URL as unusable instead.
+      return null;
+    }
+    created.on("error", () => {});
+    client = created;
   }
 
   if (client.isOpen) return client;
