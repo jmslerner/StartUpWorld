@@ -1,5 +1,6 @@
 // Lives under api/_lib on purpose: Vercel turns every other file in api/ into a function, and skips paths that contain
 // "/_".
+import { format } from "node:util";
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import handler from "../leaderboard.js";
@@ -83,14 +84,26 @@ const ENTRY = {
   timestamp: NOW.getTime(),
 };
 
+/** Every console method that writes a line is watched, so "nothing else was logged" covers all of them. */
+const CONSOLE_METHODS = ["debug", "error", "info", "log", "warn"] as const;
+/** What the handler wrote to the console, as the console prints it, with the method in front: "error: the line". */
+let logged: string[];
+
 beforeEach(() => {
   vi.useFakeTimers();
   vi.setSystemTime(NOW);
   vi.mocked(getRedis).mockReset();
+  logged = [];
+  for (const method of CONSOLE_METHODS) {
+    vi.spyOn(console, method).mockImplementation((...args: unknown[]) => {
+      logged.push(`${method}: ${format(...args)}`);
+    });
+  }
 });
 
 afterEach(() => {
   vi.useRealTimers();
+  vi.restoreAllMocks();
 });
 
 describe("leaderboard: a healthy database", () => {
@@ -128,7 +141,7 @@ describe("leaderboard: a healthy database", () => {
 });
 
 describe("leaderboard: a database that stops answering", () => {
-  it("answers 500 after 3 seconds when the list gets no reply, and closes that connection", async () => {
+  it("answers 500 after 3 seconds when the list gets no reply, closes that connection and logs why", async () => {
     const redis = fakeRedis();
     redis.zRange.mockImplementation(unanswered);
     useRedis(redis);
@@ -136,10 +149,11 @@ describe("leaderboard: a database that stops answering", () => {
     await vi.advanceTimersByTimeAsync(3000);
     expect(await peek(pending)).toEqual({ status: 500, body: { error: "Internal server error" } });
     expect(redis.destroy).toHaveBeenCalledTimes(1);
+    expect(logged).toEqual(["error: leaderboard: request failed: Redis did not reply within 3000 ms"]);
   });
 
   it.each(["get", "zAdd", "zCard", "zRemRangeByRank", "set", "zRevRank"] as const)(
-    "answers 500 after 3 seconds when %s gets no reply to a submitted score, and closes that connection",
+    "answers 500 after 3 seconds when %s gets no reply to a submitted score, closes that connection and logs why",
     async (silent) => {
       const redis = fakeRedis();
       redis[silent].mockImplementation(unanswered);
@@ -149,6 +163,47 @@ describe("leaderboard: a database that stops answering", () => {
       expect(await peek(pending)).toEqual({ status: 500, body: { error: "Internal server error" } });
       expect(redis[silent]).toHaveBeenCalledTimes(1);
       expect(redis.destroy).toHaveBeenCalledTimes(1);
+      expect(logged).toEqual(["error: leaderboard: request failed: Redis did not reply within 3000 ms"]);
     },
   );
+});
+
+describe("leaderboard: a failed request says why in the log", () => {
+  it("answers 500 when a command fails, with one line that gives the reason and never a connection string", async () => {
+    const redis = fakeRedis();
+    redis.zRange.mockRejectedValue(
+      new Error("primary rediss://default:s3cret@db.example.com:6379 failed, replica REDIS://default:0ther@db2.example.com:6380 too"),
+    );
+    useRedis(redis);
+    expect(await call("GET")).toEqual({ status: 500, body: { error: "Internal server error" } });
+    expect(logged).toEqual(["error: leaderboard: request failed: primary [redis url] failed, replica [redis url] too"]);
+    for (const secret of ["s3cret", "0ther", "db.example.com", "db2.example.com"]) expect(logged.join("\n")).not.toContain(secret);
+  });
+
+  it("answers 500 when a submitted score cannot be stored, with a line that holds nothing the player sent", async () => {
+    const redis = fakeRedis();
+    redis.zAdd.mockRejectedValue(new Error("READONLY You can't write against a read only replica."));
+    useRedis(redis);
+    expect(await call("POST", SUBMISSION)).toEqual({ status: 500, body: { error: "Internal server error" } });
+    expect(logged).toEqual(["error: leaderboard: request failed: READONLY You can't write against a read only replica."]);
+    for (const sent of ["Acme", "Ada", "4242"]) expect(logged.join("\n")).not.toContain(sent);
+  });
+
+  it("answers 500 when a stored entry is not JSON, and says which one without quoting it", async () => {
+    // What JSON.parse says about this entry quotes it: Unexpected token 'A', "Acme Corp,"... is not valid JSON
+    useRedis(fakeRedis({ zRange: [JSON.stringify(ENTRY), "Acme Corp, founded by Ada Lovelace"] }));
+    expect(await call("GET")).toEqual({ status: 500, body: { error: "Internal server error" } });
+    expect(logged).toEqual(["error: leaderboard: request failed: stored entry at index 1 is not valid JSON"]);
+    for (const stored of ["Acme", "Corp", "Ada", "Lovelace"]) expect(logged.join("\n")).not.toContain(stored);
+  });
+
+  it("logs nothing when nothing failed: a list, a new score, a submission that does not validate, a seed sent twice", async () => {
+    useRedis(fakeRedis());
+    expect((await call("GET")).status).toBe(200);
+    expect((await call("POST", SUBMISSION)).status).toBe(200);
+    expect((await call("POST", { ...SUBMISSION, companyName: "" })).status).toBe(400);
+    useRedis(fakeRedis({ get: "1" }));
+    expect((await call("POST", SUBMISSION)).status).toBe(409);
+    expect(logged).toEqual([]);
+  });
 });

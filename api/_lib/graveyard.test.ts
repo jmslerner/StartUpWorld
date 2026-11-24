@@ -1,5 +1,6 @@
 // Lives under api/_lib on purpose: Vercel turns every other file in api/ into a function, and skips paths that contain
 // "/_".
+import { format } from "node:util";
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import handler from "../graveyard.js";
@@ -68,14 +69,26 @@ const ENTRY = {
   timestamp: NOW.getTime(),
 };
 
+/** Every console method that writes a line is watched, so "nothing else was logged" covers all of them. */
+const CONSOLE_METHODS = ["debug", "error", "info", "log", "warn"] as const;
+/** What the handler wrote to the console, as the console prints it, with the method in front: "error: the line". */
+let logged: string[];
+
 beforeEach(() => {
   vi.useFakeTimers();
   vi.setSystemTime(NOW);
   vi.mocked(getRedis).mockReset();
+  logged = [];
+  for (const method of CONSOLE_METHODS) {
+    vi.spyOn(console, method).mockImplementation((...args: unknown[]) => {
+      logged.push(`${method}: ${format(...args)}`);
+    });
+  }
 });
 
 afterEach(() => {
   vi.useRealTimers();
+  vi.restoreAllMocks();
 });
 
 describe("graveyard: a healthy database", () => {
@@ -103,7 +116,7 @@ describe("graveyard: a healthy database", () => {
 });
 
 describe("graveyard: a database that stops answering", () => {
-  it("answers 500 after 3 seconds when the list gets no reply, and closes that connection", async () => {
+  it("answers 500 after 3 seconds when the list gets no reply, closes that connection and logs why", async () => {
     const redis = fakeRedis();
     redis.lRange.mockImplementation(unanswered);
     useRedis(redis);
@@ -111,10 +124,11 @@ describe("graveyard: a database that stops answering", () => {
     await vi.advanceTimersByTimeAsync(3000);
     expect(await peek(pending)).toEqual({ status: 500, body: { error: "Internal server error" } });
     expect(redis.destroy).toHaveBeenCalledTimes(1);
+    expect(logged).toEqual(["error: graveyard: request failed: Redis did not reply within 3000 ms"]);
   });
 
   it.each(["lPush", "lTrim"] as const)(
-    "answers 500 after 3 seconds when %s gets no reply to a new entry, and closes that connection",
+    "answers 500 after 3 seconds when %s gets no reply to a new entry, closes that connection and logs why",
     async (silent) => {
       const redis = fakeRedis();
       redis[silent].mockImplementation(unanswered);
@@ -124,6 +138,46 @@ describe("graveyard: a database that stops answering", () => {
       expect(await peek(pending)).toEqual({ status: 500, body: { error: "Internal server error" } });
       expect(redis[silent]).toHaveBeenCalledTimes(1);
       expect(redis.destroy).toHaveBeenCalledTimes(1);
+      expect(logged).toEqual(["error: graveyard: request failed: Redis did not reply within 3000 ms"]);
     },
   );
+});
+
+describe("graveyard: a failed request says why in the log", () => {
+  it("answers 500 when a command fails, with one line that gives the reason and never a connection string", async () => {
+    const redis = fakeRedis();
+    redis.lRange.mockRejectedValue(
+      new Error("primary rediss://default:s3cret@db.example.com:6379 failed, replica REDIS://default:0ther@db2.example.com:6380 too"),
+    );
+    useRedis(redis);
+    expect(await call("GET")).toEqual({ status: 500, body: { error: "Internal server error" } });
+    expect(logged).toEqual(["error: graveyard: request failed: primary [redis url] failed, replica [redis url] too"]);
+    for (const secret of ["s3cret", "0ther", "db.example.com", "db2.example.com"]) expect(logged.join("\n")).not.toContain(secret);
+  });
+
+  it("answers 500 when a new entry cannot be stored, with a line that holds nothing the player sent", async () => {
+    const redis = fakeRedis();
+    redis.lPush.mockRejectedValue(new Error("READONLY You can't write against a read only replica."));
+    useRedis(redis);
+    expect(await call("POST", SUBMISSION)).toEqual({ status: 500, body: { error: "Internal server error" } });
+    expect(logged).toEqual(["error: graveyard: request failed: READONLY You can't write against a read only replica."]);
+    for (const sent of ["Acme", "bankruptcy", "runway"]) expect(logged.join("\n")).not.toContain(sent);
+  });
+
+  it("answers 500 when a stored entry is not JSON, and says which one without quoting it", async () => {
+    // What JSON.parse says about this entry quotes it: Unexpected token 'I', "Initech: s"... is not valid JSON
+    const valid = JSON.stringify({ id: "gv-2", companyName: "Acme", ending: "bankruptcy", epitaph: "Ran out of runway", grade: "F", week: 12, timestamp: 2 });
+    useRedis(fakeRedis({ lRange: [valid, valid, "Initech: still invoicing"] }));
+    expect(await call("GET")).toEqual({ status: 500, body: { error: "Internal server error" } });
+    expect(logged).toEqual(["error: graveyard: request failed: stored entry at index 2 is not valid JSON"]);
+    for (const stored of ["Initech", "invoicing"]) expect(logged.join("\n")).not.toContain(stored);
+  });
+
+  it("logs nothing when nothing failed: a list, a new entry, a submission that does not validate", async () => {
+    useRedis(fakeRedis());
+    expect((await call("GET")).status).toBe(200);
+    expect((await call("POST", SUBMISSION)).status).toBe(200);
+    expect((await call("POST", { ...SUBMISSION, epitaph: "" })).status).toBe(400);
+    expect(logged).toEqual([]);
+  });
 });
