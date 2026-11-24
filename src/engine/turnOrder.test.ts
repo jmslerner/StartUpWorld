@@ -17,6 +17,23 @@ describe("resolveTurn", () => {
     expect(JSON.stringify({ state, plans })).toBe(before);
   });
 
+  it("never writes to what it is given: deep-frozen state, plans and config still resolve", () => {
+    const deepFreeze = <T>(value: T): T => {
+      if (value !== null && typeof value === "object" && !Object.isFrozen(value)) {
+        Object.freeze(value);
+        for (const item of Object.values(value)) deepFreeze(item);
+      }
+      return value;
+    };
+    let state = deepFreeze(newGame());
+    const config = deepFreeze(structuredClone(CONFIG));
+    for (let turn = 1; turn <= 6; turn++) {
+      const plans = deepFreeze(plansOf(state, { [HUMAN]: { allocation: { product: 2, growth: 0, recruiting: 1 }, marketing: 25_000 }, [INCUMBENT]: { poachTarget: BLITZ, layoffs: 1 } }));
+      state = deepFreeze(resolveTurn(state, plans, 9, config).state);
+    }
+    expect(state.turn).toBe(7);
+  });
+
   it("uses the config file when no config is passed", () => {
     const state = newGame();
     expect(resolveTurn(state, plansOf(state), 5)).toEqual(resolveTurn(state, plansOf(state), 5, CONFIG));

@@ -57,6 +57,8 @@ export interface CpuConfig {
   readonly minShareForGrowth: number;
   /** Score lost for a plan that leaves less than one turn of runway, scaled by how far short it is. */
   readonly shortRunwayPenalty: number;
+  /** Marketing options on the last turn, as shares of cash on hand: there is no next quarter to save for. */
+  readonly lastTurnMarketingShares: readonly number[];
   /** The IPO push: the prize for a quarter that wins, and what deficits and lost users cost on the way. */
   readonly ipo: { readonly win: number; readonly deficit: number; readonly nextDeficit: number; readonly usersShortfall: number };
   readonly personalities: Readonly<Record<CpuKind, CpuPersonality>>;

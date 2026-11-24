@@ -6,7 +6,7 @@
 // poaches, how big it lets the team get) are what a player can learn to read.
 
 import { CONFIG, type GameConfig } from "../config";
-import { raiseAmount, valuationOf } from "../engine/formulas";
+import { founderStake, raiseAmount, valuationOf } from "../engine/formulas";
 import { raiseBlocker } from "../engine/plan";
 import { estimateRivals, projectTurn, type Projection } from "../engine/project";
 import { STREAM, nextFloat01, streamSeed } from "../engine/rng";
@@ -21,6 +21,8 @@ interface Situation {
   readonly ipoPush: boolean;
   /** Less than a turn or so of cash: layoffs are on the table. */
   readonly trouble: boolean;
+  /** The game ends this turn: only the founder's stake counts, and there is nothing to save for. */
+  readonly lastTurn: boolean;
 }
 
 const situationOf = (view: CompanyView, config: GameConfig): Situation => {
@@ -29,6 +31,7 @@ const situationOf = (view: CompanyView, config: GameConfig): Situation => {
     runway,
     ipoPush: view.self.users >= config.ipo.users,
     trouble: runway !== null && runway < config.cpu.layoffRunway,
+    lastTurn: view.turn >= config.game.maxTurns,
   };
 };
 
@@ -66,14 +69,13 @@ export const candidatePlans = (view: CompanyView, kind: CpuKind, config: GameCon
   for (const raisePercent of raiseOptions(view, personality, situation, config)) {
     const raised = raisePercent > 0 ? raiseAmount(valuationOf(self.users, self.hype, view.climate.multiplier, config), raisePercent) : 0;
     const spendable = Math.max(0, self.cash + raised);
-    const marketingLevels = cautious
-      ? [0]
-      : unique(personality.marketingShares.map((share) => Math.min(config.pull.maxMarketing, Math.floor((share * spendable) / step) * step)));
+    const marketingShares = situation.lastTurn && !cautious ? config.cpu.lastTurnMarketingShares : cautious ? [0] : personality.marketingShares;
+    const marketingLevels = unique(marketingShares.map((share) => Math.min(config.pull.maxMarketing, Math.floor((share * spendable) / step) * step)));
 
     for (const layoffs of layoffOptions(view, situation)) {
       const available = self.headcount - layoffs - (raisePercent > 0 ? 1 : 0);
       const roomToHire = personality.teamCap - (self.headcount - layoffs);
-      const mayHire = !cautious && layoffs === 0 && roomToHire > 0;
+      const mayHire = !cautious && !situation.lastTurn && layoffs === 0 && roomToHire > 0;
       const recruiterOptions = mayHire ? (available >= 8 ? [0, 1, 2] : [0, 1]) : [0];
 
       for (const recruiting of recruiterOptions) {
@@ -115,6 +117,13 @@ const scoreOf = (view: CompanyView, projection: Projection, personality: CpuPers
   // A plan that ends below $0 is bankruptcy: anything else beats it, and among such plans the least bad wins.
   if (projection.cash < 0) return -1_000 + projection.cash / 1_000_000;
 
+  const listed = projection.users >= config.ipo.users && projection.profitable;
+  if (situation.lastTurn) {
+    // No next quarter: what counts is the founder's stake, if the founder is still there to hold it.
+    const stake = founderStake(projection.equity, projection.valuation) * (1 - projection.boardRisk);
+    return stake / (Math.max(1, projection.pool) * config.valuation.perUser) + (listed ? config.cpu.ipo.win : 0);
+  }
+
   const weights = personality.weights;
   const horizon = Math.min(personality.horizon, Math.max(0, config.game.maxTurns - view.turn));
   // What a relative gain in pull is worth per turn, as a share of the pool: s × (1 − s).
@@ -140,7 +149,6 @@ const scoreOf = (view: CompanyView, projection: Projection, personality: CpuPers
   score += weights.equity * projection.equity;
   score -= config.cpu.boardRiskPenalty * projection.boardRisk;
 
-  const listed = projection.users >= config.ipo.users && projection.profitable;
   if (listed) {
     score += config.cpu.ipo.win;
   } else if (situation.ipoPush) {

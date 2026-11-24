@@ -3,6 +3,9 @@
 This file is the source of truth for the turn-based game. The "Game design" section is the owner's design, verbatim.
 Rulings on points it leaves open, and the log of tuned numbers, are appended below it as the build proceeds.
 
+The numbers in the "Game design" section are the design's starting values. Where one differs from `src/config.ts`,
+config is what the game runs; the Tuning log at the end lists every difference.
+
 ## Game design
 
 ### Core loop
@@ -69,6 +72,13 @@ Online multiplayer, a map or multiple markets, talent roles, difficulty levels, 
 These fill gaps the design leaves open. Where a ruling and the design disagree, the design wins. Items marked
 (owner) were decided by the owner; the rest are the implementer's calls and can be changed.
 
+Most rulings only settle timing or an edge case. Four go further and add to what the design says:
+
+- Users lost to a security breach rejoin the pool, like churned users (ruling 1).
+- A poach or a burnout can never take a company's last person, and the poach floor is a tunable number (rulings 10, 11).
+- The planning panel has a "hire at most N" control (ruling 9).
+- More is public about rivals than the design lists: price tier, equity and board seats (ruling 18).
+
 ### Owner decisions
 
 - The old weekly terminal game is removed; this game replaces it. (owner)
@@ -121,22 +131,27 @@ Resolution, in this order:
 8. **Money.** Revenue = end-of-turn users × price. Costs = salaries for everyone on payroll this turn (laid-off
    people get severance instead) + marketing + $10K per hire made + $50K per poach attempt + severance.
    Profitable = revenue ≥ costs. Runway = cash ÷ (costs − revenue) for the latest quarter, with no limit when that
-   quarter was profitable. The resource bar, the board and the bots all read this one number.
+   quarter was profitable. The resource bar, the board and the bots all read this one number. Before a company's
+   first quarter its burn is its payroll. Every cost counts, one-off ones included, so a quarter that burns more
+   than a third of its opening cash plus money raised ends with under 2 turns of runway.
 9. **Hiring.** Candidates = 6 + event bonus + staff freed by companies that went out last turn + everyone laid off
    this turn. Each company wants min(capacity, its "hire at most" setting). Candidates are handed out one at a time
    in start-of-turn hype order, highest first; equal hype is ordered by the seeded RNG. The fee is charged per hire
    made. Unhired candidates leave. Hires start next turn.
 10. **Poach.** One attempt per turn, $50K whether or not it works. Chance = 50% + (your hype − their hype) ÷ 2
     points, clamped to 10–90%, on start-of-turn hype. Attempts resolve in hype order. The person changes company
-    from next turn. A target must have at least 2 people at that moment; an attempt on a smaller team is dropped at
-    no cost.
+    from next turn. A target must have at least 2 people at that moment (after its own layoffs and any earlier
+    poach that turn); an attempt on a smaller team is dropped at no cost. Several companies may each take one person
+    from the same target in a turn, down to that floor.
 11. **Layoffs.** At most headcount − 1. −10 hype once per turn with any layoffs, not per person. Nobody falls below
     1 person through layoffs, poaching or burnout.
 12. **Hype** each turn = hype × 0.8, then +15 if it launched this turn, +10 if a raise closed, +5 if users grew 25%+
     over last quarter's close (needs users at that close), −10 if anyone was laid off; clamped to 0–100.
 13. **Bad quarter.** "Users fell" compares end-of-turn users with last quarter's close, so a breach counts.
     "Runway under 2 turns" uses the runway of ruling 8. The board votes once per bad quarter, and only while
-    investor seats outnumber founder seats (a seat added by this turn's raise counts).
+    investor seats outnumber founder seats (a seat added by this turn's raise counts). With the starting seats a
+    startup's founder can be fired from its third raise on (turn 8 at the earliest) and the Incumbent's from its
+    second (turn 4 at the earliest).
 14. **Endings**, in order: IPO (250K+ users and a profitable quarter; ties go to the higher valuation, then the
     higher founder stake); bankruptcy (cash strictly below $0); board firing; last company standing wins; after turn
     20 the highest founder stake (equity × valuation) among surviving companies wins. If every remaining company
@@ -149,13 +164,23 @@ Resolution, in this order:
     pull. Burnout needs a team of 2+. The breach needs a launched company under quality 50 that has users.
 17. **Price and marketing.** Price changes are free and immediate. Marketing is paid in the turn it is set and only
     affects that turn.
-18. **Public information.** As listed in the design (users, team size, hype, quality, last raise), plus launch
-    status, price tier, equity and board seats (derivable from public raises) and last quarter's users won and
-    lost. Cash, team split, marketing and plans are private.
+18. **Public information.** As listed in the design (users, team size, hype, quality, last raise: its turn, percent
+    and amount), plus launch status, last quarter's users won and lost with the quality and hype the company
+    started that quarter on, equity and board seats (they follow from the public raises) and price tier. Price tier
+    is new information, and the clearest tell of how a rival plays. Cash, team split, marketing and plans are
+    private. CPUs plan from exactly this view.
 19. **No special player.** The engine treats all four companies alike. The app ends the session when the human's
     company is out; the simulator plays on until there is a winner.
 20. **Randomness.** Every roll comes from a stream keyed by (seed, turn, purpose, company), so a game replays
     exactly from its seed and plans, and one company's choices never shift another's rolls.
+21. **Rival types.** The rivals panel does not label a rival as Blitzscaler, Bootstrapper or Incumbent. Its pitch,
+    its price tier and how it plays show it, and the end screen names it. Rivals are seated in a random order.
+22. **Projected cash.** The planning panel cannot know how many users a quarter will bring, so it shows two figures:
+    a floor (no users won, every wanted hire made), which is exact, and an expected figure built from rivals'
+    public results.
+23. **Baseline bot details.** 40 / 40 / 20 is split in whole people by largest remainder (3 people → 1 / 1 / 1,
+    5 → 2 / 2 / 1). When it raises, the fundraiser comes out first and the rest are split. It hires k people only
+    if (cash − $10K × k) ÷ (last quarter's burn + $40K × k) stays at 3 turns or more.
 
 ### Numbers the design does not name
 

@@ -57,6 +57,8 @@ export interface Projection {
   /** Hiring is costed for every hire wanted, so cash errs on the low side. */
   readonly costs: CostBreakdown;
   readonly cash: number;
+  /** Cash if it wins no users at all this quarter and makes every hire it wants: it cannot end lower. */
+  readonly cashFloor: number;
   readonly profitable: boolean;
   readonly runway: number | null;
   readonly hype: number;
@@ -221,6 +223,7 @@ export const projectTurn = (
     revenue,
     costs,
     cash,
+    cashFloor: self.cash + (raise?.amount ?? 0) + (self.users - usersChurned) * config.priceTiers[resolved.price].price - costs.total,
     profitable: revenue >= costs.total,
     runway,
     hype,

@@ -202,6 +202,7 @@ export const CONFIG: GameConfig = {
     layoffRunway: 1,
     minShareForGrowth: 0.1,
     shortRunwayPenalty: 2,
+    lastTurnMarketingShares: [0, 0.2, 0.4, 0.6, 0.8, 0.95],
     ipo: { win: 100, deficit: 20, nextDeficit: 10, usersShortfall: 20 },
     personalities: {
       // Chases users: Budget price, raises 30% the moment it can, heavy marketing.

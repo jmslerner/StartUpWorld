@@ -39,6 +39,8 @@ export interface SimSummary {
   readonly firedShare: Readonly<Record<Seat | "all", number>>;
   /** Share of games in which at least one company went bankrupt. */
   readonly gamesWithBankruptcy: number;
+  /** Median turn on which each seat went out, among the games where it did; null if it never did. */
+  readonly medianExitTurn: Readonly<Record<Seat, number | null>>;
   readonly meanRaises: Readonly<Record<Seat, number>>;
   readonly positions: Readonly<Record<number, Readonly<Record<Seat, Position>>>>;
 }
@@ -101,6 +103,10 @@ export const summarize = (games: readonly SimGame[]): SimSummary => {
     bankruptShare: outShare("bankrupt"),
     firedShare: outShare("fired"),
     gamesWithBankruptcy: share(games.filter((game) => game.seats.some((s) => s.out === "bankrupt")).length),
+    medianExitTurn: perSeat((seat) => {
+      const exits = games.map((game) => seatOf(game, seat)?.outTurn ?? null).filter((turn) => turn !== null);
+      return exits.length > 0 ? median(exits) : null;
+    }),
     meanRaises: perSeat((seat) => mean(games.map((game) => seatOf(game, seat)?.raises ?? 0))),
     positions,
   };
@@ -181,8 +187,11 @@ export const formatReport = (summary: SimSummary, checks: readonly Check[]): str
   if (summary.medianIpoTurn !== null) lines.push(row("Median IPO turn", String(summary.medianIpoTurn)));
   lines.push("");
 
-  lines.push("Out of the game", row("", "bankrupt", "fired", "raises"));
-  for (const seat of SEATS) lines.push(row(SEAT_LABEL[seat], percent(summary.bankruptShare[seat]), percent(summary.firedShare[seat]), summary.meanRaises[seat].toFixed(1)));
+  lines.push("Out of the game", row("", "bankrupt", "fired", "median exit", "raises"));
+  for (const seat of SEATS) {
+    const exit = summary.medianExitTurn[seat];
+    lines.push(row(SEAT_LABEL[seat], percent(summary.bankruptShare[seat]), percent(summary.firedShare[seat]), exit === null ? "-" : `turn ${exit}`, summary.meanRaises[seat].toFixed(1)));
+  }
   lines.push(row("All companies", percent(summary.bankruptShare.all), percent(summary.firedShare.all)));
   lines.push(row("Games with a bankruptcy", percent(summary.gamesWithBankruptcy)));
   lines.push("");

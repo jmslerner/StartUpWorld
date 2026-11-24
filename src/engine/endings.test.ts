@@ -137,6 +137,15 @@ describe("the board", () => {
     expect(fired / seeds).toBeLessThan(0.38);
   });
 
+  it("follows the configured chance: always at 100%, never at 0%", () => {
+    const always = { ...CONFIG, board: { ...CONFIG.board, fireChance: 1 } };
+    const never = { ...CONFIG, board: { ...CONFIG.board, fireChance: 0 } };
+    for (let seed = 1; seed <= 40; seed++) {
+      expect(reportFor(resolve(shrinking(), idle, seed, always), HUMAN).board?.fired).toBe(true);
+      expect(reportFor(resolve(shrinking(), idle, seed, never), HUMAN).board?.fired).toBe(false);
+    }
+  });
+
   it("cannot fire while founders hold as many seats as investors", () => {
     for (let seed = 1; seed <= 60; seed++) {
       const result = resolve(shrinking({ investorSeats: 2 }), idle, seed);

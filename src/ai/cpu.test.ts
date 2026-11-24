@@ -231,6 +231,56 @@ describe("the Incumbent", () => {
   });
 });
 
+describe("the last turn", () => {
+  const lastTurn = (kind: CpuKind, patch: Partial<Company> = {}): GameState => withState(established(SEAT[kind], patch), { turn: CONFIG.game.maxTurns });
+
+  it("spends on users instead of saving for a next quarter that will not come", () => {
+    for (const kind of ["bootstrapper", "incumbent"] as const) {
+      const usual = Math.max(...CONFIG.cpu.personalities[kind].marketingShares);
+      const view = viewFor(lastTurn(kind), SEAT[kind]);
+      const final = chooseCpuPlan(view, kind, 1, CONFIG);
+      // More than its cautious habit would ever allow, yet never into the red.
+      expect(final.marketing, kind).toBeGreaterThan(usual * view.self.cash);
+      expect(projectTurn(view, final, CONFIG).cash, kind).toBeGreaterThanOrEqual(0);
+    }
+  });
+
+  it("goes for the largest founder stake it can project", () => {
+    for (const kind of KINDS) {
+      const view = viewFor(lastTurn(kind), SEAT[kind]);
+      const stake = (plan: Plan) => {
+        const p = projectTurn(view, plan, CONFIG);
+        return p.cash < 0 ? -1 : p.equity * p.valuation * (1 - p.boardRisk);
+      };
+      const chosen = stake(chooseCpuPlan(view, kind, 1, CONFIG));
+      const bestOnOffer = Math.max(...candidatePlans(view, kind, CONFIG).map(stake));
+      expect(chosen, kind).toBeGreaterThanOrEqual(bestOnOffer * 0.97);
+    }
+  });
+
+  it("does not hire or lay off: neither can pay back", () => {
+    for (const kind of KINDS) {
+      const view = viewFor(lastTurn(kind), SEAT[kind]);
+      const plan = chooseCpuPlan(view, kind, 1, CONFIG);
+      expect(plan.layoffs, kind).toBe(0);
+      expect(projectTurn(view, plan, CONFIG).hiresWanted, kind).toBe(0);
+    }
+  });
+
+  it("will not risk the board for it: an investor-controlled company keeps 2 turns of runway", () => {
+    for (const kind of KINDS) {
+      const view = viewFor(lastTurn(kind, { investorSeats: 3, lastRaise: { turn: 19, percent: 10, amount: 1 } }), SEAT[kind]);
+      const projection = projectTurn(view, chooseCpuPlan(view, kind, 1, CONFIG), CONFIG);
+      expect(projection.boardRisk, kind).toBe(0);
+    }
+  });
+
+  it("keeps its habits to the end", () => {
+    expect(chooseCpuPlan(viewFor(lastTurn("blitzscaler"), BLITZ), "blitzscaler", 1, CONFIG)).toMatchObject({ price: "budget", raisePercent: 30 });
+    expect(chooseCpuPlan(viewFor(lastTurn("bootstrapper"), BOOT), "bootstrapper", 1, CONFIG)).toMatchObject({ price: "premium", raisePercent: 0 });
+  });
+});
+
 describe("the IPO push", () => {
   /** Past the user bar with the given team, and a $500K-a-turn marketing habit behind it. */
   const pastTheBar = (kind: CpuKind, headcount: number): GameState => {

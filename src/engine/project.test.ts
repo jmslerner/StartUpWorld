@@ -85,6 +85,24 @@ describe("projectTurn", () => {
     expect(contested.share).toBeCloseTo(0.5, 9);
   });
 
+  it("gives a guaranteed floor: the cash it ends with if it wins no users at all and makes every hire", () => {
+    const state = launchedCompany(newGame(), HUMAN, { users: 10_000, cash: 300_000 });
+    const view = viewFor(state, HUMAN);
+    const plan = planOf(state, HUMAN, { allocation: { product: 1, growth: 1, recruiting: 1 }, marketing: 50_000 });
+    const projection = projectTurn(view, plan, CONFIG);
+    const shutOut = projectTurn(view, plan, CONFIG, { pull: 1e15, churn: 0 });
+    expect(shutOut.usersWon).toBe(0);
+    expect(projection.cashFloor).toBe(shutOut.cash);
+    expect(projection.cashFloor).toBe(300_000 - projection.costs.total + (10_000 - projection.usersChurned) * 3);
+    expect(projection.cashFloor).toBeLessThan(projection.cash);
+  });
+
+  it("has a floor equal to its cash when nobody is launched to sell to", () => {
+    const projection = projectTurn(viewFor(newGame(), HUMAN), planOf(newGame(), HUMAN, { allocation: { product: 1, growth: 2, recruiting: 0 } }), CONFIG);
+    expect(projection.launched).toBe(false);
+    expect(projection.cashFloor).toBe(projection.cash);
+  });
+
   it("is conservative about hiring: it pays for every hire wanted", () => {
     const state = newGame();
     const projection = projectTurn(viewFor(state, HUMAN), planOf(state, HUMAN, { allocation: { product: 2, growth: 0, recruiting: 1 } }), CONFIG);
