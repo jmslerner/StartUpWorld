@@ -32,7 +32,8 @@ const useRedis = (redis: ReturnType<typeof fakeRedis> | null): void => {
   vi.mocked(getRedis).mockResolvedValue(redis as unknown as RedisClient | null);
 };
 
-const call = async (method: string, body?: unknown): Promise<{ status: number; body: unknown }> => {
+/** Hands the handler a request and collects what it answers. */
+const answer = async (req: object): Promise<{ status: number; body: unknown }> => {
   const reply = { status: 200, body: undefined as unknown };
   const res = {
     status(code: number) {
@@ -44,9 +45,11 @@ const call = async (method: string, body?: unknown): Promise<{ status: number; b
       return res;
     },
   };
-  await handler({ method, body } as unknown as VercelRequest, res as unknown as VercelResponse);
+  await handler(req as unknown as VercelRequest, res as unknown as VercelResponse);
   return reply;
 };
+
+const call = (method: string, body?: unknown) => answer({ method, body });
 
 /** A command that was sent and is never answered. */
 const unanswered = () => new Promise<never>(() => {});
@@ -69,8 +72,11 @@ const ENTRY = {
   timestamp: NOW.getTime(),
 };
 
-/** Every console method that writes a line is watched, so "nothing else was logged" covers all of them. */
-const CONSOLE_METHODS = ["debug", "error", "info", "log", "warn"] as const;
+/**
+ * The console methods that write by themselves. The others (trace, table, assert, group, count, time) write through
+ * one of these, so "nothing else was logged" covers the whole console.
+ */
+const CONSOLE_METHODS = ["debug", "dir", "dirxml", "error", "info", "log", "warn"] as const;
 /** What the handler wrote to the console, as the console prints it, with the method in front: "error: the line". */
 let logged: string[];
 
@@ -147,12 +153,16 @@ describe("graveyard: a failed request says why in the log", () => {
   it("answers 500 when a command fails, with one line that gives the reason and never a connection string", async () => {
     const redis = fakeRedis();
     redis.lRange.mockRejectedValue(
-      new Error("primary rediss://default:s3cret@db.example.com:6379 failed, replica REDIS://default:0ther@db2.example.com:6380 too"),
+      // The second one is long, has another user, escapes and punctuation in the password, and is in upper case.
+      new Error(
+        "primary rediss://default:s3cret@db.example.com:6379 failed, " +
+          "replica REDIS://app-user:pa%2Fss%2Bw0rd%3D~-_.0123456789abcdefghijklmnopqrstuvwxyz@db2.example.com:6380/0 too",
+      ),
     );
     useRedis(redis);
     expect(await call("GET")).toEqual({ status: 500, body: { error: "Internal server error" } });
     expect(logged).toEqual(["error: graveyard: request failed: primary [redis url] failed, replica [redis url] too"]);
-    for (const secret of ["s3cret", "0ther", "db.example.com", "db2.example.com"]) expect(logged.join("\n")).not.toContain(secret);
+    for (const secret of ["s3cret", "w0rd", "app-user", "db.example.com", "db2.example.com"]) expect(logged.join("\n")).not.toContain(secret);
   });
 
   it("answers 500 when a new entry cannot be stored, with a line that holds nothing the player sent", async () => {
@@ -162,6 +172,19 @@ describe("graveyard: a failed request says why in the log", () => {
     expect(await call("POST", SUBMISSION)).toEqual({ status: 500, body: { error: "Internal server error" } });
     expect(logged).toEqual(["error: graveyard: request failed: READONLY You can't write against a read only replica."]);
     for (const sent of ["Acme", "bankruptcy", "runway"]) expect(logged.join("\n")).not.toContain(sent);
+  });
+
+  it("answers 500 when the request's body cannot be read, with the reason in the line", async () => {
+    // What Vercel does when the handler reads req.body and the body is not the JSON its Content-Type promised.
+    useRedis(fakeRedis());
+    const unreadable = {
+      method: "POST",
+      get body(): never {
+        throw Object.assign(new Error("Invalid JSON"), { statusCode: 400 });
+      },
+    };
+    expect(await answer(unreadable)).toEqual({ status: 500, body: { error: "Internal server error" } });
+    expect(logged).toEqual(["error: graveyard: request failed: Invalid JSON"]);
   });
 
   it("answers 500 when the database does not know a command, with a line that stops before the arguments it quotes back", async () => {
@@ -202,11 +225,14 @@ describe("graveyard: a failed request says why in the log", () => {
     expect(logged).toEqual(["error: graveyard: request failed: Socket closed unexpectedly"]);
   });
 
-  it("logs nothing when nothing failed: a list, a new entry, a submission that does not validate", async () => {
+  it("logs nothing for a request it answers without a 500: a list, a new entry, a refused submission, another method, no connection", async () => {
     useRedis(fakeRedis());
     expect((await call("GET")).status).toBe(200);
     expect((await call("POST", SUBMISSION)).status).toBe(200);
     expect((await call("POST", { ...SUBMISSION, epitaph: "" })).status).toBe(400);
+    expect((await call("DELETE", SUBMISSION)).status).toBe(405);
+    useRedis(null);
+    expect((await call("POST", SUBMISSION)).status).toBe(503);
     expect(logged).toEqual([]);
   });
 });

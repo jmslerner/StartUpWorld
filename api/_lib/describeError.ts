@@ -1,7 +1,7 @@
 /**
- * What went wrong, for the log: the message (or the error's name when the message is empty), its code, and the same for
- * each cause inside an AggregateError. Anything shaped like a connection string is removed, so a password can never
- * reach the logs through this line.
+ * What went wrong, for a log line: the message (or the error's name when the message is empty), its code, and the same
+ * for each cause inside an AggregateError. Anything shaped like a connection string is removed, so a password can never
+ * reach the logs through a line that is built from this.
  */
 export function describeError(err: unknown): string {
   const parts: string[] = [];
@@ -30,8 +30,8 @@ const ARGUMENTS_FOLLOW = ", with args beginning with:";
  *     ERR unknown command 'LPUSH', with args beginning with: 'graveyard' '{"id":"gv-1","companyName":"Acme",…
  *
  * and for LPUSH and ZADD those arguments are the player's entry. It takes a database without these commands to see
- * that reply at all, but if it ever comes, the quoted arguments are left out, so an entry can never reach the logs
- * through this line.
+ * that reply at all, but if it ever comes, the quoted arguments are left out, so an entry cannot reach the logs that
+ * way either.
  */
 export function describeErrorWithoutArguments(err: unknown): string {
   const text = describeError(err);
