@@ -57,6 +57,9 @@ export interface LastRaise {
 
 /** What everyone can see about a company's latest quarter. */
 export interface QuarterStats {
+  /** Quality and hype as that quarter started (hype after its event): what the rivals panel showed then. */
+  readonly qualityAtOpen: number;
+  readonly hypeAtOpen: number;
   /** Users at the previous close, before that quarter's event. */
   readonly usersAtOpen: number;
   readonly usersLostToEvent: number;
@@ -404,4 +407,11 @@ export interface RulesConfig {
     readonly growthThreshold: number;
   };
   readonly events: { readonly firstTurn: number; readonly chance: number; readonly deck: readonly EventCard[] };
+  /** Guesses the one-quarter projection falls back on when it has nothing better. */
+  readonly projection: {
+    /** A launched rival's pull ≈ quality × this × price factor × (1 + hype/100), until a quarter of results says otherwise. */
+    readonly rivalPullGuess: number;
+    /** How many candidates each rival is assumed to want this turn. */
+    readonly rivalHireGuess: number;
+  };
 }

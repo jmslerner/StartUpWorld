@@ -3,7 +3,9 @@
 export { createGame } from "./setup";
 export { resolveTurn } from "./resolveTurn";
 export type { TurnResult } from "./resolveTurn";
-export { defaultPlan, normalizePlan, raiseBlocker } from "./plan";
+export { defaultPlan, normalizePlan, normalizePlanFor, raiseBlocker } from "./plan";
+export { estimateRivals, projectTurn } from "./project";
+export type { Projection, RivalEstimate } from "./project";
 export type { CheckedPlan, RaiseBlocker } from "./plan";
 export { publicCompany, publicReport, viewFor } from "./view";
 export { replayGame } from "./replay";

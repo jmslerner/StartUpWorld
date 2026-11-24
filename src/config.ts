@@ -106,6 +106,10 @@ export const CONFIG: GameConfig = {
   // ── Hype ──
   hype: { decay: 0.2, launch: 15, raise: 10, growth: 5, growthThreshold: 0.25 },
 
+  // ── Projection (planning panel and CPU planner) ──
+  // Not rules: assumptions the one-quarter projection uses about rivals it cannot see into.
+  projection: { rivalPullGuess: 1.6, rivalHireGuess: 1 },
+
   // ── Events ──
   events: {
     firstTurn: 3,

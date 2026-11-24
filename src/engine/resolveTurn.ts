@@ -381,6 +381,8 @@ export const resolveTurn = (state: GameState, plans: PlanSet, seed: number, conf
       investorSeats: desk.investorSeats,
       lastRaise: desk.raise ? { turn, percent: desk.raise.percent, amount: desk.raise.amount } : company.lastRaise,
       lastQuarter: {
+        qualityAtOpen: company.quality,
+        hypeAtOpen: company.hype,
         usersAtOpen: company.usersAtLastClose,
         usersLostToEvent: Math.max(0, company.usersAtLastClose - company.users),
         usersChurned: desk.churned,

@@ -3,7 +3,7 @@
 
 import { refitAllocation } from "./formulas";
 import { PRICE_TIERS } from "./types";
-import type { Allocation, Company, CompanyId, GameState, Plan, RulesConfig } from "./types";
+import type { Allocation, Company, CompanyId, GameState, Plan, PublicCompany, RulesConfig } from "./types";
 
 /** Last turn's split refitted to today's team, same marketing, price and hire limit; no one-off actions. */
 export const defaultPlan = (company: Company): Plan => ({
@@ -40,8 +40,14 @@ export interface CheckedPlan {
   readonly notes: readonly string[];
 }
 
-export const normalizePlan = (state: GameState, id: CompanyId, plan: Plan | null, config: RulesConfig): CheckedPlan => {
-  const company = state.companies[id];
+/** The check itself, from what one company can see: itself, the turn, and the public side of the others. */
+export const normalizePlanFor = (
+  company: Company,
+  turn: number,
+  others: readonly PublicCompany[],
+  plan: Plan | null,
+  config: RulesConfig,
+): CheckedPlan => {
   const wanted = plan ?? defaultPlan(company);
   const notes: string[] = [];
 
@@ -54,7 +60,7 @@ export const normalizePlan = (state: GameState, id: CompanyId, plan: Plan | null
 
   let raisePercent = wanted.raisePercent;
   if (raisePercent !== 0) {
-    const blocker = raiseBlocker(company, state.turn, config);
+    const blocker = raiseBlocker(company, turn, config);
     if (!config.raise.options.includes(raisePercent)) {
       notes.push(`Raise dropped: ${raisePercent}% is not on offer.`);
       raisePercent = 0;
@@ -77,8 +83,9 @@ export const normalizePlan = (state: GameState, id: CompanyId, plan: Plan | null
 
   let poachTarget = wanted.poachTarget;
   if (poachTarget !== null) {
-    const target = Number.isInteger(poachTarget) ? state.companies[poachTarget] : undefined;
-    if (target === undefined || target.id === id || target.out !== null) {
+    const wantedTarget = poachTarget;
+    const target = others.find((other) => other.id === wantedTarget);
+    if (target === undefined || target.id === company.id || target.out !== null) {
       notes.push("Poach dropped: that company cannot be poached from.");
       poachTarget = null;
     } else if (target.headcount < config.poach.minTargetHeadcount) {
@@ -91,3 +98,6 @@ export const normalizePlan = (state: GameState, id: CompanyId, plan: Plan | null
 
   return { plan: { allocation, marketing, price, raisePercent, poachTarget, layoffs, hireLimit }, notes };
 };
+
+export const normalizePlan = (state: GameState, id: CompanyId, plan: Plan | null, config: RulesConfig): CheckedPlan =>
+  normalizePlanFor(state.companies[id], state.turn, state.companies, plan, config);
