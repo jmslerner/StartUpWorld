@@ -1,7 +1,7 @@
 // What a company may know. Planners and the rivals panel go through these, so "same public info
 // as the player" is a matter of types, not discipline.
 
-import type { Company, CompanyId, CompanyView, GameState, PublicCompany } from "./types";
+import type { Company, CompanyId, CompanyReport, CompanyView, GameState, PublicCompany, PublicReport } from "./types";
 
 /** A copy with the public fields only. Cash, plans and bookkeeping never leave the company. */
 export const publicCompany = (company: Company): PublicCompany => ({
@@ -31,4 +31,26 @@ export const viewFor = (state: GameState, id: CompanyId): CompanyView => ({
   modifiers: state.modifiers,
   carryOverUsers: state.carryOverUsers,
   freedPeople: state.freedPeople,
+});
+
+/** The part of a company's quarterly report its rivals can see: its moves, not its books or its plan. */
+export const publicReport = (report: CompanyReport): PublicReport => ({
+  companyId: report.companyId,
+  price: report.plan.price,
+  headcount: report.headcount,
+  quality: { start: report.quality.start, end: report.quality.end, launchedNow: report.quality.launchedNow },
+  users: {
+    open: report.users.open,
+    lostToEvent: report.users.lostToEvent,
+    churned: report.users.churned,
+    won: report.users.won,
+    end: report.users.end,
+  },
+  raise: report.raise,
+  hype: { start: report.hype.start, end: report.hype.end },
+  poach: report.poach ? { targetId: report.poach.targetId, success: report.poach.success } : null,
+  boardFired: report.board?.fired ?? false,
+  valuation: report.valuation,
+  equity: report.equity,
+  out: report.out,
 });
