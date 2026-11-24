@@ -218,6 +218,17 @@ describe("leaderboard: a failed request leaves one line in the log", () => {
     for (const sent of ["Acme", "Ada", "4242"]) expect(logged().flat().join("\n")).not.toContain(sent);
   });
 
+  it("answers 500 when a login's reply reaches the waiting command, and leaves the password out", async () => {
+    // After a reconnect, the reply to the client's own AUTH can be what a waiting command fails with. A server that
+    // does not know AUTH repeats the user and the password there.
+    const redis = fakeRedis();
+    redis.zRange.mockRejectedValue(new Error("ERR unknown command 'AUTH', with args beginning with: 'default' 's3cret' "));
+    useRedis(redis);
+    expect(await call("GET")).toEqual({ status: 500, body: { error: "Internal server error" } });
+    expect(logged()).toEqual([["error", "leaderboard: request failed: ERR unknown command 'AUTH', with args beginning with: [not logged]"]]);
+    expect(logged().flat().join("\n")).not.toContain("s3cret");
+  });
+
   it("answers 500 when a stored entry is not valid JSON, and names its place instead of quoting it", async () => {
     // Node's own message for this entry quotes it: Unexpected token 'G', ..."nderName":Gavin Bels"... is not valid JSON
     const broken = '{"id":"7-1","companyName":"Hooli","founderName":Gavin Belson,"ending":"ipo","score":40}';

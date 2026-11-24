@@ -58,6 +58,13 @@ describe("describeErrorWithoutArguments: a reply that repeats a command's argume
     ).toBe("ERR unknown command 'LPUSH', with args beginning with: [not logged]");
   });
 
+  it("is cut when what the server repeats is a login, so the password is left out", () => {
+    // The client sends AUTH with the user and the password every time it connects.
+    expect(
+      describeErrorWithoutArguments(new Error("ERR unknown command 'AUTH', with args beginning with: 'default' 's3cret' ")),
+    ).toBe("ERR unknown command 'AUTH', with args beginning with: [not logged]");
+  });
+
   it("is what describeError says when it repeats no arguments, connection strings replaced", () => {
     expect(describeErrorWithoutArguments(new Error("OOM command not allowed when used memory > 'maxmemory'."))).toBe(
       "OOM command not allowed when used memory > 'maxmemory'.",

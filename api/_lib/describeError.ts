@@ -1,7 +1,9 @@
 /**
  * What went wrong, for the log: the message (or the error's name when the message is empty), its code, and the same for
- * each cause inside an AggregateError. Anything shaped like a connection string is removed, so a password can never
- * reach the logs through this line.
+ * each cause inside an AggregateError. Anything shaped like a connection string is removed, so the password in one
+ * cannot reach the logs through a line built from this.
+ *
+ * A password that a server repeats from a login is not removed here. describeErrorWithoutArguments does that.
  */
 export function describeError(err: unknown): string {
   const parts: string[] = [];
@@ -23,14 +25,16 @@ export function describeError(err: unknown): string {
 const ARGUMENTS_FOLLOW = "with args beginning with:";
 
 /**
- * describeError, for the functions whose commands carry what a player typed.
+ * describeError, without what a server repeats of a command it does not know.
  *
- * A Redis server answers a command it does not know by repeating the command's arguments:
+ * A Redis server answers such a command by repeating its arguments:
  *
  *     ERR unknown command 'ZADD', with args beginning with: 'leaderboard' '90' '{"id":"4242-1","companyName":"Acme",…
  *
- * and for ZADD and LPUSH those arguments are the player's entry. A database these functions work with knows the
- * commands, so the reply should never come. If it does, what follows those words is left out of the text.
+ * For ZADD and LPUSH the arguments are a player's entry. For AUTH, which the client sends every time it connects, they
+ * are the user and the password, and that reply can reach a command that was waiting behind the login. A database these
+ * functions work with knows the commands, so the reply should never come. If it does, what follows those words is left
+ * out of the text. The cut is at the first time the words appear: an entry can hold them too, further on.
  */
 export function describeErrorWithoutArguments(err: unknown): string {
   const text = describeError(err);

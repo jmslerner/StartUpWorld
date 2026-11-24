@@ -193,6 +193,17 @@ describe("graveyard: a failed request leaves one line in the log", () => {
     for (const sent of ["Acme", "Ran out of runway"]) expect(logged().flat().join("\n")).not.toContain(sent);
   });
 
+  it("answers 500 when a login's reply reaches the waiting command, and leaves the password out", async () => {
+    // After a reconnect, the reply to the client's own AUTH can be what a waiting command fails with. A server that
+    // does not know AUTH repeats the user and the password there.
+    const redis = fakeRedis();
+    redis.lRange.mockRejectedValue(new Error("ERR unknown command 'AUTH', with args beginning with: 'default' 's3cret' "));
+    useRedis(redis);
+    expect(await call("GET")).toEqual({ status: 500, body: { error: "Internal server error" } });
+    expect(logged()).toEqual([["error", "graveyard: request failed: ERR unknown command 'AUTH', with args beginning with: [not logged]"]]);
+    expect(logged().flat().join("\n")).not.toContain("s3cret");
+  });
+
   it("answers 500 when a stored entry is not valid JSON, and names its place instead of quoting it", async () => {
     // Node's own message for this entry quotes it: Unexpected token 'P', ...""epitaph":Pivoted to"... is not valid JSON
     const broken = '{"id":"gv-0","companyName":"Hooli","ending":"bankruptcy","epitaph":Pivoted to blockchain,"grade":"F","week":9,"timestamp":0}';
