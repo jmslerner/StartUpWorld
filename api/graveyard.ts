@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { describeError } from "./_lib/describeError.js";
 import { getRedis, withReplyDeadline } from "./_lib/redis.js";
+import { readBody } from "./_lib/requestBody.js";
 import { parseStoredEntry } from "./_lib/storedEntry.js";
 import { validateGraveyard } from "./_lib/validate.js";
 
@@ -22,7 +23,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     if (req.method === "POST") {
-      const data = validateGraveyard(req.body);
+      const data = validateGraveyard(readBody(req));
       if (!data) {
         return res.status(400).json({ error: "Invalid submission" });
       }

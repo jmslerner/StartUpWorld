@@ -32,7 +32,8 @@ const useRedis = (redis: ReturnType<typeof fakeRedis> | null): void => {
   vi.mocked(getRedis).mockResolvedValue(redis as unknown as RedisClient | null);
 };
 
-const call = async (method: string, body?: unknown): Promise<{ status: number; body: unknown }> => {
+/** Hands the handler a request as it is, for the ones that take more than a method and a body. */
+const send = async (req: object): Promise<{ status: number; body: unknown }> => {
   const reply = { status: 200, body: undefined as unknown };
   const res = {
     status(code: number) {
@@ -44,9 +45,11 @@ const call = async (method: string, body?: unknown): Promise<{ status: number; b
       return res;
     },
   };
-  await handler({ method, body } as unknown as VercelRequest, res as unknown as VercelResponse);
+  await handler(req as unknown as VercelRequest, res as unknown as VercelResponse);
   return reply;
 };
+
+const call = (method: string, body?: unknown) => send({ method, body });
 
 /** A command that was sent and is never answered. */
 const unanswered = () => new Promise<never>(() => {});
@@ -203,6 +206,21 @@ describe("leaderboard: a failed request leaves one line in the log", () => {
     expect(await call("GET")).toEqual({ status: 500, body: { error: "Internal server error" } });
     expect(logged()).toEqual([["error", "leaderboard: request failed: the stored entry at index 1 is not valid JSON"]]);
     expect(logged().flat().join("\n")).not.toContain("Gavin");
+  });
+
+  it("answers 500 when the request body cannot be read, and says so without repeating what the reader threw", async () => {
+    // Vercel parses the body when it is first read, and that read throws when it cannot. Its message today is a fixed
+    // "Invalid JSON", but the wording is Vercel's to change, and a parser's message can quote what it choked on.
+    const request = {
+      method: "POST",
+      get body(): unknown {
+        throw new SyntaxError(`Unexpected token 'A', ..."nderName":Ada Lovela"... is not valid JSON`);
+      },
+    };
+    useRedis(fakeRedis());
+    expect(await send(request)).toEqual({ status: 500, body: { error: "Internal server error" } });
+    expect(logged()).toEqual([["error", "leaderboard: request failed: the request body could not be read"]]);
+    expect(logged().flat().join("\n")).not.toContain("Ada");
   });
 
   it("writes the line before it answers", async () => {
