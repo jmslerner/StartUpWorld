@@ -97,18 +97,3 @@ export type { AmbienceState, AmbienceTargets } from "./ambience";
 
 export { MusicDirector, MusicPlanner } from "./music";
 export type { MusicEvent, MusicMood } from "./music";
-
-export {
-  HEARTBEAT,
-  LOW_RUNWAY_WEEKS,
-  STINGER_CLEARANCE,
-  STING_LENGTH,
-  STORE_STINGERS,
-  SUPPORTING_EVENTS,
-  SUPPORT_GAIN,
-  ambienceStateFor,
-  createWorldAudio,
-  cuesForEvent,
-  planCues,
-} from "./worldAudio";
-export type { Cue, StingerOverlap, WorldAudio, WorldAudioOptions, WorldUiSounds } from "./worldAudio";
