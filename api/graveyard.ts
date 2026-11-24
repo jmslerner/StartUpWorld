@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { getRedis } from "./_lib/redis.js";
+import { getRedis, withReplyDeadline } from "./_lib/redis.js";
 import { validateGraveyard } from "./_lib/validate.js";
 
 const GRAVEYARD_KEY = "graveyard";
@@ -14,7 +14,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     if (req.method === "GET") {
-      const raw = await redis.lRange(GRAVEYARD_KEY, 0, RETURN_LIMIT - 1);
+      const raw = await withReplyDeadline(redis, redis.lRange(GRAVEYARD_KEY, 0, RETURN_LIMIT - 1));
       const entries = raw.map((e) => JSON.parse(String(e)));
       return res.json({ entries });
     }
@@ -35,8 +35,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         timestamp: Date.now(),
       };
 
-      await redis.lPush(GRAVEYARD_KEY, JSON.stringify(entry));
-      await redis.lTrim(GRAVEYARD_KEY, 0, MAX_STORED - 1);
+      await withReplyDeadline(redis, redis.lPush(GRAVEYARD_KEY, JSON.stringify(entry)));
+      await withReplyDeadline(redis, redis.lTrim(GRAVEYARD_KEY, 0, MAX_STORED - 1));
 
       return res.json({ entry });
     }
