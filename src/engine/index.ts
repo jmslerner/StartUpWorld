@@ -7,7 +7,7 @@ export { defaultPlan, normalizePlan, normalizePlanFor, raiseBlocker } from "./pl
 export { estimateRivals, projectTurn } from "./project";
 export type { Projection, RivalEstimate } from "./project";
 export type { CheckedPlan, RaiseBlocker } from "./plan";
-export { publicCompany, publicReport, viewFor } from "./view";
+export { companyRunway, publicCompany, publicReport, viewFor } from "./view";
 export { replayGame } from "./replay";
 export type { GameRecord, Replay } from "./replay";
 export { findCard } from "./events";

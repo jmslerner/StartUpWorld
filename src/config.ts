@@ -5,12 +5,18 @@
 // Nothing here is code. To add an event, add a card to `events.deck` using the effects listed in
 // EventEffect (src/engine/types.ts).
 
+import type { BaselineConfig, CpuConfig, SimConfig } from "./ai/types";
 import type { RulesConfig } from "./engine/types";
 
 const K = 1_000;
 const M = 1_000_000;
 
-export type GameConfig = RulesConfig;
+/** The rules' numbers, plus the numbers behind the computer players and the simulator. */
+export interface GameConfig extends RulesConfig {
+  readonly cpu: CpuConfig;
+  readonly baseline: BaselineConfig;
+  readonly sim: SimConfig;
+}
 
 export const CONFIG: GameConfig = {
   // ── Game length and the win ──
@@ -186,5 +192,73 @@ export const CONFIG: GameConfig = {
         effects: [{ kind: "marketingEffect", multiplier: 0.5 }],
       },
     ],
+  },
+  // ── Computer players ──
+  // Each CPU builds a few dozen plans, projects them one quarter ahead and scores them with these
+  // weights. The fixed habits (price, when it raises, whether it poaches) are what a player can read.
+  cpu: {
+    noise: 0.03,
+    boardRiskPenalty: 3,
+    layoffRunway: 1,
+    minShareForGrowth: 0.1,
+    personalities: {
+      // Chases users: Budget price, raises 30% the moment it can, heavy marketing.
+      blitzscaler: {
+        price: "budget",
+        raise: { when: "eligible", runway: 0, percents: [30] },
+        poachRunway: null,
+        teamCap: 14,
+        hireRunway: 2,
+        marketingShares: [0, 0.1, 0.2, 0.35, 0.5],
+        productShares: [0.7, 0.5, 0.3, 0.15],
+        horizon: 4,
+        weights: { users: 3, quality: 1, team: 1, runway: 0.5, runwayHalf: 1, hype: 0.3, equity: 0 },
+      },
+      // Protects runway and equity: Premium price, raises only under 2 turns of runway, small team, product first.
+      bootstrapper: {
+        price: "premium",
+        raise: { when: "runway", runway: 2, percents: [10, 20, 30] },
+        poachRunway: null,
+        teamCap: 6,
+        hireRunway: 5,
+        marketingShares: [0, 0.03, 0.06],
+        productShares: [1, 0.8, 0.6],
+        horizon: 6,
+        weights: { users: 1, quality: 2, team: 0.6, runway: 2, runwayHalf: 3, hype: 0.1, equity: 2 },
+      },
+      // Product-heavy, and poaches whenever it can afford to.
+      incumbent: {
+        price: "standard",
+        raise: { when: "runway", runway: 3, percents: [10, 20, 30] },
+        poachRunway: 3,
+        teamCap: 16,
+        hireRunway: 4,
+        marketingShares: [0, 0.05, 0.1],
+        productShares: [0.85, 0.7, 0.55],
+        horizon: 5,
+        weights: { users: 1.5, quality: 2.5, team: 0.8, runway: 1, runwayHalf: 2, hype: 0.3, equity: 0.5 },
+      },
+    },
+  },
+
+  // ── Simulator ──
+  // The baseline bot sits in the player's seat in `npm run sim`: a new player's simple policy.
+  baseline: {
+    split: { product: 0.4, growth: 0.4, recruiting: 0.2 },
+    price: "standard",
+    raisePercent: 20,
+    raiseRunway: 3,
+    hireRunway: 3,
+    marketing: 0,
+  },
+  sim: {
+    games: 1_000,
+    firstSeed: 1,
+    targets: {
+      maxCpuWinShare: 0.4,
+      baselineWinShare: [0.15, 0.35],
+      medianTurns: [14, 20],
+      ipoShare: [0.4, 0.8],
+    },
   },
 };

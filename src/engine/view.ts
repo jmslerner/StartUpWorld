@@ -1,7 +1,8 @@
 // What a company may know. Planners and the rivals panel go through these, so "same public info
 // as the player" is a matter of types, not discipline.
 
-import type { Company, CompanyId, CompanyReport, CompanyView, GameState, PublicCompany, PublicReport } from "./types";
+import { runwayOf } from "./formulas";
+import type { Company, CompanyId, CompanyReport, CompanyView, GameState, PublicCompany, PublicReport, RulesConfig } from "./types";
 
 /** A copy with the public fields only. Cash, plans and bookkeeping never leave the company. */
 export const publicCompany = (company: Company): PublicCompany => ({
@@ -54,3 +55,12 @@ export const publicReport = (report: CompanyReport): PublicReport => ({
   equity: report.equity,
   out: report.out,
 });
+
+/**
+ * A company's runway as a turn starts: cash ÷ last quarter's burn, or null when that quarter was
+ * profitable. Before its first quarter the burn is its payroll.
+ */
+export const companyRunway = (company: Company, config: RulesConfig): number | null =>
+  company.lastCosts === null || company.lastRevenue === null
+    ? runwayOf(company.cash, 0, company.headcount * config.salary)
+    : runwayOf(company.cash, company.lastRevenue, company.lastCosts);
