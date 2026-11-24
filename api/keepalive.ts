@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { getRedis } from "./_lib/redis.js";
+import { getRedis, withReplyDeadline } from "./_lib/redis.js";
 
 // A free Redis database is taken away when nothing uses it: Upstash archives one after 30 days without activity, and
 // its terms allow deleting one after a week without requests. That has taken the leaderboard and the graveyard offline
@@ -49,11 +49,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (isScheduledRun(req)) {
       const now = new Date().toISOString();
-      await redis.set(LAST_PING_KEY, now);
+      await withReplyDeadline(redis, redis.set(LAST_PING_KEY, now));
       return res.json({ ok: true, scheduled: true, lastScheduledPing: now });
     }
 
-    const stored = await redis.get(LAST_PING_KEY);
+    const stored = await withReplyDeadline(redis, redis.get(LAST_PING_KEY));
     const lastScheduledPing = stored === null ? null : String(stored);
     const hoursSinceLastPing = lastScheduledPing === null ? null : hoursSince(lastScheduledPing);
 

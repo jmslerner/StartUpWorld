@@ -8,6 +8,12 @@ const CONNECT_TIMEOUT_MS = 2000;
 const MAX_RECONNECT_ATTEMPTS = 1;
 /** Hard ceiling on getRedis() so a handler can always answer before the platform kills it. */
 const OVERALL_DEADLINE_MS = 5000;
+/**
+ * Hard ceiling on the wait for one command's reply. Connecting and the first
+ * reply together take at most 8 s, which is also how long the game waits for
+ * an answer (TIMEOUT_MS in src/api/client.ts).
+ */
+const REPLY_DEADLINE_MS = 3000;
 
 /**
  * Storage integrations name their connection string differently (Upstash via the
@@ -88,30 +94,76 @@ export async function getRedis(): Promise<RedisClient | null> {
     client = created;
   }
 
-  if (client.isOpen) return client;
+  // A reply deadline in another request can drop the shared client, and a
+  // third request can put a new one in its place, while this request waits
+  // below. From here on it deals only with the client it started with.
+  const current = client;
+  if (current.isOpen) return current;
 
   try {
-    await withDeadline(client.connect(), OVERALL_DEADLINE_MS);
-    return client;
+    await withDeadline(current.connect(), OVERALL_DEADLINE_MS, new Error("redis connect timed out"));
   } catch {
     // Drop the client so the next request starts from a clean one rather than
     // reusing a socket stuck mid-reconnect.
-    try {
-      await client.destroy();
-    } catch {
-      // already dead
-    }
-    client = null;
+    drop(current);
     return null;
+  }
+  // connect() also returns normally when the client was destroyed while it was
+  // still connecting, and a closed client is no use to the caller.
+  return current.isOpen ? current : null;
+}
+
+/**
+ * Waits for one command's reply, but not for ever:
+ *
+ *     const value = await withReplyDeadline(redis, redis.get(key));
+ *
+ * node-redis has no reply timeout. Its per-command `timeout` option and abort
+ * signal only cover a command that is still queued, so a command that was sent
+ * to a server that has gone silent stays pending until Vercel ends the
+ * function at its maximum duration, 300 s.
+ *
+ * When the deadline passes, the client is destroyed and forgotten before this
+ * throws. getRedis() would otherwise hand out the same connection for as long
+ * as it looks open, and every later request on this instance would wait out
+ * the deadline on it too.
+ *
+ * `socket.socketTimeout` is no substitute. It is an idle timer, and the
+ * reconnectStrategy above reconnects whatever the cause, so a healthy idle
+ * client would reconnect every time it fired.
+ */
+export async function withReplyDeadline<T>(redis: RedisClient, reply: Promise<T>): Promise<T> {
+  const expired = new Error(`Redis did not reply within ${REPLY_DEADLINE_MS} ms`);
+  try {
+    return await withDeadline(reply, REPLY_DEADLINE_MS, expired);
+  } catch (err) {
+    // Only the deadline itself condemns the connection. The command's own
+    // failure, an error reply included, shows that the server still answers.
+    if (err === expired) drop(redis);
+    throw err;
   }
 }
 
-function withDeadline<T>(promise: Promise<T>, ms: number): Promise<T> {
+/**
+ * Closes a client that can no longer be trusted, and forgets it if it is still
+ * the shared one, so the next getRedis() starts from a new client.
+ */
+function drop(dead: RedisClient): void {
+  try {
+    dead.destroy();
+  } catch {
+    // already closed
+  }
+  if (client === dead) client = null;
+}
+
+/** Settles like `promise`, unless it is still pending after `ms`: then it rejects with `expired`. */
+function withDeadline<T>(promise: Promise<T>, ms: number, expired: Error): Promise<T> {
   let timer: ReturnType<typeof setTimeout>;
   return Promise.race([
     promise,
     new Promise<never>((_, reject) => {
-      timer = setTimeout(() => reject(new Error("redis connect timed out")), ms);
+      timer = setTimeout(() => reject(expired), ms);
     }),
   ]).finally(() => clearTimeout(timer)) as Promise<T>;
 }

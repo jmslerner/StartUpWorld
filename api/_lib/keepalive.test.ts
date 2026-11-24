@@ -7,14 +7,19 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import handler from "../keepalive.js";
 import { getRedis } from "./redis.js";
 
-vi.mock("./redis.js", () => ({ getRedis: vi.fn() }));
+// Only getRedis is replaced. The handler also imports withReplyDeadline, and that has to stay the real one: if it were
+// missing here, the handler's own try/catch would turn the missing function into a 503 and hide the mistake.
+vi.mock("./redis.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./redis.js")>()),
+  getRedis: vi.fn(),
+}));
 
 type RedisClient = NonNullable<Awaited<ReturnType<typeof getRedis>>>;
 
 /** Pinned on purpose: once this is deployed the production database holds the key, so renaming it is a deliberate act. */
 const LAST_PING_KEY = "keepalive:last-scheduled-ping";
 
-/** An in-memory stand-in for the two commands the handler uses. */
+/** An in-memory stand-in for the two commands the handler uses, and for closing the connection. */
 const fakeRedis = (initial: Record<string, string> = {}) => {
   const data = new Map(Object.entries(initial));
   return {
@@ -24,8 +29,16 @@ const fakeRedis = (initial: Record<string, string> = {}) => {
       return "OK";
     }),
     get: vi.fn(async (key: string) => data.get(key) ?? null),
+    destroy: vi.fn(),
   };
 };
+
+/** A command that was sent and is never answered. */
+const unanswered = () => new Promise<never>(() => {});
+
+/** What the promise settled with, or "still pending". */
+const peek = <T>(promise: Promise<T>): Promise<T | "still pending"> =>
+  Promise.race([promise, Promise.resolve("still pending" as const)]);
 
 const useRedis = (redis: ReturnType<typeof fakeRedis> | null): void => {
   vi.mocked(getRedis).mockResolvedValue(redis as unknown as RedisClient | null);
@@ -253,6 +266,42 @@ describe("keepalive: failures are loud", () => {
     useRedis(redis);
     expect((await call()).status).toBe(503);
     expect(logged()).toContain("READONLY");
+  });
+});
+
+describe("keepalive: a database that stops answering", () => {
+  it("answers 503 after 3 seconds when the scheduled write gets no reply, and closes that connection", async () => {
+    const redis = fakeRedis();
+    redis.set.mockImplementation(unanswered);
+    useRedis(redis);
+    const pending = call({ userAgent: SCHEDULER });
+    await vi.advanceTimersByTimeAsync(3000);
+    expect(await peek(pending)).toMatchObject({ status: 503, body: { ok: false, error: "Database unavailable" } });
+    expect(logged()).toContain("keepalive: Redis command failed: Redis did not reply within 3000 ms");
+    expect(redis.destroy).toHaveBeenCalledTimes(1);
+  });
+
+  it("answers 503 after 3 seconds when the read gets no reply, and closes that connection", async () => {
+    const redis = fakeRedis({ [LAST_PING_KEY]: hoursAgo(1) });
+    redis.get.mockImplementation(unanswered);
+    useRedis(redis);
+    const pending = call({ userAgent: "UptimeMonitor/1.0" });
+    await vi.advanceTimersByTimeAsync(3000);
+    expect(await peek(pending)).toMatchObject({ status: 503, body: { ok: false, error: "Database unavailable" } });
+    expect(logged()).toContain("keepalive: Redis command failed: Redis did not reply within 3000 ms");
+    expect(redis.destroy).toHaveBeenCalledTimes(1);
+  });
+
+  it("still takes a reply that needs most of the 3 seconds, and keeps the connection", async () => {
+    const redis = fakeRedis({ [LAST_PING_KEY]: hoursAgo(1) });
+    redis.get.mockImplementation(
+      (key) => new Promise((resolve) => setTimeout(() => resolve(redis.data.get(key) ?? null), 2900)),
+    );
+    useRedis(redis);
+    const pending = call();
+    await vi.advanceTimersByTimeAsync(2900);
+    expect(await peek(pending)).toMatchObject({ status: 200, body: { ok: true, scheduled: false } });
+    expect(redis.destroy).not.toHaveBeenCalled();
   });
 });
 

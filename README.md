@@ -41,11 +41,12 @@ To check that the schedule is working, open `/api/keepalive` in a browser:
 
 - `200` with `"ok": true` means a scheduled run was recorded in the last 50 hours. The schedule runs once a day between
   07:00 and 08:00 UTC, so a healthy `lastScheduledPing` is from the most recent 07:00 hour.
-- `503` means no scheduled run was recorded in the last 50 hours (or ever), or the database cannot be reached. The
-  `error` field says which. Check the Cron Jobs tab of the Vercel project.
+- `503` means no scheduled run was recorded in the last 50 hours (or ever), or the database cannot be reached or does
+  not answer. The `error` field says which. Check the Cron Jobs tab of the Vercel project.
 
 `lastScheduledPing` is the time of the last request that identified itself as Vercel's scheduler. A manual run from the
 dashboard updates it too, so a value from another time of day does not show that the schedule works.
 
 For an alert when it stops, point an uptime monitor at `/api/keepalive`: it reports a non-200 answer, and its own
-requests also reach the database.
+requests also reach the database. The function answers within about 8 seconds even when the database does not (up to 5
+to connect and 3 for the reply), so give the monitor a longer timeout than that.
