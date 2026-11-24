@@ -64,5 +64,5 @@ Two kinds of reason need a word:
 
 - `stored entry at index 2 is not valid JSON`: the third entry the function read could not be parsed (the index counts
   from 0). The list answers `500` for as long as that entry is among those it reads.
-- `Invalid JSON`, `invalid media type` or `invalid parameter format`: the request itself could not be read. That is
-  about what the caller sent, not about the database.
+- `the request's body could not be read`: its body is not the JSON its `Content-Type` promises, or that header does not
+  parse. That is about what the caller sent, not about the database.

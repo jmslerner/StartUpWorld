@@ -174,17 +174,19 @@ describe("graveyard: a failed request says why in the log", () => {
     for (const sent of ["Acme", "bankruptcy", "runway"]) expect(logged.join("\n")).not.toContain(sent);
   });
 
-  it("answers 500 when the request's body cannot be read, with the reason in the line", async () => {
-    // What Vercel does when the handler reads req.body and the body is not the JSON its Content-Type promised.
+  it("answers 500 when the request's body cannot be read, and says so in its own words, whatever the parser said", async () => {
+    // Vercel parses the body when the handler first reads it, and throws when it cannot. Today its error says no more
+    // than "Invalid JSON". This one quotes what it could not read, as JSON.parse's does: none of that may reach the line.
     useRedis(fakeRedis());
     const unreadable = {
       method: "POST",
       get body(): never {
-        throw Object.assign(new Error("Invalid JSON"), { statusCode: 400 });
+        throw Object.assign(new SyntaxError(`Unexpected token 'A', "Acme Corp,"... is not valid JSON`), { statusCode: 400 });
       },
     };
     expect(await answer(unreadable)).toEqual({ status: 500, body: { error: "Internal server error" } });
-    expect(logged).toEqual(["error: graveyard: request failed: Invalid JSON"]);
+    expect(logged).toEqual(["error: graveyard: request failed: the request's body could not be read"]);
+    expect(logged.join("\n")).not.toContain("Acme");
   });
 
   it("answers 500 when the database does not know a command, with a line that stops before the arguments it quotes back", async () => {
