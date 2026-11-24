@@ -31,6 +31,9 @@ describe("getRedis: a connection string that does not parse", () => {
  * A stand-in for the database on a local port, for the real client to talk to. It answers every command until `silent`
  * is set. After that it still reads what arrives, so the client's writes succeed, but it never answers and never closes
  * the connection: what a hung server, or a connection the network has silently dropped, looks like from the client.
+ *
+ * Its URL carries a password, as the production one does. The client then starts every connection with AUTH, and that
+ * changes the path it takes when it is destroyed while the handshake is still unanswered.
  */
 const startStandIn = async () => {
   const sockets = new Set<Socket>();
@@ -64,7 +67,7 @@ const startStandIn = async () => {
       waiting.get(name)?.();
       waiting.delete(name);
       if (db.silent) return;
-      if (name === "CLIENT" || name === "SET") socket.write("+OK\r\n");
+      if (name === "AUTH" || name === "CLIENT" || name === "SET") socket.write("+OK\r\n");
       else if (name === "GET") socket.write("$-1\r\n");
       else socket.write(`-ERR unknown command '${args[0]}'\r\n`);
     };
@@ -91,7 +94,7 @@ const startStandIn = async () => {
   });
 
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
-  db.url = `redis://127.0.0.1:${(server.address() as AddressInfo).port}`;
+  db.url = `redis://default:stand-in-password@127.0.0.1:${(server.address() as AddressInfo).port}`;
   return db;
 };
 
@@ -170,8 +173,8 @@ describe("a database that stops answering", () => {
       expect(first.isOpen).toBe(false);
       await db.connections[0].closed;
       expect(db.connections.map((connection) => connection.commands)).toEqual([
-        ["CLIENT", "CLIENT", "SET"],
-        ["CLIENT", "CLIENT", "SET"],
+        ["AUTH", "CLIENT", "CLIENT", "SET"],
+        ["AUTH", "CLIENT", "CLIENT", "SET"],
       ]);
     });
 
@@ -243,7 +246,9 @@ describe("a database that stops answering", () => {
       expect(await peek(outcome)).toBe(NO_REPLY);
       expect(shared.isOpen).toBe(false);
 
-      // The first request's connect() now ends without an error, although its client has been closed.
+      // The first request's connect() now ends without an error, although its client has been closed. The client
+      // sleeps for 0 ms before it does: let that timer run whether or not it is one of the faked ones.
+      await vi.advanceTimersByTimeAsync(1);
       expect(await connecting).toBeNull();
     });
 

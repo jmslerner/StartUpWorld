@@ -98,6 +98,12 @@ export async function getRedis(): Promise<RedisClient | null> {
   // third request can put a new one in its place, while this request waits
   // below. From here on it deals only with the client it started with.
   const current = client;
+  // Open is not the same as ready. A client that another request is still
+  // connecting, or that is reconnecting by itself, is handed out as well, and
+  // a command sent on it waits in the client's queue with its 3 s already
+  // running. When connecting takes longer than that, the deadline drops the
+  // client under the request that is connecting it: both fail, and the next
+  // request starts over.
   if (current.isOpen) return current;
 
   try {
@@ -137,16 +143,21 @@ export async function withReplyDeadline<T>(redis: RedisClient, reply: Promise<T>
   try {
     return await withDeadline(reply, REPLY_DEADLINE_MS, expired);
   } catch (err) {
-    // Only the deadline itself condemns the connection. The command's own
-    // failure, an error reply included, shows that the server still answers.
+    // Only the deadline itself condemns the connection. A command that fails
+    // by itself was either answered, with an error, or refused by a client
+    // that already knows its connection is gone and reconnects by itself.
     if (err === expired) drop(redis);
     throw err;
   }
 }
 
 /**
- * Closes a client that can no longer be trusted, and forgets it if it is still
- * the shared one, so the next getRedis() starts from a new client.
+ * Destroys a client that can no longer be trusted, and forgets it if it is
+ * still the shared one, so the next getRedis() starts from a new client.
+ *
+ * Destroying closes the client's connection, with one exception that
+ * node-redis (5.11) offers no way around: a connection that is still being
+ * made is out of its reach, and stays open if it completes afterwards.
  */
 function drop(dead: RedisClient): void {
   try {

@@ -112,6 +112,7 @@ describe("leaderboard: a healthy database", () => {
     expect(board).toBe("leaderboard");
     expect(added.score).toBe(90);
     expect(JSON.parse(added.value)).toEqual(ENTRY);
+    expect(redis.zCard).toHaveBeenCalledWith("leaderboard");
     expect(redis.zRemRangeByRank).toHaveBeenCalledWith("leaderboard", 0, 0);
     expect(redis.set).toHaveBeenCalledWith("submitted-seeds:4242", "1", { EX: 86400 });
     expect(redis.zRevRank).toHaveBeenCalledWith("leaderboard", added.value);
