@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CONFIG } from "../config";
+import { DESIGN } from "../config.design";
 import { NEUTRAL_MODIFIERS, applyEvent, drawEvent, eligibleTargets, type EventContext } from "./events";
 import { BLITZ, BOOT, HUMAN, INCUMBENT, newGame, onlyActive, withCompany } from "./testKit";
 import type { EventCard, GameState, RulesConfig } from "./types";
@@ -20,9 +20,9 @@ const busyGame = (): GameState => {
   return withCompany(state, INCUMBENT, { quality: 82, users: 90_000, headcount: 12, hype: 25 });
 };
 
-const withDeck = (deck: readonly EventCard[]): RulesConfig => ({ ...CONFIG, events: { ...CONFIG.events, chance: 1, deck } });
+const withDeck = (deck: readonly EventCard[]): RulesConfig => ({ ...DESIGN, events: { ...DESIGN.events, chance: 1, deck } });
 const card = (id: string): EventCard => {
-  const found = CONFIG.events.deck.find((c) => c.id === id);
+  const found = DESIGN.events.deck.find((c) => c.id === id);
   if (!found) throw new Error(`no card ${id}`);
   return found;
 };
@@ -31,8 +31,8 @@ describe("drawEvent", () => {
   it("draws nothing before turn 3", () => {
     const state = busyGame();
     for (let seed = 1; seed <= 300; seed++) {
-      expect(drawEvent(state.companies, 1, seed, CONFIG)).toBeNull();
-      expect(drawEvent(state.companies, 2, seed, CONFIG)).toBeNull();
+      expect(drawEvent(state.companies, 1, seed, DESIGN)).toBeNull();
+      expect(drawEvent(state.companies, 2, seed, DESIGN)).toBeNull();
     }
   });
 
@@ -42,7 +42,7 @@ describe("drawEvent", () => {
     let draws = 0;
     for (let seed = 1; seed <= 300; seed++) {
       for (let turn = 3; turn <= 20; turn++) {
-        if (drawEvent(state.companies, turn, seed, CONFIG) !== null) hits++;
+        if (drawEvent(state.companies, turn, seed, DESIGN) !== null) hits++;
         draws++;
       }
     }
@@ -53,13 +53,13 @@ describe("drawEvent", () => {
   it("is the same for the same seed and turn", () => {
     const state = busyGame();
     for (let turn = 3; turn <= 20; turn++) {
-      expect(drawEvent(state.companies, turn, 77, CONFIG)).toEqual(drawEvent(state.companies, turn, 77, CONFIG));
+      expect(drawEvent(state.companies, turn, 77, DESIGN)).toEqual(drawEvent(state.companies, turn, 77, DESIGN));
     }
   });
 
   it("draws every card of the deck, roughly equally often", () => {
     const state = busyGame();
-    const always = withDeck(CONFIG.events.deck);
+    const always = withDeck(DESIGN.events.deck);
     const counts = new Map<string, number>();
     const draws = 4_500;
     for (let seed = 1; seed <= draws; seed++) {
@@ -67,7 +67,7 @@ describe("drawEvent", () => {
       expect(event).not.toBeNull();
       counts.set(event!.cardId, (counts.get(event!.cardId) ?? 0) + 1);
     }
-    expect([...counts.keys()].sort()).toEqual(CONFIG.events.deck.map((c) => c.id).sort());
+    expect([...counts.keys()].sort()).toEqual(DESIGN.events.deck.map((c) => c.id).sort());
     for (const count of counts.values()) {
       expect(count).toBeGreaterThan((draws / 9) * 0.8);
       expect(count).toBeLessThan((draws / 9) * 1.2);
@@ -79,7 +79,7 @@ describe("drawEvent", () => {
     const unlaunched = onlyActive(newGame(), [HUMAN, BLITZ, BOOT]);
     // Everyone launched is at quality 50 or more: nobody to breach.
     const solid = withCompany(busyGame(), BLITZ, { quality: 50 });
-    const always = withDeck(CONFIG.events.deck);
+    const always = withDeck(DESIGN.events.deck);
     for (let seed = 1; seed <= 1_500; seed++) {
       const a = drawEvent(unlaunched.companies, 4, seed, always);
       expect(["press-feature", "security-breach"]).not.toContain(a?.cardId);
@@ -95,7 +95,7 @@ describe("drawEvent", () => {
 
   it("gives targeted cards a target and the others none", () => {
     const state = busyGame();
-    const always = withDeck(CONFIG.events.deck);
+    const always = withDeck(DESIGN.events.deck);
     for (let seed = 1; seed <= 600; seed++) {
       const event = drawEvent(state.companies, 6, seed, always)!;
       const targeted = card(event.cardId).target !== undefined;
@@ -145,35 +145,35 @@ describe("eligibleTargets", () => {
 
 describe("applyEvent", () => {
   it("funding winter: valuations ×0.6 for 3 turns", () => {
-    const next = applyEvent(contextOf(busyGame()), { cardId: "funding-winter", targetId: null }, CONFIG);
+    const next = applyEvent(contextOf(busyGame()), { cardId: "funding-winter", targetId: null }, DESIGN);
     expect(next.climate).toEqual({ multiplier: 0.6, turnsLeft: 3 });
   });
 
   it("hot market: valuations ×1.4 for 2 turns, replacing a running climate", () => {
     const winter = { ...contextOf(busyGame()), climate: { multiplier: 0.6, turnsLeft: 2 } };
-    expect(applyEvent(winter, { cardId: "hot-market", targetId: null }, CONFIG).climate).toEqual({ multiplier: 1.4, turnsLeft: 2 });
+    expect(applyEvent(winter, { cardId: "hot-market", targetId: null }, DESIGN).climate).toEqual({ multiplier: 1.4, turnsLeft: 2 });
   });
 
   it("viral moment: +20 hype for the target, never above 100", () => {
-    const next = applyEvent(contextOf(busyGame()), { cardId: "viral-moment", targetId: HUMAN }, CONFIG);
+    const next = applyEvent(contextOf(busyGame()), { cardId: "viral-moment", targetId: HUMAN }, DESIGN);
     expect(next.companies[HUMAN].hype).toBe(50);
     const hot = withCompany(busyGame(), HUMAN, { hype: 95 });
-    expect(applyEvent(contextOf(hot), { cardId: "viral-moment", targetId: HUMAN }, CONFIG).companies[HUMAN].hype).toBe(100);
+    expect(applyEvent(contextOf(hot), { cardId: "viral-moment", targetId: HUMAN }, DESIGN).companies[HUMAN].hype).toBe(100);
   });
 
   it("burnout: the target loses one person", () => {
-    const next = applyEvent(contextOf(busyGame()), { cardId: "burnout", targetId: BLITZ }, CONFIG);
+    const next = applyEvent(contextOf(busyGame()), { cardId: "burnout", targetId: BLITZ }, DESIGN);
     expect(next.companies[BLITZ].headcount).toBe(8);
   });
 
   it("press feature: +15 hype for the target", () => {
-    const next = applyEvent(contextOf(busyGame()), { cardId: "press-feature", targetId: INCUMBENT }, CONFIG);
+    const next = applyEvent(contextOf(busyGame()), { cardId: "press-feature", targetId: INCUMBENT }, DESIGN);
     expect(next.companies[INCUMBENT].hype).toBe(40);
   });
 
   it("security breach: the target loses 10% of its users to the pool and 10 hype", () => {
     const before = contextOf(busyGame());
-    const next = applyEvent(before, { cardId: "security-breach", targetId: BLITZ }, CONFIG);
+    const next = applyEvent(before, { cardId: "security-breach", targetId: BLITZ }, DESIGN);
     expect(next.companies[BLITZ].users).toBe(36_000);
     expect(next.companies[BLITZ].hype).toBe(35);
     expect(next.carryOverUsers).toBe(before.carryOverUsers + 4_000);
@@ -183,26 +183,26 @@ describe("applyEvent", () => {
 
   it("security breach: hype never goes below 0", () => {
     const low = withCompany(busyGame(), BLITZ, { hype: 4 });
-    expect(applyEvent(contextOf(low), { cardId: "security-breach", targetId: BLITZ }, CONFIG).companies[BLITZ].hype).toBe(0);
+    expect(applyEvent(contextOf(low), { cardId: "security-breach", targetId: BLITZ }, DESIGN).companies[BLITZ].hype).toBe(0);
   });
 
   it("talent glut: 4 extra candidates this turn", () => {
-    expect(applyEvent(contextOf(busyGame()), { cardId: "talent-glut", targetId: null }, CONFIG).modifiers).toEqual({ ...NEUTRAL_MODIFIERS, extraCandidates: 4 });
+    expect(applyEvent(contextOf(busyGame()), { cardId: "talent-glut", targetId: null }, DESIGN).modifiers).toEqual({ ...NEUTRAL_MODIFIERS, extraCandidates: 4 });
   });
 
   it("market boom: new users ×1.5 this turn", () => {
-    expect(applyEvent(contextOf(busyGame()), { cardId: "market-boom", targetId: null }, CONFIG).modifiers).toEqual({ ...NEUTRAL_MODIFIERS, newUsers: 1.5 });
+    expect(applyEvent(contextOf(busyGame()), { cardId: "market-boom", targetId: null }, DESIGN).modifiers).toEqual({ ...NEUTRAL_MODIFIERS, newUsers: 1.5 });
   });
 
   it("ad prices spike: marketing half as effective this turn", () => {
-    expect(applyEvent(contextOf(busyGame()), { cardId: "ad-prices-spike", targetId: null }, CONFIG).modifiers).toEqual({ ...NEUTRAL_MODIFIERS, marketing: 0.5 });
+    expect(applyEvent(contextOf(busyGame()), { cardId: "ad-prices-spike", targetId: null }, DESIGN).modifiers).toEqual({ ...NEUTRAL_MODIFIERS, marketing: 0.5 });
   });
 
   it("touches nobody but the target, and does not change what it was given", () => {
     const state = busyGame();
     const before = contextOf(state);
     const snapshot = JSON.stringify(before);
-    const next = applyEvent(before, { cardId: "security-breach", targetId: BLITZ }, CONFIG);
+    const next = applyEvent(before, { cardId: "security-breach", targetId: BLITZ }, DESIGN);
     expect(JSON.stringify(before)).toBe(snapshot);
     for (const id of [HUMAN, BOOT, INCUMBENT]) expect(next.companies[id]).toBe(state.companies[id]);
   });
@@ -232,6 +232,6 @@ describe("applyEvent", () => {
 
   it("ignores a card it does not know", () => {
     const before = contextOf(busyGame());
-    expect(applyEvent(before, { cardId: "meteor", targetId: null }, CONFIG)).toEqual(before);
+    expect(applyEvent(before, { cardId: "meteor", targetId: null }, DESIGN)).toEqual(before);
   });
 });

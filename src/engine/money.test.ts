@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CONFIG } from "../config";
+import { DESIGN } from "../config.design";
 import { effectiveWork, valuationOf } from "./formulas";
 import { HUMAN, INCUMBENT, launchedCompany, newGame, onlyActive, reportFor, resolve, withCompany, withState } from "./testKit";
 
@@ -59,7 +59,7 @@ describe("a quarter's books", () => {
   });
 
   it("values the company on end-of-turn users and hype", () => {
-    expect(report.valuation).toBe(valuationOf(34_200, 21, 1, CONFIG));
+    expect(report.valuation).toBe(valuationOf(34_200, 21, 1, DESIGN));
     expect(report.equity).toBe(1);
   });
 
@@ -79,7 +79,7 @@ describe("a quarter's books", () => {
           onlyActive(launchedCompany(newGame(), HUMAN, { headcount: 1, headcountAtLastClose: 1, users, usersAtLastClose: users }), [HUMAN]),
           { [HUMAN]: { price: "budget" } },
           1,
-          { ...CONFIG, market: { ...CONFIG.market, newUsersTurn1: 0 } },
+          { ...DESIGN, market: { ...DESIGN.market, newUsersTurn1: 0 } },
         ),
         HUMAN,
       );
@@ -189,7 +189,7 @@ describe("hype in a turn", () => {
     expect(reportFor(resolve(hot), HUMAN).hype.end).toBe(95);
     // With the design's numbers a turn cannot push hype past 100, so switch the decay off to test the cap.
     const top = launchedCompany(newGame(), HUMAN, { hype: 100 });
-    const noDecay = { ...CONFIG, hype: { ...CONFIG.hype, decay: 0 } };
+    const noDecay = { ...DESIGN, hype: { ...DESIGN.hype, decay: 0 } };
     expect(reportFor(resolve(top, { [HUMAN]: { raisePercent: 10 } }, 1, noDecay), HUMAN).hype.end).toBe(100);
     const cold = withCompany(newGame(), HUMAN, { hype: 5, headcount: 4, headcountAtLastClose: 4 });
     const report = reportFor(resolve(cold, { [HUMAN]: { layoffs: 1, allocation: { product: 0, growth: 3, recruiting: 0 } } }), HUMAN);

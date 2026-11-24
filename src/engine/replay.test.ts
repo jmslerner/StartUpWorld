@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CONFIG } from "../config";
+import { DESIGN } from "../config.design";
 import { defaultPlan } from "./plan";
 import { replayGame } from "./replay";
 import { resolveTurn } from "./resolveTurn";
@@ -49,7 +49,7 @@ const playRandomGame = (seed: number, planSeed = seed): Played => {
   while (states[states.length - 1].outcome === null) {
     const state = states[states.length - 1];
     const turnPlans = state.companies.map((company) => (company.out === null ? randomPlan(state, company.id, random) : null));
-    const result = resolveTurn(state, turnPlans, seed, CONFIG);
+    const result = resolveTurn(state, turnPlans, seed, DESIGN);
     plans.push(turnPlans);
     logs.push(result.log);
     states.push(result.state);
@@ -82,7 +82,7 @@ describe("replay", () => {
       let current = state;
       for (const [turn, plans] of base.plans.entries()) {
         if (current.outcome !== null) break;
-        current = resolveTurn(current, plans, otherSeed, CONFIG).state;
+        current = resolveTurn(current, plans, otherSeed, DESIGN).state;
         if (JSON.stringify(current) !== JSON.stringify(base.states[turn + 1])) differs = true;
       }
     }
@@ -91,7 +91,7 @@ describe("replay", () => {
 
   it("replays a recorded game to the same end", () => {
     const played = playRandomGame(7);
-    const replayed = replayGame({ setup: FOUR_SEATS, seed: 7, plans: played.plans }, CONFIG);
+    const replayed = replayGame({ setup: FOUR_SEATS, seed: 7, plans: played.plans }, DESIGN);
     expect(replayed.state).toEqual(played.states[played.states.length - 1]);
     expect(replayed.logs).toEqual(played.logs);
   });
@@ -99,11 +99,11 @@ describe("replay", () => {
   it("stops a replay where the game ended, ignoring any plans after that", () => {
     const played = playRandomGame(7);
     const extra = [...played.plans, played.plans[0], played.plans[0]];
-    expect(replayGame({ setup: FOUR_SEATS, seed: 7, plans: extra }, CONFIG).logs).toHaveLength(played.logs.length);
+    expect(replayGame({ setup: FOUR_SEATS, seed: 7, plans: extra }, DESIGN).logs).toHaveLength(played.logs.length);
   });
 
   it("replays a game from default plans alone", () => {
-    const replayed = replayGame({ setup: FOUR_SEATS, seed: 3, plans: Array.from({ length: 20 }, () => []) }, CONFIG);
+    const replayed = replayGame({ setup: FOUR_SEATS, seed: 3, plans: Array.from({ length: 20 }, () => []) }, DESIGN);
     expect(replayed.logs.length).toBeLessThanOrEqual(20);
     expect(replayed.state.outcome).not.toBeNull();
   });
@@ -114,8 +114,8 @@ describe("replay", () => {
     const withPoach: PlanSet = base.map((plan, id) => (id === 3 ? { ...plan, poachTarget: 0 } : plan));
     const noisy: PlanSet = withPoach.map((plan, id) => (id === 1 ? { ...plan!, marketing: 200_000, poachTarget: 2, allocation: { product: 1, growth: 1, recruiting: 1 } } : plan));
     for (let seed = 1; seed <= 50; seed++) {
-      const a = resolveTurn(state, withPoach, seed, CONFIG).log.companies[3]?.poach?.success;
-      const b = resolveTurn(state, noisy, seed, CONFIG).log.companies[3]?.poach?.success;
+      const a = resolveTurn(state, withPoach, seed, DESIGN).log.companies[3]?.poach?.success;
+      const b = resolveTurn(state, noisy, seed, DESIGN).log.companies[3]?.poach?.success;
       expect(b, `seed ${seed}`).toBe(a);
     }
   });

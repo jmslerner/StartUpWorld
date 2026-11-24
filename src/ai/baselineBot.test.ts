@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { CONFIG } from "../config";
+import { DESIGN } from "../config.design";
 import { normalizePlanFor } from "../engine/plan";
 import { BLITZ, HUMAN, INCUMBENT, launchedCompany, newGame, withCompany, withState } from "../engine/testKit";
 import type { Company, GameState } from "../engine/types";
 import { viewFor } from "../engine/view";
 import { baselinePlan } from "./baselineBot";
 
-const planFor = (state: GameState) => baselinePlan(viewFor(state, HUMAN), CONFIG);
+const planFor = (state: GameState) => baselinePlan(viewFor(state, HUMAN), DESIGN);
 /** A launched company with plenty of cash, so nothing but the team size drives the split. */
 const launched = (patch: Partial<Company> = {}): GameState => launchedCompany(newGame(), HUMAN, { cash: 50_000_000, ...patch });
 
@@ -100,8 +100,8 @@ describe("baseline bot", () => {
     const states = [newGame(), launched(), launched({ headcount: 1 }), launched({ cash: 0, headcount: 9, lastCosts: 400_000, lastRevenue: 10_000 })];
     for (const state of states) {
       const view = viewFor(state, HUMAN);
-      const plan = baselinePlan(view, CONFIG);
-      expect(normalizePlanFor(view.self, view.turn, view.rivals, plan, CONFIG)).toEqual({ plan, notes: [] });
+      const plan = baselinePlan(view, DESIGN);
+      expect(normalizePlanFor(view.self, view.turn, view.rivals, plan, DESIGN)).toEqual({ plan, notes: [] });
     }
   });
 

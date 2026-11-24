@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CONFIG } from "../config";
+import { DESIGN } from "../config.design";
 import { defaultPlan } from "../engine/plan";
 import type { GameState, Plan } from "../engine/types";
 import { PLAYER_ID, createGameStore, type StorageLike } from "./gameStore";
@@ -20,7 +20,7 @@ class MemoryStorage implements StorageLike {
   }
 }
 
-const NO_EVENTS = { ...CONFIG, events: { ...CONFIG.events, chance: 0 } };
+const NO_EVENTS = { ...DESIGN, events: { ...DESIGN.events, chance: 0 } };
 const started = (storage: StorageLike | null = new MemoryStorage(), seed = 11) => {
   const store = createGameStore(storage, NO_EVENTS);
   store.getState().startGame("Acme", seed);
@@ -30,7 +30,7 @@ const game = (store: ReturnType<typeof createGameStore>): GameState => store.get
 
 describe("game store", () => {
   it("starts with no game: the new-game screen", () => {
-    const state = createGameStore(new MemoryStorage(), CONFIG).getState();
+    const state = createGameStore(new MemoryStorage(), DESIGN).getState();
     expect(state.game).toBeNull();
     expect(state.draft).toBeNull();
     expect(state.lastLog).toBeNull();
@@ -128,7 +128,7 @@ describe("game store", () => {
 describe("autosave", () => {
   it("writes nothing until a game starts", () => {
     const storage = new MemoryStorage();
-    createGameStore(storage, CONFIG);
+    createGameStore(storage, DESIGN);
     expect(storage.writes).toBe(0);
   });
 
@@ -196,7 +196,7 @@ describe("autosave", () => {
     for (const value of bad) {
       const storage = new MemoryStorage();
       if (value !== null) storage.setItem(SAVE_KEY, value);
-      expect(createGameStore(storage, CONFIG).getState().game, String(value).slice(0, 60)).toBeNull();
+      expect(createGameStore(storage, DESIGN).getState().game, String(value).slice(0, 60)).toBeNull();
     }
   });
 
@@ -216,7 +216,7 @@ describe("autosave", () => {
         throw new Error("blocked");
       },
     };
-    const guarded = createGameStore(broken, CONFIG);
+    const guarded = createGameStore(broken, DESIGN);
     expect(() => guarded.getState().startGame("Acme", 3)).not.toThrow();
     expect(() => guarded.getState().endQuarter()).not.toThrow();
     expect(() => guarded.getState().abandon()).not.toThrow();
@@ -239,7 +239,7 @@ describe("autosave", () => {
     const save = JSON.parse(storage.getItem(SAVE_KEY)!);
     const wild: Plan = { ...save.draft, layoffs: 99, marketing: 33_333, raisePercent: 30 };
     storage.setItem(SAVE_KEY, JSON.stringify({ ...save, draft: wild }));
-    const draft = createGameStore(storage, CONFIG).getState().draft!;
+    const draft = createGameStore(storage, DESIGN).getState().draft!;
     expect(draft.layoffs).toBe(2);
     expect(draft.marketing).toBe(25_000);
     expect(draft.raisePercent).toBe(0);

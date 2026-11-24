@@ -11,7 +11,8 @@ const CPUS: readonly Seat[] = ["blitzscaler", "bootstrapper", "incumbent"];
 const ENDINGS: readonly EndingKind[] = ["ipo", "turnLimit", "lastStanding", "wipeout"];
 
 const SEAT_LABEL: Record<Seat, string> = { baseline: "Baseline bot", blitzscaler: "Blitzscaler", bootstrapper: "Bootstrapper", incumbent: "Incumbent" };
-const ENDING_LABEL: Record<EndingKind, string> = { ipo: "IPO", turnLimit: "Turn 20", lastStanding: "Last one standing", wipeout: "Nobody left" };
+const endingLabel = (kind: EndingKind, maxTurns: number): string =>
+  ({ ipo: "IPO", turnLimit: `Turn ${maxTurns}`, lastStanding: "Last one standing", wipeout: "Nobody left" })[kind];
 
 export interface Position {
   /** Share of games in which this seat was still in the game at the checkpoint. */
@@ -160,13 +161,14 @@ const money = (value: number): string => {
 };
 const count = (value: number): string => (value >= 1_000 ? `${(value / 1_000).toFixed(1)}K` : String(Math.round(value)));
 
-export const formatReport = (summary: SimSummary, checks: readonly Check[]): string => {
+/** `maxTurns` is the game's turn limit, for the labels. */
+export const formatReport = (summary: SimSummary, checks: readonly Check[], maxTurns: number): string => {
   const lines: string[] = [];
   const row = (label: string, ...cells: string[]): string => `  ${label.padEnd(24)}${cells.map((cell) => cell.padStart(12)).join("")}`;
 
   lines.push(`Balance simulation: ${summary.games.toLocaleString("en-US")} games`, "");
 
-  lines.push("Win rate by player type", row("", "wins", "by IPO", "at turn 20", "last one"));
+  lines.push("Win rate by player type", row("", "wins", "by IPO", `at turn ${maxTurns}`, "last one"));
   for (const seat of SEATS) {
     const by = summary.winsBy[seat];
     lines.push(row(SEAT_LABEL[seat], percent(summary.winShare[seat]), percent(by.ipo), percent(by.turnLimit), percent(by.lastStanding)));
@@ -177,7 +179,7 @@ export const formatReport = (summary: SimSummary, checks: readonly Check[]): str
   lines.push("How games end");
   for (const kind of ENDINGS) {
     if (kind === "wipeout" && summary.endingShare.wipeout === 0) continue;
-    lines.push(row(ENDING_LABEL[kind], percent(summary.endingShare[kind])));
+    lines.push(row(endingLabel(kind, maxTurns), percent(summary.endingShare[kind])));
   }
   lines.push("");
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CONFIG } from "../config";
+import { DESIGN } from "../config.design";
 import { NEUTRAL_MODIFIERS } from "./events";
 import { pullOf, valuationOf } from "./formulas";
 import { HUMAN, launchedCompany, newGame, onlyActive, reportFor, resolve, withState } from "./testKit";
@@ -7,15 +7,15 @@ import type { RulesConfig } from "./types";
 
 /** A config whose deck holds only the named cards and always draws one. */
 const always = (...ids: string[]): RulesConfig => ({
-  ...CONFIG,
-  events: { ...CONFIG.events, chance: 1, deck: CONFIG.events.deck.filter((card) => ids.includes(card.id)) },
+  ...DESIGN,
+  events: { ...DESIGN.events, chance: 1, deck: DESIGN.events.deck.filter((card) => ids.includes(card.id)) },
 });
-const NEVER: RulesConfig = { ...CONFIG, events: { ...CONFIG.events, chance: 0 } };
+const NEVER: RulesConfig = { ...DESIGN, events: { ...DESIGN.events, chance: 0 } };
 const turn2 = () => withState(newGame(), { turn: 2 });
 
 describe("events in the flow of turns", () => {
   it("reveals nothing for turns 1 and 2", () => {
-    const everything = { ...CONFIG, events: { ...CONFIG.events, chance: 1 } };
+    const everything = { ...DESIGN, events: { ...DESIGN.events, chance: 1 } };
     const first = resolve(newGame(), {}, 1, everything);
     expect(first.state.turn).toBe(2);
     expect(first.state.event).toBeNull();
@@ -54,7 +54,7 @@ describe("events in the flow of turns", () => {
     const revealed = resolve(turn2(), {}, 1, always("ad-prices-spike"));
     const spend = { [HUMAN]: { marketing: 100_000 } };
     const expected = (report: ReturnType<typeof reportFor>, marketingModifier: number) =>
-      pullOf({ quality: report.quality.end, growthWork: report.work.growth, marketing: 100_000, tier: "standard", hype: report.hype.start, marketingModifier }, CONFIG);
+      pullOf({ quality: report.quality.end, growthWork: report.work.growth, marketing: 100_000, tier: "standard", hype: report.hype.start, marketingModifier }, DESIGN);
     const spike = resolve(revealed.state, spend, 1, NEVER);
     expect(reportFor(spike, HUMAN).users.pull).toBeCloseTo(expected(reportFor(spike, HUMAN), 0.5), 9);
     const after = resolve(spike.state, spend, 1, NEVER);
@@ -100,7 +100,7 @@ describe("events in the flow of turns", () => {
 
   it("judges 'users fell' and the growth bonus against last quarter's close, so a breach counts", () => {
     // Closed last quarter on 10,000 users, lost half to a breach, wins 1,300 back alone in a market with no new users.
-    const noNewUsers = { ...NEVER, market: { ...CONFIG.market, newUsersTurn1: 0 } };
+    const noNewUsers = { ...NEVER, market: { ...DESIGN.market, newUsersTurn1: 0 } };
     const breached = withState(
       onlyActive(launchedCompany(newGame(), HUMAN, { users: 5_000, usersAtLastClose: 10_000, investorSeats: 3, cash: 5_000_000 }), [HUMAN]),
       { carryOverUsers: 1_300 },
@@ -141,7 +141,7 @@ describe("funding climate", () => {
     const result = resolve(winter, {}, 1, NEVER);
     const report = reportFor(result, HUMAN);
     expect(result.log.climateMultiplier).toBe(0.6);
-    expect(report.valuation).toBe(valuationOf(report.users.end, report.hype.end, 0.6, CONFIG));
+    expect(report.valuation).toBe(valuationOf(report.users.end, report.hype.end, 0.6, DESIGN));
     expect(result.state.climate).toEqual({ multiplier: 1, turnsLeft: 0 });
   });
 });

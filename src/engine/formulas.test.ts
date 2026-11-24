@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CONFIG } from "../config";
+import { DESIGN } from "../config.design";
 import {
   churnRate,
   clamp,
@@ -46,44 +46,44 @@ describe("effective work", () => {
 
 describe("product quality", () => {
   it("gains 5 × product work × (1 − quality/100)", () => {
-    expect(qualityGain(0, 2, 1, CONFIG)).toBeCloseTo(10, 6);
-    expect(qualityGain(30, 2, 1, CONFIG)).toBeCloseTo(7, 6);
-    expect(qualityGain(100, 2, 1, CONFIG)).toBe(0);
+    expect(qualityGain(0, 2, 1, DESIGN)).toBeCloseTo(10, 6);
+    expect(qualityGain(30, 2, 1, DESIGN)).toBeCloseTo(7, 6);
+    expect(qualityGain(100, 2, 1, DESIGN)).toBe(0);
   });
 
   it("multiplies the gain by the catch-up bonus", () => {
-    expect(qualityGain(30, 2, 1.5, CONFIG)).toBeCloseTo(10.5, 6);
+    expect(qualityGain(30, 2, 1.5, DESIGN)).toBeCloseTo(10.5, 6);
   });
 
   it("then loses the decay, and stays within 0–100", () => {
-    expect(nextQuality(40, 7, CONFIG)).toBeCloseTo(45, 6);
-    expect(nextQuality(1, 0, CONFIG)).toBe(0);
-    expect(nextQuality(99.5, 50, CONFIG)).toBe(100);
+    expect(nextQuality(40, 7, DESIGN)).toBeCloseTo(45, 6);
+    expect(nextQuality(1, 0, DESIGN)).toBe(0);
+    expect(nextQuality(99.5, 50, DESIGN)).toBe(100);
   });
 
   it("lets three people on Product launch in one turn (quality 10 after the decay)", () => {
     const work = effectiveWork(3, 0.9);
-    const quality = nextQuality(0, qualityGain(0, work, 1, CONFIG), CONFIG);
+    const quality = nextQuality(0, qualityGain(0, work, 1, DESIGN), DESIGN);
     expect(quality).toBeCloseTo(11.4394, 3);
-    expect(quality).toBeGreaterThanOrEqual(CONFIG.quality.launchAt);
+    expect(quality).toBeGreaterThanOrEqual(DESIGN.quality.launchAt);
   });
 });
 
 describe("churn", () => {
   it("is 12% − 0.08 points per quality point on Standard", () => {
-    expect(churnRate(0, "standard", CONFIG)).toBeCloseTo(0.12, 9);
-    expect(churnRate(50, "standard", CONFIG)).toBeCloseTo(0.08, 9);
-    expect(churnRate(100, "standard", CONFIG)).toBeCloseTo(0.04, 9);
+    expect(churnRate(0, "standard", DESIGN)).toBeCloseTo(0.12, 9);
+    expect(churnRate(50, "standard", DESIGN)).toBeCloseTo(0.08, 9);
+    expect(churnRate(100, "standard", DESIGN)).toBeCloseTo(0.04, 9);
   });
 
   it("adds 4 points on Premium and takes 2 off on Budget", () => {
-    expect(churnRate(50, "premium", CONFIG)).toBeCloseTo(0.12, 9);
-    expect(churnRate(50, "budget", CONFIG)).toBeCloseTo(0.06, 9);
+    expect(churnRate(50, "premium", DESIGN)).toBeCloseTo(0.12, 9);
+    expect(churnRate(50, "budget", DESIGN)).toBeCloseTo(0.06, 9);
   });
 
   it("never goes below the floor", () => {
-    expect(churnRate(100, "budget", CONFIG)).toBeCloseTo(0.02, 9);
-    const stricter = { ...CONFIG, churn: { ...CONFIG.churn, min: 0.05 } };
+    expect(churnRate(100, "budget", DESIGN)).toBeCloseTo(0.02, 9);
+    const stricter = { ...DESIGN, churn: { ...DESIGN.churn, min: 0.05 } };
     expect(churnRate(100, "budget", stricter)).toBe(0.05);
     expect(churnRate(100, "standard", stricter)).toBe(0.05);
   });
@@ -94,33 +94,33 @@ describe("pull", () => {
 
   it("is quality × (1 + 0.3 × growth work + 0.5 × √(marketing ÷ $25K)) × price factor × (1 + hype/100)", () => {
     // 40 × (1 + 0.6 + 0.5 × 2) × 1 × 1.2
-    expect(pullOf(base, CONFIG)).toBeCloseTo(124.8, 6);
+    expect(pullOf(base, DESIGN)).toBeCloseTo(124.8, 6);
   });
 
   it("applies the price factor", () => {
-    expect(pullOf({ ...base, tier: "budget" }, CONFIG)).toBeCloseTo(156, 6);
-    expect(pullOf({ ...base, tier: "premium" }, CONFIG)).toBeCloseTo(93.6, 6);
+    expect(pullOf({ ...base, tier: "budget" }, DESIGN)).toBeCloseTo(156, 6);
+    expect(pullOf({ ...base, tier: "premium" }, DESIGN)).toBeCloseTo(93.6, 6);
   });
 
   it("halves the marketing term when ad prices spike", () => {
     // 40 × (1 + 0.6 + 0.5) × 1.2
-    expect(pullOf({ ...base, marketingModifier: 0.5 }, CONFIG)).toBeCloseTo(100.8, 6);
+    expect(pullOf({ ...base, marketingModifier: 0.5 }, DESIGN)).toBeCloseTo(100.8, 6);
   });
 
   it("is zero without a product", () => {
-    expect(pullOf({ ...base, quality: 0 }, CONFIG)).toBe(0);
+    expect(pullOf({ ...base, quality: 0 }, DESIGN)).toBe(0);
   });
 
   it("works with no growth staff and no marketing", () => {
-    expect(pullOf({ ...base, growthWork: 0, marketing: 0, hype: 0 }, CONFIG)).toBeCloseTo(40, 6);
+    expect(pullOf({ ...base, growthWork: 0, marketing: 0, hype: 0 }, DESIGN)).toBeCloseTo(40, 6);
   });
 });
 
 describe("money", () => {
   it("values a company at users × $150 × (1 + hype/100) × climate", () => {
-    expect(valuationOf(10_000, 20, 1, CONFIG)).toBe(1_800_000);
-    expect(valuationOf(10_000, 20, 0.6, CONFIG)).toBe(1_080_000);
-    expect(valuationOf(0, 50, 1, CONFIG)).toBe(0);
+    expect(valuationOf(10_000, 20, 1, DESIGN)).toBe(1_800_000);
+    expect(valuationOf(10_000, 20, 0.6, DESIGN)).toBe(1_080_000);
+    expect(valuationOf(0, 50, 1, DESIGN)).toBe(0);
   });
 
   it("raises valuation × percent, in whole dollars", () => {
@@ -144,34 +144,34 @@ describe("money", () => {
 
 describe("hiring and poaching", () => {
   it("can hire 2 × recruiting work, rounded", () => {
-    expect(hiringCapacity(0.896, CONFIG)).toBe(2);
-    expect(hiringCapacity(0.2, CONFIG)).toBe(0);
-    expect(hiringCapacity(1.25, CONFIG)).toBe(3);
-    expect(hiringCapacity(0, CONFIG)).toBe(0);
+    expect(hiringCapacity(0.896, DESIGN)).toBe(2);
+    expect(hiringCapacity(0.2, DESIGN)).toBe(0);
+    expect(hiringCapacity(1.25, DESIGN)).toBe(3);
+    expect(hiringCapacity(0, DESIGN)).toBe(0);
   });
 
   it("poaches at 50% plus half the hype gap in points", () => {
-    expect(poachChance(20, 10, CONFIG)).toBeCloseTo(0.55, 9);
-    expect(poachChance(10, 20, CONFIG)).toBeCloseTo(0.45, 9);
-    expect(poachChance(15, 15, CONFIG)).toBeCloseTo(0.5, 9);
+    expect(poachChance(20, 10, DESIGN)).toBeCloseTo(0.55, 9);
+    expect(poachChance(10, 20, DESIGN)).toBeCloseTo(0.45, 9);
+    expect(poachChance(15, 15, DESIGN)).toBeCloseTo(0.5, 9);
   });
 
   it("clamps the poach chance to 10–90%", () => {
-    expect(poachChance(100, 0, CONFIG)).toBe(0.9);
-    expect(poachChance(0, 100, CONFIG)).toBe(0.1);
+    expect(poachChance(100, 0, DESIGN)).toBe(0.9);
+    expect(poachChance(0, 100, DESIGN)).toBe(0.1);
   });
 });
 
 describe("market size", () => {
   it("starts at 20,000 new users and grows 10% a turn", () => {
-    expect(newUsersForTurn(1, 1, CONFIG)).toBe(20_000);
-    expect(newUsersForTurn(2, 1, CONFIG)).toBe(22_000);
-    expect(newUsersForTurn(3, 1, CONFIG)).toBe(24_200);
-    expect(newUsersForTurn(20, 1, CONFIG)).toBe(122_318);
+    expect(newUsersForTurn(1, 1, DESIGN)).toBe(20_000);
+    expect(newUsersForTurn(2, 1, DESIGN)).toBe(22_000);
+    expect(newUsersForTurn(3, 1, DESIGN)).toBe(24_200);
+    expect(newUsersForTurn(20, 1, DESIGN)).toBe(122_318);
   });
 
   it("applies the event multiplier", () => {
-    expect(newUsersForTurn(1, 1.5, CONFIG)).toBe(30_000);
+    expect(newUsersForTurn(1, 1.5, DESIGN)).toBe(30_000);
   });
 });
 

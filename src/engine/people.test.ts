@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CONFIG } from "../config";
+import { DESIGN } from "../config.design";
 import { poachChance } from "./formulas";
 import { STREAM, firstFloat } from "./rng";
 import { BLITZ, BOOT, HUMAN, INCUMBENT, newGame, onlyActive, reportFor, resolve, seedWhere, withCompany, withState } from "./testKit";
@@ -103,7 +103,7 @@ describe("hiring in a turn", () => {
 });
 
 describe("poaching", () => {
-  const chance = poachChance(20, 10, CONFIG);
+  const chance = poachChance(20, 10, DESIGN);
   const rollOf = (seed: number, poacher: number, turn = 1) => firstFloat(seed, turn, STREAM.poach, poacher);
   const winning = seedWhere((seed) => rollOf(seed, INCUMBENT) < chance);
   const losing = seedWhere((seed) => rollOf(seed, INCUMBENT) >= chance);
@@ -160,7 +160,7 @@ describe("poaching", () => {
   it("resolves attempts in hype order, so a team of two can only lose one person", () => {
     // Blitzscaler (hype 30) and Incumbent (hype 20) both go for the two-person human team.
     const state = withCompany(withCompany(newGame(), HUMAN, { headcount: 2, headcountAtLastClose: 2 }), BLITZ, { hype: 30 });
-    const blitzChance = poachChance(30, 10, CONFIG);
+    const blitzChance = poachChance(30, 10, DESIGN);
     const seed = seedWhere((s) => rollOf(s, BLITZ) < blitzChance && rollOf(s, INCUMBENT) < chance);
     const result = resolve(state, { [BLITZ]: { poachTarget: HUMAN }, [INCUMBENT]: { poachTarget: HUMAN } }, seed);
     expect(reportFor(result, BLITZ).poach?.success).toBe(true);
@@ -171,7 +171,7 @@ describe("poaching", () => {
 
   it("lets the second poacher try when the first one fails", () => {
     const state = withCompany(withCompany(newGame(), HUMAN, { headcount: 2, headcountAtLastClose: 2 }), BLITZ, { hype: 30 });
-    const blitzChance = poachChance(30, 10, CONFIG);
+    const blitzChance = poachChance(30, 10, DESIGN);
     const seed = seedWhere((s) => rollOf(s, BLITZ) >= blitzChance && rollOf(s, INCUMBENT) < chance);
     const result = resolve(state, { [BLITZ]: { poachTarget: HUMAN }, [INCUMBENT]: { poachTarget: HUMAN } }, seed);
     expect(reportFor(result, BLITZ).poach?.success).toBe(false);

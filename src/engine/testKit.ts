@@ -1,6 +1,9 @@
 // Helpers for the engine's tests. Not used by the game itself.
+//
+// Tests run on the design's starting numbers (src/config.design.ts), not on src/config.ts, so the
+// numbers the game ships with can be tuned without touching a single test.
 
-import { CONFIG } from "../config";
+import { DESIGN } from "../config.design";
 import { defaultPlan } from "./plan";
 import { resolveTurn, type TurnResult } from "./resolveTurn";
 import { createGame } from "./setup";
@@ -21,7 +24,7 @@ export const FOUR_SEATS: GameSetup = {
   ],
 };
 
-export const newGame = (config: RulesConfig = CONFIG): GameState => createGame(FOUR_SEATS, config);
+export const newGame = (config: RulesConfig = DESIGN): GameState => createGame(FOUR_SEATS, config);
 
 /** A copy of the state with some fields replaced. */
 export const withState = (state: GameState, patch: Partial<GameState>): GameState => ({ ...state, ...patch });
@@ -61,7 +64,7 @@ export const resolve = (
   state: GameState,
   patches: Readonly<Record<number, Partial<Plan>>> = {},
   seed = 1,
-  config: RulesConfig = CONFIG,
+  config: RulesConfig = DESIGN,
 ): TurnResult => resolveTurn(state, plansOf(state, patches), seed, config);
 
 /** A company's report for the turn; throws if it was already out. */

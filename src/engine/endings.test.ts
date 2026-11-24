@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { CONFIG } from "../config";
+import { DESIGN } from "../config.design";
 import { founderStake } from "./formulas";
 import { STREAM, firstFloat } from "./rng";
 import { BLITZ, BOOT, HUMAN, INCUMBENT, launchedCompany, newGame, onlyActive, reportFor, resolve, seedWhere, usersInSystem, withCompany, withState } from "./testKit";
 import type { Company, GameState } from "./types";
 
 const IDLE = { product: 0, growth: 3, recruiting: 0 };
-const NO_EVENTS = { ...CONFIG, events: { ...CONFIG.events, chance: 0 } };
+const NO_EVENTS = { ...DESIGN, events: { ...DESIGN.events, chance: 0 } };
 const RECRUIT = { product: 2, growth: 0, recruiting: 1 };
 
 describe("bankruptcy", () => {
@@ -108,7 +108,7 @@ describe("IPO", () => {
   });
 
   it("ends the game there: no next turn and no next event", () => {
-    const result = resolve(withState(giant(), { turn: 7 }), {}, 1, { ...CONFIG, events: { ...CONFIG.events, chance: 1 } });
+    const result = resolve(withState(giant(), { turn: 7 }), {}, 1, { ...DESIGN, events: { ...DESIGN.events, chance: 1 } });
     expect(result.state.turn).toBe(7);
     expect(result.log.nextEvent).toBeNull();
     expect(result.log.outcome?.kind).toBe("ipo");
@@ -138,8 +138,8 @@ describe("the board", () => {
   });
 
   it("follows the configured chance: always at 100%, never at 0%", () => {
-    const always = { ...CONFIG, board: { ...CONFIG.board, fireChance: 1 } };
-    const never = { ...CONFIG, board: { ...CONFIG.board, fireChance: 0 } };
+    const always = { ...DESIGN, board: { ...DESIGN.board, fireChance: 1 } };
+    const never = { ...DESIGN, board: { ...DESIGN.board, fireChance: 0 } };
     for (let seed = 1; seed <= 40; seed++) {
       expect(reportFor(resolve(shrinking(), idle, seed, always), HUMAN).board?.fired).toBe(true);
       expect(reportFor(resolve(shrinking(), idle, seed, never), HUMAN).board?.fired).toBe(false);

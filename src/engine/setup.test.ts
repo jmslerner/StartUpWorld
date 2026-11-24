@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CONFIG } from "../config";
+import { DESIGN } from "../config.design";
 import { defaultPlan } from "./plan";
 import { createGame } from "./setup";
 import { BLITZ, BOOT, FOUR_SEATS, HUMAN, INCUMBENT, newGame } from "./testKit";
@@ -87,14 +87,14 @@ describe("createGame", () => {
   });
 
   it("is pure: the same setup gives an equal state that survives a JSON round trip", () => {
-    const a = createGame(FOUR_SEATS, CONFIG);
-    const b = createGame(FOUR_SEATS, CONFIG);
+    const a = createGame(FOUR_SEATS, DESIGN);
+    const b = createGame(FOUR_SEATS, DESIGN);
     expect(a).toEqual(b);
     expect(JSON.parse(JSON.stringify(a))).toEqual(a);
   });
 
   it("refuses a game with fewer than two companies", () => {
-    expect(() => createGame({ seats: FOUR_SEATS.seats.slice(0, 1) }, CONFIG)).toThrow();
+    expect(() => createGame({ seats: FOUR_SEATS.seats.slice(0, 1) }, DESIGN)).toThrow();
   });
 });
 

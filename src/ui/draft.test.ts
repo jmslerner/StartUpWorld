@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CONFIG } from "../config";
+import { DESIGN } from "../config.design";
 import { defaultPlan } from "../engine/plan";
 import { HUMAN, INCUMBENT, launchedCompany, newGame, withCompany } from "../engine/testKit";
 import type { Company, Plan } from "../engine/types";
@@ -97,11 +97,11 @@ describe("layoffs and raising", () => {
 describe("marketing and hiring steppers", () => {
   it("moves marketing in $25K steps between 0 and the largest spend", () => {
     const c = company();
-    expect(stepMarketing(plan(c), 1, CONFIG).marketing).toBe(25_000);
-    expect(stepMarketing(plan(c, { marketing: 50_000 }), -1, CONFIG).marketing).toBe(25_000);
-    expect(stepMarketing(plan(c), -1, CONFIG).marketing).toBe(0);
-    expect(stepMarketing(plan(c, { marketing: CONFIG.pull.maxMarketing }), 1, CONFIG).marketing).toBe(CONFIG.pull.maxMarketing);
-    expect(stepMarketing(plan(c, { marketing: 50_000 }), 4, CONFIG).marketing).toBe(150_000);
+    expect(stepMarketing(plan(c), 1, DESIGN).marketing).toBe(25_000);
+    expect(stepMarketing(plan(c, { marketing: 50_000 }), -1, DESIGN).marketing).toBe(25_000);
+    expect(stepMarketing(plan(c), -1, DESIGN).marketing).toBe(0);
+    expect(stepMarketing(plan(c, { marketing: DESIGN.pull.maxMarketing }), 1, DESIGN).marketing).toBe(DESIGN.pull.maxMarketing);
+    expect(stepMarketing(plan(c, { marketing: 50_000 }), 4, DESIGN).marketing).toBe(150_000);
   });
 
   it("lowers the hire limit from 'as many as possible' and raises it back", () => {

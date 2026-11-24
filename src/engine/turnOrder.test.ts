@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { CONFIG } from "../config";
+import { DESIGN } from "../config.design";
 import { effectiveWork } from "./formulas";
 import { defaultPlan } from "./plan";
 import { resolveTurn } from "./resolveTurn";
@@ -10,7 +11,7 @@ describe("resolveTurn", () => {
     const state = newGame();
     const plans = plansOf(state);
     const before = JSON.stringify({ state, plans });
-    const result = resolveTurn(state, plans, 1, CONFIG);
+    const result = resolveTurn(state, plans, 1, DESIGN);
     expect(result.log.turn).toBe(1);
     expect(result.state.turn).toBe(2);
     expect(result.state).not.toBe(state);
@@ -26,7 +27,7 @@ describe("resolveTurn", () => {
       return value;
     };
     let state = deepFreeze(newGame());
-    const config = deepFreeze(structuredClone(CONFIG));
+    const config = deepFreeze(structuredClone(DESIGN));
     for (let turn = 1; turn <= 6; turn++) {
       const plans = deepFreeze(plansOf(state, { [HUMAN]: { allocation: { product: 2, growth: 0, recruiting: 1 }, marketing: 25_000 }, [INCUMBENT]: { poachTarget: BLITZ, layoffs: 1 } }));
       state = deepFreeze(resolveTurn(state, plans, 9, config).state);
@@ -35,7 +36,7 @@ describe("resolveTurn", () => {
   });
 
   it("uses the config file when no config is passed", () => {
-    const state = newGame();
+    const state = newGame(CONFIG);
     expect(resolveTurn(state, plansOf(state), 5)).toEqual(resolveTurn(state, plansOf(state), 5, CONFIG));
   });
 
@@ -52,10 +53,10 @@ describe("resolveTurn", () => {
       price: "budget",
       lastPlan: { ...defaultPlan(newGame().companies[HUMAN]), allocation: { product: 2, growth: 1, recruiting: 0 }, marketing: 50_000, price: "budget" },
     });
-    const result = resolveTurn(state, [null, null, null, null], 1, CONFIG);
+    const result = resolveTurn(state, [null, null, null, null], 1, DESIGN);
     expect(reportFor(result, HUMAN).plan).toEqual(defaultPlan(state.companies[HUMAN]));
     expect(reportFor(result, HUMAN).plan.marketing).toBe(50_000);
-    expect(resolveTurn(state, [], 1, CONFIG)).toEqual(result);
+    expect(resolveTurn(state, [], 1, DESIGN)).toEqual(result);
   });
 
   it("stores the plan as resolved, so it is the default next turn", () => {

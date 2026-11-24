@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { CONFIG } from "./config";
+import { DESIGN } from "./config.design";
 import { EVENT_EFFECT_KINDS, PRICE_TIERS } from "./engine/types";
+import { changedNumbers } from "./sim/changes";
 
 // These tests check the shape of the config, never a tunable value: tuning must not break them.
 describe("config", () => {
@@ -119,5 +121,43 @@ describe("config", () => {
         }
       }
     });
+  });
+});
+
+// Tuning moves numbers. It must not turn a rival into a different kind of player, or the baseline
+// bot into a different bot: those are fixed by the design. (The balance targets are numbers too;
+// `npm run sim` lists every number that differs from the design, targets included.)
+describe("what tuning may not change", () => {
+  const { blitzscaler, bootstrapper, incumbent } = CONFIG.cpu.personalities;
+
+  it("Blitzscaler: Budget pricing, and a 30% raise the moment it is eligible", () => {
+    expect(blitzscaler.price).toBe("budget");
+    expect(blitzscaler.raise.when).toBe("eligible");
+    expect(blitzscaler.raise.percents).toEqual([30]);
+  });
+
+  it("Bootstrapper: Premium pricing, and it raises only when runway drops under 2 turns", () => {
+    expect(bootstrapper.price).toBe("premium");
+    expect(bootstrapper.raise.when).toBe("runway");
+    expect(bootstrapper.raise.runway).toBe(2);
+  });
+
+  it("Incumbent: poaches when it can afford to", () => {
+    expect(incumbent.poachRunway).not.toBeNull();
+  });
+
+  it("baseline bot: 40/40/20, Standard price, raises 20% when runway drops under 3 turns", () => {
+    expect(CONFIG.baseline).toMatchObject({ split: { product: 0.4, growth: 0.4, recruiting: 0.2 }, price: "standard", raisePercent: 20, raiseRunway: 3, hireRunway: 3, marketing: 0 });
+  });
+
+  it("the raise sizes on offer: 10, 20 or 30%", () => {
+    expect(CONFIG.raise.options).toEqual([10, 20, 30]);
+  });
+});
+
+describe("the design's starting numbers", () => {
+  it("cover exactly the same numbers as the config: none missing on either side", () => {
+    const oneSided = changedNumbers(DESIGN, CONFIG).filter((change) => change.start === undefined || change.now === undefined);
+    expect(oneSided.map((change) => change.path)).toEqual([]);
   });
 });
