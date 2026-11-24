@@ -187,6 +187,21 @@ describe("graveyard: a failed request says why in the log", () => {
     for (const stored of ["Initech", "invoicing"]) expect(logged.join("\n")).not.toContain(stored);
   });
 
+  it("has the reason in the log before it answers, so it is not lost when answering fails as well", async () => {
+    const redis = fakeRedis();
+    redis.lRange.mockRejectedValue(new Error("Socket closed unexpectedly"));
+    useRedis(redis);
+    const res = {
+      status: () => res,
+      json: () => {
+        throw new Error("the response is already closed");
+      },
+    };
+    const answering = handler({ method: "GET" } as unknown as VercelRequest, res as unknown as VercelResponse);
+    await expect(answering).rejects.toThrow("the response is already closed");
+    expect(logged).toEqual(["error: graveyard: request failed: Socket closed unexpectedly"]);
+  });
+
   it("logs nothing when nothing failed: a list, a new entry, a submission that does not validate", async () => {
     useRedis(fakeRedis());
     expect((await call("GET")).status).toBe(200);
