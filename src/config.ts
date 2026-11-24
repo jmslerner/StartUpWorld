@@ -201,6 +201,8 @@ export const CONFIG: GameConfig = {
     boardRiskPenalty: 3,
     layoffRunway: 1,
     minShareForGrowth: 0.1,
+    shortRunwayPenalty: 2,
+    ipo: { win: 100, deficit: 20, nextDeficit: 10, usersShortfall: 20 },
     personalities: {
       // Chases users: Budget price, raises 30% the moment it can, heavy marketing.
       blitzscaler: {
