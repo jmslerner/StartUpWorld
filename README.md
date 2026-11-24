@@ -33,6 +33,12 @@ The leaderboard and the graveyard (`api/`) store their data in Redis. Connect a 
 (Storage tab) so the functions get a `REDIS_URL` or `KV_URL` variable; without a reachable database they answer 503 and the
 game shows the leaderboard as offline.
 
+With a connection, a request can still fail: the database refuses a command or does not answer it within 3 seconds, or
+a stored entry cannot be read. The function then answers 500 and writes one line that says why to its log (the Logs tab
+of the Vercel project), for example `leaderboard: request failed: Redis did not reply within 3000 ms`. A connection
+string in the reason is replaced by `[redis url]`, and the function adds nothing from the request or from the stored
+entries to the line.
+
 A free Redis database is taken away when nothing uses it: Upstash archives one after 30 days without activity, and its
 terms allow deleting one after a week without requests. To prevent that, `vercel.json` schedules one request a day to
 `/api/keepalive`, which writes a timestamp to the database. If the write fails, the same run tries it once more, on a

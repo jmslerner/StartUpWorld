@@ -1,5 +1,7 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
+import { describeError } from "./_lib/describeError.js";
 import { getRedis, withReplyDeadline } from "./_lib/redis.js";
+import { parseStoredEntry } from "./_lib/storedEntry.js";
 import { validateGraveyard } from "./_lib/validate.js";
 
 const GRAVEYARD_KEY = "graveyard";
@@ -15,7 +17,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     if (req.method === "GET") {
       const raw = await withReplyDeadline(redis, redis.lRange(GRAVEYARD_KEY, 0, RETURN_LIMIT - 1));
-      const entries = raw.map((e) => JSON.parse(String(e)));
+      const entries = raw.map((stored, index) => parseStoredEntry(stored, index));
       return res.json({ entries });
     }
 
@@ -42,7 +44,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     return res.status(405).json({ error: "Method not allowed" });
-  } catch {
+  } catch (err) {
+    console.error(`graveyard: request failed: ${describeError(err)}`);
     return res.status(500).json({ error: "Internal server error" });
   }
 }
