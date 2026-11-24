@@ -292,3 +292,7 @@ All four targets hold on all five.
   games.
 - The balance was found for these bots. A change to how a rival plans, or to a rule, calls for another
   `npm run sim` and probably another search.
+- The targets measure one simple policy, and skill moves the result a long way. In the player's seat over 300 games:
+  the baseline bot won 23%; a careful scripted player (keeps control of its board, keeps three quarters of cash,
+  lays people off rather than go under, cuts spending to turn a profit at the IPO bar) won 83%; a player that
+  copies the Bootstrapper won none and let the Blitzscaler go public in 80%. The rivals have no difficulty setting.
