@@ -13,6 +13,9 @@ const roundTo = (value: number, digits: number): number => {
 /** Stored quality and hype keep four decimals, so saves and replays stay tidy. */
 export const round4 = (value: number): number => roundTo(value, 4);
 
+/** Founder equity keeps six. */
+export const round6 = (value: number): number => roundTo(value, 6);
+
 /**
  * Coordination drag: effective work = headcount ^ exponent. Rounded to six decimals because
  * Math.pow may differ in the last bit between JavaScript engines, and replays must not.

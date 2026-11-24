@@ -2,8 +2,9 @@
 
 import { CONFIG } from "../config";
 import { defaultPlan } from "./plan";
+import { resolveTurn, type TurnResult } from "./resolveTurn";
 import { createGame } from "./setup";
-import type { Company, CompanyId, GameSetup, GameState, Plan, PlanSet, RulesConfig } from "./types";
+import type { Company, CompanyId, CompanyReport, GameSetup, GameState, Plan, PlanSet, RulesConfig } from "./types";
 
 /** Seat ids used throughout the tests. */
 export const HUMAN = 0;
@@ -54,3 +55,30 @@ export const onlyActive = (state: GameState, ids: readonly CompanyId[]): GameSta
 /** Sum of users held by companies plus users waiting in the pool. */
 export const usersInSystem = (state: GameState): number =>
   state.companies.reduce((sum, company) => sum + company.users, 0) + state.carryOverUsers;
+
+/** Resolve one turn with default plans plus per-company patches. */
+export const resolve = (
+  state: GameState,
+  patches: Readonly<Record<number, Partial<Plan>>> = {},
+  seed = 1,
+  config: RulesConfig = CONFIG,
+): TurnResult => resolveTurn(state, plansOf(state, patches), seed, config);
+
+/** A company's report for the turn; throws if it was already out. */
+export const reportFor = (result: TurnResult, id: CompanyId): CompanyReport => {
+  const report = result.log.companies[id];
+  if (!report) throw new Error(`company ${id} has no report`);
+  return report;
+};
+
+/** The first seed (from 1) for which the predicate holds. */
+export const seedWhere = (predicate: (seed: number) => boolean): number => {
+  for (let seed = 1; seed < 100_000; seed++) if (predicate(seed)) return seed;
+  throw new Error("no seed found");
+};
+
+/** A launched company with users, for tests that need a going concern. */
+export const launchedCompany = (state: GameState, id: CompanyId, patch: Partial<Company> = {}): GameState => {
+  const users = patch.users ?? 10_000;
+  return withCompany(state, id, { launched: true, quality: 50, users, usersAtLastClose: users, ...patch });
+};
