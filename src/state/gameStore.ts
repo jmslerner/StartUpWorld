@@ -9,10 +9,11 @@ import { defaultPlan } from "../engine/plan";
 import { resolveTurn } from "../engine/resolveTurn";
 import { createGame } from "../engine/setup";
 import type { GameState, Plan, TurnLog } from "../engine/types";
+import { PLAYER_ID } from "./player";
 import { SAVE_KEY, parseSave, serializeSave } from "./save";
 
-/** The player always sits in seat 0. */
-export const PLAYER_ID = 0;
+export { PLAYER_ID };
+
 
 export interface StorageLike {
   getItem(key: string): string | null;
