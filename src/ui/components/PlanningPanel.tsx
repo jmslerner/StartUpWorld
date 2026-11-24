@@ -92,7 +92,7 @@ export const PlanningPanel = ({ company, turn, draft, view, config, onChange }: 
         {capacity > 0 && (
           <Row
             title="Hire at most"
-            hint={`${money(view.hiring.fee)} fee each; they start next quarter. ${plural(view.hiring.candidates, "candidate", "candidates")} this quarter, most hype picks first: expect ${view.hiring.expected}.`}
+            hint={`${money(view.hiring.fee)} fee each, then ${money(config.salary)} a quarter in salary; they start next quarter. ${plural(view.hiring.candidates, "candidate", "candidates")} this quarter, most hype picks first: expect ${view.hiring.expected}.`}
           >
             <Stepper label="Hire at most" value={hireLimit} onStep={(delta) => onChange(stepHireLimit(draft, delta, capacity))} canDecrease={hireLimit > 0} canIncrease={hireLimit < capacity} />
           </Row>
