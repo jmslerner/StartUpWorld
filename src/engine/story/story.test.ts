@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import type { BoardMember, GameState, InvestorLead } from "../../types/game";
 import { parseSave, serializeSave } from "../../state/save";
 import { createInitialState } from "../actions";
@@ -6,7 +6,7 @@ import { executeCommand } from "../commands";
 import type { EngineContext } from "../context";
 import { generateEndingSummary } from "../endingSummary";
 import { eventPool } from "../events/pool";
-import { raise } from "../investors";
+import { raise, stageRaiseCaps } from "../investors";
 import { mix32 } from "../../world/hash";
 import { playStockWeek } from "../__golden__/legacyBots";
 import { refreshDerivedNoLog } from "../derived";
@@ -17,6 +17,7 @@ import { BARK_EVERY, BARKS, barkFor } from "./barks";
 import { CALLBACKS, playDueCallback } from "./callbacks";
 import { storyConfig } from "./config";
 import { applyFx } from "./effects";
+import { closeStoryRound } from "./financing";
 import { EPILOGUES, pickEpilogue } from "./epilogues";
 import { storyEvents } from "./events";
 import { INTERLUDES, countSeriesRound, interludeFor } from "./interludes";
@@ -25,9 +26,7 @@ import type { StoryEventId } from "./meta";
 import { STORY_PICK_SHARE, withStoryShare } from "./share";
 import { CALLBACK_GRACE_WEEKS, emptyStory, normalizeStory, recordStoryChoice } from "./state";
 
-afterEach(() => {
-  storyConfig.enabled = true;
-});
+// Tests that switch the pack off need no cleanup: src/test/setup.ts switches it back on before every test.
 
 const director = (id: string, role: BoardMember["role"], confidence = 60): BoardMember => ({ id, name: id, role, personality: "operator", confidence });
 const lead = (id: string, relationship: number): InvestorLead => ({ id, name: `Fund ${id}`, riskTolerance: 50, trendBias: "ai", relationship });
@@ -522,5 +521,63 @@ describe("the whole pack, end to end", () => {
     expect(r.line).toBe("Cash -$30,000. Users -50. ARPU +$1 → $11. Reputation +2. Board confidence -3.");
     expect(r.state).toMatchObject({ cash: 70_000, users: 950, arpu: 11, mrr: 10_450, reputation: 62 });
     expect(r.state.board.members.map((m) => m.confidence)).toEqual([95, 57, 57]);
+  });
+
+  it("applyFx prints the volatility-scaled change it applied, not the nominal one", () => {
+    // volatility 50: impactMultiplier 2, so soft stats move twice their nominal step; stress is never scaled.
+    const s = ripe({ volatility: 50, reputation: 40, vcReputation: 40, stress: 40 });
+    const r = applyFx(s, { rep: 2, vcRep: -3, morale: 1, stress: 2 });
+    expect(r.line).toBe("Reputation +4. VC rep -6. Morale +2. Stress +2.");
+    expect(r.state.reputation).toBe(44);
+    expect(r.state.vcReputation).toBe(34);
+    expect(r.state.culture.morale).toBe(s.culture.morale + 2);
+    expect(r.state.stress).toBe(42);
+  });
+
+  it("applyFx prints what is left after the 0..100 clamp, and nothing for a change clamped away", () => {
+    const s = ripe({ volatility: 0, reputation: 99, stress: 100 });
+    const r = applyFx(s, { rep: 5, stress: 3 });
+    expect(r.line).toBe("Reputation +1.");
+    expect(r.state.reputation).toBe(100);
+    expect(r.state.stress).toBe(100);
+    expect(applyFx({ ...s, reputation: 100 }, { rep: 5, stress: 3 }).line).toBe("Nothing measurable changes.");
+  });
+
+  it("applyFx names board and lead steps only when someone actually moved", () => {
+    const s = ripe({ volatility: 0 });
+    const maxed = { ...s, board: { ...s.board, members: s.board.members.map((m) => (m.role === "founder" ? m : { ...m, confidence: 100 })) } };
+    expect(applyFx(maxed, { board: 4 }).line).toBe("Nothing measurable changes.");
+    expect(applyFx(maxed, { board: -4 }).line).toBe("Board confidence -4.");
+  });
+});
+
+describe("story rounds: the stage's hard cap", () => {
+  it("a story round never books more than the stage's hard cap, as `raise` refuses to", () => {
+    const s = ripe({ stage: "seed", cash: 0, debtOutstanding: 0, totalRaised: 1_000_000 });
+    const cap = stageRaiseCaps.seed.hardCap;
+    const r = closeStoryRound(s, cap * 3, 20_000_000, "Big Fund");
+    expect(r.state.cash).toBe(cap);
+    expect(r.state.totalRaised).toBe(1_000_000 + cap);
+    expect(r.state.lastRound?.amount).toBe(cap);
+    expect(r.state.lastRound?.postMoney).toBe(20_000_000 + cap);
+  });
+
+  it("a round under the cap is booked as offered", () => {
+    const s = ripe({ stage: "series-a", cash: 0, debtOutstanding: 0 });
+    const r = closeStoryRound(s, 1_000_000, 50_000_000, "Small Fund");
+    expect(r.state.cash).toBe(1_000_000);
+    expect(r.state.lastRound?.amount).toBe(1_000_000);
+  });
+
+  it("the rescue's prompt quotes the capped amounts it would book", () => {
+    const def = storyEvents.find((e) => e.id === "vc-rescue-board-control");
+    expect(def).toBeDefined();
+    // A seed company burning $1M a week: 16 weeks of burn is far above the seed hard cap.
+    const s = ripe({ stage: "seed", burn: 1_000_000, cash: 2_000_000, mrr: 0 });
+    const cap = stageRaiseCaps.seed.hardCap;
+    const prompt = def!.prompt(s, ctxFor());
+    expect(prompt).toContain("Rescue: $" + cap.toLocaleString("en-US") + " at");
+    const after = def!.choices[0].apply(s, ctxFor()).state;
+    expect(after.lastRound?.amount).toBe(cap);
   });
 });
