@@ -90,6 +90,13 @@ describe("baseline bot", () => {
       expect(withCash(100_000)).toBe(0);
     });
 
+    it("never asks for more people than are on the market that quarter", () => {
+      const rich = launchedCompany(newGame(), HUMAN, { cash: 50_000_000, lastCosts: 120_000, lastRevenue: 400_000 });
+      expect(planFor(rich).hireLimit).toBe(6);
+      const glut = withState(rich, { modifiers: { newUsers: 1, marketing: 1, extraCandidates: 4 }, freedPeople: 3 });
+      expect(planFor(glut).hireLimit).toBe(13);
+    });
+
     it("counts on its revenue: a profitable company hires freely", () => {
       const profitable = launchedCompany(newGame(), HUMAN, { cash: 50_000, lastCosts: 120_000, lastRevenue: 400_000 });
       expect(planFor(profitable).hireLimit).toBeGreaterThanOrEqual(5);

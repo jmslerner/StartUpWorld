@@ -59,6 +59,16 @@ export interface CpuConfig {
   readonly shortRunwayPenalty: number;
   /** Marketing options on the last turn, as shares of cash on hand: there is no next quarter to save for. */
   readonly lastTurnMarketingShares: readonly number[];
+  /** Layoffs it weighs when pushing for a profitable quarter at the IPO bar. */
+  readonly ipoPushLayoffs: readonly number[];
+  /** Layoffs it weighs when short of cash: these head counts, then these shares of the team (1 = everyone but one). */
+  readonly troubleLayoffs: { readonly counts: readonly number[]; readonly shares: readonly number[] };
+  /** Recruiters it weighs: `few`, or `many` once at least `manyFrom` people are free to assign. */
+  readonly recruiters: { readonly few: readonly number[]; readonly many: readonly number[]; readonly manyFrom: number };
+  /** How much of the value it gives product quality over its horizon it also gives a bigger team. */
+  readonly teamGrowthShare: number;
+  /** Score of a plan projected to end below $0, less a point per $1M of shortfall: under every plan that survives. */
+  readonly bankruptScore: number;
   /** The IPO push: the prize for a quarter that wins, and what deficits and lost users cost on the way. */
   readonly ipo: { readonly win: number; readonly deficit: number; readonly nextDeficit: number; readonly usersShortfall: number };
   readonly personalities: Readonly<Record<CpuKind, CpuPersonality>>;

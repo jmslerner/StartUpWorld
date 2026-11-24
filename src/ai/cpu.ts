@@ -46,12 +46,15 @@ const raiseOptions = (view: CompanyView, personality: CpuPersonality, situation:
   return situation.runway !== null && situation.runway < personality.raise.runway ? sizes : [0];
 };
 
-const layoffOptions = (view: CompanyView, situation: Situation): number[] => {
+const layoffOptions = (view: CompanyView, situation: Situation, config: GameConfig): number[] => {
   const headcount = view.self.headcount;
   const most = headcount - 1;
   if (most <= 0) return [0];
-  if (situation.ipoPush) return unique([0, 1, 2, 3, 5, 8, 12, 16, 20, 25, 30].filter((n) => n <= most));
-  if (situation.trouble) return unique([0, 1, 2, Math.round(headcount / 3), Math.round(headcount / 2), Math.round((2 * headcount) / 3), most].filter((n) => n <= most));
+  if (situation.ipoPush) return unique(config.cpu.ipoPushLayoffs.filter((n) => n <= most));
+  if (situation.trouble) {
+    const { counts, shares } = config.cpu.troubleLayoffs;
+    return unique([...counts, ...shares.map((share) => Math.min(most, Math.round(share * headcount)))].filter((n) => n <= most));
+  }
   return [0];
 };
 
@@ -72,11 +75,11 @@ export const candidatePlans = (view: CompanyView, kind: CpuKind, config: GameCon
     const marketingShares = situation.lastTurn && !cautious ? config.cpu.lastTurnMarketingShares : cautious ? [0] : personality.marketingShares;
     const marketingLevels = unique(marketingShares.map((share) => Math.min(config.pull.maxMarketing, Math.floor((share * spendable) / step) * step)));
 
-    for (const layoffs of layoffOptions(view, situation)) {
+    for (const layoffs of layoffOptions(view, situation, config)) {
       const available = self.headcount - layoffs - (raisePercent > 0 ? 1 : 0);
       const roomToHire = personality.teamCap - (self.headcount - layoffs);
       const mayHire = !cautious && !situation.lastTurn && layoffs === 0 && roomToHire > 0;
-      const recruiterOptions = mayHire ? (available >= 8 ? [0, 1, 2] : [0, 1]) : [0];
+      const recruiterOptions = mayHire ? (available >= config.cpu.recruiters.manyFrom ? config.cpu.recruiters.many : config.cpu.recruiters.few) : [0];
 
       for (const recruiting of recruiterOptions) {
         const builders = available - recruiting;
@@ -115,7 +118,7 @@ const runwayAfter = (projection: Projection, config: GameConfig): number | null 
 const scoreOf = (view: CompanyView, projection: Projection, personality: CpuPersonality, situation: Situation, config: GameConfig): number => {
   const { self } = view;
   // A plan that ends below $0 is bankruptcy: anything else beats it, and among such plans the least bad wins.
-  if (projection.cash < 0) return -1_000 + projection.cash / 1_000_000;
+  if (projection.cash < 0) return config.cpu.bankruptScore + projection.cash / 1_000_000;
 
   const listed = projection.users >= config.ipo.users && projection.profitable;
   if (situation.lastTurn) {
@@ -139,7 +142,7 @@ const scoreOf = (view: CompanyView, projection: Projection, personality: CpuPers
 
   const exponent = config.archetypes[self.archetype].workExponent;
   const work = (people: number): number => Math.pow(Math.max(1, people), exponent);
-  score += (weights.team * 0.5 * horizon * leverage * (work(projection.headcount) - work(self.headcount))) / work(self.headcount);
+  score += (weights.team * config.cpu.teamGrowthShare * horizon * leverage * (work(projection.headcount) - work(self.headcount))) / work(self.headcount);
 
   const runway = runwayAfter(projection, config);
   score += weights.runway * (runway === null ? 1 : runway / (runway + weights.runwayHalf));

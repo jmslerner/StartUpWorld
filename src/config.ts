@@ -202,6 +202,16 @@ export const CONFIG: GameConfig = {
     minShareForGrowth: 0.1,
     shortRunwayPenalty: 2,
     lastTurnMarketingShares: [0, 0.2, 0.4, 0.6, 0.8, 0.95],
+    /** Layoffs a CPU weighs when it has the users to go public and needs a profitable quarter. */
+    ipoPushLayoffs: [0, 1, 2, 3, 5, 8, 12, 16, 20, 25, 30],
+    /** Layoffs it weighs when short of cash: these head counts, then these shares of the team (1 = everyone but one). */
+    troubleLayoffs: { counts: [0, 1, 2], shares: [0.3333, 0.5, 0.6667, 1] },
+    /** Recruiters it weighs: `few`, or `many` once `manyFrom` people are free to assign. */
+    recruiters: { few: [0, 1], many: [0, 1, 2], manyFrom: 8 },
+    /** A bigger team is worth this share of what the same gain in product quality is worth. */
+    teamGrowthShare: 0.5,
+    /** Score of a plan that ends below $0 (less a point per $1M short): under any plan that survives. */
+    bankruptScore: -1000,
     ipo: { win: 100, deficit: 20, nextDeficit: 10, usersShortfall: 20 },
     personalities: {
       // Chases users: Budget price, raises 30% the moment it can, heavy marketing.

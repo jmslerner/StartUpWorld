@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { GameConfig } from "../config";
 import { DESIGN } from "../config.design";
 import { normalizePlanFor, raiseBlocker } from "../engine/plan";
 import { projectTurn } from "../engine/project";
@@ -331,5 +332,50 @@ describe("the IPO push", () => {
       const state = established(SEAT[kind]);
       expect(chooseCpuPlan(viewFor(state, SEAT[kind]), kind, 1, DESIGN).layoffs, kind).toBe(0);
     }
+  });
+});
+
+describe("the planner's own numbers come from the config", () => {
+  const withCpu = (patch: Partial<GameConfig["cpu"]>): GameConfig => ({ ...DESIGN, cpu: { ...DESIGN.cpu, ...patch } });
+  const distinct = (values: readonly number[]): number[] => [...new Set(values)].sort((a, b) => a - b);
+
+  it("the layoffs it weighs when pushing for a profitable quarter at the IPO bar", () => {
+    const state = launchedCompany(newGame(), BLITZ, { users: 300_000, usersAtLastClose: 300_000, headcount: 20, headcountAtLastClose: 20, cash: 2_000_000 });
+    const view = viewFor(state, BLITZ);
+    const layoffs = (config: GameConfig): number[] => distinct(candidatePlans(view, "blitzscaler", config).map((plan) => plan.layoffs));
+    expect(layoffs(DESIGN)).toEqual([0, 1, 2, 3, 5, 8, 12, 16]);
+    expect(layoffs(withCpu({ ipoPushLayoffs: [0, 7] }))).toEqual([0, 7]);
+  });
+
+  it("the layoffs it weighs when short of cash", () => {
+    // 10 people, under a turn of runway: none, one, two, a third, half, two thirds, everyone but one.
+    const state = withCompany(newGame(), BOOT, { headcount: 10, headcountAtLastClose: 10, cash: 250_000, lastCosts: 400_000, lastRevenue: 0 });
+    const view = viewFor(state, BOOT);
+    const layoffs = (config: GameConfig): number[] => distinct(candidatePlans(view, "bootstrapper", config).map((plan) => plan.layoffs));
+    expect(layoffs(DESIGN)).toEqual([0, 1, 2, 3, 5, 7, 9]);
+    expect(layoffs(withCpu({ troubleLayoffs: { counts: [0], shares: [0.5] } }))).toEqual([0, 5]);
+  });
+
+  it("how many recruiters it weighs", () => {
+    const view = viewFor(established(INCUMBENT), INCUMBENT);
+    const recruiters = (config: GameConfig): number[] => distinct(candidatePlans(view, "incumbent", config).map((plan) => plan.allocation.recruiting));
+    expect(recruiters(DESIGN)).toEqual([0, 1, 2]);
+    expect(recruiters(withCpu({ recruiters: { few: [0, 1], many: [0, 3], manyFrom: 8 } }))).toEqual([0, 3]);
+    expect(recruiters(withCpu({ recruiters: { few: [0], many: [0, 1, 2], manyFrom: 99 } }))).toEqual([0]);
+  });
+
+  it("how much a bigger team is worth to it: at nothing, nobody recruits", () => {
+    const view = viewFor(established(BLITZ, { headcount: 5, headcountAtLastClose: 5 }), BLITZ);
+    const seeds = [1, 2, 3, 4, 5, 6];
+    const recruits = (config: GameConfig): boolean => seeds.some((seed) => chooseCpuPlan(view, "blitzscaler", seed, config).allocation.recruiting > 0);
+    expect(recruits(DESIGN)).toBe(true);
+    expect(recruits(withCpu({ teamGrowthShare: 0 }))).toBe(false);
+  });
+
+  it("how it rates ending below $0: told that is the best outcome of all, it walks into it", () => {
+    const view = viewFor(withCompany(newGame(), BLITZ, { cash: 150_000 }), BLITZ);
+    const cashAfter = (config: GameConfig): number => projectTurn(view, chooseCpuPlan(view, "blitzscaler", 1, config), DESIGN).cash;
+    expect(cashAfter(DESIGN)).toBeGreaterThanOrEqual(0);
+    expect(cashAfter(withCpu({ bankruptScore: 1_000 }))).toBeLessThan(0);
   });
 });
