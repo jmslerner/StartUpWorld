@@ -60,6 +60,23 @@ describe("describeErrorWithoutArguments: what a server quotes back of a command 
     expect(describeErrorWithoutArguments(new Error(reply))).toBe("ERR unknown command 'ZADD', with args beginning with: [not logged]");
   });
 
+  it("cuts at the server's own words, not at the same words inside what it quotes", () => {
+    // A company name is long enough to hold these words. The first ones in the reply are the server's.
+    const reply = `ERR unknown command 'ZADD', with args beginning with: 'leaderboard' '90' '{"id":"5-1","companyName":"Hooli, with args beginning with: x","fo' `;
+    expect(describeErrorWithoutArguments(new Error(reply))).toBe("ERR unknown command 'ZADD', with args beginning with: [not logged]");
+  });
+
+  it("finds the server's words when a connection string was replaced right in front of them", () => {
+    // The replacement takes everything up to the next space, and that includes the comma in front of "with args".
+    const reply = "ERR unknown command 'redis://x', with args beginning with: 'graveyard' 'Acme' ";
+    expect(describeErrorWithoutArguments(new Error(reply))).toBe("ERR unknown command '[redis url] with args beginning with: [not logged]");
+  });
+
+  it("leaves out a login as well: the client sends AUTH with the password on every connect", () => {
+    const reply = "ERR unknown command 'AUTH', with args beginning with: 'default' 's3cret' ";
+    expect(describeErrorWithoutArguments(new Error(reply))).toBe("ERR unknown command 'AUTH', with args beginning with: [not logged]");
+  });
+
   it("leaves out everything that follows, also on later lines", () => {
     const reply = "ERR unknown command 'LPUSH', with args beginning with: 'graveyard' 'Ran out\nof runway' 'Acme'";
     expect(describeErrorWithoutArguments(new Error(reply))).toBe("ERR unknown command 'LPUSH', with args beginning with: [not logged]");

@@ -1,7 +1,9 @@
 /**
  * What went wrong, for a log line: the message (or the error's name when the message is empty), its code, and the same
- * for each cause inside an AggregateError. Anything shaped like a connection string is removed, so a password can never
- * reach the logs through a line that is built from this.
+ * for each cause inside an AggregateError. Anything shaped like a connection string is removed, so the password in one
+ * cannot reach the logs through a line that is built from this.
+ *
+ * What a server quotes back of a command is not removed here: describeErrorWithoutArguments does that.
  */
 export function describeError(err: unknown): string {
   const parts: string[] = [];
@@ -19,19 +21,23 @@ export function describeError(err: unknown): string {
   return parts.join("; ").replace(/rediss?:\/\/\S+/gi, "[redis url]");
 }
 
-/** Where a Redis server starts quoting a command's arguments back, in its reply to a command it does not know. */
-const ARGUMENTS_FOLLOW = ", with args beginning with:";
+/**
+ * The words after which a Redis server quotes a command's arguments back, in its reply to a command it does not know.
+ * Without the comma the reply has in front of them: replacing a connection string can take that comma along.
+ */
+const ARGUMENTS_FOLLOW = "with args beginning with:";
 
 /**
- * describeError, for the functions whose commands carry what a player submitted.
+ * describeError, without what a server quotes back of a command.
  *
- * Redis answers a command it does not know by quoting the command's arguments back:
+ * Redis answers a command it does not know by quoting the command's arguments:
  *
  *     ERR unknown command 'LPUSH', with args beginning with: 'graveyard' '{"id":"gv-1","companyName":"Acme",…
  *
- * and for LPUSH and ZADD those arguments are the player's entry. It takes a database without these commands to see
- * that reply at all, but if it ever comes, the quoted arguments are left out, so an entry cannot reach the logs that
- * way either.
+ * For LPUSH and ZADD the arguments are a player's entry. For AUTH, which the client sends on every connect, they are
+ * the user and the password. It takes a server without these commands to see that reply at all, but if it ever comes,
+ * what follows the server's words is left out, so neither can reach the logs that way. The cut is at the first time the
+ * words appear: an entry can hold them too, further on.
  */
 export function describeErrorWithoutArguments(err: unknown): string {
   const text = describeError(err);
