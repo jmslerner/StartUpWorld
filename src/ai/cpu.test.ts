@@ -219,6 +219,14 @@ describe("the Incumbent", () => {
     expect(chooseCpuPlan(viewFor(state, INCUMBENT), "incumbent", 1, DESIGN).poachTarget).toBe(BOOT);
   });
 
+  it("when rivals are level, who it goes after depends on the game's seed, not on who sits where", () => {
+    // Turn 1: the three startups all have no users and no product.
+    const state = newGame();
+    const picks = Array.from({ length: 90 }, (_, i) => chooseCpuPlan(viewFor(state, INCUMBENT), "incumbent", i + 1, DESIGN).poachTarget);
+    for (const seat of [HUMAN, BLITZ, BOOT]) expect(picks.filter((id) => id === seat).length, `seat ${seat}`).toBeGreaterThan(15);
+    expect(chooseCpuPlan(viewFor(state, INCUMBENT), "incumbent", 7, DESIGN).poachTarget).toBe(picks[6]);
+  });
+
   it("poaches in most of its turns over a game", () => {
     const turns = of("incumbent");
     expect(turns.filter((d) => d.plan.poachTarget !== null).length / turns.length).toBeGreaterThan(0.5);

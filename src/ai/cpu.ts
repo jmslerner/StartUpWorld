@@ -9,7 +9,7 @@ import { CONFIG, type GameConfig } from "../config";
 import { founderStake, raiseAmount, valuationOf } from "../engine/formulas";
 import { raiseBlocker } from "../engine/plan";
 import { estimateRivals, projectTurn, type Projection } from "../engine/project";
-import { STREAM, nextFloat01, streamSeed } from "../engine/rng";
+import { STREAM, nextFloat01, nextIntInclusive, streamSeed } from "../engine/rng";
 import type { Allocation, CompanyView, CpuKind, Plan, PublicCompany } from "../engine/types";
 import { companyRunway } from "../engine/view";
 import type { CpuPersonality } from "./types";
@@ -161,18 +161,24 @@ const scoreOf = (view: CompanyView, projection: Projection, personality: CpuPers
   return score;
 };
 
-/** Who the Incumbent goes after: the rival with the most users that is big enough to lose someone. */
-const poachTargetFor = (view: CompanyView, config: GameConfig): PublicCompany | null => {
+/**
+ * Who the Incumbent goes after: the rival with the most users that is big enough to lose someone.
+ * Rivals that are level (every startup on turn 1) are picked between by the game's seed, never by
+ * where they sit: the player's seat must not be the one that always gets raided first.
+ */
+const poachTargetFor = (view: CompanyView, seed: number, config: GameConfig): PublicCompany | null => {
   const open = view.rivals.filter((rival) => rival.out === null && rival.headcount >= config.poach.minTargetHeadcount);
   if (open.length === 0) return null;
-  return [...open].sort((a, b) => b.users - a.users || b.quality - a.quality || a.id - b.id)[0];
+  const ranked = [...open].sort((a, b) => b.users - a.users || b.quality - a.quality || a.id - b.id);
+  const level = ranked.filter((rival) => rival.users === ranked[0].users && rival.quality === ranked[0].quality);
+  return level[nextIntInclusive(streamSeed(seed, view.turn, STREAM.poachTarget, view.self.id), 0, level.length - 1).value];
 };
 
 export const chooseCpuPlan = (view: CompanyView, kind: CpuKind, seed: number, config: GameConfig = CONFIG): Plan => {
   const personality = config.cpu.personalities[kind];
   const situation = situationOf(view, config);
   const rivals = estimateRivals(view, config);
-  const target = personality.poachRunway !== null && !situation.ipoPush && !situation.trouble ? poachTargetFor(view, config) : null;
+  const target = personality.poachRunway !== null && !situation.ipoPush && !situation.trouble ? poachTargetFor(view, seed, config) : null;
 
   let noise = streamSeed(seed, view.turn, STREAM.cpuNoise, view.self.id);
   let best: Plan | null = null;
