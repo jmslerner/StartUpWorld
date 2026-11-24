@@ -49,7 +49,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (isScheduledRun(req)) {
       const now = new Date().toISOString();
-      await withReplyDeadline(redis, redis.set(LAST_PING_KEY, now));
+      try {
+        await withReplyDeadline(redis, redis.set(LAST_PING_KEY, now));
+      } catch (err) {
+        // This write is all a scheduled run is for, and the scheduler does not come back until tomorrow, so it gets
+        // a second try. A connection that had stopped answering was dropped by the deadline, and getRedis() opens a
+        // new one; one that had been closed is reconnecting by now. Readers get no second try: a monitor asks again
+        // by itself.
+        console.warn(`keepalive: scheduled write failed, trying once more: ${describeError(err)}`);
+        const again = await getRedis();
+        if (!again) throw new Error("no connection for the second try");
+        await withReplyDeadline(again, again.set(LAST_PING_KEY, now));
+      }
       return res.json({ ok: true, scheduled: true, lastScheduledPing: now });
     }
 

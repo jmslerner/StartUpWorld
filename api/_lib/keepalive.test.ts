@@ -44,6 +44,11 @@ const useRedis = (redis: ReturnType<typeof fakeRedis> | null): void => {
   vi.mocked(getRedis).mockResolvedValue(redis as unknown as RedisClient | null);
 };
 
+/** What getRedis() answers, one call after the other: a dropped connection is followed by a new client, or by none. */
+const useRedisInTurn = (...clients: (ReturnType<typeof fakeRedis> | null)[]): void => {
+  for (const redis of clients) vi.mocked(getRedis).mockResolvedValueOnce(redis as unknown as RedisClient | null);
+};
+
 interface Reply {
   status: number;
   headers: Record<string, string>;
@@ -79,18 +84,22 @@ const NOW = new Date("2026-11-24T07:12:03.000Z");
 const hoursAgo = (hours: number): string => new Date(NOW.getTime() - hours * 3_600_000).toISOString();
 
 let errors: ReturnType<typeof vi.spyOn>;
-const logged = (): string => errors.mock.calls.flat().join(" ");
+let warnings: ReturnType<typeof vi.spyOn>;
+/** Everything the handler wrote to the log, warnings included. */
+const logged = (): string => [...errors.mock.calls, ...warnings.mock.calls].flat().join(" ");
 
 beforeEach(() => {
   vi.useFakeTimers();
   vi.setSystemTime(NOW);
   vi.mocked(getRedis).mockReset();
   errors = vi.spyOn(console, "error").mockImplementation(() => {});
+  warnings = vi.spyOn(console, "warn").mockImplementation(() => {});
 });
 
 afterEach(() => {
   vi.useRealTimers();
   errors.mockRestore();
+  warnings.mockRestore();
 });
 
 describe("keepalive: a scheduled run", () => {
@@ -241,6 +250,9 @@ describe("keepalive: failures are loud", () => {
     expect(reply.status).toBe(503);
     expect(reply.body).toEqual({ ok: false, error: "Database unavailable" });
     expect(logged()).toContain("Redis command failed: primary [redis url] failed, replica [redis url] too");
+    // The write was tried twice, and the line about the first failure is scrubbed too.
+    expect(redis.set).toHaveBeenCalledTimes(2);
+    expect(logged()).toContain("scheduled write failed, trying once more: primary [redis url] failed, replica [redis url] too");
     for (const secret of ["s3cret", "0ther", "db.example.com", "db2.example.com"]) expect(logged()).not.toContain(secret);
   });
 
@@ -270,18 +282,67 @@ describe("keepalive: failures are loud", () => {
 });
 
 describe("keepalive: a database that stops answering", () => {
-  it("answers 503 after 3 seconds when the scheduled write gets no reply, and closes that connection", async () => {
-    const redis = fakeRedis();
-    redis.set.mockImplementation(unanswered);
-    useRedis(redis);
+  it("writes the scheduled time on a new connection when the first one gives no reply for 3 seconds", async () => {
+    const silent = fakeRedis();
+    silent.set.mockImplementation(unanswered);
+    const fresh = fakeRedis();
+    useRedisInTurn(silent, fresh);
     const pending = call({ userAgent: SCHEDULER });
+    await vi.advanceTimersByTimeAsync(3000);
+    expect(await peek(pending)).toMatchObject({
+      status: 200,
+      body: { ok: true, scheduled: true, lastScheduledPing: NOW.toISOString() },
+    });
+    expect(silent.destroy).toHaveBeenCalledTimes(1);
+    expect(fresh.data.get(LAST_PING_KEY)).toBe(NOW.toISOString());
+    expect(logged()).toContain("keepalive: scheduled write failed, trying once more: Redis did not reply within 3000 ms");
+    expect(errors).not.toHaveBeenCalled();
+  });
+
+  it("writes the scheduled time at the second try when the first failed because the connection had closed", async () => {
+    // What a warm instance meets when the database closed its idle connection: the command is refused at once, and
+    // the client is already reconnecting, so getRedis() hands out the same one.
+    const redis = fakeRedis();
+    redis.set.mockRejectedValueOnce(new Error("Socket closed unexpectedly"));
+    useRedis(redis);
+    const reply = await call({ userAgent: SCHEDULER });
+    expect(reply.status).toBe(200);
+    expect(reply.body).toEqual({ ok: true, scheduled: true, lastScheduledPing: NOW.toISOString() });
+    expect(redis.set).toHaveBeenCalledTimes(2);
+    expect(redis.data.get(LAST_PING_KEY)).toBe(NOW.toISOString());
+    expect(redis.destroy).not.toHaveBeenCalled();
+    expect(logged()).toContain("keepalive: scheduled write failed, trying once more: Socket closed unexpectedly");
+    expect(errors).not.toHaveBeenCalled();
+  });
+
+  it("answers 503 after 6 seconds when the second try gets no reply either, and does not try a third time", async () => {
+    const first = fakeRedis();
+    first.set.mockImplementation(unanswered);
+    const second = fakeRedis();
+    second.set.mockImplementation(unanswered);
+    useRedisInTurn(first, second, fakeRedis());
+    const pending = call({ userAgent: SCHEDULER });
+    await vi.advanceTimersByTimeAsync(3000);
+    expect(await peek(pending)).toBe("still pending");
     await vi.advanceTimersByTimeAsync(3000);
     expect(await peek(pending)).toMatchObject({ status: 503, body: { ok: false, error: "Database unavailable" } });
     expect(logged()).toContain("keepalive: Redis command failed: Redis did not reply within 3000 ms");
-    expect(redis.destroy).toHaveBeenCalledTimes(1);
+    expect(first.destroy).toHaveBeenCalledTimes(1);
+    expect(second.destroy).toHaveBeenCalledTimes(1);
+    expect(getRedis).toHaveBeenCalledTimes(2);
   });
 
-  it("answers 503 after 3 seconds when the read gets no reply, and closes that connection", async () => {
+  it("answers 503 when no new connection can be made for the second try", async () => {
+    const silent = fakeRedis();
+    silent.set.mockImplementation(unanswered);
+    useRedisInTurn(silent, null);
+    const pending = call({ userAgent: SCHEDULER });
+    await vi.advanceTimersByTimeAsync(3000);
+    expect(await peek(pending)).toMatchObject({ status: 503, body: { ok: false, error: "Database unavailable" } });
+    expect(logged()).toContain("keepalive: Redis command failed: no connection for the second try");
+  });
+
+  it("answers 503 after 3 seconds when the read gets no reply, closes that connection and does not try again", async () => {
     const redis = fakeRedis({ [LAST_PING_KEY]: hoursAgo(1) });
     redis.get.mockImplementation(unanswered);
     useRedis(redis);
@@ -290,6 +351,8 @@ describe("keepalive: a database that stops answering", () => {
     expect(await peek(pending)).toMatchObject({ status: 503, body: { ok: false, error: "Database unavailable" } });
     expect(logged()).toContain("keepalive: Redis command failed: Redis did not reply within 3000 ms");
     expect(redis.destroy).toHaveBeenCalledTimes(1);
+    expect(redis.get).toHaveBeenCalledTimes(1);
+    expect(getRedis).toHaveBeenCalledTimes(1);
   });
 
   it("still takes a reply that needs most of the 3 seconds, and keeps the connection", async () => {
