@@ -1,4 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
+import { describeError } from "./_lib/describeError.js";
 import { getRedis, withReplyDeadline } from "./_lib/redis.js";
 
 // A free Redis database is taken away when nothing uses it: Upstash archives one after 30 days without activity, and
@@ -94,25 +95,4 @@ function hoursSince(iso: string): number | null {
   const then = Date.parse(iso);
   if (Number.isNaN(then)) return null;
   return Math.round(((Date.now() - then) / 3_600_000) * 10) / 10;
-}
-
-/**
- * What went wrong, for the log: the message (or the error's name when the message is empty), its code, and the same for
- * each cause inside an AggregateError. Anything shaped like a connection string is removed, so a password can never
- * reach the logs through this line.
- */
-function describeError(err: unknown): string {
-  const parts: string[] = [];
-  const add = (e: unknown): void => {
-    if (!(e instanceof Error)) {
-      parts.push(String(e));
-      return;
-    }
-    const code = (e as { code?: unknown }).code;
-    const text = e.message || e.name;
-    parts.push(typeof code === "string" && !text.includes(code) ? `${text} (${code})` : text);
-    if (e instanceof AggregateError) e.errors.forEach(add);
-  };
-  add(err);
-  return parts.join("; ").replace(/rediss?:\/\/\S+/gi, "[redis url]");
 }
