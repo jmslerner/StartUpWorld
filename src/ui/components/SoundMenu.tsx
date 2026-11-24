@@ -12,7 +12,7 @@ interface SoundMenuProps {
 
 /** Popover width (Tailwind w-60) and the gap it keeps from the button and the viewport edge. */
 const PANEL_WIDTH = 240;
-const PANEL_ROOM = 210;
+const PANEL_ROOM = 120;
 const GAP = 8;
 
 interface Anchor {
@@ -69,44 +69,14 @@ const Fader = ({ label, value, disabled, onChange, onCommit }: FaderProps) => {
   );
 };
 
-interface SwitchRowProps {
-  label: string;
-  hint?: string;
-  on: boolean;
-  onToggle: () => void;
-}
-
-const SwitchRow = ({ label, hint, on, onToggle }: SwitchRowProps) => (
-  <div className="flex items-center justify-between gap-3">
-    <span className="text-mist/80">
-      {label}
-      {hint ? <span className="ml-1.5 text-[0.6rem] text-mist/50">{hint}</span> : null}
-    </span>
-    <button
-      type="button"
-      role="switch"
-      aria-checked={on}
-      aria-label={label}
-      onClick={onToggle}
-      className={
-        on
-          ? "rounded-lg bg-neon/10 px-2 py-1 text-[0.65rem] font-semibold text-neon"
-          : "rounded-lg bg-steel/30 px-2 py-1 text-[0.65rem] text-mist/80 hover:bg-steel/50"
-      }
-    >
-      {on ? "ON" : "OFF"}
-    </button>
-  </div>
-);
-
 /** Focusable controls inside the panel, in tab order. */
 const focusables = (panel: HTMLElement | null): HTMLElement[] =>
   panel ? Array.from(panel.querySelectorAll<HTMLElement>("button:not([disabled]), input:not([disabled])")) : [];
 
 /**
- * Small sound control for the HUD: a button that opens a popover with a mute toggle, master
- * and ambience faders and the (default-off) music toggle. Self-contained — it reads and
- * writes the shared `audioSettings`, which the audio engine follows.
+ * Small sound control for the resource bar: a button that opens a popover with a mute toggle
+ * and a volume fader. Self-contained — it reads and writes the shared `audioSettings`, which
+ * the audio engine follows.
  *
  * The popover is rendered in a portal with fixed positioning, so it is never trapped under a
  * neighbouring panel (every `.panel-surface` is its own stacking context). Because a portal
@@ -152,7 +122,7 @@ export const SoundMenu = ({ className, align = "right" }: SoundMenuProps) => {
     };
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
-      // This Escape is spent: an inspector card open under the menu stays open.
+      // This Escape is spent: anything open under the menu stays open.
       event.preventDefault();
       const active = document.activeElement;
       const inside = active instanceof Node && (buttonRef.current?.contains(active) || panelRef.current?.contains(active));
@@ -216,12 +186,6 @@ export const SoundMenu = ({ className, align = "right" }: SoundMenuProps) => {
     playSound("ui-toggle-on");
   };
 
-  const toggleMusic = () => {
-    const next = !settings.musicEnabled;
-    audioSettings.setMusicEnabled(next);
-    playSound(next ? "ui-toggle-on" : "ui-toggle-off");
-  };
-
   return (
     <>
       <button
@@ -239,7 +203,7 @@ export const SoundMenu = ({ className, align = "right" }: SoundMenuProps) => {
         onClick={toggleOpen}
         onKeyDown={onButtonKeyDown}
         onBlur={onBlurWithin}
-        // While open, Escape here is the menu's (App leaves it alone instead of jumping to the terminal).
+        // While open, Escape here is the menu's.
         data-own-escape={open || undefined}
         title="Sound settings"
         className={`${
@@ -284,19 +248,12 @@ export const SoundMenu = ({ className, align = "right" }: SoundMenuProps) => {
 
               <div className="flex flex-col gap-3">
                 <Fader
-                  label="Master"
+                  label="Volume"
                   value={settings.master}
                   disabled={muted}
                   onChange={(value) => audioSettings.setMaster(value)}
                   onCommit={() => playSound("ui-select")}
                 />
-                <Fader
-                  label="Office ambience"
-                  value={settings.volumes.ambience}
-                  disabled={muted}
-                  onChange={(value) => audioSettings.setVolume("ambience", value)}
-                />
-                <SwitchRow label="Music" hint="experimental" on={settings.musicEnabled} onToggle={toggleMusic} />
               </div>
             </div>,
             document.body,
