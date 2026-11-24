@@ -41,6 +41,12 @@ describe("resource bar", () => {
     expect(view.turn).toBe(2);
   });
 
+  it("measures the change from the number shown a quarter ago, after that quarter's event", () => {
+    // Closed on 10,000; a breach took 1,000 before last quarter was planned, so the bar showed 9,000 then.
+    const lastQuarter = { qualityAtOpen: 40, hypeAtOpen: 20, usersAtOpen: 10_000, usersLostToEvent: 1_000, usersChurned: 500, usersWon: 3_500, joined: 0, left: 0 };
+    expect(resourceView(going({ users: 12_000, lastQuarter }), DESIGN).usersChange).toBe(3_000);
+  });
+
   it("applies the funding climate to the valuation it shows", () => {
     const winter = withState(going(), { climate: { multiplier: 0.6, turnsLeft: 2 } });
     expect(resourceView(winter, DESIGN).valuation).toBe(20_000 * 150 * 1.3 * 0.6);
@@ -81,6 +87,13 @@ describe("planning panel", () => {
         { percent: 30, amount: 1_170_000, equityAfter: 0.7, investorSeatsAfter: 3, handsOverBoard: true, selected: false },
       ]);
       expect(planningView(going(), draftOf(going()), DESIGN).raise.options[0].handsOverBoard).toBe(false);
+    });
+
+    it("does not call it handing over the board when investors already have it", () => {
+      const game = going({ investorSeats: 3 });
+      const view = planningView(game, draftOf(game, { raisePercent: 10, allocation: { product: 5, growth: 0, recruiting: 0 } }), DESIGN);
+      expect(view.raise.options.map((option) => option.handsOverBoard)).toEqual([false, false, false]);
+      expect(view.warnings.some((w) => /majority/.test(w.text))).toBe(false);
     });
 
     it("says why a raise is not possible", () => {
@@ -241,6 +254,15 @@ describe("quarterly report", () => {
     expect(view.released).toEqual({ users: 0, people: 3 });
   });
 
+  it("counts only what was released this quarter, not by companies that went out earlier", () => {
+    let state = withState(newGame(), { turn: 5 });
+    state = withCompany(state, BOOT, { users: 0, headcount: 0, out: { turn: 3, reason: "bankrupt", users: 5_000, headcount: 4 } });
+    state = withCompany(state, BLITZ, { cash: 0 });
+    const result = resolveTurn(state, plansOf(state, { [BLITZ]: { allocation: { product: 0, growth: 3, recruiting: 0 } } }), 1, NEVER);
+    expect(result.state.companies[BLITZ].out?.turn).toBe(5);
+    expect(reportView(result.state, result.log, DESIGN).released).toEqual({ users: 0, people: 3 });
+  });
+
   it("names the event in force and the one coming next", () => {
     const always = { ...DESIGN, events: { ...DESIGN.events, chance: 1, deck: DESIGN.events.deck.filter((card) => card.id === "viral-moment") } };
     const first = resolveTurn(withState(newGame(), { turn: 2 }), plansOf(newGame()), 1, always);
@@ -281,6 +303,13 @@ describe("end screen", () => {
     const seed = seedWhere((s) => firstFloat(s, 1, STREAM.board, HUMAN) < 0.3);
     const fired = endView(resolve(shrinking, { [HUMAN]: { allocation: { product: 0, growth: 3, recruiting: 0 } } }, seed, NEVER).state, DESIGN)!;
     expect(fired).toMatchObject({ kind: "fired", won: false, sound: "fired" });
+  });
+
+  it("going out is the player's ending even when that leaves a rival as the last one standing", () => {
+    const state = withCompany(onlyActive(newGame(), [HUMAN, BLITZ]), HUMAN, { cash: 0 });
+    const after = resolve(state, { [HUMAN]: { allocation: { product: 0, growth: 3, recruiting: 0 } } }, 1, NEVER).state;
+    expect(after.outcome).toMatchObject({ kind: "lastStanding", winnerId: BLITZ });
+    expect(endView(after, DESIGN)).toMatchObject({ kind: "bankrupt", won: false, sound: "bankrupt" });
   });
 
   it("turn 20: ranks everyone by founder stake and reveals what each rival was", () => {
