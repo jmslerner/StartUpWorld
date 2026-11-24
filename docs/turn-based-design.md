@@ -72,12 +72,14 @@ Online multiplayer, a map or multiple markets, talent roles, difficulty levels, 
 These fill gaps the design leaves open. Where a ruling and the design disagree, the design wins. Items marked
 (owner) were decided by the owner; the rest are the implementer's calls and can be changed.
 
-Most rulings only settle timing or an edge case. Four go further and add to what the design says:
+Most rulings only settle timing or an edge case. Five go further and add to what the design says:
 
 - Users lost to a security breach rejoin the pool, like churned users (ruling 1).
 - A poach or a burnout can never take a company's last person, and the poach floor is a tunable number (rulings 10, 11).
 - The planning panel has a "hire at most N" control (ruling 9).
 - More is public about rivals than the design lists: price tier, equity and board seats (ruling 18).
+- A marketing budget, a price and a hire limit stay as set from one turn to the next; the design gives a default only
+  for the team split (ruling 26).
 
 ### Owner decisions
 
@@ -139,7 +141,8 @@ Resolution, in this order:
    in start-of-turn hype order, highest first; equal hype is ordered by the seeded RNG. The fee is charged per hire
    made. Unhired candidates leave. Hires start next turn.
 10. **Poach.** One attempt per turn, $50K whether or not it works. Chance = 50% + (your hype − their hype) ÷ 2
-    points, clamped to 10–90%, on start-of-turn hype. Attempts resolve in hype order. The person changes company
+    points, clamped to 10–90%, on start-of-turn hype. Attempts resolve in hype order; equal hype is ordered by the
+    seeded RNG, on a stream of its own. The person changes company
     from next turn. A target must have at least 2 people at that moment (after its own layoffs and any earlier
     poach that turn); an attempt on a smaller team is dropped at no cost. Several companies may each take one person
     from the same target in a turn, down to that floor.
@@ -181,6 +184,18 @@ Resolution, in this order:
 23. **Baseline bot details.** 40 / 40 / 20 is split in whole people by largest remainder (3 people → 1 / 1 / 1,
     5 → 2 / 2 / 1). When it raises, the fundraiser comes out first and the rest are split. It hires k people only
     if (cash − $10K × k) ÷ (last quarter's burn + $40K × k) stays at 3 turns or more.
+24. **Precision and rounding.** Quality and hype are kept to four decimals and effective work to six, and every
+    threshold reads the stored figure: a product that works out at 9.99997 is stored, shown and launched as 10.
+    Users and dollars are whole numbers, rounded to the nearest; a fraction of exactly one half may fall either
+    way. Runway is never below 0.
+25. **Refitting a split.** Leftover people go to the largest remainders; ties go to Product, then Growth, then
+    Recruiting. A plan that places nobody puts everyone on Product.
+26. **Default plan.** A new turn starts from last turn's split, marketing budget, price and "hire at most"
+    setting. A raise, a poach and layoffs are one-off and start switched off. A marketing budget therefore stays
+    in force until the player changes it; the planning panel shows it and counts it in projected cash.
+27. **Who the Incumbent poaches from.** The rival with the most users that is big enough to lose someone. Rivals
+    that are level (every startup on turn 1) are picked between by the seeded RNG, never by seat, so the player is
+    not the one who always gets raided first.
 
 ### Numbers the design does not name
 
