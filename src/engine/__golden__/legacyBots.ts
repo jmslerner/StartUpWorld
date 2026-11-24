@@ -59,11 +59,12 @@ export const fnv1a32 = (input: string): string => {
   return (h >>> 0).toString(16).padStart(8, "0");
 };
 
-/** The whole state minus the two tycoon slices (absent on today's engine), canonicalised and hashed. */
+/** The whole state minus the two tycoon slices and the story slice (absent on the pre-tycoon engine), canonicalised and hashed. */
 export const hashLegacy = (state: GameState): string => {
   const rest: Record<string, unknown> = { ...(state as unknown as Record<string, unknown>) };
   delete rest.people;
   delete rest.product;
+  delete rest.story;
   return fnv1a32(canonicalJson(rest));
 };
 
@@ -100,7 +101,8 @@ const pickHireRole = (s: GameState): { role: string; count: number } => {
   return s.week % 2 === 0 ? { role: "engineering", count: 1 } : { role: "marketing", count: 1 };
 };
 
-const playStockWeek = (state: GameState): GameState => {
+/** One week of the stock bot (also used by the story pack tests to play whole games). */
+export const playStockWeek = (state: GameState): GameState => {
   let s = state;
   if (s.pendingEvent) {
     s = safeCmd(s, "choose 1");

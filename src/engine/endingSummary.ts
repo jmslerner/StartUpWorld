@@ -1,5 +1,7 @@
 import type { EndingType, GameState } from "../types/game";
 import { computeTeamSize } from "./context";
+import { pickEpilogue } from "./story/epilogues";
+import type { Epilogue } from "./story/epilogues";
 
 export interface EndingSummary {
   ending: EndingType;
@@ -9,6 +11,8 @@ export interface EndingSummary {
   grade: string;
   score: number;
   achievements: string[];
+  /** The Next Round story pack's closing scene, when the game earned one (never changes the ending or the score). */
+  epilogue: Pick<Epilogue, "title" | "lines" | "tagline"> | null;
 }
 
 export interface EndingStats {
@@ -135,5 +139,11 @@ export const generateEndingSummary = (state: GameState): EndingSummary | null =>
     grade: computeGrade(state),
     score: computeScore(state),
     achievements: computeAchievements(state),
+    epilogue: epilogueOf(state),
   };
+};
+
+const epilogueOf = (state: GameState): EndingSummary["epilogue"] => {
+  const e = pickEpilogue(state);
+  return e ? { title: e.title, lines: e.lines, tagline: e.tagline } : null;
 };

@@ -5,7 +5,8 @@ import type { GoldenFile } from "./__golden__/legacyBots";
 import { withSlices } from "./tycoon/roster";
 
 // Legacy golden master (TYCOON-SPEC §12.2). First recorded on the pre-tycoon engine at d641713; re-recorded for the pricing and
-// founder balance pass (the old values still replay the old recording with 0 mismatches).
+// founder balance pass, then for The Next Round story pack (each time the previous recording still replayed with 0 mismatches
+// once the change was switched off: the old values, then storyConfig.enabled = false).
 // CI subset: both legacy bots, 16 founder x cofounder pairs x 2 seeds, up to week 60, plus three
 // makeState() fixture sessions. `npm run golden:verify` checks the full recording (12 seeds, 200 weeks).
 const golden = JSON.parse(goldenText) as GoldenFile;

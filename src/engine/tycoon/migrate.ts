@@ -6,6 +6,7 @@ import {
   ROLE_ORDER, ROSTER_CAP, SURPRISE_MAX,
 } from "./constants";
 import { emptyPeople, emptyProduct, reconcileRoster, serialOf, standardSalary } from "./roster";
+import { normalizeStory } from "../story/state";
 
 // Save migration and the tycoon normalizer (TYCOON-SPEC §8). Imports only types, tycoon/constants and tycoon/roster:
 // never people/ or projects/. Build defaults are structural (scope falls back to baseScope, else 5; units to 1).
@@ -216,9 +217,13 @@ export const normalizeTycoon = (state: GameState): GameState => {
   return reconcileRoster({ ...state, people: normalizePeople(state.people, week), product: normalizeProduct(state.product, week) });
 };
 
-/** v1 → v2 is today's step (assets); v2 → v3 adds and fills the tycoon slices. Idempotent. */
+/**
+ * v1 → v2 is today's step (assets); v2 → v3 adds and fills the tycoon slices. Any version: the story slice is normalized
+ * (a save from before the story pack gets an empty one; no version bump needed, the slice is optional). Idempotent.
+ */
 export const migrateState = (state: GameState, fromVersion: number): GameState => {
   let s = state;
   if (fromVersion < 2 && !Array.isArray(s.assets)) s = { ...s, assets: [] };
-  return normalizeTycoon(s);
+  const t = normalizeTycoon(s);
+  return { ...t, story: normalizeStory(t.story, t.week) };
 };

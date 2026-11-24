@@ -1,6 +1,6 @@
 {
  "format": 1,
- "recordedAt": "pricing/founder balance pass (enterprise, consumer, philosopher and visionary retuned) on 47c5c20",
+ "recordedAt": "The Next Round story pack (14 story events, later scenes, interludes, news lines) on bcf0d26",
  "seeds": 12,
  "maxWeek": 200,
  "checkpoints": [
@@ -20,16 +20,11 @@
    "seed": 2654436560,
    "checkpoints": {
     "5": "51b6d2c2",
-    "10": "2904983a",
-    "20": "48be171a",
-    "40": "a1743a0d",
-    "80": "ea890f81",
-    "120": "f2320491",
-    "200": "2535de9c"
+    "10": "2c224d53"
    },
-   "played": 200,
-   "gameOver": false,
-   "end": "2535de9c"
+   "played": 16,
+   "gameOver": true,
+   "end": "8cd9b88c"
   },
   {
    "bot": "stock",
@@ -37,17 +32,16 @@
    "cofounder": "operator",
    "seed": 1013904899,
    "checkpoints": {
-    "5": "07547193",
-    "10": "123a8a27",
-    "20": "7c5f7d13",
-    "40": "515da287",
-    "80": "805d34e5",
-    "120": "cabd5dba",
-    "200": "4087e56e"
+    "5": "13d3db71",
+    "10": "229e877d",
+    "20": "1ce4a6bb",
+    "40": "952d004a",
+    "80": "826a8372",
+    "120": "d985242e"
    },
-   "played": 200,
-   "gameOver": false,
-   "end": "4087e56e"
+   "played": 128,
+   "gameOver": true,
+   "end": "e03f76c8"
   },
   {
    "bot": "stock",
@@ -57,15 +51,15 @@
    "checkpoints": {
     "5": "4ad61c49",
     "10": "188e8421",
-    "20": "5fc84d76",
-    "40": "2e4c04fa",
-    "80": "7b7a0032",
-    "120": "6f13a7fe",
-    "200": "48a1e572"
+    "20": "cdcdb6a4",
+    "40": "578412cc",
+    "80": "d423e575",
+    "120": "609c4d49",
+    "200": "97f2d28a"
    },
    "played": 200,
    "gameOver": false,
-   "end": "48a1e572"
+   "end": "97f2d28a"
   },
   {
    "bot": "stock",
@@ -86,12 +80,16 @@
    "seed": 387278100,
    "checkpoints": {
     "5": "6712109d",
-    "10": "551bd6eb",
-    "20": "cf718c1f"
+    "10": "22c51b91",
+    "20": "96f81c6d",
+    "40": "7e02ecda",
+    "80": "a6d7b59c",
+    "120": "03687ce7",
+    "200": "9c8ad418"
    },
-   "played": 31,
-   "gameOver": true,
-   "end": "43aa86f0"
+   "played": 200,
+   "gameOver": false,
+   "end": "9c8ad418"
   },
   {
    "bot": "stock",
@@ -100,13 +98,16 @@
    "seed": 3041713991,
    "checkpoints": {
     "5": "5d0e78da",
-    "10": "59c20988",
-    "20": "321a1377",
-    "40": "7a8f2eb3"
+    "10": "ffaacee4",
+    "20": "e33e0b51",
+    "40": "35956253",
+    "80": "08398b9a",
+    "120": "93098795",
+    "200": "1fc97108"
    },
-   "played": 41,
-   "gameOver": true,
-   "end": "10c5c55a"
+   "played": 200,
+   "gameOver": false,
+   "end": "1fc97108"
   },
   {
    "bot": "stock",
@@ -164,14 +165,14 @@
    "checkpoints": {
     "5": "1b8b5325",
     "10": "fb9e33db",
-    "20": "3a13bbd3",
-    "40": "ad3bd7a3",
-    "80": "fe96124a",
-    "120": "5fa90d09"
+    "20": "d85a5b6b",
+    "40": "8fb8bc7e",
+    "80": "c09fec58",
+    "120": "4fc9ad12"
    },
-   "played": 150,
+   "played": 148,
    "gameOver": true,
-   "end": "95a16034"
+   "end": "0de9d3de"
   },
   {
    "bot": "stock",
@@ -203,16 +204,16 @@
    "seed": 1013904716,
    "checkpoints": {
     "5": "a6e89069",
-    "10": "cfefc99b",
-    "20": "83f0cf67",
-    "40": "4fcf0d62",
-    "80": "7a64617c",
-    "120": "c75c8723",
-    "200": "40d472dd"
+    "10": "441ae9c4",
+    "20": "70e59764",
+    "40": "12a106b1",
+    "80": "9824c280",
+    "120": "7e02073f",
+    "200": "87e9db84"
    },
    "played": 200,
    "gameOver": false,
-   "end": "40d472dd"
+   "end": "87e9db84"
   },
   {
    "bot": "stock",
@@ -224,7 +225,7 @@
    },
    "played": 7,
    "gameOver": true,
-   "end": "2e8ebddb"
+   "end": "0d49596d"
   },
   {
    "bot": "stock",
@@ -232,12 +233,12 @@
    "cofounder": "builder",
    "seed": 2027806954,
    "checkpoints": {
-    "5": "305883b0",
-    "10": "e4d04aa7"
+    "5": "ecb91086",
+    "10": "954f4faa"
    },
-   "played": 16,
+   "played": 17,
    "gameOver": true,
-   "end": "3dcc6aaf"
+   "end": "cd6bfc8f"
   },
   {
    "bot": "stock",
@@ -257,11 +258,11 @@
    "checkpoints": {
     "5": "b91c1d05",
     "10": "8336bd5c",
-    "20": "256267cb"
+    "20": "605b79f3"
    },
-   "played": 31,
+   "played": 28,
    "gameOver": true,
-   "end": "df511276"
+   "end": "081dfbf8"
   },
   {
    "bot": "stock",
@@ -300,15 +301,12 @@
    "seed": 774555332,
    "checkpoints": {
     "5": "fc88a8ab",
-    "10": "381af634",
-    "20": "b424d119",
-    "40": "200a7c39",
-    "80": "b23751b2",
-    "120": "5fe9f4df"
+    "10": "516240da",
+    "20": "671a0705"
    },
-   "played": 145,
+   "played": 25,
    "gameOver": true,
-   "end": "3585467b"
+   "end": "1bef04bd"
   },
   {
    "bot": "stock",
@@ -317,12 +315,12 @@
    "seed": 3428990133,
    "checkpoints": {
     "5": "db2db918",
-    "10": "0dbe1739",
-    "20": "9429dbb2"
+    "10": "7c78bd6f",
+    "20": "23cf6a26"
    },
    "played": 23,
    "gameOver": true,
-   "end": "17cb94cd"
+   "end": "e53133b9"
   },
   {
    "bot": "stock",
@@ -332,12 +330,11 @@
    "checkpoints": {
     "5": "5b391ecc",
     "10": "f365ae87",
-    "20": "d23e5691",
-    "40": "fd31afcb"
+    "20": "f870c312"
    },
-   "played": 60,
+   "played": 34,
    "gameOver": true,
-   "end": "43f1ae52"
+   "end": "816645c9"
   },
   {
    "bot": "stock",
@@ -345,12 +342,14 @@
    "cofounder": "rainmaker",
    "seed": 2654436369,
    "checkpoints": {
-    "5": "dccaee18",
-    "10": "0debbf56"
+    "5": "16fa7b3e",
+    "10": "4a45ade2",
+    "20": "97845d9a",
+    "40": "628b7a2d"
    },
-   "played": 13,
+   "played": 60,
    "gameOver": true,
-   "end": "40a26d78"
+   "end": "14735156"
   },
   {
    "bot": "stock",
@@ -373,12 +372,15 @@
    "checkpoints": {
     "5": "c6da98f7",
     "10": "6dc1ab62",
-    "20": "cb44f4d6",
-    "40": "e4e78dc7"
+    "20": "73c90cd4",
+    "40": "3fede7d6",
+    "80": "14fca15d",
+    "120": "20a5c11c",
+    "200": "01be9e31"
    },
-   "played": 48,
-   "gameOver": true,
-   "end": "9dc884af"
+   "played": 200,
+   "gameOver": false,
+   "end": "01be9e31"
   },
   {
    "bot": "stock",
@@ -390,7 +392,7 @@
    },
    "played": 8,
    "gameOver": true,
-   "end": "a9d5f2b8"
+   "end": "dc9300de"
   },
   {
    "bot": "stock",
@@ -399,11 +401,11 @@
    "seed": 387278293,
    "checkpoints": {
     "5": "332f20be",
-    "10": "628029db"
+    "10": "23ab5bfb"
    },
    "played": 13,
    "gameOver": true,
-   "end": "03c09c01"
+   "end": "1e8eaca5"
   },
   {
    "bot": "stock",
@@ -424,15 +426,16 @@
    "seed": 1401181815,
    "checkpoints": {
     "5": "444ee8a7",
-    "10": "c32a8f7b",
-    "20": "6658bd0d",
-    "40": "26ce5c7c",
-    "80": "944dcc82",
-    "120": "3da0ccfc"
+    "10": "bee21d99",
+    "20": "c48262cc",
+    "40": "417508da",
+    "80": "f7749718",
+    "120": "995329ae",
+    "200": "ac46447e"
    },
-   "played": 186,
-   "gameOver": true,
-   "end": "1ad94f07"
+   "played": 200,
+   "gameOver": false,
+   "end": "ac46447e"
   },
   {
    "bot": "stock",
@@ -454,15 +457,15 @@
    "checkpoints": {
     "5": "2d8b9719",
     "10": "023b44b0",
-    "20": "31501569",
-    "40": "a407e91f",
-    "80": "0a890c2f",
-    "120": "4a98e3d8",
-    "200": "b5b380bf"
+    "20": "3cc43b44",
+    "40": "095e2165",
+    "80": "e15f98f8",
+    "120": "ed7dbd15",
+    "200": "170e9f29"
    },
    "played": 200,
    "gameOver": false,
-   "end": "b5b380bf"
+   "end": "170e9f29"
   },
   {
    "bot": "stock",
@@ -484,14 +487,15 @@
    "checkpoints": {
     "5": "2a71c4fb",
     "10": "1acd524b",
-    "20": "b3d703d5",
-    "40": "cfd64d16",
-    "80": "f6822abc",
-    "120": "4a9687b4"
+    "20": "1a76023f",
+    "40": "f75020d9",
+    "80": "e8e4f020",
+    "120": "42aea6fa",
+    "200": "5e578495"
    },
-   "played": 139,
-   "gameOver": true,
-   "end": "e9873fcc"
+   "played": 200,
+   "gameOver": false,
+   "end": "5e578495"
   },
   {
    "bot": "stock",
@@ -500,16 +504,11 @@
    "seed": 1788457452,
    "checkpoints": {
     "5": "cd3619f4",
-    "10": "1b398e26",
-    "20": "889cef68",
-    "40": "7d2aabe5",
-    "80": "b33e6c42",
-    "120": "4aa87871",
-    "200": "8883872a"
+    "10": "ed5e621c"
    },
-   "played": 200,
-   "gameOver": false,
-   "end": "8883872a"
+   "played": 18,
+   "gameOver": true,
+   "end": "19aa401d"
   },
   {
    "bot": "stock",
@@ -517,17 +516,17 @@
    "cofounder": "powderkeg",
    "seed": 2654436369,
    "checkpoints": {
-    "5": "15b63802",
-    "10": "eabf9e30",
-    "20": "35c39902",
-    "40": "9cf5e148",
-    "80": "bfa41577",
-    "120": "6fc661f1",
-    "200": "d6c0d282"
+    "5": "4f1c084c",
+    "10": "9eb41774",
+    "20": "e3c7dbff",
+    "40": "b1fb2a14",
+    "80": "33a63213",
+    "120": "dbe045c3",
+    "200": "1215a6d9"
    },
    "played": 200,
    "gameOver": false,
-   "end": "d6c0d282"
+   "end": "1215a6d9"
   },
   {
    "bot": "stock",
@@ -550,11 +549,15 @@
    "checkpoints": {
     "5": "830b4c0b",
     "10": "5eac07f3",
-    "20": "e6c1da84"
+    "20": "236b8c91",
+    "40": "1e106e12",
+    "80": "ca17b4ce",
+    "120": "bca8386f",
+    "200": "9a905bd3"
    },
-   "played": 21,
-   "gameOver": true,
-   "end": "2b518c4f"
+   "played": 200,
+   "gameOver": false,
+   "end": "9a905bd3"
   },
   {
    "bot": "stock",
@@ -566,7 +569,7 @@
    },
    "played": 8,
    "gameOver": true,
-   "end": "ad399072"
+   "end": "03e8206c"
   },
   {
    "bot": "stock",
@@ -575,12 +578,12 @@
    "seed": 387278293,
    "checkpoints": {
     "5": "b9a09566",
-    "10": "a524ed9a",
-    "20": "04ad68d5"
+    "10": "f3b3c0c6",
+    "20": "34a943bd"
    },
    "played": 39,
    "gameOver": true,
-   "end": "1cc3b1a2"
+   "end": "17a86f11"
   },
   {
    "bot": "stock",
@@ -601,14 +604,12 @@
    "seed": 1401181815,
    "checkpoints": {
     "5": "a3a01bbd",
-    "10": "31c63906",
-    "20": "6c071ca9",
-    "40": "4c56a1b8",
-    "80": "407faabc"
+    "10": "85c4a3f0",
+    "20": "9b55f389"
    },
-   "played": 94,
+   "played": 28,
    "gameOver": true,
-   "end": "50c6c46a"
+   "end": "0eac2a3b"
   },
   {
    "bot": "stock",
@@ -630,15 +631,15 @@
    "checkpoints": {
     "5": "0c7090f4",
     "10": "f1e70ea5",
-    "20": "d2869342",
-    "40": "5d42ef7f",
-    "80": "e1b1668e",
-    "120": "b496a0e0",
-    "200": "b1f714c1"
+    "20": "b1c031f9",
+    "40": "615b41f5",
+    "80": "b8f592fc",
+    "120": "b5c4e122",
+    "200": "a131ab23"
    },
    "played": 200,
    "gameOver": false,
-   "end": "b1f714c1"
+   "end": "a131ab23"
   },
   {
    "bot": "stock",
@@ -660,11 +661,11 @@
    "checkpoints": {
     "5": "948ef5b2",
     "10": "b0e3d781",
-    "20": "a9100025"
+    "20": "f72ea2d3"
    },
    "played": 25,
    "gameOver": true,
-   "end": "728b70ed"
+   "end": "720f3bee"
   },
   {
    "bot": "stock",
@@ -673,12 +674,16 @@
    "seed": 1788457452,
    "checkpoints": {
     "5": "093733b4",
-    "10": "b9ffc2f8",
-    "20": "4072f9d1"
+    "10": "713786d6",
+    "20": "d6ada5fa",
+    "40": "2551b673",
+    "80": "1446a3bb",
+    "120": "9f06f710",
+    "200": "32776e27"
    },
-   "played": 36,
-   "gameOver": true,
-   "end": "65cf583e"
+   "played": 200,
+   "gameOver": false,
+   "end": "32776e27"
   },
   {
    "bot": "stock",
@@ -688,15 +693,15 @@
    "checkpoints": {
     "5": "b339bf96",
     "10": "d1ba3723",
-    "20": "380ef6a9",
-    "40": "c504b728",
-    "80": "a067053b",
-    "120": "1aa052c4",
-    "200": "5054a71d"
+    "20": "91779748",
+    "40": "b9f5a8aa",
+    "80": "787a9cd2",
+    "120": "64410b19",
+    "200": "ca2950ab"
    },
    "played": 200,
    "gameOver": false,
-   "end": "5054a71d"
+   "end": "ca2950ab"
   },
   {
    "bot": "stock",
@@ -708,7 +713,7 @@
    },
    "played": 8,
    "gameOver": true,
-   "end": "d67b9c98"
+   "end": "d99a9236"
   },
   {
    "bot": "stock",
@@ -729,16 +734,16 @@
    "seed": 2027807370,
    "checkpoints": {
     "5": "f16c55a5",
-    "10": "ae65425e",
-    "20": "36b399fd",
-    "40": "98b6f0d8",
-    "80": "c6bd0cee",
-    "120": "cf3ff530",
-    "200": "b7265219"
+    "10": "4a31fc24",
+    "20": "bb79e55f",
+    "40": "fe945288",
+    "80": "9431bc5e",
+    "120": "c77bd2b8",
+    "200": "4c649319"
    },
    "played": 200,
    "gameOver": false,
-   "end": "b7265219"
+   "end": "4c649319"
   },
   {
    "bot": "stock",
@@ -747,16 +752,11 @@
    "seed": 387277883,
    "checkpoints": {
     "5": "39c2e9b2",
-    "10": "bc78306c",
-    "20": "3f83786b",
-    "40": "f50d4ac0",
-    "80": "49ec92e2",
-    "120": "7ff73512",
-    "200": "d6c8aec9"
+    "10": "bc78306c"
    },
-   "played": 200,
-   "gameOver": false,
-   "end": "d6c8aec9"
+   "played": 15,
+   "gameOver": true,
+   "end": "619f210e"
   },
   {
    "bot": "stock",
@@ -766,11 +766,11 @@
    "checkpoints": {
     "5": "31869a54",
     "10": "c7d3cbd7",
-    "20": "a037b903"
+    "20": "4f6211d6"
    },
    "played": 20,
    "gameOver": true,
-   "end": "a037b903"
+   "end": "4f6211d6"
   },
   {
    "bot": "stock",
@@ -789,16 +789,11 @@
    "seed": 4055615942,
    "checkpoints": {
     "5": "40d81e6a",
-    "10": "94ba19f4",
-    "20": "e90f933e",
-    "40": "1d1043d5",
-    "80": "7d00d900",
-    "120": "9cc001c2",
-    "200": "c1b6b3f5"
+    "10": "b8ea3966"
    },
-   "played": 200,
-   "gameOver": false,
-   "end": "c1b6b3f5"
+   "played": 16,
+   "gameOver": true,
+   "end": "6f247998"
   },
   {
    "bot": "stock",
@@ -810,7 +805,7 @@
    },
    "played": 8,
    "gameOver": true,
-   "end": "8d6282e0"
+   "end": "a86ab94e"
   },
   {
    "bot": "stock",
@@ -819,11 +814,11 @@
    "seed": 774554788,
    "checkpoints": {
     "5": "68e5a992",
-    "10": "8686ebe8"
+    "10": "f699471f"
    },
    "played": 17,
    "gameOver": true,
-   "end": "73b0d38a"
+   "end": "abaefd16"
   },
   {
    "bot": "stock",
@@ -844,16 +839,16 @@
    "seed": 1788456962,
    "checkpoints": {
     "5": "2e388e21",
-    "10": "8c3ee38d",
-    "20": "c9c0a17d",
-    "40": "c4ded858",
-    "80": "33e5165f",
-    "120": "7e956a5c",
-    "200": "50141006"
+    "10": "920b0b41",
+    "20": "da5d8897",
+    "40": "ab5af626",
+    "80": "5a38c1de",
+    "120": "d11d9242",
+    "200": "9d950cd2"
    },
    "played": 200,
    "gameOver": false,
-   "end": "50141006"
+   "end": "9d950cd2"
   },
   {
    "bot": "stock",
@@ -874,11 +869,16 @@
    "seed": 1013904483,
    "checkpoints": {
     "5": "fdc1a625",
-    "10": "d74489aa"
+    "10": "40e89f98",
+    "20": "ed2bc6fc",
+    "40": "95e59821",
+    "80": "c7b2d8ab",
+    "120": "ae011524",
+    "200": "f6612902"
    },
-   "played": 15,
-   "gameOver": true,
-   "end": "13163c09"
+   "played": 200,
+   "gameOver": false,
+   "end": "f6612902"
   },
   {
    "bot": "stock",
@@ -887,16 +887,14 @@
    "seed": 3668339218,
    "checkpoints": {
     "5": "6944c125",
-    "10": "6497a301",
-    "20": "ffd50f24",
-    "40": "bf1d3f80",
-    "80": "2601e57d",
-    "120": "1b0114de",
-    "200": "a7ae3d0d"
+    "10": "c4a5c88b",
+    "20": "762a94af",
+    "40": "26ba5b0a",
+    "80": "2e88e9d2"
    },
-   "played": 200,
-   "gameOver": false,
-   "end": "a7ae3d0d"
+   "played": 115,
+   "gameOver": true,
+   "end": "4051eea4"
   },
   {
    "bot": "stock",
@@ -905,13 +903,13 @@
    "seed": 2027807173,
    "checkpoints": {
     "5": "897586d4",
-    "10": "c67e9276",
-    "20": "6abdcf72",
-    "40": "65ba76fa"
+    "10": "57fd8b4d",
+    "20": "dd4628ca",
+    "40": "067f4ab8"
    },
-   "played": 65,
+   "played": 72,
    "gameOver": true,
-   "end": "a7c3755a"
+   "end": "c3cec600"
   },
   {
    "bot": "stock",
@@ -923,7 +921,7 @@
    },
    "played": 9,
    "gameOver": true,
-   "end": "0950081f"
+   "end": "adfd5791"
   },
   {
    "bot": "stock",
@@ -970,15 +968,15 @@
    "checkpoints": {
     "5": "5a089aad",
     "10": "1584aaa6",
-    "20": "79b9f025",
-    "40": "8521cd8c",
-    "80": "78ee7a07",
-    "120": "bb7b94b7",
-    "200": "bfff8109"
+    "20": "e56930f2",
+    "40": "75fb9e9c",
+    "80": "3b46575b",
+    "120": "287a402c",
+    "200": "32827105"
    },
    "played": 200,
    "gameOver": false,
-   "end": "bfff8109"
+   "end": "32827105"
   },
   {
    "bot": "stock",
@@ -987,16 +985,16 @@
    "seed": 774555627,
    "checkpoints": {
     "5": "89ace577",
-    "10": "ab50b90b",
-    "20": "dcf187a8",
-    "40": "23f1501b",
-    "80": "3aef5e24",
-    "120": "6ac662e3",
-    "200": "d381ff4d"
+    "10": "6a19a7f0",
+    "20": "f105777f",
+    "40": "eccce5d9",
+    "80": "3d485ee2",
+    "120": "3dfdf621",
+    "200": "9c65fcbf"
    },
    "played": 200,
    "gameOver": false,
-   "end": "d381ff4d"
+   "end": "9c65fcbf"
   },
   {
    "bot": "stock",
@@ -1019,11 +1017,15 @@
    "checkpoints": {
     "5": "17df7347",
     "10": "499801b6",
-    "20": "3a8bfa01"
+    "20": "a1fb8aff",
+    "40": "d97d0c35",
+    "80": "fad5e662",
+    "120": "1d6642b2",
+    "200": "fd141f0d"
    },
-   "played": 33,
-   "gameOver": true,
-   "end": "3b82775e"
+   "played": 200,
+   "gameOver": false,
+   "end": "fd141f0d"
   },
   {
    "bot": "stock",
@@ -1043,14 +1045,17 @@
    "cofounder": "rainmaker",
    "seed": 1013905389,
    "checkpoints": {
-    "5": "531571b9",
-    "10": "68eaf6b4",
-    "20": "a37d7aa4",
-    "40": "0aa56a3a"
+    "5": "603cf997",
+    "10": "e6c0b912",
+    "20": "e4d29daf",
+    "40": "32fd32e8",
+    "80": "2cf4f7b1",
+    "120": "eaf2f402",
+    "200": "5c3aa7de"
    },
-   "played": 65,
-   "gameOver": true,
-   "end": "e58da44b"
+   "played": 200,
+   "gameOver": false,
+   "end": "5c3aa7de"
   },
   {
    "bot": "stock",
@@ -1059,16 +1064,16 @@
    "seed": 3668339100,
    "checkpoints": {
     "5": "dca33d9d",
-    "10": "b63c8d79",
-    "20": "d4a344fa",
-    "40": "c3f92d86",
-    "80": "0a576d3b",
-    "120": "75c1d8d7",
-    "200": "7d33522b"
+    "10": "e53aaa6f",
+    "20": "53bb6162",
+    "40": "900184b8",
+    "80": "70514a2f",
+    "120": "0257eeae",
+    "200": "f7cef564"
    },
    "played": 200,
    "gameOver": false,
-   "end": "7d33522b"
+   "end": "f7cef564"
   },
   {
    "bot": "stock",
@@ -1080,7 +1085,7 @@
    },
    "played": 7,
    "gameOver": true,
-   "end": "c7dbcd57"
+   "end": "7fecac89"
   },
   {
    "bot": "stock",
@@ -1115,13 +1120,15 @@
    "checkpoints": {
     "5": "36588b3c",
     "10": "3ad6b258",
-    "20": "b7acf285",
-    "40": "c6f56696",
-    "80": "13880464"
+    "20": "11df04cd",
+    "40": "74829650",
+    "80": "130125a3",
+    "120": "a36f1a40",
+    "200": "606c9aef"
    },
-   "played": 84,
-   "gameOver": true,
-   "end": "213d854f"
+   "played": 200,
+   "gameOver": false,
+   "end": "606c9aef"
   },
   {
    "bot": "stock",
@@ -1143,11 +1150,11 @@
    "checkpoints": {
     "5": "c1248042",
     "10": "ea98872b",
-    "20": "e549c068"
+    "20": "8a3a5782"
    },
-   "played": 38,
+   "played": 32,
    "gameOver": true,
-   "end": "4c78c752"
+   "end": "a78f54c7"
   },
   {
    "bot": "stock",
@@ -1156,11 +1163,11 @@
    "seed": 774554725,
    "checkpoints": {
     "5": "129271d1",
-    "10": "187a01d6"
+    "10": "9afde77c"
    },
    "played": 17,
    "gameOver": true,
-   "end": "49363d93"
+   "end": "337a7017"
   },
   {
    "bot": "stock",
@@ -1168,12 +1175,12 @@
    "cofounder": "rainmaker",
    "seed": 3428990484,
    "checkpoints": {
-    "5": "fc6b31db",
-    "10": "5279a2cb"
+    "5": "78c791c4",
+    "10": "93703f40"
    },
    "played": 10,
    "gameOver": true,
-   "end": "5279a2cb"
+   "end": "93703f40"
   },
   {
    "bot": "stock",
@@ -1205,14 +1212,17 @@
    "cofounder": "powderkeg",
    "seed": 1013905389,
    "checkpoints": {
-    "5": "f4075290",
-    "10": "6dff5c68",
-    "20": "f217c083",
-    "40": "6f19fc01"
+    "5": "857e9c72",
+    "10": "462a6386",
+    "20": "fe3239e4",
+    "40": "b0d7c518",
+    "80": "7a03c5ad",
+    "120": "d3cbe1c6",
+    "200": "113e6076"
    },
-   "played": 65,
-   "gameOver": true,
-   "end": "733a2f2f"
+   "played": 200,
+   "gameOver": false,
+   "end": "113e6076"
   },
   {
    "bot": "stock",
@@ -1221,16 +1231,16 @@
    "seed": 3668339100,
    "checkpoints": {
     "5": "af502f5d",
-    "10": "d1462069",
-    "20": "c83218f3",
-    "40": "c9b49a85",
-    "80": "df9ba1b3",
-    "120": "42a92695",
-    "200": "6ffbe218"
+    "10": "6f1dc71f",
+    "20": "33cdcfa0",
+    "40": "d8db8771",
+    "80": "34d0c68f",
+    "120": "854de1a4",
+    "200": "fac903c7"
    },
    "played": 200,
    "gameOver": false,
-   "end": "6ffbe218"
+   "end": "fac903c7"
   },
   {
    "bot": "stock",
@@ -1242,7 +1252,7 @@
    },
    "played": 7,
    "gameOver": true,
-   "end": "4ea28a4b"
+   "end": "612f0f85"
   },
   {
    "bot": "stock",
@@ -1264,13 +1274,12 @@
    "seed": 3041713833,
    "checkpoints": {
     "5": "d2414a2f",
-    "10": "81b7c345",
-    "20": "0fa8305d",
-    "40": "3532fdf3"
+    "10": "6c9aa4da",
+    "20": "364d8290"
    },
-   "played": 40,
+   "played": 39,
    "gameOver": true,
-   "end": "3532fdf3"
+   "end": "d58f5295"
   },
   {
    "bot": "stock",
@@ -1280,13 +1289,15 @@
    "checkpoints": {
     "5": "6e7da455",
     "10": "7a0028fe",
-    "20": "397b4b95",
-    "40": "57e2b4e1",
-    "80": "6bf45466"
+    "20": "ca41e946",
+    "40": "99edfe4d",
+    "80": "2d417014",
+    "120": "5b5c2cc2",
+    "200": "18acbe10"
    },
-   "played": 89,
-   "gameOver": true,
-   "end": "e79bf25d"
+   "played": 200,
+   "gameOver": false,
+   "end": "18acbe10"
   },
   {
    "bot": "stock",
@@ -1307,11 +1318,11 @@
    "seed": 2415084470,
    "checkpoints": {
     "5": "407f0b49",
-    "10": "80469b17"
+    "10": "22e1cbc5"
    },
    "played": 14,
    "gameOver": true,
-   "end": "e4ca0c6b"
+   "end": "8260aea9"
   },
   {
    "bot": "stock",
@@ -1320,11 +1331,11 @@
    "seed": 774554725,
    "checkpoints": {
     "5": "a0a32596",
-    "10": "4e452203"
+    "10": "4dda1a71"
    },
    "played": 17,
    "gameOver": true,
-   "end": "8021c17f"
+   "end": "88413f93"
   },
   {
    "bot": "stock",
@@ -1332,12 +1343,12 @@
    "cofounder": "powderkeg",
    "seed": 3428990484,
    "checkpoints": {
-    "5": "ddd11134",
-    "10": "8ad2cf1d"
+    "5": "7115c87b",
+    "10": "cea8b3be"
    },
    "played": 10,
    "gameOver": true,
-   "end": "8ad2cf1d"
+   "end": "cea8b3be"
   },
   {
    "bot": "stock",
@@ -1357,16 +1368,17 @@
    "cofounder": "operator",
    "seed": 2654436149,
    "checkpoints": {
-    "5": "3b7487ac",
-    "10": "2ab9a54f",
-    "20": "09779f6e",
-    "40": "89228db2",
-    "80": "fdf0931e",
-    "120": "df283d51"
+    "5": "43656b1b",
+    "10": "3b27230e",
+    "20": "b4fcdbf2",
+    "40": "cb80c8dd",
+    "80": "e0326e9f",
+    "120": "8f97633f",
+    "200": "a124d3d5"
    },
-   "played": 153,
-   "gameOver": true,
-   "end": "b5d74c1c"
+   "played": 200,
+   "gameOver": false,
+   "end": "a124d3d5"
   },
   {
    "bot": "stock",
@@ -1376,13 +1388,15 @@
    "checkpoints": {
     "5": "de92edea",
     "10": "24df4b25",
-    "20": "bff58eee",
-    "40": "563867d2",
-    "80": "de508b3e"
+    "20": "206fb9b8",
+    "40": "126f6465",
+    "80": "d68971bf",
+    "120": "5f7fd264",
+    "200": "15052755"
    },
-   "played": 107,
-   "gameOver": true,
-   "end": "97b089de"
+   "played": 200,
+   "gameOver": false,
+   "end": "15052755"
   },
   {
    "bot": "stock",
@@ -1391,11 +1405,11 @@
    "seed": 3668340631,
    "checkpoints": {
     "5": "3785517f",
-    "10": "b2a2f9b5"
+    "10": "374ea6ab"
    },
    "played": 13,
    "gameOver": true,
-   "end": "407e7aa0"
+   "end": "8c0099aa"
   },
   {
    "bot": "stock",
@@ -1406,9 +1420,9 @@
     "5": "6752d6d3",
     "10": "718fda94"
    },
-   "played": 13,
+   "played": 17,
    "gameOver": true,
-   "end": "998f08f7"
+   "end": "5cb82b22"
   },
   {
    "bot": "stock",
@@ -1417,11 +1431,11 @@
    "seed": 387277553,
    "checkpoints": {
     "5": "2577f158",
-    "10": "93632ee9"
+    "10": "369078e7"
    },
    "played": 16,
    "gameOver": true,
-   "end": "4d7ae827"
+   "end": "9e59d79c"
   },
   {
    "bot": "stock",
@@ -1431,15 +1445,14 @@
    "checkpoints": {
     "5": "cba32b70",
     "10": "4b29b476",
-    "20": "99345e88",
-    "40": "e9a4b878",
-    "80": "6ce697d4",
-    "120": "98222ad6",
-    "200": "1ca8b969"
+    "20": "a6303595",
+    "40": "f0a550ae",
+    "80": "748ab71e",
+    "120": "9007897a"
    },
-   "played": 200,
-   "gameOver": false,
-   "end": "1ca8b969"
+   "played": 124,
+   "gameOver": true,
+   "end": "71ad15ac"
   },
   {
    "bot": "stock",
@@ -1461,12 +1474,14 @@
    "checkpoints": {
     "5": "20bad9ed",
     "10": "bed33cf2",
-    "20": "124238ef",
-    "40": "4f8e0002"
+    "20": "1d4910db",
+    "40": "d8dac078",
+    "80": "d116d0e0",
+    "120": "7a803940"
    },
-   "played": 62,
+   "played": 187,
    "gameOver": true,
-   "end": "611660c1"
+   "end": "fe4975c8"
   },
   {
    "bot": "stock",
@@ -1487,13 +1502,12 @@
    "seed": 774554222,
    "checkpoints": {
     "5": "d6fbfcda",
-    "10": "1a64e5e4",
-    "20": "e1b73467",
-    "40": "c8c46550"
+    "10": "5c0b664e",
+    "20": "929998de"
    },
-   "played": 43,
+   "played": 37,
    "gameOver": true,
-   "end": "36b21cbe"
+   "end": "f8d23b44"
   },
   {
    "bot": "stock",
@@ -1501,14 +1515,17 @@
    "cofounder": "operator",
    "seed": 3428988959,
    "checkpoints": {
-    "5": "99d5fae2",
-    "10": "ed5e529a",
-    "20": "04165ced",
-    "40": "61fcf054"
+    "5": "07d00c44",
+    "10": "20a31fa6",
+    "20": "115d20a2",
+    "40": "c48c7a91",
+    "80": "e46ebc34",
+    "120": "3bad6c9d",
+    "200": "49e4798d"
    },
-   "played": 40,
-   "gameOver": true,
-   "end": "61fcf054"
+   "played": 200,
+   "gameOver": false,
+   "end": "49e4798d"
   },
   {
    "bot": "stock",
@@ -1530,11 +1547,11 @@
    "checkpoints": {
     "5": "8d3f1f00",
     "10": "bc6ba0e0",
-    "20": "b75561ef"
+    "20": "f163d1b8"
    },
    "played": 35,
    "gameOver": true,
-   "end": "337426e6"
+   "end": "81fa453b"
   },
   {
    "bot": "stock",
@@ -1544,11 +1561,15 @@
    "checkpoints": {
     "5": "7ab9c3b6",
     "10": "3a9e42fe",
-    "20": "222a0006"
+    "20": "26ae1aba",
+    "40": "76ef787f",
+    "80": "61c9d840",
+    "120": "0d8c3d5d",
+    "200": "a1256222"
    },
-   "played": 24,
-   "gameOver": true,
-   "end": "76293c5a"
+   "played": 200,
+   "gameOver": false,
+   "end": "a1256222"
   },
   {
    "bot": "stock",
@@ -1557,12 +1578,12 @@
    "seed": 3668339928,
    "checkpoints": {
     "5": "41927756",
-    "10": "17a9884b",
-    "20": "692cca1d"
+    "10": "0a9ca65c",
+    "20": "538c37ad"
    },
-   "played": 24,
+   "played": 27,
    "gameOver": true,
-   "end": "3228ceaa"
+   "end": "515576ab"
   },
   {
    "bot": "stock",
@@ -1571,12 +1592,13 @@
    "seed": 2027808527,
    "checkpoints": {
     "5": "8a248302",
-    "10": "ea6e5e0f",
-    "20": "832ea0aa"
+    "10": "c7c615bb",
+    "20": "93cefff5",
+    "40": "285e4a3a"
    },
-   "played": 34,
+   "played": 40,
    "gameOver": true,
-   "end": "5f198019"
+   "end": "285e4a3a"
   },
   {
    "bot": "stock",
@@ -1597,15 +1619,15 @@
    "seed": 3041713133,
    "checkpoints": {
     "5": "1f191b36",
-    "10": "2746e263",
-    "20": "c5a8e183",
-    "40": "266b8e47",
-    "80": "19773a65",
-    "120": "47e8f1d7"
+    "10": "c7ae28a5",
+    "20": "33854528",
+    "40": "f5903d21",
+    "80": "1afdc05c",
+    "120": "33e20ee6"
    },
-   "played": 131,
+   "played": 172,
    "gameOver": true,
-   "end": "c97d59a5"
+   "end": "ee2880a3"
   },
   {
    "bot": "stock",
@@ -1615,11 +1637,11 @@
    "checkpoints": {
     "5": "d436092b",
     "10": "a9603f6f",
-    "20": "06cd9898"
+    "20": "35ade7ad"
    },
    "played": 26,
    "gameOver": true,
-   "end": "f226b9cb"
+   "end": "4fde5132"
   },
   {
    "bot": "stock",
@@ -1638,11 +1660,11 @@
    "seed": 2415085298,
    "checkpoints": {
     "5": "4704123c",
-    "10": "f7952254"
+    "10": "87227bd5"
    },
    "played": 18,
    "gameOver": true,
-   "end": "ab1763b4"
+   "end": "b462ad86"
   },
   {
    "bot": "stock",
@@ -1663,12 +1685,12 @@
    "seed": 3428989776,
    "checkpoints": {
     "5": "4428ed12",
-    "10": "340565ce",
-    "20": "68bfcfc5"
+    "10": "b63d2ff0",
+    "20": "1bb53315"
    },
-   "played": 23,
+   "played": 22,
    "gameOver": true,
-   "end": "09cb92fb"
+   "end": "9872c7bf"
   },
   {
    "bot": "stock",
@@ -1703,11 +1725,11 @@
    "checkpoints": {
     "5": "bda2f005",
     "10": "052dd1d9",
-    "20": "5ccd614a"
+    "20": "5d37fe3f"
    },
    "played": 39,
    "gameOver": true,
-   "end": "e87e4a7d"
+   "end": "08b3602e"
   },
   {
    "bot": "stock",
@@ -1716,15 +1738,16 @@
    "seed": 3668340566,
    "checkpoints": {
     "5": "c8d8536a",
-    "10": "e763f45c",
-    "20": "cb21d34e",
-    "40": "48eb30b0",
-    "80": "ef19d888",
-    "120": "f5fe296c"
+    "10": "10ff25e3",
+    "20": "144374d5",
+    "40": "ea44777a",
+    "80": "c75bb759",
+    "120": "76067009",
+    "200": "a81092d0"
    },
-   "played": 161,
-   "gameOver": true,
-   "end": "769a09fc"
+   "played": 200,
+   "gameOver": false,
+   "end": "a81092d0"
   },
   {
    "bot": "stock",
@@ -1736,7 +1759,7 @@
    },
    "played": 7,
    "gameOver": true,
-   "end": "fad8215b"
+   "end": "1962d4c1"
   },
   {
    "bot": "stock",
@@ -1745,11 +1768,11 @@
    "seed": 387277360,
    "checkpoints": {
     "5": "acbe38b2",
-    "10": "fba2edbf"
+    "10": "0dbc63c9"
    },
-   "played": 15,
+   "played": 19,
    "gameOver": true,
-   "end": "0bc81634"
+   "end": "584c122f"
   },
   {
    "bot": "stock",
@@ -1771,12 +1794,15 @@
    "seed": 1401180562,
    "checkpoints": {
     "5": "0829c07a",
-    "10": "965440fc",
-    "20": "7924e850"
+    "10": "475070a4",
+    "20": "e9467d0f",
+    "40": "629b9974",
+    "80": "7eed5b0c",
+    "120": "62c931c8"
    },
-   "played": 32,
+   "played": 135,
    "gameOver": true,
-   "end": "790df0e6"
+   "end": "0d44b697"
   },
   {
    "bot": "stock",
@@ -1785,15 +1811,14 @@
    "seed": 4055617485,
    "checkpoints": {
     "5": "c246913d",
-    "10": "6ec47235",
-    "20": "7e199aef",
-    "40": "b90cad19",
-    "80": "e717116c",
-    "120": "8443db9c"
+    "10": "2cc3c243",
+    "20": "34570e99",
+    "40": "c5035800",
+    "80": "6303815d"
    },
-   "played": 177,
+   "played": 106,
    "gameOver": true,
-   "end": "25f4eade"
+   "end": "75d2ff76"
   },
   {
    "bot": "stock",
@@ -1815,16 +1840,15 @@
    "seed": 774554287,
    "checkpoints": {
     "5": "c1d5ba12",
-    "10": "9f3ae5d5",
-    "20": "afab0708",
-    "40": "6ba2ec11",
-    "80": "85a37f66",
-    "120": "9586838c",
-    "200": "9a0e8757"
+    "10": "fc3de54b",
+    "20": "88e68bee",
+    "40": "a77da20a",
+    "80": "db949970",
+    "120": "951d4248"
    },
-   "played": 200,
-   "gameOver": false,
-   "end": "9a0e8757"
+   "played": 199,
+   "gameOver": true,
+   "end": "e248c9c9"
   },
   {
    "bot": "stock",
@@ -1843,12 +1867,12 @@
    "seed": 1788458505,
    "checkpoints": {
     "5": "beb95d1b",
-    "10": "1c40dd82",
-    "20": "cd0cf71a"
+    "10": "8061ed1b",
+    "20": "940f5625"
    },
-   "played": 33,
+   "played": 36,
    "gameOver": true,
-   "end": "28372183"
+   "end": "91860f30"
   },
   {
    "bot": "stock",
@@ -1871,11 +1895,11 @@
    "checkpoints": {
     "5": "bf09fe7f",
     "10": "b33328d0",
-    "20": "9f1aa19f"
+    "20": "90b729a2"
    },
    "played": 39,
    "gameOver": true,
-   "end": "70cc765e"
+   "end": "a2f436fe"
   },
   {
    "bot": "stock",
@@ -1899,7 +1923,7 @@
    },
    "played": 7,
    "gameOver": true,
-   "end": "80854710"
+   "end": "813a8d5a"
   },
   {
    "bot": "stock",
@@ -1908,11 +1932,11 @@
    "seed": 387277360,
    "checkpoints": {
     "5": "a343a6ab",
-    "10": "7aeb63c0"
+    "10": "7376515a"
    },
-   "played": 15,
+   "played": 19,
    "gameOver": true,
-   "end": "3431bc14"
+   "end": "719fe9d1"
   },
   {
    "bot": "stock",
@@ -1934,16 +1958,13 @@
    "seed": 1401180562,
    "checkpoints": {
     "5": "c8703ca7",
-    "10": "a5edf9af",
-    "20": "95a93046",
-    "40": "13810903",
-    "80": "a40140e5",
-    "120": "e0f1df05",
-    "200": "dfbda03f"
+    "10": "89c81cbf",
+    "20": "26910b93",
+    "40": "477dd19b"
    },
-   "played": 200,
-   "gameOver": false,
-   "end": "dfbda03f"
+   "played": 47,
+   "gameOver": true,
+   "end": "3d8e42b5"
   },
   {
    "bot": "stock",
@@ -1952,13 +1973,16 @@
    "seed": 4055617485,
    "checkpoints": {
     "5": "0da6d237",
-    "10": "bd0e7e49",
-    "20": "78ac0c02",
-    "40": "4db03b09"
+    "10": "5773bd87",
+    "20": "7ef1aadc",
+    "40": "507b107c",
+    "80": "7ddd074c",
+    "120": "d5ec2d18",
+    "200": "9e66fc9e"
    },
-   "played": 48,
-   "gameOver": true,
-   "end": "c2529181"
+   "played": 200,
+   "gameOver": false,
+   "end": "9e66fc9e"
   },
   {
    "bot": "stock",
@@ -1980,15 +2004,16 @@
    "seed": 774554287,
    "checkpoints": {
     "5": "eba28781",
-    "10": "b8bff11b",
-    "20": "ab1b90c4",
-    "40": "c1fed6a4",
-    "80": "da429adb",
-    "120": "13932d38"
+    "10": "74510225",
+    "20": "b96b9992",
+    "40": "8c027a40",
+    "80": "7556ca7a",
+    "120": "73f3f6c3",
+    "200": "47ff4e9c"
    },
-   "played": 188,
-   "gameOver": true,
-   "end": "41eec0a6"
+   "played": 200,
+   "gameOver": false,
+   "end": "47ff4e9c"
   },
   {
    "bot": "stock",
@@ -2007,12 +2032,16 @@
    "seed": 1788458505,
    "checkpoints": {
     "5": "12071f25",
-    "10": "1864bfab",
-    "20": "c34379dc"
+    "10": "02bd6586",
+    "20": "94ef7ebd",
+    "40": "0a03f004",
+    "80": "45a144f0",
+    "120": "f9409ef4",
+    "200": "1e777b8d"
    },
-   "played": 34,
-   "gameOver": true,
-   "end": "39309f73"
+   "played": 200,
+   "gameOver": false,
+   "end": "1e777b8d"
   },
   {
    "bot": "stock",
@@ -2022,15 +2051,15 @@
    "checkpoints": {
     "5": "14e19a8a",
     "10": "fde0dec1",
-    "20": "7066dc5d",
-    "40": "c92f03e8",
-    "80": "91793383",
-    "120": "1c836161",
-    "200": "cfd838f7"
+    "20": "0bc7e0aa",
+    "40": "862731ba",
+    "80": "7b5e609a",
+    "120": "c818d616",
+    "200": "d1119b36"
    },
    "played": 200,
    "gameOver": false,
-   "end": "cfd838f7"
+   "end": "d1119b36"
   },
   {
    "bot": "stock",
@@ -2052,11 +2081,11 @@
    "seed": 3668340528,
    "checkpoints": {
     "5": "73c86999",
-    "10": "5ccab2e3"
+    "10": "235f7ed9"
    },
-   "played": 17,
+   "played": 19,
    "gameOver": true,
-   "end": "333e0d78"
+   "end": "6ae7a09b"
   },
   {
    "bot": "stock",
@@ -2065,16 +2094,13 @@
    "seed": 2027807975,
    "checkpoints": {
     "5": "fa708700",
-    "10": "8255c361",
-    "20": "c6098dd5",
-    "40": "cc288293",
-    "80": "6026d3b1",
-    "120": "4b1efb81",
-    "200": "8979bddb"
+    "10": "3a1f4346",
+    "20": "47d4a5f2",
+    "40": "9ce8b2cb"
    },
-   "played": 200,
-   "gameOver": false,
-   "end": "8979bddb"
+   "played": 51,
+   "gameOver": true,
+   "end": "5ad88fa6"
   },
   {
    "bot": "stock",
@@ -2086,7 +2112,7 @@
    },
    "played": 8,
    "gameOver": true,
-   "end": "430a22bc"
+   "end": "69b6f996"
   },
   {
    "bot": "stock",
@@ -2095,15 +2121,15 @@
    "seed": 3041712133,
    "checkpoints": {
     "5": "17187e7a",
-    "10": "59afb1ba",
-    "20": "432bd76f",
-    "40": "e8206bad",
-    "80": "5d6ac9de",
-    "120": "2cfd6801"
+    "10": "24dd0d48",
+    "20": "bba5b0a8",
+    "40": "85affb96",
+    "80": "6f195885",
+    "120": "5ea9eb19"
    },
-   "played": 172,
+   "played": 199,
    "gameOver": true,
-   "end": "4f9b5830"
+   "end": "ea09adfe"
   },
   {
    "bot": "stock",
@@ -2137,12 +2163,12 @@
    "seed": 2415084826,
    "checkpoints": {
     "5": "e7558a2d",
-    "10": "7ca55509",
-    "20": "4770c7c4"
+    "10": "e9a3bb63",
+    "20": "9b0b4a2f"
    },
    "played": 29,
    "gameOver": true,
-   "end": "ca2397a1"
+   "end": "b71121ba"
   },
   {
    "bot": "stock",
@@ -2154,7 +2180,7 @@
    },
    "played": 9,
    "gameOver": true,
-   "end": "d78befda"
+   "end": "971989fb"
   },
   {
    "bot": "stock",
@@ -2175,16 +2201,16 @@
    "seed": 1788458607,
    "checkpoints": {
     "5": "43f18f5f",
-    "10": "32d6f5ab",
-    "20": "0b69db3b",
-    "40": "9a66cbf7",
-    "80": "9e0aefe9",
-    "120": "44768722",
-    "200": "45be1b23"
+    "10": "0e4a073e",
+    "20": "09ac2cba",
+    "40": "1dcf38e9",
+    "80": "830da1fa",
+    "120": "8ff8cc6a",
+    "200": "40913c12"
    },
    "played": 200,
    "gameOver": false,
-   "end": "45be1b23"
+   "end": "40913c12"
   },
   {
    "bot": "stock",
@@ -2205,11 +2231,16 @@
    "seed": 1013903886,
    "checkpoints": {
     "5": "3341fa2b",
-    "10": "d688112a"
+    "10": "6f3730e2",
+    "20": "7e017027",
+    "40": "faa10d4b",
+    "80": "75ef0851",
+    "120": "a72a9b41",
+    "200": "2bc8fbe0"
    },
-   "played": 15,
-   "gameOver": true,
-   "end": "2ba695fc"
+   "played": 200,
+   "gameOver": false,
+   "end": "2bc8fbe0"
   },
   {
    "bot": "stock",
@@ -2217,17 +2248,16 @@
    "cofounder": "builder",
    "seed": 3668339839,
    "checkpoints": {
-    "5": "0938c523",
-    "10": "1c70b608",
-    "20": "76bdf446",
-    "40": "4bf65773",
-    "80": "b50819ae",
-    "120": "2751decd",
-    "200": "5992fc29"
+    "5": "4a4bc441",
+    "10": "1563bcc8",
+    "20": "fd6ebcd2",
+    "40": "b8502390",
+    "80": "ce8ed447",
+    "120": "945835dd"
    },
-   "played": 200,
-   "gameOver": false,
-   "end": "5992fc29"
+   "played": 174,
+   "gameOver": true,
+   "end": "179587d4"
   },
   {
    "bot": "stock",
@@ -2236,16 +2266,11 @@
    "seed": 2027808680,
    "checkpoints": {
     "5": "0a8860f2",
-    "10": "518694fd",
-    "20": "26e437ee",
-    "40": "7c6de8f8",
-    "80": "e78d3ee0",
-    "120": "d3e4f73b",
-    "200": "f0c2d79e"
+    "10": "b311009f"
    },
-   "played": 200,
-   "gameOver": false,
-   "end": "f0c2d79e"
+   "played": 16,
+   "gameOver": true,
+   "end": "202617a6"
   },
   {
    "bot": "stock",
@@ -2266,12 +2291,15 @@
    "seed": 3041712970,
    "checkpoints": {
     "5": "caaa728e",
-    "10": "1a17d5dd",
-    "20": "dd00f3ba"
+    "10": "02e55268",
+    "20": "ae92b83e",
+    "40": "f97ebacc",
+    "80": "17e91b9b",
+    "120": "47d01ddd"
    },
-   "played": 31,
+   "played": 185,
    "gameOver": true,
-   "end": "deef55a1"
+   "end": "a37a4076"
   },
   {
    "bot": "stock",
@@ -2279,11 +2307,11 @@
    "cofounder": "builder",
    "seed": 1401180859,
    "checkpoints": {
-    "5": "345a9577"
+    "5": "bd93f1e5"
    },
    "played": 9,
    "gameOver": true,
-   "end": "c6d5ac58"
+   "end": "f29dd81e"
   },
   {
    "bot": "stock",
@@ -2292,16 +2320,11 @@
    "seed": 4055616740,
    "checkpoints": {
     "5": "b57ade2b",
-    "10": "ac1e8f05",
-    "20": "02af641a",
-    "40": "81617998",
-    "80": "255cd48e",
-    "120": "3d64797f",
-    "200": "adfd6b18"
+    "10": "8d253aef"
    },
-   "played": 200,
-   "gameOver": false,
-   "end": "adfd6b18"
+   "played": 18,
+   "gameOver": true,
+   "end": "6613af1e"
   },
   {
    "bot": "stock",
@@ -2311,15 +2334,11 @@
    "checkpoints": {
     "5": "b4d4d514",
     "10": "59e211d6",
-    "20": "c39a8383",
-    "40": "e71e6554",
-    "80": "25f36eca",
-    "120": "a015c67c",
-    "200": "4a6c5221"
+    "20": "0c9e5799"
    },
-   "played": 200,
-   "gameOver": false,
-   "end": "4a6c5221"
+   "played": 35,
+   "gameOver": true,
+   "end": "8d7f2a28"
   },
   {
    "bot": "stock",
@@ -2329,15 +2348,14 @@
    "checkpoints": {
     "5": "36375c69",
     "10": "dd5c6e31",
-    "20": "03f750c5",
-    "40": "93a78955",
-    "80": "b37433bf",
-    "120": "0f7ef50b",
-    "200": "dcffda2d"
+    "20": "7c4a4f34",
+    "40": "fdb780c5",
+    "80": "73aeacfe",
+    "120": "0f56a108"
    },
-   "played": 200,
-   "gameOver": false,
-   "end": "dcffda2d"
+   "played": 132,
+   "gameOver": true,
+   "end": "6bed5a46"
   },
   {
    "bot": "stock",
@@ -2347,15 +2365,15 @@
    "checkpoints": {
     "5": "8d0fbc48",
     "10": "7dcf40a4",
-    "20": "9f76c034",
-    "40": "b9b8fb7c",
-    "80": "96423478",
-    "120": "902f38fe",
-    "200": "39586d0c"
+    "20": "902c77ba",
+    "40": "d79bfc75",
+    "80": "c47acf79",
+    "120": "377b8736",
+    "200": "ac4c0e02"
    },
    "played": 200,
    "gameOver": false,
-   "end": "39586d0c"
+   "end": "ac4c0e02"
   },
   {
    "bot": "stock",
@@ -2364,15 +2382,15 @@
    "seed": 1788458272,
    "checkpoints": {
     "5": "3f179fde",
-    "10": "62c929e5",
-    "20": "44f7653b",
-    "40": "efd7525e",
-    "80": "b83ffa42",
-    "120": "64944779"
+    "10": "b14da875",
+    "20": "549239c1",
+    "40": "9893f6ec",
+    "80": "afbe6e7a",
+    "120": "fde8ccac"
    },
-   "played": 152,
+   "played": 137,
    "gameOver": true,
-   "end": "e081b894"
+   "end": "eeb0dd87"
   },
   {
    "bot": "stock",
@@ -2380,11 +2398,11 @@
    "cofounder": "rainmaker",
    "seed": 2654436179,
    "checkpoints": {
-    "5": "0cb08af7"
+    "5": "ad66ccd5"
    },
    "played": 9,
    "gameOver": true,
-   "end": "10b6f60a"
+   "end": "28956867"
   },
   {
    "bot": "stock",
@@ -2394,11 +2412,15 @@
    "checkpoints": {
     "5": "9a9726d0",
     "10": "1b70877f",
-    "20": "2a4eee89"
+    "20": "6109781f",
+    "40": "b7cffb01",
+    "80": "d39f0b31",
+    "120": "187baa1f",
+    "200": "2c87e9be"
    },
-   "played": 25,
-   "gameOver": true,
-   "end": "afe30b96"
+   "played": 200,
+   "gameOver": false,
+   "end": "2c87e9be"
   },
   {
    "bot": "stock",
@@ -2407,13 +2429,16 @@
    "seed": 3668340721,
    "checkpoints": {
     "5": "35d9261c",
-    "10": "0bb62c9d",
-    "20": "5e1d45ad",
-    "40": "e2cd8494"
+    "10": "b4f65d93",
+    "20": "03da5a6d",
+    "40": "98382385",
+    "80": "d98d6a21",
+    "120": "6aad2788",
+    "200": "042c7e4a"
    },
-   "played": 76,
-   "gameOver": true,
-   "end": "ad38dfaf"
+   "played": 200,
+   "gameOver": false,
+   "end": "042c7e4a"
   },
   {
    "bot": "stock",
@@ -2423,14 +2448,14 @@
    "checkpoints": {
     "5": "1d96c784",
     "10": "37731a8c",
-    "20": "4da25671",
-    "40": "ed9d17f1",
-    "80": "d5e43ceb",
-    "120": "4dfb92ab"
+    "20": "a3f36479",
+    "40": "e92c9da0",
+    "80": "a265868f",
+    "120": "f9247ff4"
    },
-   "played": 164,
+   "played": 186,
    "gameOver": true,
-   "end": "27981073"
+   "end": "2d74a212"
   },
   {
    "bot": "stock",
@@ -2450,17 +2475,13 @@
    "cofounder": "rainmaker",
    "seed": 3041712324,
    "checkpoints": {
-    "5": "1cfdcef9",
-    "10": "4c35033d",
-    "20": "7d2c6f2a",
-    "40": "634e1b0d",
-    "80": "ad291b08",
-    "120": "8cf1c13b",
-    "200": "85b827f0"
+    "5": "e8eb3593",
+    "10": "f6634cec",
+    "20": "e0bd0cfb"
    },
-   "played": 200,
-   "gameOver": false,
-   "end": "85b827f0"
+   "played": 38,
+   "gameOver": true,
+   "end": "896eb57b"
   },
   {
    "bot": "stock",
@@ -2468,14 +2489,17 @@
    "cofounder": "rainmaker",
    "seed": 1401180469,
    "checkpoints": {
-    "5": "61d82559",
-    "10": "d3929041",
-    "20": "7fd9ff04",
-    "40": "f50d82c9"
+    "5": "b0af93b3",
+    "10": "7946ebb4",
+    "20": "0d41e252",
+    "40": "7cabce5d",
+    "80": "be4a98a5",
+    "120": "0adca166",
+    "200": "a2164af0"
    },
-   "played": 53,
-   "gameOver": true,
-   "end": "7168d7f1"
+   "played": 200,
+   "gameOver": false,
+   "end": "a2164af0"
   },
   {
    "bot": "stock",
@@ -2493,13 +2517,17 @@
    "cofounder": "rainmaker",
    "seed": 2415085019,
    "checkpoints": {
-    "5": "cb242791",
-    "10": "ddc8185d",
-    "20": "50750a5d"
+    "5": "c63db097",
+    "10": "e68e134d",
+    "20": "86c0782f",
+    "40": "76482224",
+    "80": "c40e4c2f",
+    "120": "7c0d0260",
+    "200": "bb172ae2"
    },
-   "played": 36,
-   "gameOver": true,
-   "end": "6b6970c6"
+   "played": 200,
+   "gameOver": false,
+   "end": "bb172ae2"
   },
   {
    "bot": "stock",
@@ -2508,12 +2536,14 @@
    "seed": 774554120,
    "checkpoints": {
     "5": "1c4e9c27",
-    "10": "633e0921",
-    "20": "ff97cdf0"
+    "10": "39d65c4f",
+    "20": "7c57d087",
+    "40": "ca287044",
+    "80": "14e0706e"
    },
-   "played": 35,
+   "played": 102,
    "gameOver": true,
-   "end": "8228b3b5"
+   "end": "bffc8c78"
   },
   {
    "bot": "stock",
@@ -2521,13 +2551,17 @@
    "cofounder": "rainmaker",
    "seed": 3428989049,
    "checkpoints": {
-    "5": "11b76055",
-    "10": "6d63d515",
-    "20": "a185381e"
+    "5": "1c5ff69c",
+    "10": "a5e95251",
+    "20": "ec081870",
+    "40": "42e48966",
+    "80": "843620b3",
+    "120": "d5b6dbb5",
+    "200": "67f86b9b"
    },
-   "played": 26,
-   "gameOver": true,
-   "end": "5b974c28"
+   "played": 200,
+   "gameOver": false,
+   "end": "67f86b9b"
   },
   {
    "bot": "stock",
@@ -2561,11 +2595,15 @@
    "checkpoints": {
     "5": "52d29cd5",
     "10": "47a2be93",
-    "20": "0ca8d5fa"
+    "20": "faa96819",
+    "40": "421a0341",
+    "80": "7133a7c1",
+    "120": "c7e2b3ce",
+    "200": "5104d5ef"
    },
-   "played": 25,
-   "gameOver": true,
-   "end": "570a0b66"
+   "played": 200,
+   "gameOver": false,
+   "end": "5104d5ef"
   },
   {
    "bot": "stock",
@@ -2574,13 +2612,16 @@
    "seed": 3668340721,
    "checkpoints": {
     "5": "b5da08dc",
-    "10": "95ae818e",
-    "20": "628d63cc",
-    "40": "a7796933"
+    "10": "c15a2c1c",
+    "20": "0ae6e578",
+    "40": "986a2406",
+    "80": "3ba5a5fe",
+    "120": "394feca9",
+    "200": "4a21779a"
    },
-   "played": 76,
-   "gameOver": true,
-   "end": "ba9b0a41"
+   "played": 200,
+   "gameOver": false,
+   "end": "4a21779a"
   },
   {
    "bot": "stock",
@@ -2590,15 +2631,15 @@
    "checkpoints": {
     "5": "ddf91b12",
     "10": "2fa40f8f",
-    "20": "cc8d5586",
-    "40": "1eb9b2c1",
-    "80": "cad07e11",
-    "120": "b1b6b071",
-    "200": "e6d99016"
+    "20": "4837f9a6",
+    "40": "46f24116",
+    "80": "b72cc732",
+    "120": "131cae9f",
+    "200": "f81f04a5"
    },
    "played": 200,
    "gameOver": false,
-   "end": "e6d99016"
+   "end": "f81f04a5"
   },
   {
    "bot": "stock",
@@ -2610,7 +2651,7 @@
    },
    "played": 9,
    "gameOver": true,
-   "end": "c8a0dc2b"
+   "end": "ac1f4e62"
   },
   {
    "bot": "stock",
@@ -2618,15 +2659,13 @@
    "cofounder": "powderkeg",
    "seed": 3041712324,
    "checkpoints": {
-    "5": "21c0bebf",
-    "10": "f01900e5",
-    "20": "4d40fc5b",
-    "40": "1fa84689",
-    "80": "5f90ddab"
+    "5": "595dad39",
+    "10": "2901a49a",
+    "20": "d4785f95"
    },
-   "played": 113,
+   "played": 38,
    "gameOver": true,
-   "end": "0c3b431e"
+   "end": "0d4624f7"
   },
   {
    "bot": "stock",
@@ -2634,17 +2673,17 @@
    "cofounder": "powderkeg",
    "seed": 1401180469,
    "checkpoints": {
-    "5": "fc7e8077",
-    "10": "459e0e20",
-    "20": "b408755a",
-    "40": "9901ac26",
-    "80": "48169583",
-    "120": "f88cd6e9",
-    "200": "bf1d9e39"
+    "5": "6afe5fe5",
+    "10": "efad0cc4",
+    "20": "e8260a1d",
+    "40": "4ea0c9a6",
+    "80": "97501908",
+    "120": "7fd28234",
+    "200": "2792e2fb"
    },
    "played": 200,
    "gameOver": false,
-   "end": "bf1d9e39"
+   "end": "2792e2fb"
   },
   {
    "bot": "stock",
@@ -2662,13 +2701,17 @@
    "cofounder": "powderkeg",
    "seed": 2415085019,
    "checkpoints": {
-    "5": "b7e7582d",
-    "10": "90f243c1",
-    "20": "404cd86a"
+    "5": "8563bdbb",
+    "10": "c5a0732d",
+    "20": "d0c56913",
+    "40": "34a52bbb",
+    "80": "9cfb0f2f",
+    "120": "050b89db",
+    "200": "f48a5118"
    },
-   "played": 36,
-   "gameOver": true,
-   "end": "b9563705"
+   "played": 200,
+   "gameOver": false,
+   "end": "f48a5118"
   },
   {
    "bot": "stock",
@@ -2677,16 +2720,14 @@
    "seed": 774554120,
    "checkpoints": {
     "5": "c1c949a0",
-    "10": "f34e0a4e",
-    "20": "d2762f9b",
-    "40": "eb0b7198",
-    "80": "9fbc79a6",
-    "120": "4d0627f3",
-    "200": "5df39c83"
+    "10": "b266d974",
+    "20": "ca7e5e33",
+    "40": "9e4b60ae",
+    "80": "7432b443"
    },
-   "played": 200,
-   "gameOver": false,
-   "end": "5df39c83"
+   "played": 80,
+   "gameOver": true,
+   "end": "7432b443"
   },
   {
    "bot": "stock",
@@ -2694,15 +2735,17 @@
    "cofounder": "powderkeg",
    "seed": 3428989049,
    "checkpoints": {
-    "5": "0e1df376",
-    "10": "ab1b6018",
-    "20": "c8fbc294",
-    "40": "d64e2126",
-    "80": "a087cc1e"
+    "5": "2c0d3807",
+    "10": "1e8b1b60",
+    "20": "9cf86fbd",
+    "40": "5f4aa161",
+    "80": "2cd6a33f",
+    "120": "63aa11dd",
+    "200": "f5a4b537"
    },
-   "played": 110,
-   "gameOver": true,
-   "end": "f8babd8a"
+   "played": 200,
+   "gameOver": false,
+   "end": "f5a4b537"
   },
   {
    "bot": "stock",
@@ -2723,11 +2766,11 @@
    "seed": 2654436560,
    "checkpoints": {
     "5": "f9b344c6",
-    "10": "b5c10c17"
+    "10": "5a83b872"
    },
    "played": 10,
    "gameOver": true,
-   "end": "b5c10c17"
+   "end": "5a83b872"
   },
   {
    "bot": "wide",
@@ -2750,11 +2793,11 @@
    "checkpoints": {
     "5": "110c13b3",
     "10": "6a14ca10",
-    "20": "57515783"
+    "20": "76f7c007"
    },
-   "played": 20,
+   "played": 21,
    "gameOver": true,
-   "end": "57515783"
+   "end": "054e642c"
   },
   {
    "bot": "wide",
@@ -2763,12 +2806,12 @@
    "seed": 2027807653,
    "checkpoints": {
     "5": "a33d44e2",
-    "10": "def7d0b7",
-    "20": "2a25c28a"
+    "10": "a905b4d7",
+    "20": "7698206e"
    },
-   "played": 23,
+   "played": 20,
    "gameOver": true,
-   "end": "2b9ba1cd"
+   "end": "7698206e"
   },
   {
    "bot": "wide",
@@ -2787,12 +2830,11 @@
    "seed": 3041713991,
    "checkpoints": {
     "5": "9b610a9f",
-    "10": "22d623f7",
-    "20": "4b6f40f0"
+    "10": "22d623f7"
    },
-   "played": 20,
+   "played": 19,
    "gameOver": true,
-   "end": "4b6f40f0"
+   "end": "f94d7eea"
   },
   {
    "bot": "wide",
@@ -2836,11 +2878,11 @@
    "checkpoints": {
     "5": "a9795050",
     "10": "292aee04",
-    "20": "924078de"
+    "20": "74dfc968"
    },
    "played": 22,
    "gameOver": true,
-   "end": "be41c804"
+   "end": "872cc02f"
   },
   {
    "bot": "wide",
@@ -2870,11 +2912,11 @@
    "cofounder": "builder",
    "seed": 2654437279,
    "checkpoints": {
-    "5": "b0fe00ea"
+    "5": "5b819114"
    },
    "played": 9,
    "gameOver": true,
-   "end": "89bacd10"
+   "end": "3dfb7462"
   },
   {
    "bot": "wide",
@@ -2883,11 +2925,12 @@
    "seed": 1013904716,
    "checkpoints": {
     "5": "3894a8be",
-    "10": "6d38d957"
+    "10": "6d85b3a4",
+    "20": "691b2a3a"
    },
-   "played": 18,
+   "played": 37,
    "gameOver": true,
-   "end": "35f99447"
+   "end": "7f529d73"
   },
   {
    "bot": "wide",
@@ -2896,12 +2939,13 @@
    "seed": 3668339517,
    "checkpoints": {
     "5": "aa61571e",
-    "10": "4f24a044",
-    "20": "729f6854"
+    "10": "f20f3702",
+    "20": "f0597495",
+    "40": "0ef5de24"
    },
-   "played": 31,
+   "played": 41,
    "gameOver": true,
-   "end": "8d02f826"
+   "end": "b20c4cce"
   },
   {
    "bot": "wide",
@@ -2951,11 +2995,11 @@
    "checkpoints": {
     "5": "659c0fe7",
     "10": "25b9e981",
-    "20": "643b404e"
+    "20": "72980fba"
    },
-   "played": 23,
+   "played": 24,
    "gameOver": true,
-   "end": "5dde7497"
+   "end": "b2e56d34"
   },
   {
    "bot": "wide",
@@ -2963,12 +3007,12 @@
    "cofounder": "builder",
    "seed": 2415083799,
    "checkpoints": {
-    "5": "3891da8f",
-    "10": "9447ca76"
+    "5": "7b9b3789",
+    "10": "1c6a78ca"
    },
    "played": 14,
    "gameOver": true,
-   "end": "f5784e58"
+   "end": "f3c00c1a"
   },
   {
    "bot": "wide",
@@ -2977,11 +3021,11 @@
    "seed": 774555332,
    "checkpoints": {
     "5": "1b448223",
-    "10": "446393f3"
+    "10": "fc61ae07"
    },
    "played": 10,
    "gameOver": true,
-   "end": "446393f3"
+   "end": "fc61ae07"
   },
   {
    "bot": "wide",
@@ -3003,12 +3047,12 @@
    "seed": 1788457570,
    "checkpoints": {
     "5": "55572dbb",
-    "10": "bd5c01d1",
-    "20": "e2868a07"
+    "10": "26d175b3",
+    "20": "79a0f805"
    },
    "played": 26,
    "gameOver": true,
-   "end": "0f4d1f24"
+   "end": "5c69c514"
   },
   {
    "bot": "wide",
@@ -3027,11 +3071,11 @@
    "seed": 1013905090,
    "checkpoints": {
     "5": "af74d247",
-    "10": "16ce7291"
+    "10": "e701b50f"
    },
    "played": 14,
    "gameOver": true,
-   "end": "f8666abb"
+   "end": "97312b31"
   },
   {
    "bot": "wide",
@@ -3040,14 +3084,13 @@
    "seed": 3668338867,
    "checkpoints": {
     "5": "ea6cce24",
-    "10": "980f9d63",
-    "20": "5a74fa01",
-    "40": "351357e2",
-    "80": "e27a8023"
+    "10": "38b8b765",
+    "20": "76404612",
+    "40": "d1817368"
    },
-   "played": 91,
+   "played": 60,
    "gameOver": true,
-   "end": "90fc5776"
+   "end": "f6c8dda8"
   },
   {
    "bot": "wide",
@@ -3056,11 +3099,11 @@
    "seed": 2027807588,
    "checkpoints": {
     "5": "07f6807b",
-    "10": "a41e5b36"
+    "10": "4ee47410"
    },
    "played": 12,
    "gameOver": true,
-   "end": "d787fd1d"
+   "end": "dff58433"
   },
   {
    "bot": "wide",
@@ -3093,11 +3136,11 @@
    "checkpoints": {
     "5": "73ce0034",
     "10": "c95dc471",
-    "20": "5187dee7"
+    "20": "04612e6d"
    },
    "played": 22,
    "gameOver": true,
-   "end": "01c7075e"
+   "end": "500b063b"
   },
   {
    "bot": "wide",
@@ -3120,7 +3163,7 @@
    },
    "played": 14,
    "gameOver": true,
-   "end": "13e87728"
+   "end": "4bde4525"
   },
   {
    "bot": "wide",
@@ -3129,11 +3172,11 @@
    "seed": 774554954,
    "checkpoints": {
     "5": "508e391f",
-    "10": "1698ca5c"
+    "10": "a7bf4116"
    },
    "played": 16,
    "gameOver": true,
-   "end": "fe42b19b"
+   "end": "996bdb1a"
   },
   {
    "bot": "wide",
@@ -3159,7 +3202,7 @@
    },
    "played": 18,
    "gameOver": true,
-   "end": "42079a3b"
+   "end": "5862ffb1"
   },
   {
    "bot": "wide",
@@ -3178,11 +3221,11 @@
    "seed": 1013905090,
    "checkpoints": {
     "5": "ce121e90",
-    "10": "8e903bf1"
+    "10": "eceb8def"
    },
    "played": 14,
    "gameOver": true,
-   "end": "50217821"
+   "end": "faf2097c"
   },
   {
    "bot": "wide",
@@ -3191,12 +3234,15 @@
    "seed": 3668338867,
    "checkpoints": {
     "5": "f8664529",
-    "10": "e9bbed62",
-    "20": "46add08d"
+    "10": "6425d5f9",
+    "20": "2752165d",
+    "40": "a6d8c7a1",
+    "80": "8ac7cd97",
+    "120": "800ad829"
    },
-   "played": 31,
+   "played": 160,
    "gameOver": true,
-   "end": "c6f3bdc9"
+   "end": "be684f09"
   },
   {
    "bot": "wide",
@@ -3205,11 +3251,11 @@
    "seed": 2027807588,
    "checkpoints": {
     "5": "3df22c73",
-    "10": "da2bea28"
+    "10": "bb214dee"
    },
    "played": 12,
    "gameOver": true,
-   "end": "52b32f40"
+   "end": "5c3fe49a"
   },
   {
    "bot": "wide",
@@ -3242,11 +3288,11 @@
    "checkpoints": {
     "5": "579d3820",
     "10": "4808726a",
-    "20": "f8de9abd"
+    "20": "8575b18c"
    },
    "played": 22,
    "gameOver": true,
-   "end": "9f406071"
+   "end": "05dd2769"
   },
   {
    "bot": "wide",
@@ -3271,7 +3317,7 @@
    },
    "played": 14,
    "gameOver": true,
-   "end": "d8706631"
+   "end": "e082ff8a"
   },
   {
    "bot": "wide",
@@ -3280,11 +3326,11 @@
    "seed": 774554954,
    "checkpoints": {
     "5": "28d3f977",
-    "10": "9411f45c"
+    "10": "70bfaa82"
    },
    "played": 16,
    "gameOver": true,
-   "end": "d09f6d70"
+   "end": "53302571"
   },
   {
    "bot": "wide",
@@ -3309,7 +3355,7 @@
    },
    "played": 18,
    "gameOver": true,
-   "end": "d9c217dd"
+   "end": "634eb5cf"
   },
   {
    "bot": "wide",
@@ -3318,11 +3364,11 @@
    "seed": 2654436863,
    "checkpoints": {
     "5": "484fee98",
-    "10": "63e68726"
+    "10": "f1afc57c"
    },
    "played": 14,
    "gameOver": true,
-   "end": "e4587eb0"
+   "end": "0df98a66"
   },
   {
    "bot": "wide",
@@ -3343,11 +3389,11 @@
    "seed": 3668339037,
    "checkpoints": {
     "5": "110be406",
-    "10": "c0eacaea"
+    "10": "cdbf6548"
    },
    "played": 14,
    "gameOver": true,
-   "end": "c6e45f9d"
+   "end": "1933e8e3"
   },
   {
    "bot": "wide",
@@ -3369,7 +3415,7 @@
    },
    "played": 9,
    "gameOver": true,
-   "end": "68c2cf80"
+   "end": "bffc616e"
   },
   {
    "bot": "wide",
@@ -3383,7 +3429,7 @@
    },
    "played": 22,
    "gameOver": true,
-   "end": "167a2f1a"
+   "end": "191533d4"
   },
   {
    "bot": "wide",
@@ -3395,7 +3441,7 @@
    },
    "played": 9,
    "gameOver": true,
-   "end": "dbe65eff"
+   "end": "6f4e06ed"
   },
   {
    "bot": "wide",
@@ -3416,11 +3462,11 @@
    "seed": 2415084407,
    "checkpoints": {
     "5": "02ed2bf7",
-    "10": "c2e9f2b9"
+    "10": "edefed23"
    },
    "played": 13,
    "gameOver": true,
-   "end": "76be905a"
+   "end": "f32ffe32"
   },
   {
    "bot": "wide",
@@ -3432,7 +3478,7 @@
    },
    "played": 9,
    "gameOver": true,
-   "end": "9ad88458"
+   "end": "c20d2c76"
   },
   {
    "bot": "wide",
@@ -3441,11 +3487,11 @@
    "seed": 3428990677,
    "checkpoints": {
     "5": "6ca2b626",
-    "10": "37bcb3a1"
+    "10": "da238587"
    },
    "played": 11,
    "gameOver": true,
-   "end": "9f057735"
+   "end": "2baea263"
   },
   {
    "bot": "wide",
@@ -3454,11 +3500,11 @@
    "seed": 1788456962,
    "checkpoints": {
     "5": "27c25565",
-    "10": "c056181d"
+    "10": "bc2194a3"
    },
    "played": 10,
    "gameOver": true,
-   "end": "c056181d"
+   "end": "bc2194a3"
   },
   {
    "bot": "wide",
@@ -3479,12 +3525,12 @@
    "seed": 1013904483,
    "checkpoints": {
     "5": "1ef308cc",
-    "10": "f6a34bc6",
-    "20": "618a9d46"
+    "10": "00c6f3ed",
+    "20": "dfef2a3c"
    },
-   "played": 26,
+   "played": 24,
    "gameOver": true,
-   "end": "bc028388"
+   "end": "33704b47"
   },
   {
    "bot": "wide",
@@ -3509,7 +3555,7 @@
    },
    "played": 16,
    "gameOver": true,
-   "end": "faf0370e"
+   "end": "0570e61e"
   },
   {
    "bot": "wide",
@@ -3518,11 +3564,11 @@
    "seed": 387278708,
    "checkpoints": {
     "5": "84838f21",
-    "10": "6d720c3c"
+    "10": "85826612"
    },
    "played": 17,
    "gameOver": true,
-   "end": "db47d52e"
+   "end": "a982417a"
   },
   {
    "bot": "wide",
@@ -3531,11 +3577,11 @@
    "seed": 3041713447,
    "checkpoints": {
     "5": "253fb346",
-    "10": "b24dd8e5"
+    "10": "42961cc3"
    },
    "played": 14,
    "gameOver": true,
-   "end": "cf1591a4"
+   "end": "3730c101"
   },
   {
    "bot": "wide",
@@ -3557,11 +3603,12 @@
    "checkpoints": {
     "5": "162d369a",
     "10": "c54d4849",
-    "20": "b48c0180"
+    "20": "32463b54",
+    "40": "b7a69833"
    },
-   "played": 35,
+   "played": 42,
    "gameOver": true,
-   "end": "84f92311"
+   "end": "ffeb7326"
   },
   {
    "bot": "wide",
@@ -3574,7 +3621,7 @@
    },
    "played": 14,
    "gameOver": true,
-   "end": "4f40c024"
+   "end": "2df1496b"
   },
   {
    "bot": "wide",
@@ -3586,7 +3633,7 @@
    },
    "played": 9,
    "gameOver": true,
-   "end": "ecfd9725"
+   "end": "50f3683f"
   },
   {
    "bot": "wide",
@@ -3669,12 +3716,12 @@
    "cofounder": "rainmaker",
    "seed": 387278074,
    "checkpoints": {
-    "5": "e1b7cbe0",
-    "10": "c3b40aec"
+    "5": "49ae0587",
+    "10": "d5355928"
    },
    "played": 19,
    "gameOver": true,
-   "end": "922ca7ba"
+   "end": "07a3ddab"
   },
   {
    "bot": "wide",
@@ -3695,12 +3742,12 @@
    "seed": 1401182040,
    "checkpoints": {
     "5": "34194d15",
-    "10": "01d6d44f",
-    "20": "61b417dc"
+    "10": "cabda02c",
+    "20": "a36149c9"
    },
    "played": 25,
    "gameOver": true,
-   "end": "dcfd52e6"
+   "end": "13a1a360"
   },
   {
    "bot": "wide",
@@ -3713,7 +3760,7 @@
    },
    "played": 16,
    "gameOver": true,
-   "end": "9a91ecff"
+   "end": "c011ab39"
   },
   {
    "bot": "wide",
@@ -3743,11 +3790,11 @@
    "cofounder": "rainmaker",
    "seed": 3428990484,
    "checkpoints": {
-    "5": "e4ab44d7"
+    "5": "f5296b29"
    },
    "played": 6,
    "gameOver": true,
-   "end": "b27d4491"
+   "end": "e84dc9bb"
   },
   {
    "bot": "wide",
@@ -3816,12 +3863,12 @@
    "cofounder": "powderkeg",
    "seed": 387278074,
    "checkpoints": {
-    "5": "a358334d",
-    "10": "f78b0a0a"
+    "5": "4aea2ef2",
+    "10": "7b03076e"
    },
    "played": 17,
    "gameOver": true,
-   "end": "4888e2e9"
+   "end": "da9a50be"
   },
   {
    "bot": "wide",
@@ -3842,12 +3889,12 @@
    "seed": 1401182040,
    "checkpoints": {
     "5": "469c2874",
-    "10": "cbd76969",
-    "20": "6e9b8fbf"
+    "10": "dd558aee",
+    "20": "8ca0c51e"
    },
    "played": 25,
    "gameOver": true,
-   "end": "d00175e9"
+   "end": "4ac21e73"
   },
   {
    "bot": "wide",
@@ -3860,7 +3907,7 @@
    },
    "played": 16,
    "gameOver": true,
-   "end": "4e6a6ade"
+   "end": "5e5b991c"
   },
   {
    "bot": "wide",
@@ -3893,11 +3940,11 @@
    "cofounder": "powderkeg",
    "seed": 3428990484,
    "checkpoints": {
-    "5": "5968d3c0"
+    "5": "ac57f5aa"
    },
    "played": 6,
    "gameOver": true,
-   "end": "89ad32de"
+   "end": "fbb94b50"
   },
   {
    "bot": "wide",
@@ -3917,11 +3964,11 @@
    "cofounder": "operator",
    "seed": 2654436149,
    "checkpoints": {
-    "5": "83b84a23"
+    "5": "cfc913bd"
    },
    "played": 6,
    "gameOver": true,
-   "end": "37aeb32a"
+   "end": "d8091440"
   },
   {
    "bot": "wide",
@@ -3964,11 +4011,11 @@
    "checkpoints": {
     "5": "ce2364d0",
     "10": "96f079b3",
-    "20": "201aaf9d"
+    "20": "d0f87541"
    },
-   "played": 25,
+   "played": 24,
    "gameOver": true,
-   "end": "8723ff9a"
+   "end": "ca17e4a0"
   },
   {
    "bot": "wide",
@@ -3989,13 +4036,13 @@
    "cofounder": "operator",
    "seed": 1401180499,
    "checkpoints": {
-    "5": "ca28a892",
-    "10": "c5abadec",
-    "20": "3b10813d"
+    "5": "a9035a18",
+    "10": "fccb6357",
+    "20": "e65192cd"
    },
-   "played": 25,
+   "played": 29,
    "gameOver": true,
-   "end": "b01049dc"
+   "end": "70f20bcb"
   },
   {
    "bot": "wide",
@@ -4016,12 +4063,11 @@
    "seed": 2415084989,
    "checkpoints": {
     "5": "593c3738",
-    "10": "939eea34",
-    "20": "99faa5dc"
+    "10": "939eea34"
    },
-   "played": 20,
+   "played": 18,
    "gameOver": true,
-   "end": "99faa5dc"
+   "end": "17cbb5cc"
   },
   {
    "bot": "wide",
@@ -4030,11 +4076,11 @@
    "seed": 774554222,
    "checkpoints": {
     "5": "fe6495d0",
-    "10": "229ff83f"
+    "10": "b7507d68"
    },
    "played": 15,
    "gameOver": true,
-   "end": "b5dfbdf2"
+   "end": "9546b426"
   },
   {
    "bot": "wide",
@@ -4103,11 +4149,11 @@
    "seed": 2027808527,
    "checkpoints": {
     "5": "ec778a90",
-    "10": "9a30d5da"
+    "10": "57f67d84"
    },
    "played": 17,
    "gameOver": true,
-   "end": "4d31962d"
+   "end": "874ebbea"
   },
   {
    "bot": "wide",
@@ -4142,11 +4188,11 @@
    "seed": 1401180700,
    "checkpoints": {
     "5": "ff1b2e24",
-    "10": "155582f8"
+    "10": "0861535b"
    },
    "played": 11,
    "gameOver": true,
-   "end": "853adc1c"
+   "end": "edf7fe0e"
   },
   {
    "bot": "wide",
@@ -4155,11 +4201,11 @@
    "seed": 4055616579,
    "checkpoints": {
     "5": "9bdf212b",
-    "10": "50d75028"
+    "10": "3556951e"
    },
    "played": 18,
    "gameOver": true,
-   "end": "392e11f8"
+   "end": "a75a48f8"
   },
   {
    "bot": "wide",
@@ -4172,7 +4218,7 @@
    },
    "played": 19,
    "gameOver": true,
-   "end": "5c7973a9"
+   "end": "56e0fc25"
   },
   {
    "bot": "wide",
@@ -4180,11 +4226,11 @@
    "cofounder": "builder",
    "seed": 774553889,
    "checkpoints": {
-    "5": "7d18ac7d"
+    "5": "097fb2db"
    },
    "played": 9,
    "gameOver": true,
-   "end": "bfc5f1c2"
+   "end": "c151249c"
   },
   {
    "bot": "wide",
@@ -4251,11 +4297,11 @@
    "seed": 2027807873,
    "checkpoints": {
     "5": "e70d76bc",
-    "10": "844e6f63"
+    "10": "0cfd4ac8"
    },
    "played": 13,
    "gameOver": true,
-   "end": "9041daab"
+   "end": "010a7364"
   },
   {
    "bot": "wide",
@@ -4265,11 +4311,11 @@
    "checkpoints": {
     "5": "edd53810",
     "10": "626bcce1",
-    "20": "c81ecd60"
+    "20": "ce6f8250"
    },
-   "played": 21,
+   "played": 20,
    "gameOver": true,
-   "end": "622afa3a"
+   "end": "ce6f8250"
   },
   {
    "bot": "wide",
@@ -4290,11 +4336,11 @@
    "seed": 1401180562,
    "checkpoints": {
     "5": "1d0d5f47",
-    "10": "0151dd0f"
+    "10": "726856de"
    },
    "played": 11,
    "gameOver": true,
-   "end": "377f4fc4"
+   "end": "cfd37c62"
   },
   {
    "bot": "wide",
@@ -4307,7 +4353,7 @@
    },
    "played": 18,
    "gameOver": true,
-   "end": "e44bd351"
+   "end": "0d318754"
   },
   {
    "bot": "wide",
@@ -4315,12 +4361,12 @@
    "cofounder": "rainmaker",
    "seed": 2415084924,
    "checkpoints": {
-    "5": "92d2e9ea",
-    "10": "abf176e0"
+    "5": "54d26270",
+    "10": "7ba06468"
    },
    "played": 19,
    "gameOver": true,
-   "end": "86860713"
+   "end": "6e7630de"
   },
   {
    "bot": "wide",
@@ -4341,13 +4387,13 @@
    "seed": 3428989150,
    "checkpoints": {
     "5": "f085644b",
-    "10": "77d6feaf",
-    "20": "f5053085",
-    "40": "d885d668"
+    "10": "10f303cd",
+    "20": "6f5f1487",
+    "40": "5a0d66f1"
    },
-   "played": 57,
+   "played": 76,
    "gameOver": true,
-   "end": "8cec574a"
+   "end": "8097aa39"
   },
   {
    "bot": "wide",
@@ -4356,12 +4402,12 @@
    "seed": 1788458505,
    "checkpoints": {
     "5": "9a7bb8eb",
-    "10": "5ad2d56a",
-    "20": "11756629"
+    "10": "c463bc40",
+    "20": "8272a1da"
    },
-   "played": 39,
+   "played": 33,
    "gameOver": true,
-   "end": "302e09e6"
+   "end": "6e29e057"
   },
   {
    "bot": "wide",
@@ -4403,11 +4449,11 @@
    "seed": 2027807873,
    "checkpoints": {
     "5": "8f31d9b8",
-    "10": "1830146c"
+    "10": "607b7141"
    },
    "played": 13,
    "gameOver": true,
-   "end": "43ef3a2c"
+   "end": "c294ecb5"
   },
   {
    "bot": "wide",
@@ -4417,11 +4463,11 @@
    "checkpoints": {
     "5": "a0f1aefc",
     "10": "4f595c61",
-    "20": "4e1c7ce8"
+    "20": "f2914ffb"
    },
-   "played": 21,
+   "played": 20,
    "gameOver": true,
-   "end": "9b6d708c"
+   "end": "f2914ffb"
   },
   {
    "bot": "wide",
@@ -4442,11 +4488,11 @@
    "seed": 1401180562,
    "checkpoints": {
     "5": "f8a754df",
-    "10": "f9ade7c8"
+    "10": "2baeae51"
    },
    "played": 11,
    "gameOver": true,
-   "end": "80ca7301"
+   "end": "89dd4f13"
   },
   {
    "bot": "wide",
@@ -4459,7 +4505,7 @@
    },
    "played": 18,
    "gameOver": true,
-   "end": "d0d49f2c"
+   "end": "0a811356"
   },
   {
    "bot": "wide",
@@ -4467,12 +4513,12 @@
    "cofounder": "powderkeg",
    "seed": 2415084924,
    "checkpoints": {
-    "5": "fb845149",
-    "10": "b0723d51"
+    "5": "1bdf615b",
+    "10": "2b698041"
    },
    "played": 19,
    "gameOver": true,
-   "end": "bcb72cad"
+   "end": "42c6316c"
   },
   {
    "bot": "wide",
@@ -4493,13 +4539,13 @@
    "seed": 3428989150,
    "checkpoints": {
     "5": "a1387912",
-    "10": "01466986",
-    "20": "aaac7a11",
-    "40": "57d1fbee"
+    "10": "03cbb9e8",
+    "20": "9d806673",
+    "40": "83ebb0e7"
    },
-   "played": 57,
+   "played": 56,
    "gameOver": true,
-   "end": "d6260dad"
+   "end": "a1ecdfed"
   },
   {
    "bot": "wide",
@@ -4508,12 +4554,12 @@
    "seed": 1788458505,
    "checkpoints": {
     "5": "90edbe6c",
-    "10": "eacc101a",
-    "20": "20e6bc8f"
+    "10": "c388238c",
+    "20": "737e0bdd"
    },
    "played": 22,
    "gameOver": true,
-   "end": "7fa31602"
+   "end": "1507cc45"
   },
   {
    "bot": "wide",
@@ -4546,12 +4592,12 @@
    "seed": 3668340528,
    "checkpoints": {
     "5": "1904a8cc",
-    "10": "f779c6dd",
-    "20": "55f51fdc"
+    "10": "37666f12",
+    "20": "bd1cea31"
    },
    "played": 26,
    "gameOver": true,
-   "end": "122c8e41"
+   "end": "9ea0e798"
   },
   {
    "bot": "wide",
@@ -4575,7 +4621,7 @@
    },
    "played": 8,
    "gameOver": true,
-   "end": "9f6da26f"
+   "end": "8467f5b9"
   },
   {
    "bot": "wide",
@@ -4609,11 +4655,11 @@
    "checkpoints": {
     "5": "e668fb2b",
     "10": "5d346cff",
-    "20": "1eee4686"
+    "20": "07af45f2"
    },
    "played": 20,
    "gameOver": true,
-   "end": "1eee4686"
+   "end": "07af45f2"
   },
   {
    "bot": "wide",
@@ -4635,11 +4681,11 @@
    "checkpoints": {
     "5": "6c5a3789",
     "10": "5b38c426",
-    "20": "6e6ea986"
+    "20": "06e04900"
    },
-   "played": 27,
+   "played": 25,
    "gameOver": true,
-   "end": "94461147"
+   "end": "4072b508"
   },
   {
    "bot": "wide",
@@ -4661,11 +4707,12 @@
    "checkpoints": {
     "5": "baf2d274",
     "10": "9e6272fc",
-    "20": "27eb3d0e"
+    "20": "a4e5e471",
+    "40": "0e46b691"
    },
-   "played": 30,
+   "played": 58,
    "gameOver": true,
-   "end": "a4879abd"
+   "end": "a83fc91e"
   },
   {
    "bot": "wide",
@@ -4698,11 +4745,11 @@
    "seed": 3668339839,
    "checkpoints": {
     "5": "d8d3c976",
-    "10": "9d39f865"
+    "10": "aaf1f29b"
    },
    "played": 12,
    "gameOver": true,
-   "end": "5159e85b"
+   "end": "90310267"
   },
   {
    "bot": "wide",
@@ -4711,12 +4758,12 @@
    "seed": 2027808680,
    "checkpoints": {
     "5": "12152f42",
-    "10": "8087137e",
-    "20": "cf671554"
+    "10": "c02387b0",
+    "20": "db420901"
    },
-   "played": 32,
+   "played": 23,
    "gameOver": true,
-   "end": "385001f8"
+   "end": "ccc984ac"
   },
   {
    "bot": "wide",
@@ -4738,11 +4785,11 @@
    "checkpoints": {
     "5": "037faa7c",
     "10": "a7daf864",
-    "20": "75ca1222"
+    "20": "06a61c3e"
    },
-   "played": 37,
+   "played": 39,
    "gameOver": true,
-   "end": "07f3c3cb"
+   "end": "65fa38a7"
   },
   {
    "bot": "wide",
@@ -4765,7 +4812,7 @@
    },
    "played": 18,
    "gameOver": true,
-   "end": "b80b8894"
+   "end": "47a3424f"
   },
   {
    "bot": "wide",
@@ -4774,11 +4821,11 @@
    "seed": 2415085141,
    "checkpoints": {
     "5": "9c2880ed",
-    "10": "f940b137"
+    "10": "8cd73b4d"
    },
    "played": 19,
    "gameOver": true,
-   "end": "1f546b20"
+   "end": "0372a696"
   },
   {
    "bot": "wide",
@@ -4803,7 +4850,7 @@
    },
    "played": 17,
    "gameOver": true,
-   "end": "1187b177"
+   "end": "88767550"
   },
   {
    "bot": "wide",
@@ -4812,12 +4859,12 @@
    "seed": 1788458272,
    "checkpoints": {
     "5": "4cc6f452",
-    "10": "10167c1e",
-    "20": "4472e1ee"
+    "10": "03be3903",
+    "20": "66e15c11"
    },
    "played": 22,
    "gameOver": true,
-   "end": "dd1b0c6d"
+   "end": "41b94c87"
   },
   {
    "bot": "wide",
@@ -4837,11 +4884,11 @@
    "cofounder": "rainmaker",
    "seed": 1013903744,
    "checkpoints": {
-    "5": "836a5b56"
+    "5": "6a8148bf"
    },
    "played": 5,
    "gameOver": true,
-   "end": "836a5b56"
+   "end": "6a8148bf"
   },
   {
    "bot": "wide",
@@ -4864,14 +4911,12 @@
    "checkpoints": {
     "5": "7a2a38dd",
     "10": "8e0b33b9",
-    "20": "bdd8020a",
-    "40": "62a65553",
-    "80": "b326632f",
-    "120": "e621a5aa"
+    "20": "510ffef7",
+    "40": "1d77e206"
    },
-   "played": 158,
+   "played": 60,
    "gameOver": true,
-   "end": "8fe90abf"
+   "end": "5b5fa130"
   },
   {
    "bot": "wide",
@@ -4892,12 +4937,12 @@
    "seed": 3041712324,
    "checkpoints": {
     "5": "40a448c3",
-    "10": "43b2c4d6",
-    "20": "84e69ae8"
+    "10": "1342ccd8",
+    "20": "4af5159f"
    },
-   "played": 21,
+   "played": 20,
    "gameOver": true,
-   "end": "fe7ce474"
+   "end": "4af5159f"
   },
   {
    "bot": "wide",
@@ -4906,12 +4951,12 @@
    "seed": 1401180469,
    "checkpoints": {
     "5": "842b36b6",
-    "10": "f674f3b5",
-    "20": "54769752"
+    "10": "349286ff",
+    "20": "6f97e50c"
    },
-   "played": 25,
+   "played": 24,
    "gameOver": true,
-   "end": "c53fd990"
+   "end": "e5b991ff"
   },
   {
    "bot": "wide",
@@ -4933,12 +4978,12 @@
    "seed": 2415085019,
    "checkpoints": {
     "5": "a722ef77",
-    "10": "45da71b4",
-    "20": "33e29b15"
+    "10": "e2e51eda",
+    "20": "98b84019"
    },
    "played": 20,
    "gameOver": true,
-   "end": "33e29b15"
+   "end": "98b84019"
   },
   {
    "bot": "wide",
@@ -4948,11 +4993,11 @@
    "checkpoints": {
     "5": "71bfa4da",
     "10": "12b64639",
-    "20": "f0265e4e"
+    "20": "340312c8"
    },
-   "played": 26,
+   "played": 24,
    "gameOver": true,
-   "end": "3c52435e"
+   "end": "0a236445"
   },
   {
    "bot": "wide",
@@ -4962,11 +5007,11 @@
    "checkpoints": {
     "5": "79f48bfd",
     "10": "187f6f7d",
-    "20": "1654faa7"
+    "20": "db603265"
    },
-   "played": 22,
+   "played": 21,
    "gameOver": true,
-   "end": "1c908a65"
+   "end": "4f2cce1c"
   },
   {
    "bot": "wide",
@@ -4975,11 +5020,11 @@
    "seed": 1788458670,
    "checkpoints": {
     "5": "3387c5ab",
-    "10": "7387fe95"
+    "10": "7ced2cc7"
    },
    "played": 16,
    "gameOver": true,
-   "end": "c4bb598c"
+   "end": "be254913"
   },
   {
    "bot": "wide",
@@ -5000,11 +5045,11 @@
    "cofounder": "powderkeg",
    "seed": 1013903744,
    "checkpoints": {
-    "5": "be6217b8"
+    "5": "429d66f9"
    },
    "played": 5,
    "gameOver": true,
-   "end": "be6217b8"
+   "end": "429d66f9"
   },
   {
    "bot": "wide",
@@ -5027,14 +5072,12 @@
    "checkpoints": {
     "5": "b627273c",
     "10": "09e09b0b",
-    "20": "25423768",
-    "40": "211085c4",
-    "80": "40c6577f",
-    "120": "c7f395ea"
+    "20": "5b8dec97",
+    "40": "fcc18123"
    },
-   "played": 127,
+   "played": 60,
    "gameOver": true,
-   "end": "dbeb8b01"
+   "end": "97897381"
   },
   {
    "bot": "wide",
@@ -5055,11 +5098,11 @@
    "seed": 3041712324,
    "checkpoints": {
     "5": "b17da424",
-    "10": "ce39d19a"
+    "10": "b54ea4ec"
    },
    "played": 18,
    "gameOver": true,
-   "end": "44e513e0"
+   "end": "09b12563"
   },
   {
    "bot": "wide",
@@ -5068,12 +5111,12 @@
    "seed": 1401180469,
    "checkpoints": {
     "5": "eddb8c28",
-    "10": "474a7bf1",
-    "20": "4937131c"
+    "10": "6b5954ef",
+    "20": "2491c385"
    },
-   "played": 25,
+   "played": 24,
    "gameOver": true,
-   "end": "74383c05"
+   "end": "a41cfa34"
   },
   {
    "bot": "wide",
@@ -5109,11 +5152,11 @@
    "checkpoints": {
     "5": "275f4557",
     "10": "84d83540",
-    "20": "afbc682f"
+    "20": "40b3b38d"
    },
-   "played": 26,
+   "played": 24,
    "gameOver": true,
-   "end": "5bc6df1f"
+   "end": "f459f446"
   },
   {
    "bot": "wide",
@@ -5123,11 +5166,11 @@
    "checkpoints": {
     "5": "eb97e5f6",
     "10": "d24058c9",
-    "20": "a4094211"
+    "20": "8df0bafd"
    },
-   "played": 22,
+   "played": 21,
    "gameOver": true,
-   "end": "718ee571"
+   "end": "57c028cb"
   },
   {
    "bot": "wide",
@@ -5136,11 +5179,11 @@
    "seed": 1788458670,
    "checkpoints": {
     "5": "47d432f6",
-    "10": "1613d58a"
+    "10": "b8dbdbe4"
    },
    "played": 16,
    "gameOver": true,
-   "end": "96bafa8c"
+   "end": "8ffee3e9"
   }
  ],
  "fixtures": [
@@ -5148,16 +5191,16 @@
    "name": "plain",
    "checkpoints": {
     "5": "c81d2a13",
-    "10": "917168e5",
-    "15": "97f17c39",
-    "20": "e8c23587",
-    "25": "94307f74",
-    "30": "58688645",
-    "35": "ef2b7ebb",
-    "40": "0c015632"
+    "10": "5cb9aea3",
+    "15": "35362bb1",
+    "20": "f617a08b",
+    "25": "ed70b77e",
+    "30": "3f1dff58",
+    "35": "ae50f51b",
+    "40": "891c9036"
    },
    "played": 40,
-   "end": "0c015632"
+   "end": "891c9036"
   },
   {
    "name": "fractional",
@@ -5172,11 +5215,16 @@
    "name": "empty-roster",
    "checkpoints": {
     "5": "e4eda4b1",
-    "10": "98107dbe",
-    "15": "0aaf9516"
+    "10": "cba9b675",
+    "15": "8ef65d55",
+    "20": "ed3f96ce",
+    "25": "6259771c",
+    "30": "217d488c",
+    "35": "5f8eb574",
+    "40": "c60a8d14"
    },
-   "played": 19,
-   "end": "26b54bba"
+   "played": 40,
+   "end": "c60a8d14"
   }
  ]
 }
