@@ -7,7 +7,7 @@
 // uses seed 86, the first seed in 1..200 on which the no-retain bot reaches week 29 with a build lead holding an outside
 // offer (spec §12.7's fallback rule). The spec's worked examples B, C and D stay pinned to the digit by the unit tests,
 // which build their states by hand and do not depend on the streams.
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import type { GameState } from "../types/game";
 import { createInitialState } from "./actions";
 import { executeCommand } from "./commands";
@@ -84,11 +84,9 @@ describe("mid game: seed 86, hacker + builder, replayed to week 29", () => {
   // The fixture was recorded on the game before The Next Round story pack and pins exact tycoon numbers (seed 86 is the
   // first seed with a lead on notice at week 29); the pack's events and news lines would change that game, so it replays
   // with the pack switched off. The pack has its own tests in src/engine/story/.
-  beforeAll(() => {
+  // Per test, not per file: the shared setup (src/test/setup.ts) switches the pack back on before every test.
+  beforeEach(() => {
     storyConfig.enabled = false;
-  });
-  afterAll(() => {
-    storyConfig.enabled = true;
   });
 
   const atWeek29 = () => {

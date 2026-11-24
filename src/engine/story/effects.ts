@@ -88,59 +88,79 @@ export const applyFx = (s0: GameState, fx: Fx): { state: GameState; line: string
   }
   if (mrrDirty) s = { ...s, mrr: Math.max(0, Math.round(s.users * s.arpu)) };
 
+  // Every point stat prints the change it actually made: after volatility scaling (soft stats), the 0..100 clamp and,
+  // for cruft and moat, rounding to a tenth. A change that clamps or rounds away to nothing prints nothing.
+  const stat = (label: string, before: number, after: number): void => {
+    const d = Math.round((after - before) * 10) / 10;
+    if (d !== 0) parts.push(`${label} ${signed(d)}.`);
+  };
+
   if (fx.rep) {
-    s = { ...s, reputation: point(s.reputation, scaled(s, fx.rep)) };
-    parts.push(`Reputation ${signed(fx.rep)}.`);
+    const next = point(s.reputation, scaled(s, fx.rep));
+    stat("Reputation", s.reputation, next);
+    s = { ...s, reputation: next };
   }
   if (fx.vcRep) {
-    s = { ...s, vcReputation: point(s.vcReputation, scaled(s, fx.vcRep)) };
-    parts.push(`VC rep ${signed(fx.vcRep)}.`);
+    const next = point(s.vcReputation, scaled(s, fx.vcRep));
+    stat("VC rep", s.vcReputation, next);
+    s = { ...s, vcReputation: next };
   }
   if (fx.board) {
     const d = fx.board;
-    if (s.board.members.some((m) => m.role !== "founder")) {
-      s = { ...s, board: { ...s.board, members: s.board.members.map((m) => (m.role === "founder" ? m : { ...m, confidence: point(m.confidence, d) })) } };
+    const members = s.board.members.map((m) => (m.role === "founder" ? m : { ...m, confidence: point(m.confidence, d) }));
+    // Per-director clamps can differ, so the line names the nominal step, and only when some director actually moved.
+    if (members.some((m, i) => m.confidence !== s.board.members[i].confidence)) {
+      s = { ...s, board: { ...s.board, members } };
       parts.push(`Board confidence ${signed(d)}.`);
     }
   }
   if (fx.leads) {
     const d = fx.leads;
-    if (s.investors.pipeline.length > 0) {
-      s = { ...s, investors: { pipeline: s.investors.pipeline.map((l) => ({ ...l, relationship: point(l.relationship, d) })) } };
+    const pipeline = s.investors.pipeline.map((l) => ({ ...l, relationship: point(l.relationship, d) }));
+    if (pipeline.some((l, i) => l.relationship !== s.investors.pipeline[i].relationship)) {
+      s = { ...s, investors: { pipeline } };
       parts.push(`Investor relationships ${signed(d)}.`);
     }
   }
   if (fx.morale) {
-    s = { ...s, culture: { ...s.culture, morale: point(s.culture.morale, scaled(s, fx.morale)) } };
-    parts.push(`Morale ${signed(fx.morale)}.`);
+    const next = point(s.culture.morale, scaled(s, fx.morale));
+    stat("Morale", s.culture.morale, next);
+    s = { ...s, culture: { ...s.culture, morale: next } };
   }
   if (fx.cohesion) {
-    s = { ...s, culture: { ...s.culture, cohesion: point(s.culture.cohesion, scaled(s, fx.cohesion)) } };
-    parts.push(`Cohesion ${signed(fx.cohesion)}.`);
+    const next = point(s.culture.cohesion, scaled(s, fx.cohesion));
+    stat("Cohesion", s.culture.cohesion, next);
+    s = { ...s, culture: { ...s.culture, cohesion: next } };
   }
   if (fx.trust) {
-    s = { ...s, cofounder: { ...s.cofounder, trust: point(s.cofounder.trust, scaled(s, fx.trust)) } };
-    parts.push(`Cofounder trust ${signed(fx.trust)}.`);
+    const next = point(s.cofounder.trust, scaled(s, fx.trust));
+    stat("Cofounder trust", s.cofounder.trust, next);
+    s = { ...s, cofounder: { ...s.cofounder, trust: next } };
   }
   if (fx.ego) {
-    s = { ...s, cofounder: { ...s.cofounder, ego: point(s.cofounder.ego, scaled(s, fx.ego)) } };
-    parts.push(`Cofounder ego ${signed(fx.ego)}.`);
+    const next = point(s.cofounder.ego, scaled(s, fx.ego));
+    stat("Cofounder ego", s.cofounder.ego, next);
+    s = { ...s, cofounder: { ...s.cofounder, ego: next } };
   }
   if (fx.stress) {
-    s = { ...s, stress: point(s.stress, fx.stress) };
-    parts.push(`Stress ${signed(fx.stress)}.`);
+    const next = point(s.stress, fx.stress);
+    stat("Stress", s.stress, next);
+    s = { ...s, stress: next };
   }
   if (fx.volatility) {
-    s = { ...s, volatility: point(s.volatility, fx.volatility) };
-    parts.push(`Volatility ${signed(fx.volatility)}.`);
+    const next = point(s.volatility, fx.volatility);
+    stat("Volatility", s.volatility, next);
+    s = { ...s, volatility: next };
   }
   if (fx.cruft && s.product) {
-    s = { ...s, product: { ...s.product, cruft: Math.round(point(s.product.cruft, fx.cruft) * 10) / 10 } };
-    parts.push(`Cruft ${signed(fx.cruft)}.`);
+    const next = Math.round(point(s.product.cruft, fx.cruft) * 10) / 10;
+    stat("Cruft", s.product.cruft, next);
+    s = { ...s, product: { ...s.product, cruft: next } };
   }
   if (fx.moat && s.product) {
-    s = { ...s, product: { ...s.product, moat: Math.round(point(s.product.moat, fx.moat) * 10) / 10 } };
-    parts.push(`Moat ${signed(fx.moat)}.`);
+    const next = Math.round(point(s.product.moat, fx.moat) * 10) / 10;
+    stat("Moat", s.product.moat, next);
+    s = { ...s, product: { ...s.product, moat: next } };
   }
 
   return { state: s, line: parts.join(" ") || "Nothing measurable changes." };

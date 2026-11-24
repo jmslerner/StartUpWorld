@@ -1,12 +1,16 @@
 // Story rounds (the unicorn offer, the rescue and the bridge): booked exactly like a closed `raise` round in
 // investors.ts (debt repaid first, cap table diluted at post-money, totalRaised and lastRound updated), minus the stage
-// change and the board seats a stage change brings. A Series A+ round gets its interlude.
+// change and the board seats a stage change brings. A Series A+ round gets its interlude, like a `raise` round at the same
+// stage (the interludes are narrative labels and count rounds, not stage changes). Like `raise`, a story round never
+// exceeds the stage's hard cap.
 import type { GameState } from "../../types/game";
+import { stageRaiseCaps } from "../investors";
 import { clamp } from "../utils";
 import { usd } from "./effects";
 import { countSeriesRound, isSeriesRound } from "./interludes";
 
-export const closeStoryRound = (s0: GameState, amount: number, preMoney: number, investorName: string): { state: GameState; lines: string[] } => {
+export const closeStoryRound = (s0: GameState, offered: number, preMoney: number, investorName: string): { state: GameState; lines: string[] } => {
+  const amount = Math.min(offered, stageRaiseCaps[s0.stage].hardCap);
   const postMoney = preMoney + amount;
   const dilutionPct = postMoney > 0 ? clamp(amount / postMoney, 0.01, 0.6) : 0.15;
   const debtBefore = Math.max(0, s0.debtOutstanding);

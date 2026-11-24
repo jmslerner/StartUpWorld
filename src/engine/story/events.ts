@@ -10,6 +10,7 @@ import type { EngineContext } from "../context";
 import { calcNetBurn } from "../economy";
 import type { EventDef } from "../events/types";
 import { STAGE_VALUATION_FLOOR } from "../valuation";
+import { stageRaiseCaps } from "../investors";
 import { callbackDelay, storyRoundSize } from "./callbacks";
 import { storyConfig } from "./config";
 import { applyFx, money, moneyWords, numberWord, usd, weeksOfBurn } from "./effects";
@@ -78,10 +79,13 @@ const topLeads = (s: GameState) => [...s.investors.pipeline].sort((a, b) => b.re
 /** Net weekly burn, floored at a third of a burn unit so a rescue is never sized at zero. */
 const netBurnOf = (s: GameState): number => Math.max(calcNetBurn(s), Math.round(Math.max(10_000, s.burn) / 3));
 
+/** Story rounds respect the stage's hard cap, as `raise` does (closeStoryRound enforces it too; this keeps the prompt honest). */
+const capped = (s: GameState, amount: number): number => Math.min(amount, stageRaiseCaps[s.stage].hardCap);
+
 const rescueTerms = (s: GameState) => ({
-  rescue: money(netBurnOf(s) * 16),
+  rescue: capped(s, money(netBurnOf(s) * 16)),
   rescuePre: money(implied(s) * 0.6),
-  bridge: money(netBurnOf(s) * 8),
+  bridge: capped(s, money(netBurnOf(s) * 8)),
   bridgePre: money(implied(s) * 0.85),
   prepay: money(netBurnOf(s) * 10),
 });
