@@ -53,7 +53,7 @@ requests also reach the database. A monitor's request is answered within about 8
 not answer (up to 5 to connect and 3 for the reply), so give the monitor a longer timeout than that.
 
 When the leaderboard or the graveyard answers `500`, the function's log (Logs tab of the Vercel project) has one line
-that says why, for example `leaderboard: request failed: Redis did not reply within 3000 ms`. The line never contains
-the database's connection string or anything a player submitted. `stored entry at index 2 is not valid JSON` means the
-third entry the function read could not be parsed (the index counts from 0); the list answers `500` for as long as that
-entry is among those it reads.
+that says why, for example `leaderboard: request failed: Redis did not reply within 3000 ms`. The line is built from the
+error alone: a connection string in it is replaced by `[redis url]`, and neither the request body nor a stored entry is
+written to it. `stored entry at index 2 is not valid JSON` means the third entry the function read could not be parsed
+(the index counts from 0); the list answers `500` for as long as that entry is among those it reads.

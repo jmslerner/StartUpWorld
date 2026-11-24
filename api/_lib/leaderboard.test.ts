@@ -189,6 +189,20 @@ describe("leaderboard: a failed request says why in the log", () => {
     for (const sent of ["Acme", "Ada", "4242"]) expect(logged.join("\n")).not.toContain(sent);
   });
 
+  it("answers 500 when the database does not know a command, with a line that stops before the arguments it quotes back", async () => {
+    // What redis-server 7 answers to a command it does not know. For ZADD the arguments are the player's entry.
+    const redis = fakeRedis();
+    redis.zAdd.mockRejectedValue(
+      new Error(
+        `ERR unknown command 'ZADD', with args beginning with: 'leaderboard' '90' '{"id":"4242-1795521600000","companyName":"Acme","founderName":"Ada","ending":"ipo","grade":"A","score":90,"fi' `,
+      ),
+    );
+    useRedis(redis);
+    expect(await call("POST", SUBMISSION)).toEqual({ status: 500, body: { error: "Internal server error" } });
+    expect(logged).toEqual(["error: leaderboard: request failed: ERR unknown command 'ZADD', with args beginning with: [not logged]"]);
+    for (const sent of ["Acme", "Ada", "4242"]) expect(logged.join("\n")).not.toContain(sent);
+  });
+
   it("answers 500 when a stored entry is not JSON, and says which one without quoting it", async () => {
     // What JSON.parse says about this entry quotes it: Unexpected token 'A', "Acme Corp,"... is not valid JSON
     useRedis(fakeRedis({ zRange: [JSON.stringify(ENTRY), "Acme Corp, founded by Ada Lovelace"] }));

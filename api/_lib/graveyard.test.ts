@@ -164,6 +164,20 @@ describe("graveyard: a failed request says why in the log", () => {
     for (const sent of ["Acme", "bankruptcy", "runway"]) expect(logged.join("\n")).not.toContain(sent);
   });
 
+  it("answers 500 when the database does not know a command, with a line that stops before the arguments it quotes back", async () => {
+    // What redis-server 7 answers to a command it does not know. For LPUSH the arguments are the player's entry.
+    const redis = fakeRedis();
+    redis.lPush.mockRejectedValue(
+      new Error(
+        `ERR unknown command 'LPUSH', with args beginning with: 'graveyard' '{"id":"gv-1795521600000-adyva5","companyName":"Acme","ending":"bankruptcy","epitaph":"Ran out of runway","grade":"F"' `,
+      ),
+    );
+    useRedis(redis);
+    expect(await call("POST", SUBMISSION)).toEqual({ status: 500, body: { error: "Internal server error" } });
+    expect(logged).toEqual(["error: graveyard: request failed: ERR unknown command 'LPUSH', with args beginning with: [not logged]"]);
+    for (const sent of ["Acme", "bankruptcy", "runway"]) expect(logged.join("\n")).not.toContain(sent);
+  });
+
   it("answers 500 when a stored entry is not JSON, and says which one without quoting it", async () => {
     // What JSON.parse says about this entry quotes it: Unexpected token 'I', "Initech: s"... is not valid JSON
     const valid = JSON.stringify({ id: "gv-2", companyName: "Acme", ending: "bankruptcy", epitaph: "Ran out of runway", grade: "F", week: 12, timestamp: 2 });
