@@ -58,12 +58,15 @@ const unanswered = () => new Promise<never>(() => {});
 const peek = <T>(promise: Promise<T>): Promise<T | "still pending"> =>
   Promise.race([promise, Promise.resolve("still pending" as const)]);
 
-/** The console methods whose output ends up in Vercel's log. */
-const CONSOLE_METHODS = ["error", "warn", "info", "log", "debug"] as const;
+/**
+ * The console methods that write by themselves. The rest of the console (trace, table, group, assert, count and the
+ * timers) prints through one of these. A write straight to process.stdout or process.stderr is not seen here.
+ */
+const CONSOLE_METHODS = ["error", "warn", "info", "log", "debug", "dir", "dirxml"] as const;
 
 /**
- * Everything the handler wrote to the log: one [method, line] pair per call. The line is spelled out the way the
- * console prints it, so an error object handed to the console counts with all it carries, not only its message.
+ * Everything the handler printed with the console: one [method, line] pair per call. The line is spelled out the way
+ * the console prints it, so an error object handed to the console counts with all it carries, not only its message.
  */
 const logged = (): [method: string, line: string][] =>
   CONSOLE_METHODS.flatMap((method) =>
@@ -249,6 +252,7 @@ describe("leaderboard: a failed request leaves one line in the log", () => {
     expect((await call("GET")).status).toBe(200);
     expect((await call("POST", SUBMISSION)).status).toBe(200);
     expect((await call("POST", { ...SUBMISSION, companyName: "" })).status).toBe(400);
+    expect((await call("DELETE")).status).toBe(405);
     useRedis(fakeRedis({ get: "1" }));
     expect((await call("POST", SUBMISSION)).status).toBe(409);
     expect(logged()).toEqual([]);
