@@ -288,6 +288,7 @@ export interface TurnLog {
     readonly carriedIn: number;
     readonly churned: number;
     readonly pool: number;
+    /** Users waiting for the next market: the unclaimed part of the pool plus those released by companies that went out. */
     readonly carriedOut: number;
   };
   readonly hiring: {

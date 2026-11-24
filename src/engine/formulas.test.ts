@@ -136,6 +136,11 @@ describe("money", () => {
     expect(runwayOf(300_000, 20_000, 120_000)).toBe(3);
   });
 
+  it("never reports a negative runway: a company below $0 has none left", () => {
+    expect(runwayOf(-1, 0, 40_000)).toBe(0);
+    expect(runwayOf(0, 0, 40_000)).toBe(0);
+  });
+
   it("has no runway limit when the quarter was profitable or broke even", () => {
     expect(runwayOf(300_000, 120_000, 120_000)).toBeNull();
     expect(runwayOf(300_000, 200_000, 120_000)).toBeNull();

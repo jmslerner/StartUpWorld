@@ -422,7 +422,8 @@ export const resolveTurn = (state: GameState, plans: PlanSet, seed: number, conf
     turn,
     event: state.event,
     climateMultiplier: climate,
-    market: { newUsers: market.newUsers, carriedIn: market.carriedIn, churned: market.churned, pool: market.pool, carriedOut: market.carriedOut },
+    // Carried out = the part of the pool nobody took, plus the users of companies that went out this turn.
+    market: { newUsers: market.newUsers, carriedIn: market.carriedIn, churned: market.churned, pool: market.pool, carriedOut: carryOverUsers },
     hiring: { candidates, picks: hiring.picks },
     companies: state.companies.map((company) => {
       const desk = deskOf(company.id);

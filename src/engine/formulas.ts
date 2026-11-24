@@ -65,10 +65,10 @@ export const raiseAmount = (valuation: number, percent: number): number => Math.
 /** What decides a game that reaches the turn limit. */
 export const founderStake = (founderEquity: number, valuation: number): number => Math.round(founderEquity * valuation);
 
-/** Turns of cash left at this burn; null when the quarter was profitable (no limit). */
+/** Turns of cash left at this burn, never below 0; null when the quarter was profitable (no limit). */
 export const runwayOf = (cash: number, revenue: number, costs: number): number | null => {
   const burn = costs - revenue;
-  return burn > 0 ? cash / burn : null;
+  return burn > 0 ? Math.max(0, cash) / burn : null;
 };
 
 export const hiringCapacity = (recruitingWork: number, config: RulesConfig): number =>

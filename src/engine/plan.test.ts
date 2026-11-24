@@ -82,6 +82,23 @@ describe("normalizePlan", () => {
     });
   });
 
+  describe("hire limit", () => {
+    it("is a whole number, 0 or more, and the notes say when it had to be fixed", () => {
+      const state = newGame();
+      for (const [asked, fixed] of [
+        [-3, 0],
+        [2.5, 2],
+        [Number.NaN, 0],
+      ]) {
+        const { plan, notes } = normalizePlan(state, HUMAN, planOf(state, HUMAN, { hireLimit: asked }), DESIGN);
+        expect(plan.hireLimit, String(asked)).toBe(fixed);
+        expect(notes.join(" "), String(asked)).toMatch(/Hire limit set to/);
+      }
+      expect(normalizePlan(state, HUMAN, planOf(state, HUMAN, { hireLimit: 2 }), DESIGN).notes).toEqual([]);
+      expect(normalizePlan(state, HUMAN, planOf(state, HUMAN, { hireLimit: null }), DESIGN).notes).toEqual([]);
+    });
+  });
+
   describe("layoffs", () => {
     it("always keeps one person", () => {
       const state = newGame();
@@ -89,6 +106,15 @@ describe("normalizePlan", () => {
       expect(plan.layoffs).toBe(2);
       expect(plan.allocation.product + plan.allocation.growth + plan.allocation.recruiting).toBe(1);
       expect(notes.length).toBeGreaterThan(0);
+    });
+
+    it("says so when a layoff count had to be made a whole number of people", () => {
+      const state = newGame();
+      for (const asked of [-1, 1.5, Number.NaN, Number.POSITIVE_INFINITY]) {
+        const { notes } = normalizePlan(state, HUMAN, planOf(state, HUMAN, { layoffs: asked }), DESIGN);
+        expect(notes.join(" "), String(asked)).toMatch(/Layoffs set to/);
+      }
+      expect(normalizePlan(state, HUMAN, planOf(state, HUMAN, { layoffs: 0 }), DESIGN).notes).toEqual([]);
     });
 
     it("treats negative or fractional layoffs as whole people, never below zero", () => {

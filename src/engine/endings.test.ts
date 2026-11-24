@@ -19,6 +19,16 @@ describe("bankruptcy", () => {
     expect(result.state.outcome).toBeNull();
   });
 
+  it("logs the users it releases as carried out: what one turn carries out, the next carries in", () => {
+    const state = launchedCompany(newGame(NO_EVENTS), HUMAN, { users: 12_000, cash: -500_000 });
+    const first = resolve(state, { [HUMAN]: { allocation: IDLE } }, 1, NO_EVENTS);
+    expect(first.state.companies[HUMAN].out?.reason).toBe("bankrupt");
+    expect(first.state.carryOverUsers).toBeGreaterThan(0);
+    expect(first.log.market.carriedOut).toBe(first.state.carryOverUsers);
+    const second = resolve(first.state, {}, 1, NO_EVENTS);
+    expect(second.log.market.carriedIn).toBe(first.log.market.carriedOut);
+  });
+
   it("lets a company that ends on exactly $0 survive", () => {
     const state = withCompany(newGame(), HUMAN, { cash: 120_000 });
     const result = resolve(state, { [HUMAN]: { allocation: IDLE } });

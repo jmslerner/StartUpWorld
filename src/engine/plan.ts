@@ -52,6 +52,7 @@ export const normalizePlanFor = (
   const notes: string[] = [];
 
   const askedLayoffs = whole(wanted.layoffs);
+  if (askedLayoffs !== wanted.layoffs) notes.push(`Layoffs set to ${askedLayoffs}: it has to be a whole number of people.`);
   const layoffs = Math.min(askedLayoffs, Math.max(0, company.headcount - 1));
   if (layoffs !== askedLayoffs) notes.push(`Laid off ${layoffs}, not ${askedLayoffs}: at least one person has to stay.`);
 
@@ -95,6 +96,7 @@ export const normalizePlanFor = (
   }
 
   const hireLimit = wanted.hireLimit === null ? null : whole(wanted.hireLimit);
+  if (hireLimit !== wanted.hireLimit) notes.push(`Hire limit set to ${hireLimit}: it has to be a whole number of people.`);
 
   return { plan: { allocation, marketing, price, raisePercent, poachTarget, layoffs, hireLimit }, notes };
 };
