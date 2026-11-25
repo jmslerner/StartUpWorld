@@ -1,10 +1,11 @@
 /**
  * The drawing loop: when a frame is asked of the page, and how long each one is taken to last.
  *
- * It draws while it is running in the sense of ./rest.ts, that is while something moves and for a second after,
- * and then stops: at rest it draws nothing and has no frame requested, so a still office costs the page nothing.
- * `wake` starts it again. It also stops while paused (the view is hidden or off screen) and while suspended (the
- * graphics context is lost), and for good once disposed. `setKeepAwake` holds it running whatever moves.
+ * It draws while it is running in the sense of ./rest.ts, that is while something moves and for a second of the
+ * page's time after, however slowly frames come, and then stops: at rest it draws nothing and has no frame
+ * requested, so a still office costs the page nothing. `wake` starts it again. It also stops while paused (the
+ * view is hidden or off screen) and while suspended (the graphics context is lost), and for good once disposed.
+ * `setKeepAwake` holds it running whatever moves.
  *
  * It knows nothing of three.js or the page: frames are requested through the host it is given, so a test can play
  * them one by one. The World is its host.
@@ -29,6 +30,13 @@ export const frameSeconds = (intervalMs: number): number => {
   if (!(seconds > MIN_FRAME_SECONDS)) return MIN_FRAME_SECONDS;
   return Math.min(seconds, MAX_FRAME_SECONDS);
 };
+
+/**
+ * How long a frame counts towards the quiet second before rest: the time since the frame before as the page's
+ * clock tells it, or what the frame simulated when there is no such time to go by (the first frame after a stop, a
+ * clock that stood still or ran backwards).
+ */
+const quietSeconds = (intervalMs: number, dt: number): number => (intervalMs > 0 && Number.isFinite(intervalMs) ? intervalMs / 1000 : dt);
 
 export interface FrameLoopHost {
   /** The page's requestAnimationFrame and cancelAnimationFrame. */
@@ -154,7 +162,9 @@ export class FrameLoop {
     } finally {
       // A frame that threw counts as one in which nothing moved: a fault must not keep the loop awake for good.
       this.frameCount += 1;
-      this.rest = restStep(this.rest, { dt, busy, woken: this.woken });
+      // The quiet second is counted on the page's clock: a frame simulates at most a tenth of a second, but on a
+      // page that draws slowly the loop would otherwise go on drawing an unchanged picture for several seconds.
+      this.rest = restStep(this.rest, { dt: quietSeconds(interval, dt), busy, woken: this.woken });
       this.woken = false;
       // The frame may have brought the loop to rest, or paused or disposed it: then the request just made goes.
       // The next frame of an unbroken run is not a start, so this never restarts the clock.

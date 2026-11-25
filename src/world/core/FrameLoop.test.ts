@@ -163,6 +163,26 @@ describe("FrameLoop", () => {
     expect(r.clock.requested).toBe(asked);
   });
 
+  it("on a slow page the second of grace is still a second of the page's time, not ten frames of a tenth", () => {
+    // A software renderer drawing a frame every quarter of a second: each frame simulates at most a tenth of a
+    // second, but resting is about the picture standing still, which the page's clock measures.
+    const r = rig();
+    r.busy = true;
+    r.loop.start();
+    for (let i = 0; i < 5; i += 1) r.clock.tick(250);
+    r.busy = false;
+    const quietFrom = r.clock.now;
+    let fired = 0;
+    while (fired < 100 && r.clock.tick(250)) fired += 1;
+    expect(r.loop.resting).toBe(true);
+    // The last frame drawn is the first one at least a second after the last movement.
+    expect(r.clock.now - 250 - quietFrom).toBeGreaterThanOrEqual(1000);
+    expect(r.clock.now - 250 - quietFrom).toBeLessThan(1250);
+    expect(fired).toBe(4);
+    // The frames themselves still simulate no more than a tenth of a second each.
+    expect(r.frames[r.frames.length - 1].dt).toBe(MAX_FRAME_SECONDS);
+  });
+
   it("wakes when asked: one frame is requested however often, and a second of frames follows", () => {
     const r = rig();
     r.loop.start();

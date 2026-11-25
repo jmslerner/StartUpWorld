@@ -25,8 +25,8 @@ export const AWAKE: RestState = Object.freeze({ running: true, quiet: 0 });
 
 /**
  * One frame's worth: `busy` is whether any system or the camera is still moving, `woken` whether something asked
- * for a frame. `dt` is taken as given (the World clamps it first); a length that is not a positive, finite number
- * adds no quiet.
+ * for a frame. `dt` is taken as given (the loop hands it the frame's length on the page's clock); a length that
+ * is not a positive, finite number adds no quiet.
  */
 export const restStep = (
   state: RestState,
