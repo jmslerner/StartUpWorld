@@ -35,6 +35,13 @@ skill for this method is not installed on this machine; the method is followed b
   off: the reviewer of Task 9 and the implementer of Task 10, whose files were left uncommitted. From then on every
   agent is run on another model, named when it is dispatched. The cut-off work is treated as an unreviewed draft: a
   fresh implementer verifies or redoes it, and the review of Task 9 starts again from nothing.
+- Task 11 measured two of the plan's limits as not met, and both are met by changing what is drawn, not by moving
+  the limit. (1) The campus's year took 18 seconds to come to rest against 15, because a walk across the largest
+  floor is long. A walk in or out now hurries: its speed is raised so that it lasts at most 9 seconds. (2) Under
+  reduced motion nobody walks, but the "+N" and "-N" at the door lasted 1.4 seconds and thin dust still rose when
+  the office changed, against a limit of 1 second. Under reduced motion the numbers now stand still for under a
+  second and no dust rises. The plan's "rests within 1 second" is read as "nothing moves after 1 second": the loop
+  itself, by the same plan, draws for one quiet second before it rests.
 - Someone back from being away takes the first team that is short, in the order Product, Growth, Recruiting, which
   need not be the team they left (ruling 4, as written). Kept: the plan's ruling is explicit.
 
@@ -51,7 +58,8 @@ skill for this method is not installed on this machine; the method is followed b
 | 7 | done | bb811ab, aab5a0c, 9ca7013 (fixes) | approved with two important points, fixed before Task 9 |
 | 8 | done | 3dbd554 | approved; three minor points, fixed with Task 9 |
 | 9 | done | b47bf0c, 98e73bf | approved; no findings |
-| 10 | done, in review | 1847d99 | pending |
+| 10 | done | 1847d99, and a fix commit | changes required: one important point, fixed after Task 11 |
+| 11 | done but for two limits, being fixed | 747e01f (merge), aba5cd1, f23d8aa | pending |
 
 ## Task notes
 
@@ -363,3 +371,28 @@ file that contains three (826.66 kB) loads lazily from the lab page only.
 
 In headless Chromium: the plan's example scene drew 22 people in 302 draw calls; after twenty mounts and unmounts
 the renderer held no geometry and no texture; without WebGL the note shows and the controls work.
+
+Review: changes required, for one fault. An era in the address that ends in half an emoji (the cut to 40 was by
+code units) made the address writer throw and left the page blank. Fixed by cutting by code points, with a test,
+in a commit after Task 11. Two minor points fixed with it: a count of several hundred digits read as nobody instead
+of the largest count, and the office menu's first choice was too long to read at 1280 wide. Everything else held:
+hostile addresses of many kinds, the build (three reached only by the lab's lazy import; the first-load rule fails
+when the game's entry is made to import the lab), the page at both sizes, twenty-fold mounting, a lost context, and
+no WebGL.
+
+### Task 11
+
+The second merge of the rules branch brought ten of its commits, all in its own files, and was green on its own
+(2403 tests). Nothing the scene reads changed. The plan check now keeps `goPublic` in a career plan.
+
+Faults the browser found, and their fixes: the quiet second before rest was counted in clamped frame time, so on a
+machine drawing four frames a second it lasted up to 2.7 seconds; it is now a second of the page's clock (test
+first). Twenty mounts back to back starved the timers that release each graphics context, so the browser threw
+contexts away; the check now lets a timer run between mounts.
+
+Decisions the implementer took: years are timed in the world's seconds, with the page's seconds printed beside
+them, since this machine draws slowly; the year is built by the script with a copy of the lab's `endYear`, because
+the controls are hidden for the screenshots; the 5 : 4 : 1 split is rounded by largest remainder.
+
+The measurements are in `docs/superpowers/specs/3d-groundwork-check.md`. The design's phone budget of 300 draw
+calls is first crossed by the own office with 22 people (301).
