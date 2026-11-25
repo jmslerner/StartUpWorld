@@ -1504,6 +1504,17 @@ describe("the career's starting numbers", () => {
       [2011, { pick: "random", launched: true, qualityBelow: 50, minUsers: 1 }],
       [2035, { pick: "random", launched: true, qualityBelow: 60, minUsers: 1 }],
     ]);
+    expect(CAREER_DESIGN.career.dated.map((card) => card.name)).toEqual(["Recession", "A web of pages", "Free for all",
+      "First banner adverts", "The browser", "Seven-fold debut", "The worst week", "Broadband majority", "Video site sale",
+      "The touchscreen phone", "Bank collapse", "Cloud outage", "Thirteen people, one billion", "Nineteen billion",
+      "Privacy law", "The pulled offering", "Everyone goes home", "Rates rise", "The chatbot", "Four trillion",
+      "Compute crunch", "Sign-off law", "The one-person billion", "Back-office layoffs", "Glasses outsell phones",
+      "Home-helper recall", "Power rationing", "Citizen funds"]);
+  });
+  it("make the last two eras play as the design describes them", () => {
+    const rulesOf = (id: string) => rulesForTurn(CAREER_DESIGN, turnOf(CAREER_DESIGN.career.eras.find((era) => era.id === id)!.firstYear, CAREER_DESIGN.career));
+    expect(rulesOf("agents").quality.gainPerWork).toBeGreaterThan(rulesOf("winter-ai").quality.gainPerWork);              // small teams that build fast
+    expect(rulesOf("ambient").pull.marketingCoefficient).toBeLessThan(rulesOf("agents").pull.marketingCoefficient);      // trust is worth more than reach
   });
   it("cover exactly the same numbers as the career's config: none missing on either side", () => {
     /* as "the design's starting numbers" does for the race in src/config.test.ts, whole cards exempt */
@@ -1735,6 +1746,8 @@ export interface SimCareer {
   readonly leaderHeld: boolean | null;
   /** By year, then by seat. */
   readonly checkpoints: Readonly<Record<number, readonly CareerSnapshot[]>>;
+  /** For each dated card that hits one company: the year, and whether it found one. */
+  readonly targetedCards: readonly { readonly year: number; readonly hit: boolean }[];
 }
 export const runCareer: (seed: number, config?: CareerGameConfig, pilot?: Pilot) => SimCareer;      // pilot plans seat 0; default baselinePlan
 export const runCareerBatch: (careers: number, firstSeed: number, config?: CareerGameConfig, pilot?: Pilot) => SimCareer[];
@@ -1753,6 +1766,8 @@ export interface CareerSummary {
   readonly medianOutYear: number | null; readonly medianListingYear: number | null;
   readonly leaderHeldShare: number;                                // among careers where `leaderHeld` is not null
   readonly rivalsOutPerCareer: number;
+  readonly cardHitShare: Readonly<Record<number, number>>;         // by year: how often a card that hits one company found one
+  readonly rescuedInYearShare: Readonly<Record<number, number>>;   // by year: how often the player's seat was rescued that year
   readonly positions: Readonly<Record<number, Readonly<Record<Seat, CareerPosition>>>>;   // medians among companies in the game, by year and style
 }
 export type CareerCheckId = "cpu-cap" | "baseline" | "early-end" | "listed" | "lead";
@@ -1880,7 +1895,9 @@ prints `formatCareerReport`, the seeds and the time taken, the overrides, then
 `formatChanges(changedNumbers(CAREER_DESIGN, CAREER))`. `games=` sets the number of careers. `strict=1` exits with 1
 when a target fails. Without `mode=career` the script does exactly what it does today. Update `USAGE`. The report's
 sections, in order: who wins (by style, and how many winners were newcomers); the baseline bot's career; leads;
-rivals; typical position at each checkpoint year; loophole checks; targets.
+rivals; typical position at each checkpoint year; dated cards that hit one company, with how often each found one;
+loophole checks, where the overspending pilot's line also says in what share of careers it was rescued in its year
+(a pilot that is never rescued has not tried the loophole); targets.
 
 `docs/career-rules.md` gains a section "How the simulator measures the targets", with these as rulings: "A win is
 counted under the style the winning company plays, a newcomer's included." "The baseline bot's career 'ends early'
@@ -1888,7 +1905,8 @@ when its company is out at the end, which takes two failures." "It 'goes public'
 leader of 2010 is the company not out with the largest founder's stake as 2010 closes; it 'wins' if the winner of
 2038 is that same company, same seat and same founding year; careers with no company in the game in 2010 are left
 out of the figure." "A loophole pilot is flagged when its win share beats the baseline bot's on the same seeds by more
-than `loopholeMargin`; a flag is reported, not counted as a failed target."
+than `loopholeMargin`; a flag is reported, not counted as a failed target." "A range target passes on its bounds;
+the lead target passes only under its figure."
 
 - [ ] **Step 4: Run the tests, the checks, and the script both ways**
 
@@ -1940,7 +1958,7 @@ against). A rule C1 to C11 that turns out to be unclear in a way a ruling cannot
 - [ ] **Step 4: Break each rule on purpose**
 
 One at a time, each undone afterwards, and each must make at least one test fail: the premium is not applied the year
-after a listing; a listing starts a raise cooldown; a public company may raise; the bar is read from last year's era;
+after a listing; a listing starts a raise cooldown; a public company may raise; a qualified company loses the offer after a losing year;
 a second failure is rescued again; the board votes in the year after a rescue; a rescue resets cash that was not
 below $0; the ceiling multiplies quality instead of capping it; a dated card is subject to the chance roll; the
 marketing limit ignores the year's raise; candidates may go below none; a newcomer enters after one year; the
@@ -1968,7 +1986,8 @@ git add src scripts docs package.json README.md && git commit -m "engine: indepe
 - [ ] **Step 1: Measure where the starting numbers stand**
 
 Run: `npm run sim:career`
-Record the whole report in the Tuning log under "Where the starting numbers stood".
+Record the whole report in the Tuning log under "Where the starting numbers stood", the lead figure (target 5)
+included: it is the first measurement of C4.
 
 - [ ] **Step 2: Search**
 
@@ -1984,6 +2003,10 @@ target without breaking a passing one. Work in this order, because each stage de
 3. Listing: bars and markets such that the baseline bot goes public in 40% to 80%.
 4. Who wins: the computer players' weights, caps and thresholds, until no style is over 40% and the baseline bot
    wins 15% to 35%. Then re-check stages 1 to 3.
+
+Two numbers are tuned for what they let the simulator see, not for a target: `sim.overspendYear`, until the
+overspending pilot is rescued in its year in a clear majority of careers, and the `qualityBelow` of a dated card that
+finds a target in under half of careers.
 
 What may change: any number of `CAREER`, except those the tests of "what tuning may not change in a career" pin. A
 computer player's logic may change only when numbers cannot do it, with a failing test first and a ruling. A rule C1
