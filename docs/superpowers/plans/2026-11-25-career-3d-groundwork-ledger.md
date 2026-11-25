@@ -39,8 +39,8 @@ skill for this method is not installed on this machine; the method is followed b
 | 4 | done | 0b2fc50 | approved; five minor points, four fixed with Task 6 |
 | 5 | done | a103c6c, 5cd04ed | approved; minor points, two fixed with Task 7 |
 | 6 | done | b5e5a27, 182fad9 | approved; no findings |
-| 7 | done, in review | bb811ab, aab5a0c | pending |
-| 8 | done, in review | 3dbd554 | pending |
+| 7 | done | bb811ab, aab5a0c, 9ca7013 (fixes) | approved with two important points, fixed before Task 9 |
+| 8 | done | 3dbd554 | approved; three minor points, fixed with Task 9 |
 
 ## Task notes
 
@@ -240,6 +240,21 @@ For Task 9: the order in `setScene` is cast, layout, `seating.reconcile`, then t
 before people. One `update` must run between `setScene` and the first drawn frame, or someone away shows a lit desk
 for a frame. A big year can take 20 to 40 seconds to play out with the old limits (arrivals 0.4 s apart).
 
+Review: approved, with two important points and seven minor ones, all fixed in one commit before Task 9. The
+reviewer's fuzz (300 runs of 50 scenes through the cast and the seating; 150 hostile runs through the crew) broke no
+invariant and always came to rest, even with the door blocked for good. The important points:
+
+- More than 56 figures could exist for a while: people leaving kept their bodies until they reached the door while
+  people from the sign's count appeared at once (60 measured at the campus). The fix holds the number of bodies at
+  56 on every frame: a walk-out that would pass the cap is skipped and the body removed at once.
+- The plan's claim "when one person changes team, at most two people walk" is false between Product and Recruiting:
+  1/1/2 becoming 2/1/1 makes three people walk. The code follows the rulings as written, so the claim is corrected
+  (two between neighbouring teams, three between Product and Recruiting) and a test pins the three-walk case. This
+  is a wrong sentence in the plan, not a change to the design.
+
+Minor: three seating tests that could not fail are strengthened; a frame time that is not a number no longer wedges
+the crew; two tests return for someone who comes back while still walking out; dead fields leave `actor.ts`.
+
 ### Task 8
 
 The particle simulation's 23 tests and the placement's 14 are among the passing ones. Five effect files and the
@@ -268,3 +283,9 @@ nothing; "-N" shows when the year advances, while the people take some seconds t
 For Task 9: systems are registered office, people, lighting, effects; the effects need the new frame's layout
 already in place when the frame is applied; the rest state must also ask the camera rig whether it is moving; the
 frame time handed to the systems must be a positive, clamped number.
+
+Review: approved. 19 mutations of the effects system were all caught; the numbers at the door came out right in
+every case tried on both sides of the cap; the system always came to rest and released what it made. Until the lab
+page exists nothing reaches the shell, so `world.css` is not in the build at all. Minor points, fixed in a small
+commit at the start of Task 9: a frame time that is not a number, and a bubble asked to last for ever, must not
+keep the effects busy for good; two comments lose old-game words.
