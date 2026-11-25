@@ -85,7 +85,7 @@ export const Tooltip = ({ content, children, align = "left", widthClassName = "w
               style={pos ? { top: `${pos.top}px`, left: `${pos.left}px` } : { top: 0, left: 0 }}
               role="tooltip"
             >
-              <span className="panel-surface block max-w-[calc(100vw-16px)] rounded-xl px-3 py-2 text-xs leading-relaxed text-slate-100/90">
+              <span className="panel-surface block max-w-[calc(100vw-16px)] rounded-xl px-3 py-2 text-xs leading-relaxed text-gray-200/90">
                 {content}
               </span>
             </span>,

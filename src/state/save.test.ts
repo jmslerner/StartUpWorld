@@ -1,186 +1,236 @@
 import { describe, expect, it } from "vitest";
-import type { GameState, LogEntry, TeamRole } from "../types/game";
-import { createInitialState, executeCommand } from "../engine";
-import { calcBurn } from "../engine/economy";
-import { listRoster } from "../engine/people";
-import { parseSave, SAVE_VERSION, serializeSave } from "./save";
+import { CONFIG } from "../config";
+import { DESIGN } from "../config.design";
+import { endView, eventView, planningView, reportView, resourceView, rivalsView } from "../ui/viewModel";
+import { PLAYER_ID, createGameStore, type StorageLike } from "./gameStore";
+import { SAVE_KEY, parseSave } from "./save";
 
-// The store's save format (guide d1): version 3, with every older save migrated by the
-// engine's migrateState. Runs in node: parseSave never touches `window`.
+class MemoryStorage implements StorageLike {
+  readonly items = new Map<string, string>();
+  getItem(key: string): string | null {
+    return this.items.get(key) ?? null;
+  }
+  setItem(key: string, value: string): void {
+    this.items.set(key, value);
+  }
+  removeItem(key: string): void {
+    this.items.delete(key);
+  }
+}
 
-/** Runs commands in order; a pending event is answered with `choose 1` first, as a player would. */
-const play = (state: GameState, commands: string[]): GameState =>
-  commands.reduce((s, cmd) => {
-    const ready = s.pendingEvent ? executeCommand(s, "choose 1").state : s;
-    return executeCommand(ready, cmd).state;
-  }, state);
+/** Events every quarter from the third, so saves hold an event and its effects. */
+const EVENTFUL = { ...DESIGN, events: { ...DESIGN.events, chance: 1 } };
 
-/** A real run a few weeks in: setup, some hires, a patch, a campaign and two week closes. */
-const liveRun = (): GameState =>
-  play(createInitialState(), [
-    "seed 4242",
-    "name Ada",
-    "company Loopwell",
-    "founder hacker",
-    "cofounder builder",
-    "raise friends",
-    "raise loan",
-    "hire eng 1",
-    "hire ux 1",
-    "end",
-    "ship login page",
-    "end",
-    "pitch",
-    "end",
-  ]);
+type Store = ReturnType<typeof createGameStore>;
 
-/** What the pre-tycoon game stored: the same state with no `people` / `product` slices. */
-const legacyState = (s: GameState): GameState => {
-  const copy: Partial<GameState> = { ...s };
-  delete copy.people;
-  delete copy.product;
-  return copy as GameState;
+/** A player who launches, then spreads the team, markets a little and hires within reason. */
+const playQuarter = (store: Store): void => {
+  const { game } = store.getState();
+  if (game === null) return;
+  const self = game.companies[PLAYER_ID];
+  if (self.launched) {
+    const recruiting = self.headcount < 8 ? 1 : 0;
+    const growth = Math.floor((self.headcount - recruiting) / 2);
+    store.getState().setDraft({ allocation: { product: self.headcount - recruiting - growth, growth, recruiting }, marketing: 25_000, hireLimit: 1 });
+  }
+  store.getState().endQuarter();
 };
 
-const withoutSlices = (s: GameState): Omit<GameState, "people" | "product"> => {
-  const copy: Partial<GameState> = { ...s };
-  delete copy.people;
-  delete copy.product;
-  return copy as Omit<GameState, "people" | "product">;
+/** The raw save after `quarters` quarters of one seeded game, or when the game ends if that comes first. */
+const saveAfter = (seed: number, quarters: number, config = EVENTFUL): string => {
+  const storage = new MemoryStorage();
+  const store = createGameStore(storage, config);
+  store.getState().startGame("Acme", seed);
+  for (let i = 0; i < quarters && !store.getState().over; i++) playQuarter(store);
+  return storage.getItem(SAVE_KEY)!;
 };
 
-const LOG: LogEntry[] = [{ id: "l1", text: "> status", kind: "user" } as LogEntry];
-
-const stored = (version: number, state: GameState, extra: Record<string, unknown> = {}): string =>
-  JSON.stringify({ version, state, log: LOG, commandHistory: ["status"], ...extra });
-
-const ROLES: TeamRole[] = ["engineering", "design", "marketing", "sales", "ops", "hr", "legal", "data", "product", "executive"];
-
-describe("save format", () => {
-  it("is version 3, from the engine", () => {
-    expect(SAVE_VERSION).toBe(3);
-    expect(JSON.parse(serializeSave(liveRun(), LOG, [])).version).toBe(3);
-  });
-
-  it("starts fresh games with both tycoon slices", () => {
-    const fresh = createInitialState();
-    expect(fresh.people).toBeDefined();
-    expect(fresh.product).toBeDefined();
-  });
-
-  it("round-trips a current save unchanged", () => {
-    const s = liveRun();
-    const loaded = parseSave(serializeSave(s, LOG, ["end"]));
-    expect(loaded).not.toBeNull();
-    expect(loaded!.fromVersion).toBe(3);
-    expect(loaded!.state).toEqual(s);
-    expect(loaded!.log).toEqual(LOG);
-    expect(loaded!.commandHistory).toEqual(["end"]);
-  });
-});
-
-describe("loading a version 2 save (before named people and builds)", () => {
-  const v2 = legacyState(liveRun());
-
-  it("is a real pre-tycoon shape: head counts, no slices, a run in progress", () => {
-    expect(v2.week).toBe(4);
-    expect(v2.gameOver).toBeFalsy();
-    expect(v2.cash).toBeGreaterThan(10_000);
-    expect(v2.team.engineering + v2.team.design).toBeGreaterThanOrEqual(2);
-    expect(v2.people).toBeUndefined();
-    expect(v2.product).toBeUndefined();
-  });
-
-  it("gets a roster equal to the whole heads per role and an empty product", () => {
-    const loaded = parseSave(stored(2, v2))!;
-    expect(loaded.version).toBe(3);
-    expect(loaded.fromVersion).toBe(2);
-    const roster = loaded.state.people!.roster;
-    for (const role of ROLES) {
-      expect(roster.filter((e) => e.role === role).length).toBe(Math.floor(v2.team[role]));
+/** Where a value holds something no screen can show: undefined, or a number that is not finite. */
+const unusable = (value: unknown, path = "$"): string | null => {
+  if (value === undefined) return `${path} is undefined`;
+  if (typeof value === "number" && !Number.isFinite(value)) return `${path} is ${value}`;
+  if (Array.isArray(value)) {
+    for (let i = 0; i < value.length; i++) {
+      const found = unusable(value[i], `${path}[${i}]`);
+      if (found !== null) return found;
     }
-    expect(roster.every((e) => /^e\d+$/.test(e.id) && e.name.length > 0)).toBe(true);
-    expect(loaded.state.product!.active).toEqual([]);
-    expect(loaded.state.product!.shippedCount).toBe(0);
-  });
-
-  it("changes nothing the old game had, and costs the same to run", () => {
-    const loaded = parseSave(stored(2, v2))!;
-    expect(withoutSlices(loaded.state)).toEqual(v2);
-    expect(calcBurn(loaded.state)).toBe(calcBurn(v2));
-    expect(loaded.log).toEqual(LOG);
-    expect(loaded.commandHistory).toEqual(["status"]);
-  });
-
-  it("keeps playing: legacy commands match the old state, new commands work", () => {
-    const loaded = parseSave(stored(2, v2))!.state;
-    let a = v2;
-    let b = loaded;
-    for (const cmd of ["hire eng 1", "ship search", "end"]) {
-      a = play(a, [cmd]);
-      b = play(b, [cmd]);
-      expect(withoutSlices(b)).toEqual(withoutSlices(a));
+  } else if (typeof value === "object" && value !== null) {
+    for (const [key, child] of Object.entries(value)) {
+      const found = unusable(child, `${path}.${key}`);
+      if (found !== null) return found;
     }
-    if (b.pendingEvent) b = executeCommand(b, "choose 1").state;
-    const team = executeCommand(b, "team");
-    expect(team.logs.some((l) => l.kind === "error")).toBe(false);
-    const name = listRoster(b)[0].name.split(" ")[0];
-    expect(executeCommand(b, `team ${name}`).logs.some((l) => l.kind === "error")).toBe(false);
+  }
+  return null;
+};
 
-    const started = executeCommand(b, "build feature s Atlas");
-    expect(started.logs.filter((l) => l.kind === "error").map((l) => l.text)).toEqual([]);
-    expect(started.state.product!.active.map((x) => x.slug)).toEqual(["atlas"]);
-  });
+/** What goes wrong when the app loads this save, draws every screen and plays one more quarter; null if nothing does. */
+const harmOf = (raw: string, config = EVENTFUL): string | null => {
+  const storage = new MemoryStorage();
+  storage.setItem(SAVE_KEY, raw);
+  try {
+    const store = createGameStore(storage, config);
+    const screens = (when: string): string | null => {
+      const { game, draft, lastLog } = store.getState();
+      if (game === null || draft === null) return null;
+      const drawn = {
+        resource: resourceView(game, config),
+        planning: planningView(game, draft, config),
+        rivals: rivalsView(game, config),
+        event: eventView(game.event, game, config),
+        end: endView(game, config),
+        report: lastLog === null ? null : reportView(game, lastLog, config),
+      };
+      const found = unusable(drawn);
+      return found === null ? null : `${when}: ${found}`;
+    };
+    const before = screens("as loaded");
+    if (before !== null) return before;
+    store.getState().endQuarter();
+    const { failure } = store.getState();
+    if (failure !== null) return `ending the quarter: ${failure.message}`;
+    return screens("after one more quarter");
+  } catch (error) {
+    return `threw: ${error instanceof Error ? error.message : String(error)}`;
+  }
+};
 
-  it("is idempotent: loading the written-back save changes nothing", () => {
-    const once = parseSave(stored(2, v2))!;
-    const twice = parseSave(serializeSave(once.state, once.log, once.commandHistory))!;
-    expect(twice.fromVersion).toBe(3);
-    expect(twice.state).toEqual(once.state);
-  });
+type Json = null | boolean | number | string | Json[] | { [key: string]: Json };
+type Step = string | number;
 
-  it("leaves a save an interim build stamped 2 while it already held slices alone", () => {
-    const live = liveRun();
-    expect(parseSave(stored(2, live))!.state).toEqual(live);
-  });
-});
+const at = (root: Json, path: readonly Step[]): Json => path.reduce<Json>((node, step) => (node as Record<Step, Json>)[step], root);
 
-describe("loading a version 1 save (before assets)", () => {
-  it("gets `assets: []` and both slices", () => {
-    const v1: Partial<GameState> = { ...legacyState(liveRun()) };
-    delete v1.assets;
-    const loaded = parseSave(stored(1, v1 as GameState))!;
-    expect(loaded.version).toBe(3);
-    expect(loaded.state.assets).toEqual([]);
-    expect(loaded.state.people!.roster.length).toBe(Math.floor(v1.team!.engineering) + Math.floor(v1.team!.design));
-    expect(loaded.state.product).toBeDefined();
-  });
-});
+/** Every place in the document, parents before children. */
+const pathsOf = (node: Json, path: readonly Step[] = []): Step[][] => {
+  const here = path.length === 0 ? [] : [[...path]];
+  if (Array.isArray(node)) return [...here, ...node.flatMap((child, index) => pathsOf(child, [...path, index]))];
+  if (typeof node === "object" && node !== null) return [...here, ...Object.entries(node).flatMap(([key, child]) => pathsOf(child, [...path, key]))];
+  return here;
+};
 
-describe("unusable saves start a fresh run", () => {
-  const s = liveRun();
+const REMOVED = Symbol("removed");
+
+/** The ways one value can be damaged: gone, emptied, or of the wrong kind or size. */
+const damagesFor = (value: Json): (Json | typeof REMOVED)[] => {
+  const damages: (Json | typeof REMOVED)[] = [REMOVED];
+  if (value !== null) damages.push(null);
+  if (typeof value === "number") damages.push("x", -1, 0.5, 1e9);
+  else if (typeof value === "string") damages.push(7, "zzz");
+  else if (typeof value === "boolean") damages.push("x");
+  else if (value === null) damages.push("x", 7);
+  else if (Array.isArray(value)) damages.push("x", ...(value.length > 0 ? [[] as Json] : []));
+  else damages.push("x", ...(Object.keys(value).length > 0 ? [{} as Json] : []));
+  return damages;
+};
+
+/** A copy of the document with the value at `path` replaced or removed. */
+const damaged = (root: Json, path: readonly Step[], replacement: Json | typeof REMOVED): Json => {
+  const copy = JSON.parse(JSON.stringify(root)) as Json;
+  const parent = at(copy, path.slice(0, -1));
+  const last = path[path.length - 1];
+  if (Array.isArray(parent)) {
+    if (replacement === REMOVED) parent.splice(last as number, 1);
+    else parent[last as number] = replacement;
+  } else {
+    const record = parent as { [key: string]: Json };
+    if (replacement === REMOVED) delete record[last as string];
+    else record[last as string] = replacement;
+  }
+  return copy;
+};
+
+describe("a saved game", () => {
+  // On the design's numbers with an event every quarter, and on the numbers the game ships with.
   it.each([
-    ["nothing stored", null],
-    ["empty string", ""],
-    ["not JSON", "{oops"],
-    ["JSON null", "null"],
-    ["a future version", stored(4, s)],
-    ["version 0", stored(0, s)],
-    ["a fractional version", stored(2.5, s)],
-    ["a string version", JSON.stringify({ version: "3", state: s, log: [], commandHistory: [] })],
-    ["no version", JSON.stringify({ state: s, log: [], commandHistory: [] })],
-    ["no seed", stored(3, { ...s, seed: undefined as unknown as number })],
-    ["no state", JSON.stringify({ version: 3, log: [], commandHistory: [] })],
-  ])("%s", (_label, raw) => {
-    expect(parseSave(raw)).toBeNull();
+    ["the design's numbers", EVENTFUL],
+    ["the shipped numbers", CONFIG],
+  ])("loads back exactly, quarter after quarter, in every state a game goes through (%s)", (_name, config) => {
+    for (const seed of [3, 11, 21, 40, 72, 4242]) {
+      const storage = new MemoryStorage();
+      const store = createGameStore(storage, config);
+      store.getState().startGame("Acme", seed);
+      for (let quarter = 0; quarter < 25; quarter++) {
+        const now = store.getState();
+        const loaded = parseSave(storage.getItem(SAVE_KEY), config);
+        expect(loaded, `seed ${seed}, quarter ${quarter}`).not.toBeNull();
+        expect(loaded).toEqual({ seed: now.seed, game: now.game, draft: now.draft, lastLog: now.lastLog, reportOpen: now.reportOpen });
+        if (now.over) break;
+        playQuarter(store);
+      }
+      expect(store.getState().over, `seed ${seed} reaches an ending`).toBe(true);
+    }
   });
 
-  it("drops malformed log and history entries instead of crashing", () => {
-    const loaded = parseSave(stored(3, s, { log: [LOG[0], 7, { text: 1 }], commandHistory: ["end", 3, null] }))!;
-    expect(loaded.log).toEqual(LOG);
-    expect(loaded.commandHistory).toEqual(["end"]);
-    const noArrays = parseSave(stored(3, s, { log: "x", commandHistory: {} }))!;
-    expect(noArrays.log).toEqual([]);
-    expect(noArrays.commandHistory).toEqual([]);
+  it("keeps people the player had left unassigned when the page is reloaded", () => {
+    const storage = new MemoryStorage();
+    const store = createGameStore(storage, EVENTFUL);
+    store.getState().startGame("Acme", 3);
+    store.getState().setDraft({ allocation: { product: 1, growth: 1, recruiting: 1 } });
+    store.getState().endQuarter();
+    store.getState().closeReport();
+    // One person taken out of Product and not yet placed anywhere.
+    store.getState().setDraft({ allocation: { product: 0, growth: 1, recruiting: 1 } });
+    const reloaded = createGameStore(storage, EVENTFUL).getState();
+    expect(reloaded.draft?.allocation).toEqual({ product: 0, growth: 1, recruiting: 1 });
+  });
+
+  it("still shrinks a saved split that holds more people than the company has", () => {
+    const storage = new MemoryStorage();
+    createGameStore(storage, EVENTFUL).getState().startGame("Acme", 3);
+    const save = JSON.parse(storage.getItem(SAVE_KEY)!);
+    storage.setItem(SAVE_KEY, JSON.stringify({ ...save, draft: { ...save.draft, allocation: { product: 9, growth: 9, recruiting: 0 } } }));
+    const split = createGameStore(storage, EVENTFUL).getState().draft!.allocation;
+    expect(split.product + split.growth + split.recruiting).toBe(3);
+  });
+});
+
+describe("a damaged save", () => {
+  // A fresh game, a game in full swing (an event in force, raises and poaches behind it) and a finished one.
+  const saves: Record<string, string> = {
+    "a new game": saveAfter(11, 0),
+    "mid-game": saveAfter(11, 9),
+    "a finished game": saveAfter(40, 25),
+  };
+
+  it("starts from saves that are themselves fine", () => {
+    for (const [name, raw] of Object.entries(saves)) {
+      expect(parseSave(raw, EVENTFUL), name).not.toBeNull();
+      expect(harmOf(raw), name).toBeNull();
+    }
+    const mid = parseSave(saves["mid-game"], EVENTFUL)!;
+    expect(mid.game.event).not.toBeNull();
+    expect(mid.lastLog).not.toBeNull();
+    expect(mid.game.companies.some((company) => company.lastRaise !== null)).toBe(true);
+    const done = parseSave(saves["a finished game"], EVENTFUL)!;
+    expect(done.game.outcome !== null || done.game.companies[PLAYER_ID].out !== null).toBe(true);
+  });
+
+  it("is either ignored or harmless, whichever single value is missing, emptied or of the wrong kind", () => {
+    const harms: string[] = [];
+    let tried = 0;
+    let ignored = 0;
+    for (const [name, raw] of Object.entries(saves)) {
+      const document = JSON.parse(raw) as Json;
+      for (const path of pathsOf(document)) {
+        for (const replacement of damagesFor(at(document, path))) {
+          tried++;
+          const broken = JSON.stringify(damaged(document, path, replacement));
+          if (parseSave(broken, EVENTFUL) === null) {
+            ignored++;
+            continue;
+          }
+          const harm = harmOf(broken);
+          if (harm !== null) harms.push(`${name}: ${path.join(".")} = ${replacement === REMOVED ? "(removed)" : JSON.stringify(replacement)} -> ${harm}`);
+        }
+      }
+    }
+    expect(tried).toBeGreaterThan(3_000);
+    expect(ignored).toBeGreaterThan(1_000);
+    expect(harms.slice(0, 25), `${harms.length} of ${tried} damaged saves were accepted and then went wrong`).toEqual([]);
+  });
+
+  it("is ignored when it holds fewer companies than its own report", () => {
+    const save = JSON.parse(saves["mid-game"]);
+    const three = { ...save, game: { ...save.game, companies: save.game.companies.slice(0, 3) } };
+    expect(harmOf(JSON.stringify(three))).toBeNull();
   });
 });

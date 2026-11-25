@@ -1,13 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { EndingType } from "../types/game";
-import { SFX } from "../ui/sound";
+import { GAME_END_SOUNDS, SFX, type GameEndSound } from "../ui/sound";
 import { setSharedAudioEngine } from "./engine";
 import { SOUNDS } from "./sounds";
 import { makeHarness, reaches, type FakeNode, type Harness } from "./testing/fakeAudio";
 
-const ENDINGS: EndingType[] = ["ipo", "acquisition", "bankruptcy", "founder-removal", "zombie-saas", "ai-hype-exit", "forced-acquisition"];
+const ENDINGS: GameEndSound[] = ["win", "loss", "bankrupt", "fired"];
 
-/** Every way the store (src/state/useGameStore.ts) and the terminal call the facade. */
+/** Every way the game calls the facade. */
 const CALLS: Array<[string, () => void]> = [
   ["success", () => SFX.success()],
   ["fail", () => SFX.fail()],
@@ -37,7 +36,7 @@ describe("SFX facade", () => {
     vi.useRealTimers();
   });
 
-  it("keeps the API the store relies on", () => {
+  it("keeps the API the game relies on", () => {
     expect(Object.keys(SFX).sort()).toEqual(["alert", "cashIn", "click", "crisis", "fail", "gameOver", "opportunity", "success", "tick", "warning"]);
     for (const key of Object.keys(SFX) as Array<keyof typeof SFX>) expect(typeof SFX[key]).toBe("function");
     expect(SFX.gameOver.length).toBe(1);
@@ -59,16 +58,16 @@ describe("SFX facade", () => {
   it("gives each ending its own sting, all of them stingers", () => {
     const names = new Set<string>();
     for (const ending of ENDINGS) {
-      const name = `gameover-${ending}`;
+      const name = GAME_END_SOUNDS[ending];
       expect(name in SOUNDS).toBe(true);
       names.add(name);
     }
-    expect(names.size).toBe(7);
+    expect(names.size).toBe(ENDINGS.length);
     for (const name of names) expect(SOUNDS[name as keyof typeof SOUNDS].kind).toBe("stinger");
   });
 
   it("ignores an ending it does not know", () => {
-    expect(() => SFX.gameOver("heat-death" as EndingType)).not.toThrow();
+    expect(() => SFX.gameOver("heat-death" as GameEndSound)).not.toThrow();
     expect(h.engine.voiceCount()).toBe(0);
   });
 

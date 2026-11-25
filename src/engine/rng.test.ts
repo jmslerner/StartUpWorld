@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { nextUint32, nextFloat01, nextIntInclusive, chance, signedUnit, pickWeightedIndex } from "./rng";
+import { STREAM, chance, firstFloat, nextFloat01, nextIntInclusive, nextUint32, pickWeightedIndex, signedUnit, streamSeed } from "./rng";
 
 describe("nextUint32", () => {
   it("is deterministic (same seed → same output)", () => {
@@ -125,5 +125,63 @@ describe("pickWeightedIndex", () => {
       expect(d.value!).toBeLessThan(4);
       rng = d.rng;
     }
+  });
+});
+
+describe("streams", () => {
+  it("gives the same stream for the same key, and never the stuck state 0", () => {
+    for (const seed of [0, 1, 2, 86, 0xffffffff]) {
+      for (let turn = 0; turn <= 20; turn++) {
+        const a = streamSeed(seed, turn, STREAM.poach, 2);
+        expect(a).toBe(streamSeed(seed, turn, STREAM.poach, 2));
+        expect(a).not.toBe(0);
+        expect(a).toBe(a >>> 0);
+      }
+    }
+  });
+
+  it("gives every (turn, purpose, company) of a game its own stream", () => {
+    const seen = new Set<number>();
+    let count = 0;
+    for (let turn = 0; turn <= 20; turn++) {
+      for (const purpose of Object.values(STREAM)) {
+        for (let company = 0; company < 4; company++) {
+          seen.add(streamSeed(12345, turn, purpose, company));
+          count++;
+        }
+      }
+    }
+    expect(seen.size).toBe(count);
+  });
+
+  it("does not let small neighbouring seeds share their first roll", () => {
+    let below = 0;
+    const n = 2000;
+    for (let seed = 1; seed <= n; seed++) {
+      if (firstFloat(seed, 3, STREAM.eventRoll) < 0.5) below++;
+    }
+    expect(below / n).toBeGreaterThan(0.45);
+    expect(below / n).toBeLessThan(0.55);
+  });
+
+  it("keeps purpose ids fixed, so a new purpose never shifts an old stream", () => {
+    expect(STREAM).toMatchObject({
+      eventRoll: 1,
+      eventCard: 2,
+      eventTarget: 3,
+      hiringOrder: 4,
+      poachOrder: 5,
+      poach: 6,
+      board: 7,
+      cpuNoise: 8,
+      names: 9,
+    });
+  });
+
+  it("firstFloat is the first draw of the stream, in [0, 1)", () => {
+    const value = firstFloat(7, 4, STREAM.board, 1);
+    expect(value).toBe(nextFloat01(streamSeed(7, 4, STREAM.board, 1)).value);
+    expect(value).toBeGreaterThanOrEqual(0);
+    expect(value).toBeLessThan(1);
   });
 });

@@ -1,0 +1,407 @@
+import { describe, expect, it } from "vitest";
+import type { GameConfig } from "../config";
+import { DESIGN } from "../config.design";
+import { normalizePlanFor, raiseBlocker } from "../engine/plan";
+import { projectTurn } from "../engine/project";
+import { resolveTurn } from "../engine/resolveTurn";
+import { BLITZ, BOOT, HUMAN, INCUMBENT, launchedCompany, newGame, onlyActive, withCompany, withState } from "../engine/testKit";
+import type { Company, CompanyView, CpuKind, GameState, Plan } from "../engine/types";
+import { companyRunway, viewFor } from "../engine/view";
+import { choosePlans } from "./choosePlans";
+import { candidatePlans, chooseCpuPlan } from "./cpu";
+
+const KINDS: readonly CpuKind[] = ["blitzscaler", "bootstrapper", "incumbent"];
+const SEAT: Record<CpuKind, number> = { blitzscaler: BLITZ, bootstrapper: BOOT, incumbent: INCUMBENT };
+
+interface Decision {
+  readonly state: GameState;
+  readonly view: CompanyView;
+  readonly kind: CpuKind;
+  readonly plan: Plan;
+}
+
+/** Every decision the three CPUs make over a few self-played games (the human seat repeats its default plan). */
+const decisions: Decision[] = [];
+for (let seed = 1; seed <= 12; seed++) {
+  let state = newGame();
+  while (state.outcome === null) {
+    const plans = choosePlans(state, seed, DESIGN);
+    for (const company of state.companies) {
+      if (company.out !== null || company.controller === "human") continue;
+      decisions.push({ state, view: viewFor(state, company.id), kind: company.controller as CpuKind, plan: plans[company.id]! });
+    }
+    state = resolveTurn(state, plans, seed, DESIGN).state;
+  }
+}
+const of = (kind: CpuKind): Decision[] => decisions.filter((d) => d.kind === kind);
+
+/** A well-funded, launched company in the given seat, to compare personalities from the same position. */
+const established = (seat: number, patch: Partial<Company> = {}): GameState =>
+  launchedCompany(withState(newGame(), { turn: 6 }), seat, { users: 40_000, quality: 45, cash: 2_000_000, headcount: 8, headcountAtLastClose: 8, hype: 25, lastCosts: 400_000, lastRevenue: 120_000, ...patch });
+
+describe("candidate plans", () => {
+  it("come by the dozen", () => {
+    for (const d of decisions) {
+      const count = candidatePlans(d.view, d.kind, DESIGN).length;
+      expect(count, `${d.kind} turn ${d.view.turn}`).toBeGreaterThanOrEqual(3);
+      expect(count, `${d.kind} turn ${d.view.turn}`).toBeLessThanOrEqual(160);
+    }
+    const typical = decisions.map((d) => candidatePlans(d.view, d.kind, DESIGN).length).sort((a, b) => a - b);
+    expect(typical[Math.floor(typical.length / 2)]).toBeGreaterThanOrEqual(12);
+  });
+
+  it("are all legal as they stand", () => {
+    for (const d of decisions.filter((_, i) => i % 7 === 0)) {
+      for (const plan of candidatePlans(d.view, d.kind, DESIGN)) {
+        expect(normalizePlanFor(d.view.self, d.view.turn, d.view.rivals, plan, DESIGN)).toEqual({ plan, notes: [] });
+      }
+    }
+  });
+});
+
+describe("the chosen plan", () => {
+  it("is always one of the candidates, and legal", () => {
+    for (const d of decisions) {
+      expect(normalizePlanFor(d.view.self, d.view.turn, d.view.rivals, d.plan, DESIGN).notes).toEqual([]);
+    }
+  });
+
+  it("never ends the quarter below $0 on its own projection when another candidate would not", () => {
+    for (const d of decisions) {
+      const chosen = projectTurn(d.view, d.plan, DESIGN);
+      if (chosen.cash >= 0) continue;
+      const alternatives = candidatePlans(d.view, d.kind, DESIGN).map((plan) => projectTurn(d.view, plan, DESIGN).cash);
+      expect(Math.max(...alternatives), `${d.kind} turn ${d.view.turn}`).toBeLessThan(0);
+    }
+  });
+
+  it("is the same for the same seed", () => {
+    for (const d of decisions.filter((_, i) => i % 5 === 0)) {
+      expect(chooseCpuPlan(d.view, d.kind, 3, DESIGN)).toEqual(chooseCpuPlan(d.view, d.kind, 3, DESIGN));
+    }
+  });
+
+  it("varies a little from seed to seed", () => {
+    let differs = 0;
+    for (const d of decisions.filter((_, i) => i % 5 === 0)) {
+      const plans = new Set([1, 2, 3, 4, 5, 6].map((seed) => JSON.stringify(chooseCpuPlan(d.view, d.kind, seed, DESIGN))));
+      if (plans.size > 1) differs++;
+    }
+    expect(differs).toBeGreaterThan(0);
+  });
+
+  it("does not depend on anything private about its rivals", () => {
+    for (const d of decisions.filter((_, i) => i % 9 === 0)) {
+      let secret = d.state;
+      for (const company of d.state.companies) {
+        if (company.id === d.view.self.id || company.out !== null) continue;
+        secret = withCompany(secret, company.id, {
+          cash: company.cash * 7 + 1,
+          lastPull: 12_345,
+          lastRevenue: 1,
+          lastCosts: 2,
+          lastPlan: { ...company.lastPlan, marketing: 975_000, allocation: { product: 0, growth: company.headcount, recruiting: 0 } },
+          controller: "human",
+        });
+      }
+      expect(chooseCpuPlan(viewFor(secret, d.view.self.id), d.kind, 5, DESIGN)).toEqual(chooseCpuPlan(d.view, d.kind, 5, DESIGN));
+    }
+  });
+
+  it("copes with a one-person company", () => {
+    for (const kind of KINDS) {
+      const state = withCompany(newGame(), SEAT[kind], { headcount: 1, headcountAtLastClose: 1 });
+      const view = viewFor(state, SEAT[kind]);
+      const plan = chooseCpuPlan(view, kind, 1, DESIGN);
+      expect(plan.allocation.product + plan.allocation.growth + plan.allocation.recruiting).toBe(1);
+      expect(plan.layoffs).toBe(0);
+    }
+  });
+
+  it("lays people off rather than go bankrupt when it cannot raise", () => {
+    for (const kind of KINDS) {
+      // 10 people ($400K a turn), $250K in the bank, no users to raise against.
+      const state = withCompany(newGame(), SEAT[kind], { headcount: 10, headcountAtLastClose: 10, cash: 250_000, users: 0, usersAtLastClose: 0, launched: false, quality: 2, lastCosts: 400_000, lastRevenue: 0 });
+      const view = viewFor(state, SEAT[kind]);
+      const plan = chooseCpuPlan(view, kind, 1, DESIGN);
+      expect(plan.layoffs, kind).toBeGreaterThan(0);
+      expect(projectTurn(view, plan, DESIGN).cash, kind).toBeGreaterThanOrEqual(0);
+    }
+  });
+});
+
+describe("the Blitzscaler", () => {
+  it("always charges Budget", () => {
+    for (const d of of("blitzscaler")) expect(d.plan.price).toBe("budget");
+  });
+
+  it("raises 30% on every turn the rules allow, and never otherwise", () => {
+    expect(of("blitzscaler").some((d) => d.plan.raisePercent === 30)).toBe(true);
+    for (const d of of("blitzscaler")) {
+      const allowed = raiseBlocker(d.view.self, d.view.turn, DESIGN) === null;
+      expect(d.plan.raisePercent, `turn ${d.view.turn}`).toBe(allowed ? 30 : 0);
+    }
+  });
+
+  it("outspends the other two on marketing from the same position", () => {
+    const spend = (kind: CpuKind) => chooseCpuPlan(viewFor(established(SEAT[kind]), SEAT[kind]), kind, 1, DESIGN).marketing;
+    expect(spend("blitzscaler")).toBeGreaterThan(spend("bootstrapper"));
+    expect(spend("blitzscaler")).toBeGreaterThan(spend("incumbent"));
+  });
+
+  it("never poaches", () => {
+    for (const d of of("blitzscaler")) expect(d.plan.poachTarget).toBeNull();
+  });
+});
+
+describe("the Bootstrapper", () => {
+  it("always charges Premium", () => {
+    for (const d of of("bootstrapper")) expect(d.plan.price).toBe("premium");
+  });
+
+  it("never raises while it has 2 turns of runway", () => {
+    for (const d of of("bootstrapper")) {
+      const runway = companyRunway(d.view.self, DESIGN);
+      if (runway === null || runway >= 2) expect(d.plan.raisePercent, `turn ${d.view.turn}`).toBe(0);
+    }
+  });
+
+  it("raises once it has less, if the rules allow", () => {
+    const short = established(BOOT, { cash: 300_000, lastCosts: 400_000, lastRevenue: 120_000 });
+    const plan = chooseCpuPlan(viewFor(short, BOOT), "bootstrapper", 1, DESIGN);
+    expect([10, 20, 30]).toContain(plan.raisePercent);
+    const comfortable = established(BOOT, { cash: 3_000_000 });
+    expect(chooseCpuPlan(viewFor(comfortable, BOOT), "bootstrapper", 1, DESIGN).raisePercent).toBe(0);
+  });
+
+  it("keeps a small team: it never hires past its cap", () => {
+    const cap = DESIGN.cpu.personalities.bootstrapper.teamCap;
+    for (const d of of("bootstrapper")) {
+      const projection = projectTurn(d.view, d.plan, DESIGN);
+      if (d.view.self.headcount >= cap) expect(projection.hiresWanted, `turn ${d.view.turn}`).toBe(0);
+      else expect(d.view.self.headcount + projection.hiresWanted, `turn ${d.view.turn}`).toBeLessThanOrEqual(cap);
+    }
+    const atCap = established(BOOT, { headcount: cap, headcountAtLastClose: cap, cash: 9_000_000 });
+    expect(projectTurn(viewFor(atCap, BOOT), chooseCpuPlan(viewFor(atCap, BOOT), "bootstrapper", 1, DESIGN), DESIGN).hiresWanted).toBe(0);
+  });
+
+  it("puts product first: it never has more people on Growth than on Product", () => {
+    for (const d of of("bootstrapper")) {
+      expect(d.plan.allocation.product, `turn ${d.view.turn}`).toBeGreaterThanOrEqual(d.plan.allocation.growth);
+    }
+  });
+
+  it("never poaches", () => {
+    for (const d of of("bootstrapper")) expect(d.plan.poachTarget).toBeNull();
+  });
+});
+
+describe("the Incumbent", () => {
+  it("attempts a poach when it can afford one, on the rival with the most users", () => {
+    let state = established(INCUMBENT);
+    state = launchedCompany(state, HUMAN, { users: 9_000 });
+    state = launchedCompany(state, BLITZ, { users: 30_000 });
+    const plan = chooseCpuPlan(viewFor(state, INCUMBENT), "incumbent", 1, DESIGN);
+    expect(plan.poachTarget).toBe(BLITZ);
+  });
+
+  it("does not poach when it cannot afford to", () => {
+    // Under two turns of cash, and it raised last turn, so it cannot top up either.
+    const poor = established(INCUMBENT, { cash: 450_000, lastCosts: 400_000, lastRevenue: 120_000, lastRaise: { turn: 5, percent: 10, amount: 1 } });
+    const plan = chooseCpuPlan(viewFor(poor, INCUMBENT), "incumbent", 1, DESIGN);
+    expect(plan.raisePercent).toBe(0);
+    expect(plan.poachTarget).toBeNull();
+  });
+
+  it("never targets a company that is out or too small to lose anyone", () => {
+    let state = onlyActive(established(INCUMBENT), [HUMAN, BOOT, INCUMBENT]);
+    state = launchedCompany(state, HUMAN, { users: 90_000, headcount: 1, headcountAtLastClose: 1 });
+    state = launchedCompany(state, BOOT, { users: 5_000 });
+    expect(chooseCpuPlan(viewFor(state, INCUMBENT), "incumbent", 1, DESIGN).poachTarget).toBe(BOOT);
+  });
+
+  it("when rivals are level, who it goes after depends on the game's seed, not on who sits where", () => {
+    // Turn 1: the three startups all have no users and no product.
+    const state = newGame();
+    const picks = Array.from({ length: 90 }, (_, i) => chooseCpuPlan(viewFor(state, INCUMBENT), "incumbent", i + 1, DESIGN).poachTarget);
+    for (const seat of [HUMAN, BLITZ, BOOT]) expect(picks.filter((id) => id === seat).length, `seat ${seat}`).toBeGreaterThan(15);
+    expect(chooseCpuPlan(viewFor(state, INCUMBENT), "incumbent", 7, DESIGN).poachTarget).toBe(picks[6]);
+  });
+
+  it("poaches in most of its turns over a game", () => {
+    const turns = of("incumbent");
+    expect(turns.filter((d) => d.plan.poachTarget !== null).length / turns.length).toBeGreaterThan(0.5);
+  });
+
+  it("is product-heavy: more builders than marketers in most turns", () => {
+    const turns = of("incumbent");
+    const heavy = turns.filter((d) => d.plan.allocation.product >= d.plan.allocation.growth).length;
+    expect(heavy / turns.length).toBeGreaterThan(0.7);
+  });
+});
+
+describe("the last turn", () => {
+  const lastTurn = (kind: CpuKind, patch: Partial<Company> = {}): GameState => withState(established(SEAT[kind], patch), { turn: DESIGN.game.maxTurns });
+
+  it("spends on users instead of saving for a next quarter that will not come", () => {
+    for (const kind of ["bootstrapper", "incumbent"] as const) {
+      const usual = Math.max(...DESIGN.cpu.personalities[kind].marketingShares);
+      const view = viewFor(lastTurn(kind), SEAT[kind]);
+      const final = chooseCpuPlan(view, kind, 1, DESIGN);
+      // More than its cautious habit would ever allow, yet never into the red.
+      expect(final.marketing, kind).toBeGreaterThan(usual * view.self.cash);
+      expect(projectTurn(view, final, DESIGN).cash, kind).toBeGreaterThanOrEqual(0);
+    }
+  });
+
+  it("goes for the largest founder stake it can project", () => {
+    for (const kind of KINDS) {
+      const view = viewFor(lastTurn(kind), SEAT[kind]);
+      const stake = (plan: Plan) => {
+        const p = projectTurn(view, plan, DESIGN);
+        return p.cash < 0 ? -1 : p.equity * p.valuation * (1 - p.boardRisk);
+      };
+      const chosen = stake(chooseCpuPlan(view, kind, 1, DESIGN));
+      const bestOnOffer = Math.max(...candidatePlans(view, kind, DESIGN).map(stake));
+      expect(chosen, kind).toBeGreaterThanOrEqual(bestOnOffer * 0.97);
+    }
+  });
+
+  it("does not hire or lay off: neither can pay back", () => {
+    for (const kind of KINDS) {
+      const view = viewFor(lastTurn(kind), SEAT[kind]);
+      const plan = chooseCpuPlan(view, kind, 1, DESIGN);
+      expect(plan.layoffs, kind).toBe(0);
+      expect(projectTurn(view, plan, DESIGN).hiresWanted, kind).toBe(0);
+    }
+  });
+
+  it("will not risk the board for it: an investor-controlled company keeps 2 turns of runway", () => {
+    for (const kind of KINDS) {
+      const view = viewFor(lastTurn(kind, { investorSeats: 3, lastRaise: { turn: 19, percent: 10, amount: 1 } }), SEAT[kind]);
+      const projection = projectTurn(view, chooseCpuPlan(view, kind, 1, DESIGN), DESIGN);
+      expect(projection.boardRisk, kind).toBe(0);
+    }
+  });
+
+  it("keeps its habits to the end", () => {
+    expect(chooseCpuPlan(viewFor(lastTurn("blitzscaler"), BLITZ), "blitzscaler", 1, DESIGN)).toMatchObject({ price: "budget", raisePercent: 30 });
+    expect(chooseCpuPlan(viewFor(lastTurn("bootstrapper"), BOOT), "bootstrapper", 1, DESIGN)).toMatchObject({ price: "premium", raisePercent: 0 });
+  });
+
+  it("does not poach: the person would start in a quarter that is never played", () => {
+    // The same company a turn earlier does poach, so it is the last turn that stops it.
+    const before = withState(lastTurn("incumbent"), { turn: DESIGN.game.maxTurns - 1 });
+    expect(chooseCpuPlan(viewFor(before, INCUMBENT), "incumbent", 1, DESIGN).poachTarget).not.toBeNull();
+    for (let seed = 1; seed <= 5; seed++) expect(chooseCpuPlan(viewFor(lastTurn("incumbent"), INCUMBENT), "incumbent", seed, DESIGN).poachTarget, `seed ${seed}`).toBeNull();
+  });
+
+  it("still picks a plan when users are worth nothing: every stake is then $0", () => {
+    const worthless: GameConfig = { ...DESIGN, valuation: { ...DESIGN.valuation, perUser: 0 } };
+    for (const kind of KINDS) {
+      const view = viewFor(lastTurn(kind), SEAT[kind]);
+      const plan = chooseCpuPlan(view, kind, 1, worthless);
+      expect(normalizePlanFor(view.self, view.turn, view.rivals, plan, worthless).notes, kind).toEqual([]);
+    }
+  });
+});
+
+describe("the IPO push", () => {
+  /** Past the user bar with the given team, and a $500K-a-turn marketing habit behind it. */
+  const pastTheBar = (kind: CpuKind, headcount: number): GameState => {
+    const seat = SEAT[kind];
+    const state = established(seat, { users: 300_000, usersAtLastClose: 300_000, quality: 85, headcount, headcountAtLastClose: headcount, cash: 3_000_000, lastCosts: headcount * 40_000 + 500_000, lastRevenue: 600_000, investorSeats: 0 });
+    return withCompany(state, seat, { lastPlan: { ...state.companies[seat].lastPlan, marketing: 500_000 } });
+  };
+
+  it("stops marketing and hiring to turn a profit and list", () => {
+    for (const kind of KINDS) {
+      // 12 people cost $480K; even on Budget, 300K users bring in $600K. Only the marketing stands in the way.
+      const view = viewFor(pastTheBar(kind, 12), SEAT[kind]);
+      const plan = chooseCpuPlan(view, kind, 1, DESIGN);
+      const projection = projectTurn(view, plan, DESIGN);
+      expect(plan.marketing, kind).toBe(0);
+      expect(projection.hiresWanted, kind).toBe(0);
+      expect(projection.profitable, kind).toBe(true);
+      expect(projection.users, kind).toBeGreaterThanOrEqual(DESIGN.ipo.users);
+    }
+  });
+
+  it("lays people off when the payroll alone is more than the revenue", () => {
+    // 30 people cost $1.2M against $600K of Budget revenue. Severance means this quarter cannot be saved,
+    // so it cuts deep enough for the next one to be profitable.
+    const view = viewFor(pastTheBar("blitzscaler", 30), BLITZ);
+    const plan = chooseCpuPlan(view, "blitzscaler", 1, DESIGN);
+    const projection = projectTurn(view, plan, DESIGN);
+    expect(plan.layoffs).toBeGreaterThanOrEqual(12);
+    expect(projection.headcount * DESIGN.salary).toBeLessThanOrEqual(projection.revenue);
+  });
+
+  it("does not lay anyone off when cutting marketing is enough", () => {
+    for (const kind of KINDS) {
+      expect(chooseCpuPlan(viewFor(pastTheBar(kind, 12), SEAT[kind]), kind, 1, DESIGN).layoffs, kind).toBe(0);
+    }
+  });
+
+  it("is not triggered below the bar: no layoffs from a healthy company", () => {
+    for (const kind of KINDS) {
+      const state = established(SEAT[kind]);
+      expect(chooseCpuPlan(viewFor(state, SEAT[kind]), kind, 1, DESIGN).layoffs, kind).toBe(0);
+    }
+  });
+});
+
+describe("the planner's own numbers come from the config", () => {
+  const withCpu = (patch: Partial<GameConfig["cpu"]>): GameConfig => ({ ...DESIGN, cpu: { ...DESIGN.cpu, ...patch } });
+  const distinct = (values: readonly number[]): number[] => [...new Set(values)].sort((a, b) => a - b);
+
+  it("the layoffs it weighs when pushing for a profitable quarter at the IPO bar", () => {
+    const state = launchedCompany(newGame(), BLITZ, { users: 300_000, usersAtLastClose: 300_000, headcount: 20, headcountAtLastClose: 20, cash: 2_000_000 });
+    const view = viewFor(state, BLITZ);
+    const layoffs = (config: GameConfig): number[] => distinct(candidatePlans(view, "blitzscaler", config).map((plan) => plan.layoffs));
+    expect(layoffs(DESIGN)).toEqual([0, 1, 2, 3, 5, 8, 12, 16]);
+    expect(layoffs(withCpu({ ipoPushLayoffs: [0, 7] }))).toEqual([0, 7]);
+  });
+
+  it("the layoffs it weighs when short of cash", () => {
+    // 10 people, under a turn of runway: none, one, two, a third, half, two thirds, everyone but one.
+    const state = withCompany(newGame(), BOOT, { headcount: 10, headcountAtLastClose: 10, cash: 250_000, lastCosts: 400_000, lastRevenue: 0 });
+    const view = viewFor(state, BOOT);
+    const layoffs = (config: GameConfig): number[] => distinct(candidatePlans(view, "bootstrapper", config).map((plan) => plan.layoffs));
+    expect(layoffs(DESIGN)).toEqual([0, 1, 2, 3, 5, 7, 9]);
+    expect(layoffs(withCpu({ troubleLayoffs: { counts: [0], shares: [0.5] } }))).toEqual([0, 5]);
+  });
+
+  it("how many recruiters it weighs", () => {
+    const view = viewFor(established(INCUMBENT), INCUMBENT);
+    const recruiters = (config: GameConfig): number[] => distinct(candidatePlans(view, "incumbent", config).map((plan) => plan.allocation.recruiting));
+    expect(recruiters(DESIGN)).toEqual([0, 1, 2]);
+    expect(recruiters(withCpu({ recruiters: { few: [0, 1], many: [0, 3], manyFrom: 8 } }))).toEqual([0, 3]);
+    expect(recruiters(withCpu({ recruiters: { few: [0], many: [0, 1, 2], manyFrom: 99 } }))).toEqual([0]);
+  });
+
+  it("how much a bigger team is worth to it: at nothing, nobody recruits", () => {
+    const view = viewFor(established(BLITZ, { headcount: 5, headcountAtLastClose: 5 }), BLITZ);
+    const seeds = [1, 2, 3, 4, 5, 6];
+    const recruits = (config: GameConfig): boolean => seeds.some((seed) => chooseCpuPlan(view, "blitzscaler", seed, config).allocation.recruiting > 0);
+    expect(recruits(DESIGN)).toBe(true);
+    expect(recruits(withCpu({ teamGrowthShare: 0 }))).toBe(false);
+  });
+
+  it("how it rates ending below $0: told that is the best outcome of all, it walks into it", () => {
+    const view = viewFor(withCompany(newGame(), BLITZ, { cash: 150_000 }), BLITZ);
+    const cashAfter = (config: GameConfig): number => projectTurn(view, chooseCpuPlan(view, "blitzscaler", 1, config), DESIGN).cash;
+    expect(cashAfter(DESIGN)).toBeGreaterThanOrEqual(0);
+    expect(cashAfter(withCpu({ bankruptScore: 1_000 }))).toBeLessThan(0);
+  });
+
+  it("how short a runway it fears: told to fear anything under 1,000 turns, it stops spending", () => {
+    const view = viewFor(established(BLITZ), BLITZ);
+    const marketing = (config: GameConfig): number => chooseCpuPlan(view, "blitzscaler", 1, config).marketing;
+    // A heavy penalty changes nothing while every plan keeps the turn of runway it asks for...
+    expect(marketing(DESIGN)).toBeGreaterThan(0);
+    expect(marketing(withCpu({ shortRunwayPenalty: 1_000 }))).toBe(marketing(DESIGN));
+    // ...and everything once the bar is out of reach: the plan that burns least wins.
+    expect(marketing(withCpu({ shortRunwayPenalty: 1_000, shortRunwayTurns: 1_000 }))).toBe(0);
+  });
+});

@@ -1,60 +1,60 @@
-import type { GameState, LogEntry } from "../types/game";
-import { migrateState, SAVE_VERSION } from "../engine";
-
-// The save format, kept free of `window` so it can be tested in node. The store owns
-// reading and writing localStorage; this module only turns a stored string into a
-// playable save (or null) and back.
+// The game in progress, kept in the browser so a refresh does not lose it.
 //
-// Versions: 1 had no `assets`; 2 is the pre-tycoon game (head counts only); 3 adds the
-// `people` and `product` slices. Every step lives in the engine's `migrateState`, which is
-// idempotent and leaves a valid live state unchanged, so a save an interim build stamped
-// "2" while it already held slices loads correctly too.
+// One localStorage key, with a version. A save this build cannot use (older or newer version,
+// damaged, or not shaped like a game) is ignored and the player starts a new game: it never crashes.
+// The old weekly game's keys ("startupworld:save" and friends) are left alone.
 
-export const SAVE_KEY = "startupworld:save";
+import { CONFIG } from "../config";
+import { normalizePlan } from "../engine/plan";
+import type { GameState, Plan, RulesConfig, TurnLog } from "../engine/types";
+import { PLAYER_ID } from "./player";
+import { isGame, isPlan, isRecord, isTurnLog } from "./shape";
 
-export { SAVE_VERSION };
+export const SAVE_KEY = "startupworld:tb:save";
 
-export interface SaveData {
-  version: number;
-  state: GameState;
-  log: LogEntry[];
-  commandHistory: string[];
+/** Bump whenever GameState, Plan or TurnLog changes shape, so an older save starts a new game instead of breaking this one. */
+export const SAVE_VERSION = 1;
+
+export interface SavedGame {
+  readonly seed: number;
+  readonly game: GameState;
+  /** The plan the player was editing. */
+  readonly draft: Plan;
+  /** Last quarter's log, for the quarterly report. */
+  readonly lastLog: TurnLog | null;
+  readonly reportOpen: boolean;
 }
 
-/** A parsed save, plus the version it was stored as (the store writes a migrated save back once). */
-export interface LoadedSave extends SaveData {
-  fromVersion: number;
-}
-
-const isLogEntry = (x: unknown): x is LogEntry =>
-  typeof x === "object" && x !== null && typeof (x as LogEntry).text === "string" && typeof (x as LogEntry).kind === "string";
-
-/** The stored string for a save (always the current version). */
-export const serializeSave = (state: GameState, log: LogEntry[], commandHistory: string[]): string =>
-  JSON.stringify({ version: SAVE_VERSION, state, log, commandHistory } satisfies SaveData);
+export const serializeSave = (save: SavedGame): string => JSON.stringify({ version: SAVE_VERSION, ...save });
 
 /**
- * A stored save, migrated to the current version, or null when there is nothing usable:
- * no save, unreadable JSON, no week/seed, or a version this build does not know (a save
- * from a newer build starts a fresh run rather than being misread).
+ * The saved draft as the planning panel may hold it: every number legal, and people left without a
+ * department still without one. Only a split holding more people than there are is refitted.
  */
-export const parseSave = (raw: string | null): LoadedSave | null => {
+const loadedDraft = (game: GameState, draft: Plan, config: RulesConfig): Plan => {
+  const checked = normalizePlan(game, PLAYER_ID, draft, config).plan;
+  const saved = [draft.allocation.product, draft.allocation.growth, draft.allocation.recruiting];
+  const available = checked.allocation.product + checked.allocation.growth + checked.allocation.recruiting;
+  const fits = saved.every((people) => Number.isInteger(people) && people >= 0) && saved[0] + saved[1] + saved[2] <= available;
+  return fits ? { ...checked, allocation: draft.allocation } : checked;
+};
+
+export const parseSave = (raw: string | null, config: RulesConfig = CONFIG): SavedGame | null => {
   if (!raw) return null;
   try {
-    const data = JSON.parse(raw) as Partial<SaveData> | null;
-    if (!data || typeof data !== "object") return null;
-    const state = data.state;
-    if (typeof state?.week !== "number" || typeof state?.seed !== "number") return null;
-    const version = data.version;
-    if (typeof version !== "number" || !Number.isInteger(version) || version < 1 || version > SAVE_VERSION) return null;
+    const data: unknown = JSON.parse(raw);
+    if (!isRecord(data) || data.version !== SAVE_VERSION) return null;
+    if (!Number.isInteger(data.seed)) return null;
+    const { game, draft } = data;
+    if (!isGame(game, config) || !isPlan(draft)) return null;
+    // A report that cannot be shown is dropped; the game itself is still good.
+    const lastLog = isTurnLog(data.lastLog, game.companies.length) ? data.lastLog : null;
     return {
-      version: SAVE_VERSION,
-      fromVersion: version,
-      state: migrateState(state, version),
-      log: Array.isArray(data.log) ? data.log.filter(isLogEntry) : [],
-      commandHistory: Array.isArray(data.commandHistory)
-        ? data.commandHistory.filter((entry): entry is string => typeof entry === "string")
-        : [],
+      seed: data.seed as number,
+      game,
+      draft: loadedDraft(game, draft, config),
+      lastLog,
+      reportOpen: data.reportOpen === true && lastLog !== null,
     };
   } catch {
     return null;
