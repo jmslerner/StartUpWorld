@@ -595,7 +595,7 @@ export interface EndView {
   readonly standings: readonly Standing[];
 }
 
-const TYPE_LABEL: Record<Controller, string> = {
+export const TYPE_LABEL: Record<Controller, string> = {
   human: "You",
   baseline: "Baseline bot",
   blitzscaler: "Blitzscaler",
