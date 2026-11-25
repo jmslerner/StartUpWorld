@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { DESIGN } from "../config.design";
-import { CAREER_TEST, atTurn, newCareer } from "./careerKit";
+import { CAREER_TEST, atTurn, newCareer, withCareerOf } from "./careerKit";
 import { BLITZ, BOOT, HUMAN, launchedCompany, onlyActive, reportFor, resolve, withCompany, withState } from "./testKit";
 import type { CompanyId, GameState } from "./types";
 
@@ -58,8 +58,9 @@ describe("how a career ends", () => {
   });
 
   it("a company that is out cannot win", () => {
-    // Seat 0 holds by far the largest stake, but its cash runs out in the last year.
+    // Seat 0 holds by far the largest stake, but its cash runs out in the last year, with its one rescue spent.
     let broke = launchedCompany(lastYear(), HUMAN, { users: 200_000, founderEquity: 1, cash: -10_000_000 });
+    broke = withCareerOf(broke, HUMAN, { rescue: { turn: 20, reason: "bankrupt" } });
     broke = launchedCompany(broke, BLITZ, { users: 10_000, founderEquity: 0.5 });
     const result = resolve(broke, {}, 1, CAREER_TEST);
     expect(reportFor(result, HUMAN).out).toBe("bankrupt");

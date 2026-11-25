@@ -47,27 +47,35 @@ export const viewFor = (state: GameState, id: CompanyId): CompanyView => {
   return state.wave === undefined ? view : { ...view, wave: state.wave };
 };
 
-/** The part of a company's quarterly report its rivals can see: its moves, not its books or its plan. */
-export const publicReport = (report: CompanyReport): PublicReport => ({
-  companyId: report.companyId,
-  price: report.plan.price,
-  headcount: report.headcount,
-  quality: { start: report.quality.start, end: report.quality.end, launchedNow: report.quality.launchedNow },
-  users: {
-    open: report.users.open,
-    lostToEvent: report.users.lostToEvent,
-    churned: report.users.churned,
-    won: report.users.won,
-    end: report.users.end,
-  },
-  raise: report.raise,
-  hype: { start: report.hype.start, end: report.hype.end },
-  poach: report.poach ? { targetId: report.poach.targetId, success: report.poach.success } : null,
-  boardFired: report.board?.fired ?? false,
-  valuation: report.valuation,
-  equity: report.equity,
-  out: report.out,
-});
+/**
+ * The part of a company's quarterly report its rivals can see: its moves, not its books or its plan. A career report
+ * also shows whether the company went public that year, what it was rescued from if it was, and the office it moved
+ * to if it moved; a race report's copy has no such key.
+ */
+export const publicReport = (report: CompanyReport): PublicReport => {
+  const shown: PublicReport = {
+    companyId: report.companyId,
+    price: report.plan.price,
+    headcount: report.headcount,
+    quality: { start: report.quality.start, end: report.quality.end, launchedNow: report.quality.launchedNow },
+    users: {
+      open: report.users.open,
+      lostToEvent: report.users.lostToEvent,
+      churned: report.users.churned,
+      won: report.users.won,
+      end: report.users.end,
+    },
+    raise: report.raise,
+    hype: { start: report.hype.start, end: report.hype.end },
+    poach: report.poach ? { targetId: report.poach.targetId, success: report.poach.success } : null,
+    boardFired: report.board?.fired ?? false,
+    valuation: report.valuation,
+    equity: report.equity,
+    out: report.out,
+  };
+  if (report.career === undefined) return shown;
+  return { ...shown, career: { listed: report.career.listing !== null, rescued: report.career.rescue?.reason ?? null, movedTo: report.career.office?.to ?? null } };
+};
 
 /**
  * A company's runway as a turn starts: cash ÷ last quarter's burn, or null when that quarter was

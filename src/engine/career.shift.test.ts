@@ -4,9 +4,9 @@ import type { GameConfig } from "../config";
 import { heldCeiling, upcomingShift } from "./career";
 import { CAREER_TEST, atTurn, careerOf, newCareer, withCareer } from "./careerKit";
 import { applyEvent } from "./events";
-import { newUsersForTurn } from "./formulas";
-import { projectTurn } from "./project";
-import { BLITZ, BOOT, HUMAN, INCUMBENT, launchedCompany, newGame, onlyActive, reportFor, resolve, withCompany, withState } from "./testKit";
+import { clamp, newUsersForTurn } from "./formulas";
+import { estimateRivals, projectTurn } from "./project";
+import { BLITZ, BOOT, HUMAN, INCUMBENT, launchedCompany, newGame, onlyActive, planOf, reportFor, resolve, withCompany, withState } from "./testKit";
 import type { DatedCard, GameState, Plan } from "./types";
 import { viewFor } from "./view";
 
@@ -143,6 +143,73 @@ describe("a platform shift", () => {
       const projected = projectTurn(viewFor(y1995, id), null, config).share;
       expect(Math.abs(projected - reportFor(played1995, id).users.share)).toBeLessThan(0.05);
     }
+  });
+
+  describe("the year after a ceiling that held (ruling 40)", () => {
+    const SEATS = [HUMAN, BLITZ, BOOT, INCUMBENT];
+    /** A team of `size`: three quarters on Product, the rest on Growth, no hires and no marketing. */
+    const teamPlan = (size: number): Partial<Plan> => {
+      const product = Math.round((size * 3) / 4);
+      return { allocation: { product, growth: size - product, recruiting: 0 }, hireLimit: 0, marketing: 0 };
+    };
+    /**
+     * The review's scenario: four launched companies with money enough and `size` people each play 1991 to 1995 on
+     * the same plan, 1995 being the shift. `before1995` may change the state as 1995 opens. `after` is the state as
+     * 1996 opens.
+     */
+    const yearAfterTheShift = (played: GameConfig, size = 8, before1995: (state: GameState) => GameState = (state) => state) => {
+      let state: GameState = atTurn(newCareer(played), 2);
+      for (const id of SEATS) state = launchedCompany(state, id, { cash: RICH, headcount: size, headcountAtLastClose: size });
+      const plans = Object.fromEntries(SEATS.map((id) => [id, teamPlan(size)]));
+      for (let year = 1991; year <= 1995; year++) {
+        if (year === 1995) state = before1995(state);
+        state = resolve(state, plans, 1, played).state;
+      }
+      return { after: state, plans, plan: planOf(state, HUMAN, teamPlan(size)) };
+    };
+
+    it("a plan's projection knows its rivals rebuild", () => {
+      const { after, plans, plan } = yearAfterTheShift(config);
+      expect(after.companies.map((c) => careerOf(after, c.id).qualityAtLastClose)).toEqual([30, 30, 30, 30]);
+      const played = resolve(after, plans, 1, config);
+      for (const id of SEATS) {
+        const projected = projectTurn(viewFor(after, id), id === HUMAN ? plan : planOf(after, id, plans[id]), config).share;
+        expect(Math.abs(projected - reportFor(played, id).users.share)).toBeLessThan(0.05); // was 0.336 against 0.257
+      }
+    });
+
+    it("and errs low, not high, about its own share", () => {
+      for (const size of [8, 20]) {
+        const { after, plans, plan } = yearAfterTheShift(config, size);
+        const played = reportFor(resolve(after, plans, 1, config), HUMAN);
+        expect(projectTurn(viewFor(after, HUMAN), plan, config).share).toBeLessThanOrEqual(played.users.share + 0.01);
+      }
+    });
+
+    it("a rival that closed the shift year under the ceiling keeps the rate its year showed", () => {
+      // Seat 1 opens 1995 at quality 10, so it closes the shift year under 30.
+      const { after } = yearAfterTheShift(config, 8, (state) => withCompany(state, BLITZ, { quality: 10 }));
+      const closed = careerOf(after, BLITZ).qualityAtLastClose;
+      expect(closed).toBeLessThan(30);
+      // A view in which seat 1 is the only rival in the game, worked out by hand from the formula of before ruling 40.
+      const view = viewFor(onlyActive(after, [HUMAN, BLITZ]), HUMAN);
+      const rival = after.companies[BLITZ];
+      const last = rival.lastQuarter;
+      const self = view.self;
+      if (last === null || self.lastQuarter === null || self.lastPull === null) throw new Error("the scenario has played years");
+      const decay = CAREER_TEST.quality.decay;
+      const gain = (closed - last.qualityAtOpen + decay) * ((100 - rival.quality) / (100 - last.qualityAtOpen));
+      const heading = clamp(rival.quality + gain - decay, 0, 100);
+      const lastPull = (self.lastPull / self.lastQuarter.usersWon) * last.usersWon;
+      const expected = (lastPull * (heading / closed) * (1 + rival.hype / 100)) / (1 + last.hypeAtOpen / 100);
+      expect(estimateRivals(view, config).pull).toBeCloseTo(expected, 6);
+    });
+
+    it("with the ceiling cut once and not holding, the year after is projected as before", () => {
+      const { after, plans, plan } = yearAfterTheShift(cutOnceConfig);
+      const played = reportFor(resolve(after, plans, 1, cutOnceConfig), HUMAN);
+      expect(Math.abs(projectTurn(viewFor(after, HUMAN), plan, cutOnceConfig).share - played.users.share)).toBeLessThan(0.05);
+    });
   });
 
   it("the annual report says what the shift took", () => {

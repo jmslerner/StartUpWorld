@@ -8,7 +8,10 @@ export type CompanyId = number;
 /** Decides starting stats, the coordination-drag exponent and the catch-up bonus. */
 export type Archetype = "startup" | "incumbent";
 
-/** Who makes a company's plans. The engine never branches on this; it is only a label. */
+/**
+ * Who makes a company's plans. The engine reads it in one place, to tell a rival's seat from the player's: in a
+ * career a newcomer takes the seat of a rival that went out, never the player's.
+ */
 export type Controller = "human" | "baseline" | "blitzscaler" | "bootstrapper" | "incumbent";
 export type CpuKind = "blitzscaler" | "bootstrapper" | "incumbent";
 
@@ -117,7 +120,10 @@ export interface Company extends PublicCompany {
   /** Users and headcount when the last quarter closed, before the next turn's event touched them. */
   readonly usersAtLastClose: number;
   readonly headcountAtLastClose: number;
-  /** Latest quarter's totals, for runway. null until a quarter has been played. */
+  /**
+   * Latest quarter's totals, for runway. null until a quarter has been played. In a career the costs leave out a
+   * moving bill, which cannot recur (ruling 41).
+   */
   readonly lastRevenue: number | null;
   readonly lastCosts: number | null;
   /** Pull in the latest market, for estimating rivals. null until launched. */

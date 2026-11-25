@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { DESIGN } from "../config.design";
-import { CAREER_TEST, atTurn, newCareer, withCareer } from "./careerKit";
+import { rulesForTurn } from "./career";
+import { CAREER_TEST, atTurn, newCareer, withCareer, withEras } from "./careerKit";
 import { NEUTRAL_MODIFIERS, findCard } from "./events";
 import { BOOT, BLITZ, HUMAN, INCUMBENT, launchedCompany, resolve, withCompany } from "./testKit";
-import type { DatedCard, Plan } from "./types";
+import type { DatedCard, EventCard, Plan } from "./types";
 
 const SLUMP: DatedCard = {
   year: 1992,
@@ -103,5 +104,18 @@ describe("dated cards", () => {
 
   it("a dated card can be looked up like any other", () => {
     expect(findCard("slump", withCareer({ dated: [SLUMP] }))?.name).toBe("Slump");
+  });
+
+  it("a card of the base deck is found through the numbers of an era that has its own deck", () => {
+    const baseCard = DESIGN.events.deck[0];
+    const eraCard: EventCard = { id: "era-card", name: "Era card", text: "…", weight: 1, effects: [{ kind: "newUsers", multiplier: 0.9 }] };
+    const config = withEras(
+      { id: "a", name: "A", firstYear: 1990, invented: false, values: {} },
+      { id: "b", name: "B", firstYear: 1993, invented: false, values: { events: { deck: [eraCard] } } },
+    );
+    expect(rulesForTurn(config, 5).events.deck).toEqual([eraCard]);
+    expect(findCard(baseCard.id, rulesForTurn(config, 5))).toMatchObject({ id: baseCard.id });
+    expect(findCard(eraCard.id, rulesForTurn(config, 1))).toMatchObject({ id: eraCard.id });
+    expect(findCard(eraCard.id, rulesForTurn(config, 5))).toMatchObject({ id: eraCard.id });
   });
 });
