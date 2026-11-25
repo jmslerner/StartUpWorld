@@ -16,7 +16,7 @@ export const Timeline = ({ view, marks = view.marks }: TimelineProps) => {
   const historyEdge = `${(((view.historyEnds - view.firstYear + 1) / span) * 100).toFixed(3)}%`;
   const showsHistoryEnd = view.historyEnds < view.lastYear;
 
-  // Marks of the same year stack upwards so none hides another.
+  // Marks of the same year stack downwards so none hides another.
   const seen = new Map<number, number>();
   const placed = marks.map((mark) => {
     const index = seen.get(mark.year) ?? 0;

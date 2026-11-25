@@ -14,7 +14,8 @@
  * With `--write` it saves the six texts as `scripts/race-text.snapshot.json`. Without, it compares them with that
  * file and exits 1 naming the first line that differs.
  *
- * Exports `raceText(page)` for the career's browser check, which serves the app itself.
+ * Exports `raceText(page, base)` for the career's browser check, which serves the app itself on its own port and
+ * passes that server's address as `base` (by default this script's own, port 4181).
  */
 import { spawn, spawnSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
@@ -56,10 +57,11 @@ const textOf = (locator) =>
 
 /**
  * Plays the first three quarters of a Quick race named "Race Co" with seed 20417 on a page whose storage is fresh
- * and whose analytics script is stubbed, and returns the six texts: game screen, report, three times over.
+ * and whose analytics script is stubbed, and returns the six texts: game screen, report, three times over. `base` is
+ * the address of the server that serves the app, such as "http://localhost:4180".
  */
-export const raceText = async (page) => {
-  await page.goto(`${BASE}/`);
+export const raceText = async (page, base = BASE) => {
+  await page.goto(new URL("/", base).href);
   await page.getByLabel("Name your startup").waitFor();
   // The first screen offers both modes; the race is the one recorded.
   const race = page.getByRole("button", { name: /Quick race/ });
