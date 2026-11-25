@@ -29,6 +29,9 @@ Resolution, in this order:
      until it qualifies the reason names what it still needs against this year's bar (rulings 18 and 19). A plan
      that both raises and goes public loses the raise (ruling 21), and a public company cannot raise privately
      (ruling 22). The resolved plan always says whether the company goes public.
+   - Marketing is cut to the room the company has: its opening cash, never counted below $0, plus this year's raise
+     or listing at the opening valuation (a raise the rules drop brings nothing), rounded down to the marketing step.
+     When this cut applies, its note is the only marketing note (ruling 23).
 2. Layoffs.
 3. The raise closes.
    - A listing closes here, in place of a raise: the company sells `listing.percent` of itself at the year's opening
@@ -103,6 +106,8 @@ Resolution, in this order:
     end of that year, rounded to whole dollars after it.
 21. A plan that both raises and goes public loses the raise.
 22. A public company cannot raise privately. A race plan that asks to go public is played as if it did not.
+23. The room for marketing is the opening cash, never counted below $0, plus this year's raise or listing at the
+    opening valuation, rounded down to the marketing step.
 
 ## Starting numbers
 

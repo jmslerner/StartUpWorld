@@ -1,8 +1,8 @@
 // Plans: the default for a new turn, and the check that turns any plan into a legal one.
 // An illegal part is fixed up or dropped at no cost, with a note for the quarterly report.
 
-import { listingBlocker, rulesForTurn } from "./career";
-import { poachFloor, refitAllocation } from "./formulas";
+import { listingBlocker, listingOf, rulesForTurn } from "./career";
+import { poachFloor, raiseAmount, refitAllocation, valuationOf } from "./formulas";
 import { PRICE_TIERS } from "./types";
 import type { Allocation, Company, CompanyId, GameState, Plan, PublicCompany, RulesConfig } from "./types";
 
@@ -44,8 +44,8 @@ export interface CheckedPlan {
 }
 
 /**
- * The check itself, from what one company can see: itself, the turn, and the public side of the others. Limits are
- * those of the turn being planned.
+ * The check itself, from what one company can see: itself, the turn, the funding climate and the public side of the
+ * others. Limits are those of the turn being planned.
  */
 export const normalizePlanFor = (
   company: Company,
@@ -53,6 +53,7 @@ export const normalizePlanFor = (
   others: readonly PublicCompany[],
   plan: Plan | null,
   config: RulesConfig,
+  climateMultiplier = 1,
 ): CheckedPlan => {
   const rules = rulesForTurn(config, turn);
   const wanted = plan ?? defaultPlan(company);
@@ -102,8 +103,24 @@ export const normalizePlanFor = (
   if (!sameSplit(allocation, wanted.allocation)) notes.push(`Team split refitted to ${people(available)}.`);
 
   const step = rules.pull.marketingStep;
-  const marketing = Math.min(rules.pull.maxMarketing, Math.floor(whole(wanted.marketing) / step) * step);
-  if (marketing !== wanted.marketing) notes.push(`Marketing set to ${dollars(marketing)}.`);
+  let marketing = Math.min(rules.pull.maxMarketing, Math.floor(whole(wanted.marketing) / step) * step);
+  // In a career marketing is paid from the cash in hand, never counted below $0, plus what this year's raise or
+  // listing brings at the opening valuation. When this limit cuts the budget, its note is the only one.
+  let cashCut = false;
+  if (rules.career !== undefined) {
+    const proceeds = goPublic
+      ? listingOf(company, climateMultiplier, rules).amount
+      : raisePercent > 0
+        ? raiseAmount(valuationOf(company.users, company.hype, climateMultiplier, rules), raisePercent)
+        : 0;
+    const room = Math.floor((Math.max(0, company.cash) + proceeds) / step) * step;
+    if (room < marketing) {
+      marketing = room;
+      cashCut = true;
+    }
+  }
+  if (cashCut) notes.push(`Marketing set to ${dollars(marketing)}: it cannot exceed the cash in hand.`);
+  else if (marketing !== wanted.marketing) notes.push(`Marketing set to ${dollars(marketing)}.`);
 
   let poachTarget = wanted.poachTarget;
   if (poachTarget !== null) {
@@ -126,4 +143,4 @@ export const normalizePlanFor = (
 };
 
 export const normalizePlan = (state: GameState, id: CompanyId, plan: Plan | null, config: RulesConfig): CheckedPlan =>
-  normalizePlanFor(state.companies[id], state.turn, state.companies, plan, config);
+  normalizePlanFor(state.companies[id], state.turn, state.companies, plan, config, state.climate.multiplier);
