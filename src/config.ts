@@ -339,7 +339,7 @@ export const CAREER: CareerGameConfig = {
   // ── Talent ──
   /** Per person per year: the first era's. */
   salary: 50 * K,
-  hiring: { candidatesPerTurn: 4, capacityPerWork: 3, fee: 20 * K },
+  hiring: { candidatesPerTurn: 2, capacityPerWork: 3, fee: 20 * K },
   poach: { cost: 150 * K, baseChance: 0.5, chancePerHypePoint: 0.005, minChance: 0.1, maxChance: 0.9, minTargetHeadcount: 4 },
   layoff: { severance: 40 * K, hype: -10 },
 
@@ -350,16 +350,17 @@ export const CAREER: CareerGameConfig = {
   /** The first era's curve. Each era starts its own curve in its first year. */
   market: { newUsersTurn1: 20 * K, growthPerTurn: 0.35 },
   pull: { growthCoefficient: 0.3, marketingCoefficient: 0.3, marketingStep: 50 * K, maxMarketing: 1 * M },
+  /** The first era's prices. Each era sets its own: a user brings less as the market grows. */
   priceTiers: {
-    budget: { price: 8, pullFactor: 1.05, churnDelta: -0.05 },
-    standard: { price: 12, pullFactor: 1, churnDelta: 0 },
-    premium: { price: 20, pullFactor: 0.75, churnDelta: 0.03 },
+    budget: { price: 5.44, pullFactor: 1.05, churnDelta: -0.05 },
+    standard: { price: 8.16, pullFactor: 1, churnDelta: 0 },
+    premium: { price: 13.6, pullFactor: 0.75, churnDelta: 0.03 },
   },
   churn: { base: 0.3, perQualityPoint: 0.002, min: 0.05 },
 
   // ── Money ──
   raise: { minUsers: 1 * K, cooldownTurns: 1, options: [10, 20, 30] },
-  valuation: { perUser: 40 },
+  valuation: { perUser: 27 },
   board: { fireChance: 0.3, runwayTurns: 1 },
 
   // ── Hype ──
@@ -383,9 +384,9 @@ export const CAREER: CareerGameConfig = {
     /** At most two people laid off to make a listing year profitable: the prize for listing is small. */
     ipoPushLayoffs: [0, 1, 2],
     troubleLayoffs: { counts: [0, 1, 2], shares: [0.3333, 0.5, 0.6667, 1] },
-    /** Also a tenth and a fifth of the people free to assign, so a rival can grow its team in a year. */
-    recruiters: { few: [0, 1], many: [0, 1, 2], manyFrom: 8, shares: [0.1, 0.2] },
-    teamGrowthShare: 0.5,
+    /** Also a fifth and three tenths of the people free to assign, so a rival can grow its team in a year. */
+    recruiters: { few: [0, 1], many: [0, 1, 2], manyFrom: 8, shares: [0.2, 0.3] },
+    teamGrowthShare: 1,
     bankruptScore: -1000,
     ipo: { win: 2, deficit: 2, nextDeficit: 1, usersShortfall: 2 },
     personalities: {
@@ -394,7 +395,7 @@ export const CAREER: CareerGameConfig = {
         price: "budget",
         raise: { when: "eligible", runway: 0, percents: [30] },
         poachRunway: null,
-        teamCap: 8,
+        teamCap: 12,
         hireRunway: 1,
         marketingShares: [0, 0.05, 0.1, 0.175, 0.25],
         productShares: [0.7, 0.5, 0.3, 0.15],
@@ -406,7 +407,7 @@ export const CAREER: CareerGameConfig = {
         price: "premium",
         raise: { when: "runway", runway: 1, percents: [10, 20, 30] },
         poachRunway: null,
-        teamCap: 6,
+        teamCap: 9,
         hireRunway: 2,
         marketingShares: [0, 0.081, 0.162],
         productShares: [1, 0.8, 0.6],
@@ -418,7 +419,7 @@ export const CAREER: CareerGameConfig = {
         price: "standard",
         raise: { when: "runway", runway: 1.5, percents: [10, 20, 30] },
         poachRunway: 1.5,
-        teamCap: 12,
+        teamCap: 18,
         hireRunway: 1.5,
         marketingShares: [0, 0.075, 0.15],
         productShares: [0.85, 0.7, 0.55],
@@ -466,13 +467,14 @@ export const CAREER: CareerGameConfig = {
         values: {
           market: { newUsersTurn1: 20 * K, growthPerTurn: 0.35 },
           salary: 50 * K,
-          valuation: { perUser: 40 },
-          hiring: { candidatesPerTurn: 4 },
+          valuation: { perUser: 27 },
+          priceTiers: { budget: { price: 5.44 }, standard: { price: 8.16 }, premium: { price: 13.6 } },
+          hiring: { candidatesPerTurn: 2 },
           ipo: { users: 60 * K },
           archetypes: { startup: { cash: 400 * K } },
           // Magazine adverts, trade shows and disks in the post buy little.
           pull: { maxMarketing: 1 * M, marketingCoefficient: 0.2 },
-          cpu: { personalities: { blitzscaler: { teamCap: 8 }, bootstrapper: { teamCap: 6 }, incumbent: { teamCap: 12 } } },
+          cpu: { personalities: { blitzscaler: { teamCap: 12 }, bootstrapper: { teamCap: 9 }, incumbent: { teamCap: 18 } } },
           events: {
             deck: [
               {
@@ -536,12 +538,13 @@ export const CAREER: CareerGameConfig = {
         values: {
           market: { newUsersTurn1: 100 * K, growthPerTurn: 0.4 },
           salary: 70 * K,
-          valuation: { perUser: 200 },
-          hiring: { candidatesPerTurn: 6 },
+          valuation: { perUser: 90 },
+          priceTiers: { budget: { price: 3.6 }, standard: { price: 5.4 }, premium: { price: 9 } },
+          hiring: { candidatesPerTurn: 4 },
           ipo: { users: 300 * K },
           archetypes: { startup: { cash: 600 * K } },
           pull: { maxMarketing: 5 * M },
-          cpu: { personalities: { blitzscaler: { teamCap: 15 }, bootstrapper: { teamCap: 9 }, incumbent: { teamCap: 20 } } },
+          cpu: { personalities: { blitzscaler: { teamCap: 22 }, bootstrapper: { teamCap: 14 }, incumbent: { teamCap: 30 } } },
           // Hiring is a fight: staff leave for share options.
           poach: { baseChance: 0.6 },
           events: {
@@ -607,13 +610,14 @@ export const CAREER: CareerGameConfig = {
         values: {
           market: { newUsersTurn1: 380 * K, growthPerTurn: 0.05 },
           salary: 85 * K,
-          valuation: { perUser: 50 },
+          valuation: { perUser: 18 },
+          priceTiers: { budget: { price: 2.8 }, standard: { price: 4.2 }, premium: { price: 7 } },
           // The cheapest hiring of the career.
-          hiring: { candidatesPerTurn: 9, fee: 10 * K },
+          hiring: { candidatesPerTurn: 5, fee: 10 * K },
           ipo: { users: 800 * K },
           archetypes: { startup: { cash: 500 * K } },
           pull: { maxMarketing: 5 * M },
-          cpu: { personalities: { blitzscaler: { teamCap: 15 }, bootstrapper: { teamCap: 9 }, incumbent: { teamCap: 20 } } },
+          cpu: { personalities: { blitzscaler: { teamCap: 22 }, bootstrapper: { teamCap: 14 }, incumbent: { teamCap: 30 } } },
           events: {
             deck: [
               {
@@ -677,14 +681,15 @@ export const CAREER: CareerGameConfig = {
         values: {
           market: { newUsersTurn1: 700 * K, growthPerTurn: 0.1 },
           salary: 100 * K,
-          valuation: { perUser: 80 },
-          hiring: { candidatesPerTurn: 8 },
+          valuation: { perUser: 16 },
+          priceTiers: { budget: { price: 1.6 }, standard: { price: 2.4 }, premium: { price: 4 } },
+          hiring: { candidatesPerTurn: 5 },
           ipo: { users: 1.5 * M },
           archetypes: { startup: { cash: 600 * K } },
           // Rented servers: each builder ships more. Store charts and sharing make Growth work count for more.
           quality: { gainPerWork: 11 },
           pull: { maxMarketing: 10 * M, growthCoefficient: 0.4 },
-          cpu: { personalities: { blitzscaler: { teamCap: 25 }, bootstrapper: { teamCap: 14 }, incumbent: { teamCap: 35 } } },
+          cpu: { personalities: { blitzscaler: { teamCap: 38 }, bootstrapper: { teamCap: 21 }, incumbent: { teamCap: 52 } } },
           events: {
             deck: [
               {
@@ -755,12 +760,13 @@ export const CAREER: CareerGameConfig = {
         values: {
           market: { newUsersTurn1: 1.3 * M, growthPerTurn: 0.03 },
           salary: 130 * K,
-          valuation: { perUser: 130 },
-          hiring: { candidatesPerTurn: 16 },
+          valuation: { perUser: 23 },
+          priceTiers: { budget: { price: 1.44 }, standard: { price: 2.16 }, premium: { price: 3.6 } },
+          hiring: { candidatesPerTurn: 10 },
           ipo: { users: 3 * M },
           archetypes: { startup: { cash: 1 * M } },
           pull: { maxMarketing: 30 * M },
-          cpu: { personalities: { blitzscaler: { teamCap: 50 }, bootstrapper: { teamCap: 25 }, incumbent: { teamCap: 70 } } },
+          cpu: { personalities: { blitzscaler: { teamCap: 75 }, bootstrapper: { teamCap: 38 }, incumbent: { teamCap: 105 } } },
           // Users move between rivals.
           churn: { base: 0.35 },
           events: {
@@ -826,14 +832,15 @@ export const CAREER: CareerGameConfig = {
         values: {
           market: { newUsersTurn1: 1.6 * M, growthPerTurn: 0.04 },
           salary: 150 * K,
-          valuation: { perUser: 100 },
-          hiring: { candidatesPerTurn: 12 },
+          valuation: { perUser: 18 },
+          priceTiers: { budget: { price: 1.44 }, standard: { price: 2.16 }, premium: { price: 3.6 } },
+          hiring: { candidatesPerTurn: 7 },
           ipo: { users: 4 * M },
           archetypes: { startup: { cash: 1 * M } },
           // Coding assistants build faster; features are copied in weeks.
           quality: { gainPerWork: 12, decay: 8 },
           pull: { maxMarketing: 30 * M },
-          cpu: { personalities: { blitzscaler: { teamCap: 50 }, bootstrapper: { teamCap: 25 }, incumbent: { teamCap: 70 } } },
+          cpu: { personalities: { blitzscaler: { teamCap: 75 }, bootstrapper: { teamCap: 38 }, incumbent: { teamCap: 105 } } },
           events: {
             deck: [
               {
@@ -896,16 +903,17 @@ export const CAREER: CareerGameConfig = {
         invented: true,
         values: {
           market: { newUsersTurn1: 2 * M, growthPerTurn: 0.06 },
-          salary: 220 * K,
-          valuation: { perUser: 60 },
-          hiring: { candidatesPerTurn: 4 },
+          salary: 300 * K,
+          valuation: { perUser: 9 },
+          priceTiers: { budget: { price: 1.2 }, standard: { price: 1.8 }, premium: { price: 3 } },
+          hiring: { candidatesPerTurn: 2 },
           ipo: { users: 5 * M },
           archetypes: { startup: { cash: 1.5 * M } },
           // Small teams that build fast; agents switch to the better product at once and do not watch adverts.
           quality: { gainPerWork: 18 },
           churn: { perQualityPoint: 0.003 },
           pull: { maxMarketing: 40 * M, marketingCoefficient: 0.15 },
-          cpu: { personalities: { blitzscaler: { teamCap: 30 }, bootstrapper: { teamCap: 15 }, incumbent: { teamCap: 40 } } },
+          cpu: { personalities: { blitzscaler: { teamCap: 45 }, bootstrapper: { teamCap: 22 }, incumbent: { teamCap: 60 } } },
           events: {
             deck: [
               {
@@ -962,14 +970,15 @@ export const CAREER: CareerGameConfig = {
         values: {
           market: { newUsersTurn1: 3.5 * M, growthPerTurn: 0.1 },
           salary: 280 * K,
-          valuation: { perUser: 80 },
-          hiring: { candidatesPerTurn: 16 },
+          valuation: { perUser: 11 },
+          priceTiers: { budget: { price: 1.12 }, standard: { price: 1.68 }, premium: { price: 2.8 } },
+          hiring: { candidatesPerTurn: 10 },
           ipo: { users: 8 * M },
           archetypes: { startup: { cash: 2 * M } },
           // Trust is worth more than reach: adverts hardly move users, a launch moves them more.
           pull: { maxMarketing: 60 * M, marketingCoefficient: 0.1 },
           hype: { launch: 25 },
-          cpu: { personalities: { blitzscaler: { teamCap: 60 }, bootstrapper: { teamCap: 30 }, incumbent: { teamCap: 90 } } },
+          cpu: { personalities: { blitzscaler: { teamCap: 90 }, bootstrapper: { teamCap: 45 }, incumbent: { teamCap: 135 } } },
           events: {
             deck: [
               {
