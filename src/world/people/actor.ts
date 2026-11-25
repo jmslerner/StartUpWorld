@@ -28,6 +28,22 @@ import { angleDelta, PathFollower, turnToward, TURN_RATE } from "./pathFollower"
 
 /** Normal walking pace, in world units per second. */
 export const WALK_SPEED = 1.6;
+/**
+ * The longest a walk in through the door, out through it or to a new desk may last, in seconds of walking. On a big
+ * floor such a walk is quickened to fit (see `walkSpeedFor`); a wander keeps the usual pace.
+ */
+export const MAX_WALK_SECONDS = 9;
+/**
+ * Walkers slow down while they turn a corner (pathFollower.ts), which costs a long route about a fifth of a second
+ * in all. The pace is worked out for this long less, so that the walk, corners included, stays inside the limit.
+ */
+const CORNER_ALLOWANCE = 0.5;
+/**
+ * The pace of a walk of `length` world units: the usual pace, raised when needed so that the walk lasts at most
+ * MAX_WALK_SECONDS, its corners included. A pure function of the length.
+ */
+export const walkSpeedFor = (length: number): number =>
+  Number.isFinite(length) ? Math.max(WALK_SPEED, length / (MAX_WALK_SECONDS - CORNER_ALLOWANCE)) : WALK_SPEED;
 /** How much faster somebody walks when they have been told to hurry. */
 export const HURRY_FACTOR = 2.2;
 /**
@@ -175,6 +191,8 @@ export class Actor {
   /** Countdown for the timed modes (waiting, rising, pausing, settling). */
   private timer = 0;
   private walkLimit = 0;
+  /** The pace of the current walk, in world units per second (see `walkSpeedFor`). */
+  private pace = WALK_SPEED;
   /** Seconds spent away from the seat on the current trip. */
   private awayFor = 0;
   /** While positive the actor hurries; when it runs out they are snapped to where they were going. */
@@ -598,7 +616,10 @@ export class Actor {
     }
     this.motion.follow(path);
     this.mode = "walking";
-    this.walkLimit = (pathLength(from, path) / WALK_SPEED) * WALK_SLACK + WALK_GRACE;
+    const length = pathLength(from, path);
+    // A wander (out to a spot, or back from it) keeps the usual pace; any other walk is quickened to fit.
+    this.pace = this.errand === null ? walkSpeedFor(length) : WALK_SPEED;
+    this.walkLimit = (length / this.pace) * WALK_SLACK + WALK_GRACE;
     if (!this.motion.moving) this.arrive(stage);
   }
 
@@ -612,7 +633,7 @@ export class Actor {
       this.bail();
       return;
     }
-    const speed = this.hurryLeft > 0 ? WALK_SPEED * HURRY_FACTOR : WALK_SPEED;
+    const speed = this.hurryLeft > 0 ? this.pace * HURRY_FACTOR : this.pace;
     if (this.motion.advance(dt, speed)) this.arrive(stage);
   }
 

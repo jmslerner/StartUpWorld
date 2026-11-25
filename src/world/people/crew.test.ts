@@ -773,6 +773,38 @@ describe("Crew: coming to rest", () => {
   });
 });
 
+describe("Crew: the campus's year", () => {
+  /** Seconds of 60 fps frames until nobody is on the move any more (at most `limit`). */
+  const secondsToRest = (crew: Crew, limit = 60): number => {
+    let time = 0;
+    while (crew.busy() && time < limit) {
+      crew.update(1 / 60);
+      time += 1 / 60;
+    }
+    return time;
+  };
+
+  it.each([0, 7, 20_240_607])(
+    "the year with three hires and two let go is at rest within 14 seconds, however far the desks are (seed %i)",
+    (seed) => {
+      // The browser check's year: the campus full (150, split 5 : 4 : 1), two let go and three expected, then the
+      // year ends and the three join the smallest team. 50 are drawn, the rest are on the sign.
+      const campus = { office: 4 as OfficeIndex, capacity: 150, seed, runId: `lab:${seed}` };
+      const r = office([75, 60, 15], campus);
+      r.apply([73, 60, 15], { ...campus, leaving: 2, arriving: 3 });
+      secondsToRest(r.crew);
+      expect(r.crew.busy()).toBe(false);
+      r.apply([73, 60, 18], { ...campus, year: 1991 });
+      expect(r.crew.busy()).toBe(true);
+      // Movement only: the drawing loop's own quiet second comes on top.
+      expect(secondsToRest(r.crew)).toBeLessThanOrEqual(14);
+      expect(r.crew.busy()).toBe(false);
+      expectAllSeated(r);
+      expect(r.crew.departing).toHaveLength(0);
+    }
+  );
+});
+
 describe("Crew: a new year", () => {
   it("has whoever is up trot back, and snaps them into their seat within a second", () => {
     const r = office([1, 0, 0]);

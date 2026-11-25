@@ -12,7 +12,7 @@ import {
 } from "../office/layouts";
 import type { CastMember } from "../cast";
 import type { BubbleIcon, OfficeIndex, OfficeLayout, Placement, Seat, SeatKind } from "../types";
-import { Actor, CHAIR_SECONDS, HURRY_FACTOR, POP_SECONDS, RISE_SECONDS, WALK_SPEED } from "./actor";
+import { Actor, CHAIR_SECONDS, HURRY_FACTOR, MAX_WALK_SECONDS, POP_SECONDS, RISE_SECONDS, walkSpeedFor, WALK_SPEED } from "./actor";
 import { chairApproach } from "./approach";
 import type { ActorStage, ErrandLeg } from "./actor";
 
@@ -208,6 +208,84 @@ describe("Actor arriving", () => {
     expectAtSeat(actor, desk(1));
     expect(actor.seatedIdle).toBe(true);
     expect(stage.settledCount).toBe(0);
+  });
+});
+
+describe("Actor walking a long way", () => {
+  const campus = getOfficeLayout(4);
+  const campusDoor = doorExterior(campus, 0.8);
+
+  /** Seconds spent walking (not rising, settling or vanishing) until `done`, and the fastest ground speed. */
+  const walkOf = (actor: Actor, stage: ActorStage, done: () => boolean): { walking: number; fastest: number } => {
+    let walking = 0;
+    let fastest = 0;
+    runUntil(actor, stage, done, 120, () => {
+      if (actor.mode === "walking") walking += DT;
+      fastest = Math.max(fastest, actor.walkSpeed);
+    });
+    return { walking, fastest };
+  };
+
+  it("hurries a walk only as much as it takes to last at most nine seconds", () => {
+    expect(MAX_WALK_SECONDS).toBe(9);
+    expect(walkSpeedFor(0)).toBe(WALK_SPEED);
+    expect(walkSpeedFor(WALK_SPEED * 8)).toBe(WALK_SPEED);
+    // Raised in proportion beyond that: twice as far, twice as fast, with half a second kept for the corners.
+    expect(walkSpeedFor(34)).toBeCloseTo(4, 10);
+    expect(walkSpeedFor(68)).toBeCloseTo(2 * walkSpeedFor(34), 10);
+    expect(walkSpeedFor(Number.NaN)).toBe(WALK_SPEED);
+  });
+
+  it("walks out of the campus from any desk, the farthest included, in nine seconds at most", () => {
+    let longest = 0;
+    let longestWalk = 0;
+    campus.deskSeats.forEach((placement, index) => {
+      const stage = new TestStage(campus);
+      const actor = new Actor(person(), seatAt(placement, "desk", index));
+      actor.leave(campusDoor, 0, true);
+      const { walking } = walkOf(actor, stage, () => actor.gone);
+      longest = Math.max(longest, walking);
+      longestWalk = Math.max(longestWalk, pathLength(placement, findPath(campus, placement, campusDoor)));
+    });
+    // The farthest desk is a long way from the door: at the usual pace it would take far longer.
+    expect(longestWalk / WALK_SPEED).toBeGreaterThan(12);
+    expect(longest).toBeLessThanOrEqual(MAX_WALK_SECONDS);
+  });
+
+  it("walks in through the campus door to any desk in nine seconds at most", () => {
+    let longest = 0;
+    campus.deskSeats.forEach((placement, index) => {
+      const stage = new TestStage(campus);
+      const actor = new Actor(person(), seatAt(placement, "desk", index));
+      actor.enterFrom(campusDoor, campus.door.facing, 0, false);
+      longest = Math.max(longest, walkOf(actor, stage, () => actor.mode === "seated").walking);
+    });
+    expect(longest).toBeLessThanOrEqual(MAX_WALK_SECONDS);
+  });
+
+  it("walks from a spot at the door to a far desk in nine seconds at most", () => {
+    const stage = new TestStage(campus);
+    const far = campus.deskSeats.reduce((best, seat) => (Math.hypot(seat.x - campusDoor.x, seat.z - campusDoor.z) > Math.hypot(best.x - campusDoor.x, best.z - campusDoor.z) ? seat : best));
+    const actor = new Actor(person(), seatAt(campus.waitingSpots[0], "waiting", 0));
+    actor.rehome(seatAt(far, "desk", campus.deskSeats.indexOf(far)), stage);
+    const { walking, fastest } = walkOf(actor, stage, () => actor.mode === "seated");
+    expect(fastest).toBeGreaterThan(WALK_SPEED);
+    expect(walking).toBeLessThanOrEqual(MAX_WALK_SECONDS);
+  });
+
+  it("keeps the usual pace on a short walk, and on a wander however long", () => {
+    const stage = new TestStage(layout);
+    const actor = new Actor(person(), desk(7));
+    actor.enterFrom(exterior, layout.door.facing, 0, false);
+    expect(walkOf(actor, stage, () => actor.mode === "seated").fastest).toBeCloseTo(WALK_SPEED, 5);
+
+    const campusStage = new TestStage(campus);
+    const far = campus.deskSeats.reduce((best, seat) => (seat.x - seat.z > best.x - best.z ? seat : best));
+    const spot = campus.deskSeats.reduce((best, seat) => (seat.x - seat.z < best.x - best.z ? seat : best));
+    const wanderer = new Actor(person(), seatAt(far, "desk", campus.deskSeats.indexOf(far)));
+    expect(pathLength(far, findPath(campus, far, spot)) / WALK_SPEED).toBeGreaterThan(MAX_WALK_SECONDS);
+    wanderer.runErrand("wander", [{ x: spot.x, z: spot.z + 0.9, facing: null, pause: 0.5, bubble: null }], campusStage);
+    expect(walkOf(wanderer, campusStage, () => wanderer.mode === "seated").fastest).toBeCloseTo(WALK_SPEED, 5);
   });
 });
 
