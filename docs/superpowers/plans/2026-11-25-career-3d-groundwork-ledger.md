@@ -19,6 +19,9 @@ skill for this method is not installed on this machine; the method is followed b
   the door, for as many arrivals as there were hidden people; and in Task 8 the "+N" and "-N" at the door are worked
   out from the head counts of the two scenes whenever either cast has hidden people, and from the cast's lists
   otherwise.
+- Nothing in this plan registers a team's area as something to tap. Task 6 makes picking ready for it and tests it;
+  the area itself belongs with "moving a person by touching a team's area", which the plan leaves for the wiring.
+  Whoever registers it must keep the box low (about 0.1 high), or it wins the tap ahead of the figures inside it.
 - Someone back from being away takes the first team that is short, in the order Product, Growth, Recruiting, which
   need not be the team they left (ruling 4, as written). Kept: the plan's ruling is explicit.
 
@@ -31,6 +34,7 @@ skill for this method is not installed on this machine; the method is followed b
 | 3 | done | 1fecaab (merge), 996c1a0 | approved; four minor points, fixed with Task 5 |
 | 4 | done | 0b2fc50 | approved; five minor points, four fixed with Task 6 |
 | 5 | done, in review | a103c6c, 5cd04ed | pending |
+| 6 | done, in review | b5e5a27, 182fad9 | pending |
 
 ## Task notes
 
@@ -169,3 +173,11 @@ no station, door or wall writes a word, that the sign writes a plus and a number
 
 Noted: the built stylesheet grew by about 0.3 kB though `src/index.css` is untouched. To be explained by the
 whole-branch review.
+
+### Task 6
+
+Five files are byte for byte the old ones (`HighlightRing.ts`, `gestures.ts`, `picking.ts`, and `hitProxy.ts` and
+`footprint.ts` from Task 5); `Interaction.ts` differs in two comments that spoke of the terminal. The test file has
+36 tests, the old 34 and the plan's two. The nine station literals in the test stay as they were: the inventory
+expected `station` to leave the union, and Task 2 kept it. The desk literals and the founder ids were the ones to
+change.
