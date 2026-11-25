@@ -50,7 +50,7 @@ skill for this method is not installed on this machine; the method is followed b
 | 6 | done | b5e5a27, 182fad9 | approved; no findings |
 | 7 | done | bb811ab, aab5a0c, 9ca7013 (fixes) | approved with two important points, fixed before Task 9 |
 | 8 | done | 3dbd554 | approved; three minor points, fixed with Task 9 |
-| 9 | done, in review | b47bf0c, 98e73bf | pending |
+| 9 | done | b47bf0c, 98e73bf | approved; no findings |
 | 10 | done, in review | 1847d99 | pending |
 
 ## Task notes
@@ -330,6 +330,14 @@ afterwards (5 of 5 caught).
 
 To look at in Task 11's screenshots: in the shared office at 900 by 600 the neighbours' half of the loft crops at
 the right edge. The camera frames the company's own floor.
+
+Review (of Task 9, the fixes to the people, and the two effects fixes): approved with no findings. Driven in a real
+browser: at rest neither a frame nor a frame request for two seconds and more; a pointer, a resize, a selection, a
+new scene, a restored context and the end of a pause each woke it; under React's strict mode one canvas and one
+subscription; after dispose no listener left. A fuzz of 150 runs of 60 scenes never passed 56 figures, and 200,000
+single team changes never moved more than two drawn people between neighbouring teams or three between Product and
+Recruiting. With the keep-running switch turned off again, rest can take about 35 seconds, while trips under way
+finish.
 
 ### Task 10
 
