@@ -1,9 +1,11 @@
 # The 3D groundwork, checked in a real browser
 
 What `scripts/world-check.mjs` measured on the lab page (`/office-lab.html`) after the last task of the groundwork
-plan, on 25 November 2026, with the rules branch merged in, and measured again after the three fixes at the end of
-this page (walks that hurry on a large floor, reduced motion that stands still, and the lab's era and office list).
-Every number below is from that second run, which passed every check.
+plan, on 25 November 2026, with the rules branch merged in, measured again after the three fixes at the end of
+this page (walks that hurry on a large floor, reduced motion that stands still, and the lab's era and office list),
+and a third time after the final review's corrections (the numbers at the door last 0.8 seconds under reduced motion,
+and the script holds each limit against the unrounded measurement). Every number below is from that third run, which
+passed every check and exited with 0.
 
 **This machine renders WebGL in software.** Headless Chromium draws through its software renderer on four CPUs, at
 about four to fifteen frames a second. Its frame rates and its page-time durations say nothing about a phone. The
@@ -34,15 +36,16 @@ Read from the renderer once the office has come to rest. Draw calls include the 
 | Garage | 4 | 390×844 | 82 | 31,458 | 4 | 0 |
 | Shared office | 9 | 1280×800 | 160 | 71,160 | 9 | 0 |
 | Shared office | 9 | 390×844 | 160 | 71,160 | 9 | 0 |
-| Own office | 22 | 1280×800 | 301 | 122,820 | 22 | 0 |
+| Own office | 22 | 1280×800 | 301 | 122,880 | 22 | 0 |
 | Own office | 22 | 390×844 | 300 | 122,800 | 22 | 0 |
 | Full floor | 40 | 1280×800 | 519 | 224,478 | 40 | 0 |
 | Full floor | 40 | 390×844 | 519 | 224,478 | 40 | 0 |
-| Campus | 150 | 1280×800 | 630 | 281,252 | 50 | 100 |
+| Campus | 150 | 1280×800 | 629 | 280,880 | 50 | 100 |
 | Campus | 150 | 390×844 | 629 | 280,880 | 50 | 100 |
 
-The counts move by a call or two and a few dozen triangles from one run to the next (a shadow that falls inside or
-outside a frustum); the first run had 159 and 301 where this one has 160 and 300. The design's phone budget is 300
+Draw calls vary by one or two between runs, and triangles by a few dozen to a few hundred, because of the shadow pass
+(a shadow that falls inside or outside a frustum): the first run had 159 and 301 where this one has 160 and 300, and
+the second had 630 at the campus where this one has 629. The design's phone budget is 300
 draw calls. The own office, full with 22 people, is the first to reach it (300 to 301); the
 shared office with 9 is well inside (160). One restored figure costs 8 draw calls, and 2 to 6 more in the shadow pass,
 so the people are most of the bill: 22 figures are about 176 calls before their shadows, 50 are 400. The campus stays
@@ -64,19 +67,29 @@ machine took. The loop draws on for one second after the last movement and then 
 
 | Office | Size | End of year: rest, world s | End of year: page s | Before it, layoffs and hires to the door: rest, world s (page s) | Reduced motion: moving, world s | Reduced motion: rest, page s |
 |---|---|---|---|---|---|---|
-| Garage | 1280×800 | 2.5 | 2.7 | 7.5 (7.6) | 0.8 | 2.2 |
-| Garage | 390×844 | 2.5 | 2.6 | 7.5 (7.6) | 0.9 | 2.1 |
-| Shared office | 1280×800 | 2.5 | 2.8 | 9.3 (11.1) | 0.9 | 2.2 |
-| Shared office | 390×844 | 2.5 | 2.6 | 9.2 (9.3) | 1.0 | 2.1 |
-| Own office | 1280×800 | 2.5 | 3.4 | 11.0 (14.7) | 0.8 | 2.4 |
-| Own office | 390×844 | 2.7 | 2.9 | 11.0 (11.2) | 0.8 | 2.2 |
-| Full floor | 1280×800 | 2.5 | 3.6 | 11.1 (21.3) | 0.9 | 2.8 |
-| Full floor | 390×844 | 2.5 | 3.4 | 11.1 (16.5) | 0.8 | 2.8 |
-| Campus | 1280×800 | 10.9 | 25.3 | 11.0 (26.4) | 0.8 | 3.3 |
-| Campus | 390×844 | 10.9 | 18.9 | 11.0 (21.0) | 0.8 | 2.8 |
+| Garage | 1280×800 | 2.5 | 2.8 | 7.6 (7.6) | 0.7 | 2.0 |
+| Garage | 390×844 | 2.5 | 2.6 | 7.5 (7.5) | 0.8 | 1.9 |
+| Shared office | 1280×800 | 2.6 | 2.9 | 9.3 (10.5) | 0.7 | 2.0 |
+| Shared office | 390×844 | 2.5 | 2.6 | 9.2 (9.4) | 0.7 | 1.8 |
+| Own office | 1280×800 | 2.5 | 3.1 | 11.0 (14.5) | 0.7 | 2.3 |
+| Own office | 390×844 | 2.5 | 2.8 | 11.0 (11.2) | 0.7 | 2.0 |
+| Full floor | 1280×800 | 2.5 | 3.8 | 11.1 (21.0) | 0.7 | 2.7 |
+| Full floor | 390×844 | 2.6 | 3.2 | 11.1 (17.0) | 0.7 | 2.5 |
+| Campus | 1280×800 | 10.9 | 23.6 | 11.0 (24.6) | 0.7 | 2.9 |
+| Campus | 390×844 | 10.9 | 19.4 | 11.0 (19.8) | 0.7 | 2.5 |
 
-The limits: a year's end comes to rest within 15 world seconds (the loop's quiet second included), and under reduced
-motion nothing moves after 1 second. Both are met everywhere.
+Rounded to a tenth, as the script prints them; the limits are held against the unrounded values.
+
+The limits, and how each is read:
+
+- **A year's end comes to rest within 15 seconds.** Read as world seconds from the new scene to the loop's rest, the
+  loop's quiet second included. Met everywhere: at most 10.9.
+- **Under reduced motion the loop rests within 1 second.** That is what the plan asks, and as written it cannot be
+  met: by the same plan the loop draws one quiet second after the last movement before it rests, so even a change
+  with no movement at all rests a second after it. The limit is therefore read as **nothing moves after 1 second**:
+  the world seconds until the last movement, without the quiet second. Met everywhere: movement is over after 0.7 to
+  0.8 world seconds. Under reduced motion the loop actually comes to rest 1.8 to 2.9 page seconds after the change
+  on this machine: the movement, then the quiet second, on slow frames.
 
 What the numbers say:
 
@@ -89,12 +102,14 @@ What the numbers say:
   go leave through the door, and the hires take their desks, one of them crossing the whole floor from the door.
   That walk is what kept it long, not the stagger: in the first run the leavers were out by about 7 seconds and the
   last 8 seconds were that one person walking. A walk in, out or to a new desk now lasts at most 9 seconds (below).
-  On this machine the page took 19 to 25 seconds, as the world runs at about half speed here.
-- **Under reduced motion nothing moves after 0.8 to 1.0 world seconds** (1.3 to 1.4 in the first run). Everyone is
-  placed at once; no dust rises and the camera does not shake when the office changes; the "+N" and "−N" over the
-  door stand still and are gone after 0.9 seconds. The script reads 1.0 in one case because a frame on this machine
-  counts up to a tenth of a second; the effects themselves are tested to be at rest within a second at frames of
-  1/60 s and of 0.1 s. The loop then draws its one quiet second and rests: 2.1 to 3.3 page seconds in all.
+  On this machine the page took 19 to 24 seconds, as the world runs at about half speed here.
+- **Under reduced motion nothing moves after 0.7 to 0.8 world seconds** (1.3 to 1.4 in the first run, 0.8 to 1.0 in
+  the second). Everyone is placed at once; no dust rises and the camera does not shake when the office changes; the
+  "+N" and "−N" over the door stand still and are gone after 0.8 seconds. The second run read 1.0 in one case, at the
+  limit, because a frame on this machine counts up to a tenth of a second; the numbers then lasted 0.9 seconds, and
+  were shortened to 0.8 to leave room without touching the limit. The effects themselves are tested to be at rest
+  within a second at frames of 1/60 s and of 0.1 s. The loop then draws its one quiet second and rests: 1.8 to 2.9
+  page seconds in all.
 
 ## The rest of the checks
 
@@ -158,14 +173,16 @@ and one fault of the lab page found in review, were fixed after it.
   at most nine seconds, corners included (`people/actor.ts`: speed = max(1.6, length / 8.5), the half second kept
   for slowing at corners). A wander keeps the usual pace; the path follower is unchanged. Tested on the campus: the
   longest walk from any desk to the door takes 8.7 seconds, every walk in takes at most nine, a short walk keeps the
-  usual pace, and the browser's year among 150 people is at rest after 9.4 seconds of movement (16.5 before), held
-  to 14 by a test. **Now 10.9.**
+  usual pace, and the crew test's year among 150 people has 9.4 seconds of movement (16.5 before), held to 14 by
+  that test. In the browser the campus's year has about 9.9 world seconds of movement and is at rest at 10.9.
+  **Now 10.9.**
 - **Limit missed: under reduced motion things moved for 1.3 to 1.4 world seconds against 1.** Nobody walked, but the
   "+N" and "−N" at the door lived 1.4 seconds and still rose a little, and thin dust rose when the office changed (an
   earlier, tested decision, now reversed: that test now checks that none rises). Under reduced motion the effects
   (`fx/FxSystem.ts`) raise no dust and no shake on a change of office, and the numbers at the door stand where they
-  appear, at their size, for 0.9 seconds. The float text layer had no way to be given a length or to stand still,
-  so it takes two optional settings that leave it as it was when they are left out. **Now 0.8 to 1.0.**
+  appear, at their size, for 0.9 seconds (0.8 since the final review). The float text layer had no way to be given a
+  length or to stand still, so it takes two optional settings that leave it as it was when they are left out.
+  **Now 0.7 to 0.8.**
 - **The lab page went blank for an era cut through an emoji.** An era is cut to 40 letters; it was cut by UTF-16
   units, which can leave half an emoji, and writing the address then threw before the page was drawn. It is now cut
   by whole letters, and half a letter never reaches the address by any route (the address, an edit, or a whole scene
@@ -192,7 +209,10 @@ node scripts/world-check.mjs --json check.json     # also writes every measureme
 node scripts/world-check.mjs --no-build            # serves the dist that is there
 ```
 
-It takes about nine minutes on this machine, exits with 1 when any check fails, and lists each failure. It uses the
+It takes about nine minutes on this machine, exits with 1 when any check fails, and lists each failure; a once-only
+check that throws is one more failure in that list, not the end of the report. It stops at once, with a clear message,
+if port 4179 is already taken, and it waits for vite to say where it serves before it takes an answer on the port as
+vite's. Each limit is held against the measured value; only the printed table rounds. It uses the
 machine's own Playwright and Chromium, is not part of `npm test`, and is not read by the linter or the test runner.
 As things stand it exits with 0: "all checks passed". The first run exited with 1, for twelve failures: the
 campus's year at both sizes, and the reduced motion year in all ten.

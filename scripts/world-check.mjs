@@ -19,6 +19,7 @@
 import { spawn, spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
+import { connect } from "node:net";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -156,7 +157,27 @@ process.on("unhandledRejection", (error) => {
   process.exit(1);
 });
 
+/** Whether something already listens on `port` at `host`. */
+const answers = (host, port) =>
+  new Promise((done) => {
+    const socket = connect({ host, port });
+    socket.setTimeout(1000);
+    socket.once("connect", () => {
+      socket.destroy();
+      done(true);
+    });
+    socket.once("timeout", () => {
+      socket.destroy();
+      done(false);
+    });
+    socket.once("error", () => done(false));
+  });
+
 const startServer = async () => {
+  // vite gives up on a taken port (--strictPort), but whatever holds it would still answer the polling below.
+  for (const host of ["127.0.0.1", "::1"]) {
+    if (await answers(host, PORT)) throw new Error(`port ${PORT} is already in use (on ${host}): stop whatever holds it and run again`);
+  }
   server = spawn("npx", ["vite", "preview", "--port", String(PORT), "--strictPort"], {
     cwd: ROOT,
     detached: true,
@@ -168,6 +189,11 @@ const startServer = async () => {
   const until = Date.now() + 30000;
   while (Date.now() < until) {
     if (server.exitCode !== null) throw new Error(`vite preview exited:\n${output}`);
+    // Only once vite says where it serves is an answer on the port vite's own.
+    if (!output.includes("Local:")) {
+      await new Promise((done) => setTimeout(done, 200));
+      continue;
+    }
     try {
       const response = await fetch(`${BASE}${PAGE}`);
       if (response.ok) return;
@@ -233,6 +259,7 @@ const framesInSecondQuietSecond = (page) =>
  * - `settledS`: world seconds until the last thing stopped moving. The loop rests a second of page time after
  *   that (core/rest.ts), so this counts the frames drawn up to a second before the last one.
  * - `restS`: `settledS` and the world's one second of grace: how long the year lasts on a page that keeps up.
+ * Both are left unrounded: a limit is held against the measured value, and only the report rounds it.
  */
 const playOut = (page, next) =>
   page.evaluate(
@@ -261,8 +288,8 @@ const playOut = (page, next) =>
               rested: now - last >= quietMs,
               frames: frames - first,
               restMs: Math.round(last - start),
-              settledS: Math.round(settled * 10) / 10,
-              restS: Math.round((settled + graceMs / 1000) * 10) / 10,
+              settledS: settled,
+              restS: settled + graceMs / 1000,
             });
           } else requestAnimationFrame(look);
         };
@@ -283,7 +310,7 @@ const playYear = async (page, full, label, limitS, measure) => {
   const year = await playOut(page, next);
   check(year.rested, `${label}: the year never came to rest within ${WATCH_MS / 1000} s`);
   check(year.frames > 0, `${label}: the year drew no frame`);
-  check(year[measure] <= limitS, `${label}: the year took ${year[measure]} s (${measure}), over ${limitS} s`);
+  check(year[measure] <= limitS, `${label}: the year took ${year[measure].toFixed(3)} s (${measure}), over ${limitS} s`);
   return { door, year, next };
 };
 
@@ -445,24 +472,35 @@ const main = async () => {
 
   const browser = await chromium.launch();
   const rows = [];
-  let once;
+  const once = {};
+  /** A check run once: if it throws, that is one more failure, and the report goes on. */
+  const runOnce = async (name, label, run) => {
+    try {
+      once[name] = await run();
+    } catch (error) {
+      const message = String(error?.message ?? error).split("\n")[0];
+      check(false, `${label}: ${message}`);
+      once[name] = { error: message };
+    }
+  };
   try {
     for (let office = 0; office < CAPACITY.length; office++) {
       for (const size of SIZES) {
         try {
           const row = await officeRun(browser, office, size, shotsDir, reportShots);
           rows.push(row);
-          console.log(`office ${office} ${size.width}x${size.height}: ${row.drawCalls} calls, year ${row.year.restS} s`);
+          console.log(`office ${office} ${size.width}x${size.height}: ${row.drawCalls} calls, year ${row.year.restS.toFixed(1)} s`);
         } catch (error) {
           check(false, `office ${office} at ${size.width}x${size.height}: ${error.message.split("\n")[0]}`);
         }
       }
     }
-    once = { lostContext: await lostContext(browser), mounts: await mountTwenty(browser) };
+    await runOnce("lostContext", "lost context", () => lostContext(browser));
+    await runOnce("mounts", "twenty mounts", () => mountTwenty(browser));
   } finally {
     await browser.close();
   }
-  once.withoutWebGL = await withoutWebGL();
+  await runOnce("withoutWebGL", "without WebGL", () => withoutWebGL());
 
   console.log("");
   console.log("                                                       |      year (s)       |  reduced motion (s)");
@@ -478,8 +516,11 @@ const main = async () => {
   console.log("to be shown at the door before the year ends (not timed against a limit)");
   console.log("");
   console.log(`lost context, then "${RELOAD}": ${once.lostContext.error ?? `${once.lostContext.status}, ${once.lostContext.figures} people drawn`}`);
-  console.log(`without WebGL: status ${once.withoutWebGL.status}, note ${once.withoutWebGL.noteShown ? "shown" : "missing"}, ${once.withoutWebGL.pageErrors.length} page errors`);
-  console.log(`twenty mounts: geometries/textures ${once.mounts.first.geometries}/${once.mounts.first.textures} after the first unmount, ${once.mounts.last.geometries}/${once.mounts.last.textures} after the last`);
+  const { withoutWebGL: bare, mounts } = once;
+  console.log(`without WebGL: ${bare.error ?? `status ${bare.status}, note ${bare.noteShown ? "shown" : "missing"}, ${bare.pageErrors.length} page errors`}`);
+  console.log(
+    `twenty mounts: ${mounts.error ?? `geometries/textures ${mounts.first.geometries}/${mounts.first.textures} after the first unmount, ${mounts.last.geometries}/${mounts.last.textures} after the last`}`
+  );
   console.log(`screenshots at scale 1: ${reportShots}`);
   if (shotsDir) console.log(`screenshots at scale 2: ${shotsDir}`);
 
