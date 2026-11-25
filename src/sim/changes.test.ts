@@ -80,4 +80,34 @@ describe("formatChanges", () => {
       "  events.deck.brand-new    (not there) -> added",
     ]);
   });
+
+  it("prints a setting that is switched off as 'off', not as something added or removed", () => {
+    // poachRunway: null means that rival never poaches.
+    const text = formatChanges([
+      { path: "cpu.personalities.blitzscaler.poachRunway", start: null, now: 2 },
+      { path: "cpu.personalities.incumbent.poachRunway", start: 3, now: null },
+      { path: "events.deck.old-card", start: { id: "old-card" }, now: undefined },
+    ]);
+    expect(text.split("\n").slice(1)).toEqual([
+      "  cpu.personalities.blitzscaler.poachRunway  off -> 2",
+      "  cpu.personalities.incumbent.poachRunway    3 -> off",
+      "  events.deck.old-card                       (was there) -> (not there)",
+    ]);
+  });
+});
+
+describe("applyOverrides", () => {
+  it("gives a number to a setting that is switched off", () => {
+    expect(DESIGN.cpu.personalities.blitzscaler.poachRunway).toBeNull();
+    const poaching = applyOverrides(DESIGN, { "cpu.personalities.blitzscaler.poachRunway": 3 });
+    expect(poaching.cpu.personalities.blitzscaler.poachRunway).toBe(3);
+    expect(changedNumbers(DESIGN, poaching)).toEqual([{ path: "cpu.personalities.blitzscaler.poachRunway", start: null, now: 3 }]);
+  });
+
+  it("still refuses a value of the wrong kind, a missing number and a whole section", () => {
+    expect(() => applyOverrides(DESIGN, { salary: "lots" })).toThrow(/salary is a number/);
+    expect(() => applyOverrides(DESIGN, { "cpu.personalities.blitzscaler.poachRunway": "soon" })).toThrow(/poachRunway takes a number/);
+    expect(() => applyOverrides(DESIGN, { "ipo.user": 1 })).toThrow(/No such config number: ipo\.user/);
+    expect(() => applyOverrides(DESIGN, { "cpu.personalities.incumbent": 1 })).toThrow(/not a single value/);
+  });
 });

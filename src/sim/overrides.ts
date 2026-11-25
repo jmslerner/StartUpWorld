@@ -18,8 +18,13 @@ export const applyOverrides = <T>(config: T, overrides: Readonly<Record<string, 
     const last = keys[keys.length - 1];
     if (!isRecord(node) || !(last in node)) throw new Error(`No such config number: ${path}`);
     const current = node[last];
-    if (typeof current !== "number" && typeof current !== "string") throw new Error(`${path} is not a single value`);
-    if (typeof current !== typeof value) throw new Error(`${path} is a ${typeof current}, not a ${typeof value}`);
+    if (current === null) {
+      // Switched off in the config (a rival that never poaches): a number switches it on.
+      if (typeof value !== "number") throw new Error(`${path} takes a number`);
+    } else {
+      if (typeof current !== "number" && typeof current !== "string") throw new Error(`${path} is not a single value`);
+      if (typeof current !== typeof value) throw new Error(`${path} is a ${typeof current}, not a ${typeof value}`);
+    }
     node[last] = value;
   }
   return copy;

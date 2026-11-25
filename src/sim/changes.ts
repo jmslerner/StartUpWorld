@@ -36,6 +36,8 @@ export const changedNumbers = (start: unknown, now: unknown, path = ""): Change[
 
 const show = (value: unknown, side: "start" | "now"): string => {
   if (value === undefined) return "(not there)";
+  // A setting that is switched off, such as the runway a rival wants before it poaches.
+  if (value === null) return "off";
   if (typeof value === "number") return Number.isInteger(value) && Math.abs(value) >= 1_000 ? value.toLocaleString("en-US") : String(value);
   if (isLeafList(value)) return value.map((item) => show(item, side)).join(", ");
   if (typeof value === "object") return side === "now" ? "added" : "(was there)";
