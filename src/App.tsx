@@ -1,8 +1,13 @@
 import { Analytics } from "@vercel/analytics/react";
-import { useGame } from "./state/useGame";
+import { gameStore, useGame } from "./state/useGame";
+import { moneyInBillions } from "./ui/format";
 import { EndScreen } from "./ui/screens/EndScreen";
 import { GameScreen } from "./ui/screens/GameScreen";
 import { NewGameScreen } from "./ui/screens/NewGameScreen";
+
+// A career's money reads in billions from $1B; the race's never does. Set before any screen reads the new state.
+moneyInBillions(gameStore.getState().config.career !== undefined);
+gameStore.subscribe((state) => moneyInBillions(state.config.career !== undefined));
 
 /** Which screen is up: no game yet, a game in progress (with its report after each year or quarter), or a finished one. */
 const Screen = () => {

@@ -89,4 +89,10 @@ describe("the marketing note", () => {
     expect(marketingNote(note, null)).toBe(note);
     expect(marketingNote("Raise dropped: it needs 5,000 users.", "raise")).toBe("Raise dropped: it needs 5,000 users.");
   });
+
+  it("says a raise cooldown runs past the career's last year in years", () => {
+    const game = launchedCompany(real(48), HUMAN, { users: 1_000_000, lastRaise: { turn: 47, percent: 10, amount: 1 } });
+    const text = planningView(game, draftOf(game), CAREER).raise.blockedText;
+    expect(text).toBe("You raised in 2036. There is no time for another raise before your career ends in 2038.");
+  });
 });

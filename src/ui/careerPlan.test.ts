@@ -71,10 +71,25 @@ describe("the career's warnings", () => {
     const draft = draftOf(growing, { allocation: { product: 1, growth: 0, recruiting: 3 }, hireLimit: null });
     const projection = projectTurn(viewFor(growing, HUMAN), draft, CAREER_TEST);
     const move = officeMoveView(projection, CAREER_TEST);
-    expect(move).toMatchObject({ from: "Garage", to: "Shared office", bill: projection.career?.office?.bill });
+    expect(move).toMatchObject({ from: "Garage", to: "Shared office", capacity: CAREER_TEST.career!.offices[0].capacity, bill: projection.career?.office?.bill });
     expect(texts(growing, draft)).toContain(move!.text);
     const last = atTurn(newCareer(), 49);
     expect(texts(last, draftOf(last))).toContain("Final year: after 2038 the largest founder's stake (equity × valuation) wins.");
+  });
+
+  it("does not count the moving bill twice: a plan that ends the year above $0 gets a note, not a caution", () => {
+    const growing = withCompany(newCareer(), HUMAN, { headcount: 4, headcountAtLastClose: 4 });
+    const draft = draftOf(growing, { allocation: { product: 1, growth: 0, recruiting: 3 }, hireLimit: null });
+    const first = projectTurn(viewFor(growing, HUMAN), draft, CAREER_TEST);
+    const bill = first.career!.office!.bill;
+    // The cash that leaves half the bill at the year's end, the bill already counted in the costs.
+    const tight = withCompany(growing, HUMAN, { cash: growing.companies[HUMAN].cash - first.cash + bill / 2 });
+    const projection = projectTurn(viewFor(tight, HUMAN), draft, CAREER_TEST);
+    expect(projection.career?.office).not.toBeNull();
+    expect(projection.cash).toBeGreaterThan(0);
+    expect(projection.cash).toBeLessThan(bill);
+    const move = officeMoveView(projection, CAREER_TEST)!;
+    expect(planningView(tight, draft, CAREER_TEST).warnings.find((w) => w.text === move.text)?.level).toBe("note");
   });
 
   it("tells a company at the bar how to qualify, and one that has qualified that it may list", () => {

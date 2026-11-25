@@ -41,11 +41,13 @@ interface QuarterReportProps {
   career: CareerReportView | null;
   /** The year the coming card is dated to; null for a random draw, and always in a race. */
   datedNext: number | null;
+  /** The timeline's last year of history; null in a race. A dated card after it is invented. */
+  historyEnds: number | null;
   onClose: () => void;
 }
 
 /** The year's or quarter's results as a ledger printout, shown over the game after every turn. */
-export const QuarterReport = ({ companyName, view, over, words, career, datedNext, onClose }: QuarterReportProps) => {
+export const QuarterReport = ({ companyName, view, over, words, career, datedNext, historyEnds, onClose }: QuarterReportProps) => {
   const titleId = useId();
   const closeRef = useRef<HTMLButtonElement | null>(null);
 
@@ -222,7 +224,7 @@ export const QuarterReport = ({ companyName, view, over, words, career, datedNex
 
           {view.nextEvent !== null && !over && (
             <p className="mt-4 border-t border-white/10 pt-3 text-amber-300/90">
-              {datedNext !== null && <span className="mr-2 text-[0.65rem] font-semibold uppercase tracking-[0.22em] text-amber-400">Dated {datedNext}</span>}
+              {datedNext !== null && <span className="mr-2 text-[0.65rem] font-semibold uppercase tracking-[0.22em] text-amber-400">{historyEnds !== null && datedNext > historyEnds ? "Invented" : "History"}</span>}
               <span className="font-semibold">
                 Coming in {words.when(view.turn + 1)}: <span data-card-text="">{view.nextEvent.name}.</span>
               </span>{" "}

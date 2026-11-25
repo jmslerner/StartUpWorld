@@ -59,9 +59,9 @@ export const ProjectionCard = ({ company, view, words, move }: ProjectionCardPro
         </div>
         {words.career && move !== null && (
           <div className="flex items-baseline justify-between gap-3">
-            <dt className="text-mist">Office move</dt>
+            <dt className="text-mist">Office move if above {move.capacity}</dt>
             <dd className="text-right tabular-nums text-gray-100">
-              {move.from} → {move.to}, {money(move.bill)}
+              {move.from} → {move.to}, up to {money(move.bill)}
             </dd>
           </div>
         )}

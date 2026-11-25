@@ -53,6 +53,20 @@ describe("the end of a career", () => {
     });
   });
 
+  it("names both failures when the rescue was for the other reason", () => {
+    const outAt = (reason: "bankrupt" | "fired", rescued: "bankrupt" | "fired"): GameState =>
+      withCareerOf(withCompany(atTurn(newCareer(), 13), HUMAN, { out: { turn: 12, reason, users: 0, headcount: 0 } }), HUMAN, { rescue: { turn: 4, reason: rescued } });
+    const fired = careerEndView(outAt("fired", "bankrupt"), [], CAREER_TEST)!;
+    expect(fired).toMatchObject({ kind: "fired", year: 2001, title: "Your board fired you." });
+    expect(fired.text).toBe("Investors held your board, and 2001 was a bad year. Your one rescue, from running out of cash in 1993, is spent, so your career is over.");
+    const bankrupt = careerEndView(outAt("bankrupt", "fired"), [], CAREER_TEST)!;
+    expect(bankrupt).toMatchObject({ kind: "bankrupt", year: 2001, title: "Acme ran out of cash." });
+    expect(bankrupt.text).toBe("You ended 2001 below $0. Your one rescue, when your board fired you in 1993, is spent, so your career is over.");
+    const firedTwice = careerEndView(outAt("fired", "fired"), [], CAREER_TEST)!;
+    expect(firedTwice.title).toBe("Your board fired you again.");
+    for (const view of [fired, bankrupt]) expect(`${view.title} ${view.text}`).not.toMatch(/again|second time/);
+  });
+
   it("lists a rival whose seat was taken by a newcomer, by its own name", () => {
     const record: CareerRecord = [{ kind: "rivalOut", turn: 8, seat: BOOT, name: "Oakline", founded: 1, reason: "fired" }];
     const replaced = withCareerOf(withCompany(newCareer(), BOOT, { name: "Newco" }), BOOT, { founded: 10 });

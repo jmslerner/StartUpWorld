@@ -57,7 +57,8 @@ const isShift = (card: DatedCard): boolean => card.effects.some((effect) => effe
 
 const YOURS: ReadonlySet<Milestone["kind"]> = new Set(["launch", "office", "listed", "rescued", "out"]);
 
-const markText = (milestone: Milestone, config: RulesConfig): string => {
+/** The reason of the rescue before an "out", so the out says "a second time" only when it was the same failure. */
+const markText = (milestone: Milestone, config: RulesConfig, rescued: (Milestone & { kind: "rescued" }) | null): string => {
   switch (milestone.kind) {
     case "launch":
       return "Product launched";
@@ -70,7 +71,9 @@ const markText = (milestone: Milestone, config: RulesConfig): string => {
     case "rescued":
       return milestone.reason === "bankrupt" ? "Rescued from bankruptcy" : "Rescued when the board fired you";
     case "out":
-      return milestone.reason === "bankrupt" ? "Out: bankrupt a second time" : "Out: fired a second time";
+      if (rescued === null) return milestone.reason === "bankrupt" ? "Out: bankrupt" : "Out: fired";
+      if (rescued.reason === milestone.reason) return milestone.reason === "bankrupt" ? "Out: bankrupt a second time" : "Out: fired a second time";
+      return milestone.reason === "bankrupt" ? "Out: bankrupt, after the rescue when the board fired you" : "Out: fired, after the rescue from bankruptcy";
     case "rivalOut":
       return milestone.reason === "bankrupt" ? `${milestone.name} went bankrupt` : `${milestone.name}'s founder was fired`;
     case "rivalIn":
@@ -82,12 +85,12 @@ const markText = (milestone: Milestone, config: RulesConfig): string => {
 export const marksOf = (record: CareerRecord, config: RulesConfig): TimelineMark[] => {
   const career = config.career;
   if (career === undefined) return [];
-  return record.map((milestone) => ({
-    year: yearOf(milestone.turn, career),
-    kind: milestone.kind,
-    yours: YOURS.has(milestone.kind),
-    text: markText(milestone, config),
-  }));
+  let rescued: (Milestone & { kind: "rescued" }) | null = null;
+  return record.map((milestone) => {
+    const mark = { year: yearOf(milestone.turn, career), kind: milestone.kind, yours: YOURS.has(milestone.kind), text: markText(milestone, config, rescued) };
+    if (milestone.kind === "rescued") rescued = milestone;
+    return mark;
+  });
 };
 
 /** The whole career on one line: its eras, the dated cards so far, the shift ahead and the milestones. Null in a race. */
@@ -119,7 +122,7 @@ export const timelineView = (game: GameState, record: CareerRecord, config: Rule
           year: notice.year,
           yearsAway: notice.yearsAway,
           ceiling: notice.ceiling,
-          text: `${shiftName} arrives in ${notice.year}, ${notice.yearsAway === 1 ? "next year" : `in ${notice.yearsAway} years`}: that year no product keeps more than quality ${notice.ceiling}.`,
+          text: `A platform shift comes in ${notice.year} (${shiftName}), ${notice.yearsAway === 1 ? "next year" : `in ${notice.yearsAway} years`}: that year no product keeps more than quality ${notice.ceiling}.`,
         };
   return {
     year,

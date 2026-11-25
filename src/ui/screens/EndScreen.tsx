@@ -19,7 +19,7 @@ export const EndScreen = () => {
   const record = useGame((state) => state.record);
   const words = useMemo(() => wordsFor(config), [config]);
   const view = useMemo(() => (game === null ? null : endView(game, config)), [game, config]);
-  // A career's ending, and its whole timeline; null in a race.
+  // A career's ending, and its whole timeline (wide enough to show in full, with no "you are here"); null in a race.
   const career = useMemo(() => (game === null ? null : careerEndView(game, record, config)), [game, record, config]);
   const timeline = useMemo(() => (game === null || career === null ? null : timelineView(game, record, config)), [game, career, record, config]);
   if (view === null) return null;
@@ -28,7 +28,7 @@ export const EndScreen = () => {
   const standings = career?.standings ?? view.standings.map((standing) => ({ ...standing, publicSince: null }));
 
   return (
-    <main className="mx-auto flex min-h-[100dvh] w-full max-w-2xl flex-col justify-center gap-3 px-3 py-6">
+    <main className={`mx-auto flex min-h-[100dvh] w-full ${career !== null ? "max-w-4xl" : "max-w-2xl"} flex-col justify-center gap-3 px-3 py-6`}>
       <section className="panel-surface rounded-xl px-4 py-5 sm:px-6">
         <p className={won ? LABEL : "text-[0.65rem] font-semibold uppercase tracking-[0.22em] text-amber-400"}>
           {career !== null ? `${won ? "You win" : "Career over"} · ${career.year}` : `${view.won ? "You win" : "Game over"} · ${words.when(view.turn)}`}
@@ -76,7 +76,7 @@ export const EndScreen = () => {
         {career !== null && timeline !== null && (
           <>
             <h2 className={`${LABEL} mt-5 mb-2`}>Your career</h2>
-            <Timeline view={timeline} marks={career.marks} />
+            <Timeline view={timeline} marks={career.marks} here={false} />
           </>
         )}
 

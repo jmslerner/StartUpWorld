@@ -9,7 +9,9 @@
  * plays its first quarter); the first screen in Career; a whole career from 1990 to 2038 with seed 1, checking each
  * year's header, timeline, button, report and words, a reload, "Save and leave" and the end screen; then, from the
  * saves scripts/career-fixtures.ts makes, going public, the rescue, the board firing the founder and the rescue
- * keeping them on, the second failure, an office move and a full campus; last, no sideways scroll at 390 px.
+ * keeping them on, the second failure, an office move and a full campus; last, no sideways scroll at 390 px. Every
+ * year, "you are here" must sit inside the timeline; on an end screen the timeline must fit with no sideways scroll,
+ * every era named in full and no "you are here"; and a finished career beside a race save is offered by its ending.
  *
  * Every page fails on any console error or page error. "Forbidden words" are period words a career never uses,
  * looked for in the page's text and its title and aria-label attributes, leaving out every element that carries
@@ -240,6 +242,35 @@ const fullReport = async (page) => {
 
 const eraOf = (year) => ERAS.filter(([first]) => first <= year).pop()[1];
 
+/**
+ * The timeline as laid out: whether its strip needs a sideways scroll, the era names that do not fit their box, and
+ * where "you are here" sits against the strip's visible box (null when it is not drawn).
+ */
+const timelineLayout = (page, scope = "main") =>
+  page.locator(`${scope} section[aria-label="Timeline"]`).first().evaluate((timeline) => {
+    const strip = timeline.querySelector(".overflow-x-auto");
+    const box = strip.getBoundingClientRect();
+    const here = timeline.querySelector("[data-here]");
+    const label = here === null ? null : here.getBoundingClientRect();
+    const cut = [...timeline.querySelectorAll("[title] > div:first-child")].filter((name) => name.scrollWidth > name.clientWidth || name.scrollHeight > name.clientHeight + 1).map((name) => name.textContent);
+    return {
+      scrolls: strip.scrollWidth > strip.clientWidth + 1,
+      cut,
+      here: label === null ? null : { inside: label.left >= box.left - 0.5 && label.right <= box.right + 0.5, left: label.left, right: label.right, boxLeft: box.left, boxRight: box.right },
+    };
+  });
+
+/** The end screen's timeline fits without a sideways scroll, with every era named in full and no "you are here". */
+const endTimelineFits = async (page) => {
+  const layout = await timelineLayout(page);
+  assert(!layout.scrolls, "the end screen's timeline needs a sideways scroll at 1280 px");
+  assert(layout.cut.length === 0, `the end screen's timeline cuts off era names: ${JSON.stringify(layout.cut)}`);
+  assert(layout.here === null, 'the end screen\'s timeline draws "you are here"');
+};
+
+/** A race save, kept from the race played first, to set beside a career save. */
+let raceSave = null;
+
 /** A page with nothing but `save` under the career's key, loaded. */
 const loadSave = async (save, size = DESKTOP) => {
   const { context, page } = await freshPage(size);
@@ -288,6 +319,7 @@ const raceUnchanged = async () => {
   assert((await report.locator("h2").first().innerText()) === "Race Co: Q1 report", 'the report is not titled "Race Co: Q1 report"');
   assert((await report.getByRole("button", { name: "Plan Q2", exact: true }).count()) === 1, 'the report has no "Plan Q2" button');
   await closeWith(page, "Plan Q2");
+  raceSave = (await storageKeys(page)).race;
   await page.getByRole("button", { name: "New game", exact: true }).click();
   await page.getByRole("button", { name: "Abandon game", exact: true }).click();
   await page.getByLabel("Name your startup").waitFor();
@@ -352,16 +384,18 @@ const wholeCareer = async () => {
     assert(await timeline.isVisible(), "the timeline is not visible");
     const timelineText = await timeline.innerText();
     assert(timelineText.includes(eraOf(year)), `the timeline does not name ${eraOf(year)}`);
+    const layout = await timelineLayout(page);
+    assert(layout.here !== null && layout.here.inside, `"you are here" in ${year} is cut off by the timeline's edge: ${JSON.stringify(layout.here)}`);
     const status = await page.locator('section[aria-label="Your career"]').innerText();
     assert(status.startsWith(eraOf(year)), `the year's status does not open with ${eraOf(year)}: ${JSON.stringify(status)}`);
     assert(/history ends/i.test(timelineText), 'the timeline has no "history ends" line');
-    if (year === 2021 || year === 2022) assert(timelineText.includes("The chatbot arrives in 2023"), 'the timeline does not say "The chatbot arrives in 2023"');
+    if (year === 2021 || year === 2022) assert(timelineText.includes("A platform shift comes in 2023 (The chatbot)"), 'the timeline does not say "A platform shift comes in 2023 (The chatbot)"');
 
     const event = page.locator('section[aria-label="This year\'s event"]');
     const label = (await event.count()) === 0 ? null : (await event.locator("span").first().textContent()).trim();
     if (year === 1995) assert(label !== null && label === "History 1995", `the event card's label in 1995 is ${JSON.stringify(label)}`);
-    if (label !== null && /^(History|Ahead) /.test(label)) {
-      const want = `${year >= 2027 ? "Ahead" : "History"} ${year}`;
+    if (label !== null && /^(History|Invented) /.test(label)) {
+      const want = `${year >= 2027 ? "Invented" : "History"} ${year}`;
       assert(label === want, `a dated card is labelled ${JSON.stringify(label)}, not ${JSON.stringify(want)}`);
       if (year >= 2027) aheadSeen = true;
     }
@@ -394,8 +428,8 @@ const wholeCareer = async () => {
     noErrors();
   }
   current = "3. A whole career";
-  assert(aheadSeen, 'no year from 2027 showed a dated card labelled "Ahead"');
-  passed("every year from 1990 to 2038: header, timeline, era, button, summary, full report, no forbidden words");
+  assert(aheadSeen, 'no year from 2027 showed a dated card labelled "Invented"');
+  passed('every year from 1990 to 2038: header, timeline ("you are here" not cut off), era, button, summary, full report, no forbidden words');
 
   // The end screen.
   current = "3. A whole career, the end screen";
@@ -404,6 +438,7 @@ const wholeCareer = async () => {
     assert((await page.locator("main ol > li").count()) === 4, "the final standings do not have four entries");
     assert((await page.getByRole("heading", { name: "Your career" }).count()) === 1, 'the end screen has no "Your career"');
     assert(await page.locator('main section[aria-label="Timeline"]').isVisible(), "the end screen shows no timeline");
+    await endTimelineFits(page);
     if (rivalWentOut && rivalEntered) assert((await page.getByRole("heading", { name: "Gone", exact: true }).count()) === 1, 'the end screen has no "Gone"');
     assert((await milestones(page)).some((line) => line.endsWith(": Product launched")), 'the milestones do not include "Product launched"');
     await noForbiddenWords(page.locator("body"), "the end screen");
@@ -413,7 +448,7 @@ const wholeCareer = async () => {
   await page.reload();
   await page.getByRole("heading", { name: "Final standings" }).waitFor();
   await checkEnd();
-  passed("the end screen: four standings, your career on the timeline, still there after a reload");
+  passed("the end screen: four standings, your career on a timeline that fits with no \"you are here\", still there after a reload");
 
   await page.getByRole("button", { name: "Last year's report", exact: true }).click();
   const last = await opened(page);
@@ -508,12 +543,26 @@ const secondFailure = async ({ save, year }) => {
     assert((await title.innerText()) === "Check Co ran out of cash again.", `the end screen is titled ${JSON.stringify(await title.innerText())}`);
     const text = await page.locator("main h1 + p").innerText();
     assert(text.includes(String(year)) && text.includes("1994"), `the end screen's text does not name ${year} and 1994: ${JSON.stringify(text)}`);
+    await endTimelineFits(page);
   };
   await checkEnd();
   await page.reload();
   await checkEnd();
   noErrors();
-  passed(`a second failure in ${year} ends the career, and the end screen stays after a reload`);
+  passed(`a second failure in ${year} ends the career, and the end screen (its timeline fits, no "you are here") stays after a reload`);
+
+  // With a race save beside it, the first screen offers the finished career's ending, dated to its last year.
+  assert(raceSave !== null, "no race save was kept from the race played first");
+  await page.evaluate(([key, value]) => localStorage.setItem(key, value), [RACE_KEY, raceSave]);
+  await page.reload();
+  await page.getByLabel("Name your startup").waitFor();
+  const ended = page.getByRole("button", { name: `See how your career ended (${year})`, exact: true });
+  assert((await ended.count()) === 1, `the first screen does not offer "See how your career ended (${year})"`);
+  assert((await page.getByRole("button", { name: /^Resume your career/ }).count()) === 0, 'the first screen offers a finished career as "Resume your career"');
+  await ended.click();
+  await checkEnd();
+  noErrors();
+  passed(`beside a race save, the finished career is offered as "See how your career ended (${year})", and opens on its end screen`);
   await context.close();
 };
 

@@ -108,14 +108,14 @@ describe("two saves, one game in play", () => {
     s.getState().endQuarter();
     const kept = storage.getItem(CAREER_SAVE_KEY);
     s.getState().leave();
-    expect(s.getState()).toMatchObject({ mode: null, game: null, resumable: { race: null, career: 2 }, preferred: "career" });
+    expect(s.getState()).toMatchObject({ mode: null, game: null, resumable: { race: null, career: { turn: 2, over: false } }, preferred: "career" });
     s.getState().startGame("Acme", 11);
     s.getState().endQuarter();
     expect(storage.getItem(CAREER_SAVE_KEY)).toBe(kept);
     s.getState().abandon();
     expect(storage.getItem(SAVE_KEY)).toBeNull();
     expect(storage.getItem(CAREER_SAVE_KEY)).toBe(kept);
-    expect(s.getState()).toMatchObject({ mode: null, game: null, record: [], resumable: { race: null, career: 2 }, preferred: "race" });
+    expect(s.getState()).toMatchObject({ mode: null, game: null, record: [], resumable: { race: null, career: { turn: 2, over: false } }, preferred: "race" });
     expect(s.getState().config).toBe(RACE);
   });
 
@@ -142,10 +142,28 @@ describe("two saves, one game in play", () => {
       serializeCareerSave({ seed: 7, game: career.getState().game!, draft: career.getState().draft!, lastLog: null, reportOpen: false, record: career.getState().record }),
     );
     const s = store(storage);
-    expect(s.getState()).toMatchObject({ mode: null, game: null, resumable: { race: 1, career: 2 } });
+    expect(s.getState()).toMatchObject({ mode: null, game: null, resumable: { race: 1, career: { turn: 2, over: false } } });
     s.getState().resume("career");
     expect(s.getState()).toMatchObject({ mode: "career", resumable: { race: 1, career: null } });
     expect(s.getState().game).toEqual(career.getState().game);
+  });
+
+  it("offers a finished career by the year it ended, not as one to resume", () => {
+    const storage = new MemoryStorage();
+    createGameStore(storage, RACE).getState().startGame("Acme", 11);
+    const career = store(new MemoryStorage());
+    career.getState().startCareer("Acme", 7);
+    career.getState().endQuarter();
+    const live = career.getState().game!;
+    // Out in the first year: the engine has already moved the state on to the next.
+    const ended = withCompany(atTurn(live, 13), HUMAN, { out: { turn: 12, reason: "fired", users: 0, headcount: 0 } });
+    storage.setItem(CAREER_SAVE_KEY, serializeCareerSave({ seed: 7, game: ended, draft: career.getState().draft!, lastLog: null, reportOpen: false, record: [] }));
+    const s = store(storage);
+    expect(s.getState()).toMatchObject({ mode: null, resumable: { race: 1, career: { turn: 12, over: true } } });
+    s.getState().resume("career");
+    expect(s.getState()).toMatchObject({ mode: "career", over: true });
+    s.getState().leave();
+    expect(s.getState().resumable.career).toEqual({ turn: 12, over: true });
   });
 
   it("removes a career save it refuses, and preselects Career", () => {

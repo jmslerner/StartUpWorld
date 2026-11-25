@@ -64,6 +64,9 @@ export const listingView = (game: GameState, draft: Plan, config: RulesConfig): 
 export interface OfficeMoveView {
   readonly from: string;
   readonly to: string;
+  /** The move comes only if the team ends the year above this many people. */
+  readonly capacity: number;
+  /** The most it costs: the projection counts it in full. */
   readonly bill: number;
   readonly text: string;
 }
@@ -78,6 +81,7 @@ export const officeMoveView = (projection: Projection, config: RulesConfig): Off
   return {
     from: from.name,
     to: to.name,
+    capacity: from.capacity,
     bill: move.bill,
     text:
       `If the team ends the year above ${from.capacity}, you move from ${officePhrase(from.name, "your")} to ${officePhrase(to.name, "your")}: ` +
@@ -129,7 +133,8 @@ export const careerWarnings = (game: GameState, draft: Plan, projection: Project
   if (listingBlocker(self, game.turn, config) === null && draft.goPublic !== true) warn("note", "You may go public this year: see Go public in the plan.");
 
   const move = officeMoveView(projection, config);
-  if (move !== null) warn(projection.cash - move.bill < 0 ? "caution" : "note", move.text);
+  // The bill is already in the projection's costs, so the year-end cash is what is left after it.
+  if (move !== null) warn(projection.cash < 0 ? "caution" : "note", move.text);
 
   if (game.turn >= rules.game.maxTurns) {
     warn("note", `Final year: after ${yearOf(rules.game.maxTurns, career)} the largest founder's stake (equity × valuation) wins.`);

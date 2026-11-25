@@ -223,7 +223,7 @@ export const GameScreen = () => {
         (careerReport !== null && !fullReport ? (
           <YearSummary career={careerReport} view={report} over={over} words={words} onFull={showFullReport} onClose={onCloseReport} />
         ) : (
-          <QuarterReport companyName={resource.companyName} view={report} over={over} words={words} career={careerReport} datedNext={datedNext} onClose={onCloseReport} />
+          <QuarterReport companyName={resource.companyName} view={report} over={over} words={words} career={careerReport} datedNext={datedNext} historyEnds={timeline?.historyEnds ?? null} onClose={onCloseReport} />
         ))}
       {helpOpen && <HowToPlayDialog config={config} onClose={closeHelp} />}
     </>

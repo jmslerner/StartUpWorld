@@ -57,8 +57,12 @@ export interface GameStore {
   readonly configs: { readonly race: PlayConfig; readonly career: PlayConfig };
   /** The career's milestones by year; [] in a race. */
   readonly record: CareerRecord;
-  /** The turn of a save on disk the first screen can resume, by mode; null for none, and always null for the mode in play. */
-  readonly resumable: { readonly race: number | null; readonly career: number | null };
+  /**
+   * A save on disk the first screen can offer, by mode; null for none, and always null for the mode in play. The race's
+   * is its turn. The career's says whether it is over, with the year it ended in then, so a finished career is never
+   * offered as one to resume, nor dated a year after its end.
+   */
+  readonly resumable: { readonly race: number | null; readonly career: CareerPoint | null };
   /** The mode the first screen preselects: Career on a fresh first screen, else the mode just left. */
   readonly preferred: Mode;
   startCareer(name: string, seed: number): void;
@@ -69,6 +73,14 @@ export interface GameStore {
 }
 
 const isOver = (game: GameState | null): boolean => game !== null && (game.outcome !== null || game.companies[PLAYER_ID].out !== null);
+
+/** Where a saved career stands: the turn it is at, or, once over, the turn it ended in (the engine has moved on a year past an out). */
+export interface CareerPoint {
+  readonly turn: number;
+  readonly over: boolean;
+}
+const careerPoint = (game: GameState): CareerPoint =>
+  isOver(game) ? { turn: game.companies[PLAYER_ID].out?.turn ?? game.outcome?.turn ?? game.turn, over: true } : { turn: game.turn, over: false };
 
 const KEYS: Readonly<Record<Mode, string>> = { race: SAVE_KEY, career: CAREER_SAVE_KEY };
 
@@ -115,14 +127,14 @@ export const createGameStore = (storage: StorageLike | null, config: PlayConfig 
     only === "race" ? playing("race", race!) : only === "career" ? playing("career", career!) : { ...NO_GAME, config };
   const resumable: Resumable = {
     race: race !== null && only !== "race" ? race.game.turn : null,
-    career: career !== null && only !== "career" ? career.game.turn : null,
+    career: career !== null && only !== "career" ? careerPoint(career.game) : null,
   };
 
   const store = createStore<GameStore>()((set, get) => {
     /** What the first screen can resume once the game in play makes way for one of `next`'s mode (or none). */
     const resumableAfter = (next: Mode | null): Resumable => {
       const { mode, game, resumable } = get();
-      const kept = mode !== null && game !== null && mode !== next ? { ...resumable, [mode]: game.turn } : resumable;
+      const kept = mode !== null && game !== null && mode !== next ? { ...resumable, [mode]: mode === "career" ? careerPoint(game) : game.turn } : resumable;
       return next === null ? kept : { ...kept, [next]: null };
     };
 

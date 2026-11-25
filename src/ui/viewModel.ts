@@ -216,7 +216,7 @@ const raiseView = (self: Company, game: GameState, draft: Plan, rules: RulesConf
     const next = self.lastRaise.turn + rules.raise.cooldownTurns + 1;
     blockedText =
       next > rules.game.maxTurns
-        ? `You raised in ${w.when(self.lastRaise.turn)}. There is no time for another raise before the game ends.`
+        ? `You raised in ${w.when(self.lastRaise.turn)}. There is no time for another raise before ${w.career ? `your career ends in ${w.when(rules.game.maxTurns)}` : "the game ends"}.`
         : `You raised in ${w.when(self.lastRaise.turn)}. You can raise again in ${w.when(next)}.`;
   }
   const investorSeatsAfter = self.investorSeats + 1;

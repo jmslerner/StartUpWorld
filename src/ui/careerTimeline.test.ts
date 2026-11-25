@@ -34,8 +34,8 @@ describe("the timeline", () => {
     expect(view.cards.map((card) => card.year)).toEqual(datedUpTo(2021));
     expect(view.cards.find((card) => card.year === 2007)).toEqual({ year: 2007, name: "The touchscreen phone", shift: true });
     const notice = upcomingShift(32, CAREER)!;
-    expect(view.shift).toEqual({ name: "The chatbot", year: 2023, yearsAway: 2, ceiling: notice.ceiling, text: `The chatbot arrives in 2023, in 2 years: that year no product keeps more than quality ${notice.ceiling}.` });
-    expect(timelineView(real(33), [], CAREER)!.shift?.text).toMatch(/^The chatbot arrives in 2023, next year:/);
+    expect(view.shift).toEqual({ name: "The chatbot", year: 2023, yearsAway: 2, ceiling: notice.ceiling, text: `A platform shift comes in 2023 (The chatbot), in 2 years: that year no product keeps more than quality ${notice.ceiling}.` });
+    expect(timelineView(real(33), [], CAREER)!.shift?.text).toMatch(/^A platform shift comes in 2023 \(The chatbot\), next year:/);
     expect(timelineView(real(31), [], CAREER)!.shift).toBeNull();
     expect(timelineView(real(34), [], CAREER)!.shift).toBeNull();
   });
@@ -61,6 +61,15 @@ describe("the timeline", () => {
     ]);
     expect(officePhrase("Own office", "its")).toBe("its own office");
     expect(officePhrase("Full floor", "your")).toBe("the full floor");
+  });
+
+  it("says a second failure was the same only when it was", () => {
+    const outText = (rescued: "bankrupt" | "fired", out: "bankrupt" | "fired"): string =>
+      marksOf([{ kind: "rescued", turn: 4, reason: rescued }, { kind: "out", turn: 12, reason: out }], CAREER)[1].text;
+    expect(outText("bankrupt", "bankrupt")).toBe("Out: bankrupt a second time");
+    expect(outText("fired", "fired")).toBe("Out: fired a second time");
+    expect(outText("bankrupt", "fired")).toBe("Out: fired, after the rescue from bankruptcy");
+    expect(outText("fired", "bankrupt")).toBe("Out: bankrupt, after the rescue when the board fired you");
   });
 
   it("is not there in a race", () => {

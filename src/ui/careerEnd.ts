@@ -111,14 +111,27 @@ export const careerEndView = (game: GameState, record: CareerRecord, config: Rul
       title: `${rival} finished on top.`,
       text: `After ${lastYear}, ${rival}'s founder holds ${money(winner?.stake ?? 0)}; your stake is ${stake}.`,
     },
-    bankrupt: {
-      title: `${self.name} ran out of cash again.`,
-      text: `You ended ${year} below $0 for the second time. Your one rescue was in ${rescueYear}, so your career is over.`,
-    },
-    fired: {
-      title: "Your board fired you again.",
-      text: `Investors held your board, and ${year} was a bad year. Your one rescue was in ${rescueYear}, so your career is over.`,
-    },
+    // "Again" only when the rescue was for the same reason: a rescue from bankruptcy and then a firing are two different failures.
+    bankrupt:
+      rescue === null || rescue.reason === "bankrupt"
+        ? {
+            title: `${self.name} ran out of cash again.`,
+            text: `You ended ${year} below $0 for the second time. Your one rescue was in ${rescueYear}, so your career is over.`,
+          }
+        : {
+            title: `${self.name} ran out of cash.`,
+            text: `You ended ${year} below $0. Your one rescue, when your board fired you in ${rescueYear}, is spent, so your career is over.`,
+          },
+    fired:
+      rescue === null || rescue.reason === "fired"
+        ? {
+            title: "Your board fired you again.",
+            text: `Investors held your board, and ${year} was a bad year. Your one rescue was in ${rescueYear}, so your career is over.`,
+          }
+        : {
+            title: "Your board fired you.",
+            text: `Investors held your board, and ${year} was a bad year. Your one rescue, from running out of cash in ${rescueYear}, is spent, so your career is over.`,
+          },
   };
 
   return {

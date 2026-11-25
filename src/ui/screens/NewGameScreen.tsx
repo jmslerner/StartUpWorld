@@ -59,7 +59,7 @@ export const NewGameScreen = () => {
           <div className="mt-3 flex flex-wrap gap-1.5">
             {careerTurn !== null && career !== undefined && (
               <button type="button" onClick={() => resume("career")} className={`${BUTTON} px-3 py-2 text-xs`}>
-                Resume your career ({yearOf(careerTurn, career)})
+                {careerTurn.over ? "See how your career ended" : "Resume your career"} ({yearOf(Math.min(careerTurn.turn, configs.career.game.maxTurns), career)})
               </button>
             )}
             {raceTurn !== null && (
