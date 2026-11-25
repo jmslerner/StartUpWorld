@@ -6,7 +6,7 @@
 // from public information only.
 
 import { CONFIG } from "../config";
-import { closingValuation, heldCeiling, listingEffects, listingOf, marketTurn, rulesForTurn } from "./career";
+import { boardPaused, closingValuation, heldCeiling, listingEffects, listingOf, marketTurn, rulesForTurn } from "./career";
 import {
   churnRate,
   clamp,
@@ -228,7 +228,8 @@ export const projectTurn = (
   );
 
   const badQuarter = users < self.usersAtLastClose || (runway !== null && runway < rules.board.runwayTurns);
-  const boardRisk = investorSeats > self.founderSeats && badQuarter ? rules.board.fireChance : 0;
+  // In a career the board does not vote in the year after a rescue. The projection does not predict a rescue.
+  const boardRisk = investorSeats > self.founderSeats && badQuarter && !boardPaused(self, view.turn) ? rules.board.fireChance : 0;
 
   const projection: Projection = {
     plan: resolved,

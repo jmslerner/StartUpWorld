@@ -5,7 +5,7 @@
 // docs/turn-based-design.md, "Order of a turn".
 
 import { CONFIG } from "../config";
-import { closingValuation, heldCeiling, listingEffects, listingOf, marketTurn, rulesForTurn } from "./career";
+import { boardPaused, closingValuation, heldCeiling, listingEffects, listingOf, marketTurn, rescueEffects, rulesForTurn } from "./career";
 import { NEUTRAL_MODIFIERS, applyEvent, drawEvent, type EventContext } from "./events";
 import {
   churnRate,
@@ -63,8 +63,8 @@ interface Desk {
   readonly raise: CompanyReport["raise"];
   /** Career only: set in the year the company goes public. */
   readonly listing: CareerReport["listing"];
-  readonly equity: number;
-  readonly investorSeats: number;
+  equity: number;
+  investorSeats: number;
   effective: number;
   productWork: number;
   growthWork: number;
@@ -98,6 +98,10 @@ interface Desk {
   valuation: number;
   board: CompanyReport["board"];
   out: OutReason | null;
+  /** Career only: set in the year the company is rescued. */
+  rescue: CareerReport["rescue"];
+  /** Career only: the change in hype the rescue made. */
+  rescueHype: number;
 }
 
 const NO_COSTS: CostBreakdown = { salaries: 0, marketing: 0, hiring: 0, poaching: 0, severance: 0, total: 0 };
@@ -154,6 +158,8 @@ const openDesk = (state: GameState, company: Company, plan: Plan | null, rules: 
     valuation: 0,
     board: null,
     out: null,
+    rescue: null,
+    rescueHype: 0,
   };
 };
 
@@ -186,6 +192,49 @@ const best = (desks: readonly Desk[], ...keys: ((desk: Desk) => number)[]): Desk
     }
     return a.company.id - b.company.id;
   })[0];
+
+/**
+ * Step 12 for one company: why it would go out this year, or null. Bankruptcy is checked first; otherwise, when
+ * investors hold more seats than the founders, the board looks at the year and its report is kept. A board that may
+ * not fire this year still says what it saw.
+ */
+const failureOf = (desk: Desk, mayFire: boolean, seed: number, turn: number, rules: RulesConfig): OutReason | null => {
+  if (desk.cash < 0) return "bankrupt";
+  if (desk.investorSeats <= desk.company.founderSeats) return null;
+  const usersFell = desk.users < desk.company.usersAtLastClose;
+  const lowRunway = desk.runway !== null && desk.runway < rules.board.runwayTurns;
+  const fired = mayFire && (usersFell || lowRunway) && firstFloat(seed, turn, STREAM.board, desk.company.id) < rules.board.fireChance;
+  desk.board = { usersFell, lowRunway, fired };
+  return fired ? "fired" : null;
+};
+
+/**
+ * A career company's one rescue, from what it would have gone out for: its equity, seats, hype and cash as
+ * `rescueEffects` leaves them, then the valuation and the runway worked out again from those.
+ */
+const rescue = (desk: Desk, reason: OutReason, climate: number, rules: RulesConfig): void => {
+  const { company } = desk;
+  desk.rescue = { reason, cashBefore: desk.cash, equityBefore: desk.equity };
+  const after = rescueEffects(
+    {
+      equity: desk.equity,
+      investorSeats: desk.investorSeats,
+      founderSeats: company.founderSeats,
+      hype: desk.hype.end,
+      cash: desk.cash,
+      payroll: desk.payroll,
+      headcount: desk.headcountEnd,
+    },
+    rules,
+  );
+  desk.equity = after.equity;
+  desk.investorSeats = after.investorSeats;
+  desk.hype = { ...desk.hype, end: after.hype };
+  desk.rescueHype = after.hypeChange;
+  desk.cash = after.cash;
+  desk.valuation = closingValuation(valuationOf(desk.users, after.hype, climate, rules), company, desk.listing !== null, rules);
+  desk.runway = runwayOf(desk.cash, desk.revenue, desk.costs.total);
+};
 
 /** The funding climate one year on; a career's wave of new users ticks down the same way. */
 const tickClimate = (climate: Climate): Climate =>
@@ -241,7 +290,7 @@ const reportOf = (desk: Desk, rules: RulesConfig): CompanyReport => {
   // A career's report says what the career did to the company this year; a race report has no such key.
   if (company.career === undefined) return report;
   const qualityLostToEvent = Math.max(0, company.career.qualityAtLastClose - company.quality);
-  return { ...report, career: { listing: desk.listing, rescue: null, office: null, hype: { listing: desk.listingHype, rescue: 0 }, qualityLostToEvent } };
+  return { ...report, career: { listing: desk.listing, rescue: desk.rescue, office: null, hype: { listing: desk.listingHype, rescue: desk.rescueHype }, qualityLostToEvent } };
 };
 
 const closedLog = (state: GameState): TurnLog => ({
@@ -369,37 +418,21 @@ export const resolveTurn = (state: GameState, plans: PlanSet, seed: number, conf
     if (listing.length > 0) {
       outcome = { kind: "ipo", turn, winnerId: best(listing, (d) => d.valuation, stakeOf).company.id };
     } else {
-      for (const desk of desks) {
-        if (desk.cash < 0) {
-          desk.out = "bankrupt";
-          continue;
-        }
-        if (desk.investorSeats <= desk.company.founderSeats) continue;
-        const usersFell = desk.users < desk.company.usersAtLastClose;
-        const lowRunway = desk.runway !== null && desk.runway < rules.board.runwayTurns;
-        const fired = (usersFell || lowRunway) && firstFloat(seed, turn, STREAM.board, desk.company.id) < rules.board.fireChance;
-        desk.board = { usersFell, lowRunway, fired };
-        if (fired) desk.out = "fired";
-      }
+      for (const desk of desks) desk.out = failureOf(desk, true, seed, turn, rules);
       const survivors = desks.filter((desk) => desk.out === null);
       if (survivors.length === 0) outcome = { kind: "wipeout", turn, winnerId: null };
       else if (survivors.length === 1) outcome = { kind: "lastStanding", turn, winnerId: survivors[0].company.id };
       else if (turn >= rules.game.maxTurns) outcome = { kind: "turnLimit", turn, winnerId: best(survivors, stakeOf, (d) => d.valuation).company.id };
     }
   } else {
-    // A career: bankruptcy and the board vote as in the race. Reaching the bar ends nothing, nor does one company
-    // left or none; the career gets its outcome only after its last year, on the largest founder's stake.
+    // A career: bankruptcy and the board vote as in the race, except that the board does not fire in the year after
+    // a rescue, and a company's first failure is a rescue, not the end. Reaching the bar ends nothing, nor does one
+    // company left or none; the career gets its outcome only after its last year, on the largest founder's stake.
     for (const desk of desks) {
-      if (desk.cash < 0) {
-        desk.out = "bankrupt";
-        continue;
-      }
-      if (desk.investorSeats <= desk.company.founderSeats) continue;
-      const usersFell = desk.users < desk.company.usersAtLastClose;
-      const lowRunway = desk.runway !== null && desk.runway < rules.board.runwayTurns;
-      const fired = (usersFell || lowRunway) && firstFloat(seed, turn, STREAM.board, desk.company.id) < rules.board.fireChance;
-      desk.board = { usersFell, lowRunway, fired };
-      if (fired) desk.out = "fired";
+      const failure = failureOf(desk, !boardPaused(desk.company, turn), seed, turn, rules);
+      if (failure === null) continue;
+      if (desk.company.career?.rescue === null) rescue(desk, failure, climate, rules);
+      else desk.out = failure;
     }
     if (turn >= rules.game.maxTurns) {
       const survivors = desks.filter((desk) => desk.out === null);
@@ -446,8 +479,8 @@ export const resolveTurn = (state: GameState, plans: PlanSet, seed: number, conf
       lastRevenue: desk.revenue,
       lastCosts: desk.costs.total,
       lastPull: desk.launched ? desk.pull : null,
-      // A career keeps the quality the year closed with, before next year's card can touch it, records a listing,
-      // and qualifies a company for one once a year closes at that year's bar with a profit; it stays qualified.
+      // A career keeps the quality the year closed with, before next year's card can touch it, records a listing and a
+      // rescue, and qualifies a company to list once a year closes at that year's bar with a profit; it stays qualified.
       ...(company.career === undefined
         ? {}
         : {
@@ -455,6 +488,7 @@ export const resolveTurn = (state: GameState, plans: PlanSet, seed: number, conf
               ...company.career,
               qualityAtLastClose: desk.quality,
               listed: desk.listing === null ? company.career.listed : { turn, ...desk.listing },
+              rescue: desk.rescue === null ? company.career.rescue : { turn, reason: desk.rescue.reason },
               qualified: company.career.qualified || (desk.users >= rules.ipo.users && desk.profitable),
             },
           }),

@@ -58,6 +58,16 @@ Resolution, in this order:
 11. IPO check.
     - No IPO check: reaching the bar with a profit ends nothing (ruling 6).
 12. Bankruptcy, then the board vote. Companies that go out release their users and staff.
+    - A company's first failure is a rescue, not the end: cash below $0 is checked first, then the board. A company
+      rescued from bankruptcy is not voted on that year; one the board fires keeps the board's report. A company
+      whose rescue is spent goes out as in the race (rulings 24 and 25).
+    - A rescue, in this order: the founder keeps `rescue.equityKept` of their equity; investors gain
+      `rescue.investorSeats` seats, or end with one more than the founders if that is more; `rescue.hype` is added
+      to the year's hype once it is worked out, not below 0; cash below $0 is reset to `rescue.salaryYears` of
+      salaries at the closing year's salary for the people paid during the year. The valuation, with its listing
+      premium, and the runway are then worked out again from what the rescue leaves (rulings 26 to 30).
+    - In the year after a rescue the board does not vote: its report says what it saw, with `fired: false`, and the
+      one-year projection puts the board's risk at 0. It does not predict a rescue (ruling 25).
 13. Last company standing, then the ranking at the last turn.
     - One company left, or none, ends nothing. After the last year (turn 49, 2038) the largest founder's stake among
       the companies still in the game wins; with nobody left the outcome is `wipeout` (ruling 6).
@@ -65,6 +75,7 @@ Resolution, in this order:
       year's card can cut it (ruling 17).
     - Closing the books also records a listing, and marks a company qualified when the year closed with that
       year's bar in users and with revenue that covered its costs (ruling 18).
+    - Closing the books also records a rescue, its turn and what it was from; a company is rescued once (ruling 24).
 14. The funding climate ticks down and next year's card is drawn.
     - A wave of new users ticks down with the funding climate, before next year's card can set a new one (ruling 15).
     - The card is drawn from next year's numbers, so a new era's deck is in play from its first year.
@@ -108,6 +119,20 @@ Resolution, in this order:
 22. A public company cannot raise privately. A race plan that asks to go public is played as if it did not.
 23. The room for marketing is the opening cash, never counted below $0, plus this year's raise or listing at the
     opening valuation, rounded down to the marketing step.
+24. Every company, the Incumbent included, has one rescue. The first time it would go out it is rescued; the second
+    failure is final, whenever it comes. Bankruptcy is checked first; a company rescued from it is not voted on that
+    year.
+25. "The year after a rescue" is the next turn only. In it the board does not vote, though its report still says what
+    it saw; bankruptcy still applies.
+26. The rescue's hype is taken off after the year's hype is worked out, not below 0, and the valuation follows. The
+    report gives the change actually made.
+27. Investors end a rescue with two more seats, or one more than the founders if that is more.
+28. Cash is reset only from below $0, to a year of salaries at the salary of the year that closes, for the people who
+    were on the payroll during the year. People who join as the year ends are not counted, so hiring on the way down
+    buys nothing.
+29. A company that lists and is rescued in the same year keeps its listing: both changes to its equity, seats and hype
+    apply.
+30. After a rescue the report's runway is worked out again from the cash the rescue leaves.
 
 ## Starting numbers
 

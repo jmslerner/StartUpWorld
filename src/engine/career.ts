@@ -1,7 +1,7 @@
 // The career's own rules, as pure functions. They apply only to a config that has a `career` block; the race's
 // config has none. The rules are recorded in docs/career-rules.md.
 
-import { raiseAmount, round6, valuationOf } from "./formulas";
+import { clamp, raiseAmount, round4, round6, valuationOf } from "./formulas";
 import type { ActiveEvent, CareerRules, Company, DatedCard, EventCard, EventEffect, RulesConfig } from "./types";
 
 /** The calendar year a turn is played in: turn 1 is the career's first year. */
@@ -157,6 +157,46 @@ export const listingEffects = (company: Company, rules: RulesConfig): { equity: 
     equity: round6(company.founderEquity * (1 - listing.percent / 100)),
     investorSeats: company.investorSeats + listing.investorSeats,
     hype: listing.hype,
+  };
+};
+
+/** True in the turn after the company's rescue, and only then: that year its board does not vote. */
+export const boardPaused = (company: Company, turn: number): boolean =>
+  company.career !== undefined && company.career.rescue !== null && company.career.rescue.turn === turn - 1;
+
+/** A company's year as it closes, before a rescue: what the rescue changes, and what it reads. */
+export interface RescueInput {
+  readonly equity: number;
+  readonly investorSeats: number;
+  readonly founderSeats: number;
+  readonly hype: number;
+  readonly cash: number;
+  /** The head count the year was paid for: its start less its layoffs. */
+  readonly payroll: number;
+  /** The head count the year ends with. */
+  readonly headcount: number;
+}
+
+/**
+ * What a rescue does, in this order: the founder keeps `equityKept` of their equity; investors gain `investorSeats`
+ * seats, or end with one more than the founders if that is more; `hype` is added to the year's hype, not below 0
+ * (`hypeChange` is the change actually made); cash below $0 becomes `salaryYears` of salaries, at the year's salary,
+ * for the people who were on the payroll during the year and are still there. Cash at or above $0 is kept.
+ * Throws outside a career.
+ */
+export const rescueEffects = (
+  year: RescueInput,
+  rules: RulesConfig,
+): { equity: number; investorSeats: number; hype: number; hypeChange: number; cash: number } => {
+  if (rules.career === undefined) throw new Error("only a career has rescues");
+  const rescue = rules.career.rescue;
+  const hype = round4(clamp(year.hype + rescue.hype, 0, 100));
+  return {
+    equity: round6(year.equity * rescue.equityKept),
+    investorSeats: Math.max(year.investorSeats + rescue.investorSeats, year.founderSeats + 1),
+    hype,
+    hypeChange: round4(hype - year.hype),
+    cash: year.cash < 0 ? Math.min(year.payroll, year.headcount) * rules.salary * rescue.salaryYears : year.cash,
   };
 };
 

@@ -12,6 +12,7 @@ export { replayGame } from "./replay";
 export type { GameRecord, Replay } from "./replay";
 export { findCard } from "./events";
 export {
+  boardPaused,
   closingValuation,
   datedCardFor,
   eraIndexOf,
@@ -21,11 +22,12 @@ export {
   listingOf,
   marketTurn,
   officeFor,
+  rescueEffects,
   rulesForTurn,
   turnOf,
   upcomingShift,
   yearOf,
 } from "./career";
-export type { ListingBlocker, ShiftNotice } from "./career";
+export type { ListingBlocker, RescueInput, ShiftNotice } from "./career";
 export * from "./formulas";
 export * from "./types";

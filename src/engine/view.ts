@@ -49,7 +49,8 @@ export const viewFor = (state: GameState, id: CompanyId): CompanyView => {
 
 /**
  * The part of a company's quarterly report its rivals can see: its moves, not its books or its plan. A career report
- * also shows whether the company went public that year; a race report's copy has no such key.
+ * also shows whether the company went public that year, and what it was rescued from if it was; a race report's copy
+ * has no such key.
  */
 export const publicReport = (report: CompanyReport): PublicReport => {
   const shown: PublicReport = {
@@ -73,7 +74,7 @@ export const publicReport = (report: CompanyReport): PublicReport => {
     out: report.out,
   };
   if (report.career === undefined) return shown;
-  return { ...shown, career: { listed: report.career.listing !== null, rescued: null, movedTo: null } };
+  return { ...shown, career: { listed: report.career.listing !== null, rescued: report.career.rescue?.reason ?? null, movedTo: null } };
 };
 
 /**
