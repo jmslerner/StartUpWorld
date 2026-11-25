@@ -168,8 +168,32 @@ describe("what tuning may not change", () => {
 });
 
 describe("the design's starting numbers", () => {
+  /**
+   * Numbers that only one of two configs has. Whole event cards are left out: the deck is the
+   * owner's to add to or thin out in src/config.ts, and the design's deck stays as it was.
+   */
+  const oneSided = (start: unknown, now: unknown): string[] =>
+    changedNumbers(start, now)
+      .filter((change) => change.start === undefined || change.now === undefined)
+      .map((change) => change.path)
+      .filter((path) => !/^events\.deck\.[^.]+$/.test(path));
+
   it("cover exactly the same numbers as the config: none missing on either side", () => {
-    const oneSided = changedNumbers(DESIGN, CONFIG).filter((change) => change.start === undefined || change.now === undefined);
-    expect(oneSided.map((change) => change.path)).toEqual([]);
+    expect(oneSided(DESIGN, CONFIG)).toEqual([]);
+  });
+
+  it("let the config add an event card, or drop one, without touching the design's deck", () => {
+    const deck = CONFIG.events.deck;
+    const priceWar = { id: "price-war", name: "Price war", text: "Everyone discounts: fewer new users this quarter.", weight: 1, effects: [{ kind: "newUsers", multiplier: 0.8 }] };
+    expect(oneSided(DESIGN, { ...CONFIG, events: { ...CONFIG.events, deck: [...deck, priceWar] } })).toEqual([]);
+    expect(oneSided(DESIGN, { ...CONFIG, events: { ...CONFIG.events, deck: deck.slice(1) } })).toEqual([]);
+  });
+
+  it("still catch a number that only one side has, inside a card too", () => {
+    expect(oneSided(DESIGN, { ...CONFIG, signingBonus: 5_000 })).toEqual(["signingBonus"]);
+    expect(oneSided(DESIGN, Object.fromEntries(Object.entries(CONFIG).filter(([key]) => key !== "salary")))).toEqual(["salary"]);
+    const [first, ...rest] = CONFIG.events.deck;
+    const lighter = { ...CONFIG, events: { ...CONFIG.events, deck: [Object.fromEntries(Object.entries(first).filter(([key]) => key !== "weight")), ...rest] } };
+    expect(oneSided(DESIGN, lighter)).toEqual([`events.deck.${first.id}.weight`]);
   });
 });
