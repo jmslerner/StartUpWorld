@@ -296,6 +296,31 @@ describe("end screen", () => {
     expect(lost.title).toMatch(/Zipp/);
   });
 
+  it("IPO: the company that went public heads the standings, however small its founder's stake", () => {
+    // Zipp lists having sold almost everything: by stake it would come last of the four.
+    let state = withCompany(giant(BLITZ), BLITZ, { founderEquity: 0.001 });
+    state = launchedCompany(state, HUMAN, { users: 60_000, cash: 3_000_000 });
+    state = launchedCompany(state, BOOT, { users: 40_000, cash: 3_000_000 });
+    state = launchedCompany(state, INCUMBENT, { users: 80_000, cash: 3_000_000 });
+    const view = endView(resolve(state, {}, 1, NEVER).state, DESIGN)!;
+    expect(view.kind).toBe("ipo-loss");
+    // The rest by stake: Acme owns all of 60K users, Nimbus 60% of 80K, Oakline all of 40K.
+    expect(view.standings.map((s) => s.name)).toEqual(["Zipp", "Acme", "Nimbus", "Oakline"]);
+    expect(view.standings[0]).toMatchObject({ winner: true });
+    const others = view.standings.slice(1).map((s) => s.stake);
+    expect(others).toEqual([...others].sort((a, b) => b - a));
+    expect(view.standings[0].stake).toBeLessThan(Math.min(...others));
+  });
+
+  it("IPO: the player's own listing puts them first, even below a rival on stake", () => {
+    let state = withCompany(giant(HUMAN), HUMAN, { founderEquity: 0.001 });
+    state = launchedCompany(state, INCUMBENT, { users: 80_000, cash: 3_000_000 });
+    const view = endView(resolve(state, {}, 1, NEVER).state, DESIGN)!;
+    expect(view.kind).toBe("ipo-win");
+    expect(view.standings[0]).toMatchObject({ you: true, winner: true });
+    expect(view.standings[0].stake).toBeLessThan(view.standings[1].stake);
+  });
+
   it("bankrupt and fired are the player's own endings, whatever the rivals are doing", () => {
     const broke = endView(resolve(withCompany(newGame(), HUMAN, { cash: 0 }), { [HUMAN]: { allocation: { product: 0, growth: 3, recruiting: 0 } } }, 1, NEVER).state, DESIGN)!;
     expect(broke).toMatchObject({ kind: "bankrupt", won: false, sound: "bankrupt" });

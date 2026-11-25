@@ -493,7 +493,7 @@ export interface EndView {
   readonly turn: number;
   readonly title: string;
   readonly text: string;
-  /** Companies still standing by founder's stake, then those that went out, latest first. */
+  /** The winner, then the other companies still standing by founder's stake, then those that went out, latest first. */
   readonly standings: readonly Standing[];
 }
 
@@ -539,6 +539,8 @@ export const endView = (game: GameState, config: RulesConfig): EndView | null =>
       };
     })
     .sort((a, b) => {
+      // Stake only decides a game that runs to the last turn: whoever won comes first, however it won.
+      if (a.winner !== b.winner) return a.winner ? -1 : 1;
       if (a.out === null && b.out === null) return b.stake - a.stake || b.valuation - a.valuation || a.id - b.id;
       if (a.out !== null && b.out !== null) return b.out.turn - a.out.turn || a.id - b.id;
       return a.out === null ? -1 : 1;
