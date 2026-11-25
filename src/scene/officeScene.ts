@@ -35,10 +35,14 @@ export const officeSceneFor = ({ game, companyId, config, seed, draft, expectedH
   const rules = config.career;
   const company: GameState["companies"][number] | undefined = game.companies[companyId];
   const career = company?.career;
-  if (rules === undefined || company === undefined || career === undefined) throw new Error("an office scene needs a career game");
+  // A career without eras is no career: said here, in this builder's words, before the engine is asked anything.
+  if (rules === undefined || rules.eras.length === 0 || company === undefined || career === undefined) {
+    throw new Error("an office scene needs a career game");
+  }
 
   const office = Math.min(whole(career.office), LAST_OFFICE, Math.max(0, rules.offices.length - 1)) as OfficeIndex;
-  const { plan } = normalizePlan(game, companyId, draft ?? null, config);
+  // A company that is out plans nothing: a draft left over for it is not read, so nobody of it is shown away or leaving.
+  const { plan } = normalizePlan(game, companyId, company.out === null ? (draft ?? null) : null, config);
   const { product, growth, recruiting } = plan.allocation;
 
   let ending: OfficeScene["ending"] = null;
@@ -51,7 +55,7 @@ export const officeSceneFor = ({ game, companyId, config, seed, draft, expectedH
     year: yearOf(game.turn, rules),
     office,
     capacity: rules.offices.at(office)?.capacity ?? 0,
-    era: rules.eras.at(eraIndexOf(game.turn, rules))?.id ?? "",
+    era: rules.eras[eraIndexOf(game.turn, rules)].id,
     teams: { product, growth, recruiting },
     away: plan.raisePercent > 0 ? 1 : 0,
     leaving: plan.layoffs,

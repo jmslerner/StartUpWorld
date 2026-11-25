@@ -53,7 +53,6 @@ export interface WorldCallbacks {
   onZoom?(factor: number): void;
 }
 
-/** Where on screen a sound comes from: −1 the canvas's left edge … 1 its right edge (kept moderate). */
 export interface WorldHandle {
   /** Show this scene. The world works out the people (nextCast) and what changed (sceneEvents) by itself. */
   setScene(scene: OfficeScene): void;

@@ -90,6 +90,7 @@ export interface WorldSystem {
 }
 
 export interface WorldSoundCue {
+  /** Where on screen the sound comes from: −1 the canvas's left edge … 1 its right edge (kept moderate). */
   pan: number;
 }
 

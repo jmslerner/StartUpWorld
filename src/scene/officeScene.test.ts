@@ -105,6 +105,13 @@ describe("the office scene of a company", () => {
     expect(officeSceneFor({ game, companyId: 0, config, seed: 7 })).toMatchObject({ office: 1, capacity: 9 });
   });
 
+  it("a config with more offices than five stops at the fifth", () => {
+    const config = withCareer({ offices: [...CAREER_TEST.career!.offices, { id: "tower", name: "Tower", capacity: 400 }] });
+    expect(config.career!.offices).toHaveLength(6);
+    const game = withCareerOf(newCareer(config), 0, { office: 5 });
+    expect(officeSceneFor({ game, companyId: 0, config, seed: 7 })).toMatchObject({ office: 4, capacity: 150 });
+  });
+
   it("names the era of the year", () => {
     const config = withEras(
       { id: "a", name: "A", firstYear: 1990, invented: false, values: {} },
@@ -144,7 +151,24 @@ describe("the office scene of a company", () => {
     expect(() => officeSceneFor({ game: newGame(), companyId: 0, config: DESIGN, seed: 7 })).toThrow("an office scene needs a career game");
     // A career's config over a race's state: the company has no career facts.
     expect(() => officeSceneFor({ game: newGame(), companyId: 0, config: CAREER_TEST, seed: 7 })).toThrow("an office scene needs a career game");
+    // A career's state over a race's config: there are no career rules to read.
+    expect(() => officeSceneFor({ game: newCareer(), companyId: 0, config: DESIGN, seed: 7 })).toThrow("an office scene needs a career game");
     for (const id of [12, -1]) expect(() => sceneOf(newCareer(), id)).toThrow("an office scene needs a career game");
+  });
+
+  it("a career with no eras has no office scene, and the engine is never asked", () => {
+    const config = withEras();
+    expect(config.career!.eras).toHaveLength(0);
+    expect(() => officeSceneFor({ game: newCareer(), companyId: 0, config, seed: 7 })).toThrow("an office scene needs a career game");
+  });
+
+  it("a draft left for a company that is out is not read", () => {
+    const live = eightAllowedToRaise();
+    const draft: Plan = planOf(live, 3, { raisePercent: 20, layoffs: 1 });
+    expect(sceneOf(live, 3, { draft })).toMatchObject({ away: 1, leaving: 1 });
+    const out = withCompany(live, 3, { out: { turn: 1, reason: "bankrupt", users: 50_000, headcount: 8 } });
+    expect(sceneOf(out, 3, { draft })).toEqual(sceneOf(out, 3));
+    expect(sceneOf(out, 3, { draft })).toMatchObject({ away: 0, ending: "lost" });
   });
 
   it("the same input gives an equal scene, and the input is left as it was", () => {
