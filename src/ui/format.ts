@@ -45,3 +45,16 @@ export const runwayText = (runway: number | null): string => {
 /** How long something that counts the quarter under way still lasts: a funding climate with 2 turns left ends after the next quarter. */
 export const quartersLeft = (turnsLeft: number): string =>
   turnsLeft <= 1 ? "this quarter only" : turnsLeft === 2 ? "this quarter and the next" : `this quarter and ${turnsLeft - 1} more`;
+
+/** Runway in years, cut to one decimal like runwayText; null means the last year was profitable. */
+export const yearRunwayText = (runway: number | null): string => {
+  if (runway === null) return "profitable";
+  if (runway <= 0) return "0 years";
+  if (runway > 40) return "40+ years";
+  const text = (Math.floor(runway * 10) / 10).toFixed(1);
+  return `${text} ${text === "1.0" ? "year" : "years"}`;
+};
+
+/** How long something that counts the year under way still lasts: a climate with 2 years left ends after the next year. */
+export const yearsLeft = (turnsLeft: number): string =>
+  turnsLeft <= 1 ? "this year only" : turnsLeft === 2 ? "this year and the next" : `this year and ${turnsLeft - 1} more`;

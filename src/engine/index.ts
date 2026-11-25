@@ -4,7 +4,7 @@ export { createGame, seatCompany } from "./setup";
 export { CAREER_PITCHES, ENTRANT_PITCHES, NAME_ENDS, NAME_STARTS, PITCHES, drawEntrant, drawName, picker } from "./cast";
 export { resolveTurn } from "./resolveTurn";
 export type { TurnResult } from "./resolveTurn";
-export { defaultPlan, normalizePlan, normalizePlanFor, raiseBlocker } from "./plan";
+export { defaultPlan, marketingRoom, normalizePlan, normalizePlanFor, raiseBlocker } from "./plan";
 export { estimateRivals, projectTurn } from "./project";
 export type { Projection, RivalEstimate } from "./project";
 export type { CheckedPlan, RaiseBlocker } from "./plan";

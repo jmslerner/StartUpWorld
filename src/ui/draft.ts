@@ -36,9 +36,10 @@ export const setLayoffs = (company: Company, plan: Plan, layoffs: number): Plan 
 /** 0 switches the raise off. */
 export const setRaise = (company: Company, plan: Plan, percent: number): Plan => fit(company, { ...plan, raisePercent: percent });
 
-export const stepMarketing = (plan: Plan, steps: number, config: RulesConfig): Plan => ({
+/** Marketing up or down by whole steps, between $0 and `max`: the most a plan may budget, the race's cap by default. */
+export const stepMarketing = (plan: Plan, steps: number, config: RulesConfig, max: number = config.pull.maxMarketing): Plan => ({
   ...plan,
-  marketing: Math.min(config.pull.maxMarketing, Math.max(0, plan.marketing + steps * config.pull.marketingStep)),
+  marketing: Math.min(max, Math.max(0, plan.marketing + steps * config.pull.marketingStep)),
 });
 
 /**

@@ -37,6 +37,23 @@ const people = (n: number): string => (n === 1 ? "1 person" : `${n} people`);
 
 const dollars = (n: number): string => `$${n.toLocaleString("en-US")}`;
 
+/**
+ * The most marketing a plan may budget in a career (C11), step-rounded; null outside a career. It is the cash in hand,
+ * never counted below $0, plus what the plan's listing (`goPublic`) or raise (`raisePercent`) brings at the opening
+ * valuation. `rules` are the year's.
+ */
+export const marketingRoom = (company: Company, plan: Plan, climateMultiplier: number, rules: RulesConfig): number | null => {
+  if (rules.career === undefined) return null;
+  const proceeds =
+    plan.goPublic === true
+      ? listingOf(company, climateMultiplier, rules).amount
+      : plan.raisePercent > 0
+        ? raiseAmount(valuationOf(company.users, company.hype, climateMultiplier, rules), plan.raisePercent)
+        : 0;
+  const step = rules.pull.marketingStep;
+  return Math.floor((Math.max(0, company.cash) + proceeds) / step) * step;
+};
+
 export interface CheckedPlan {
   readonly plan: Plan;
   /** What was changed, in plain words. Empty for a plan that was already legal. */
@@ -107,17 +124,10 @@ export const normalizePlanFor = (
   // In a career marketing is paid from the cash in hand, never counted below $0, plus what this year's raise or
   // listing brings at the opening valuation. When this limit cuts the budget, its note is the only one.
   let cashCut = false;
-  if (rules.career !== undefined) {
-    const proceeds = goPublic
-      ? listingOf(company, climateMultiplier, rules).amount
-      : raisePercent > 0
-        ? raiseAmount(valuationOf(company.users, company.hype, climateMultiplier, rules), raisePercent)
-        : 0;
-    const room = Math.floor((Math.max(0, company.cash) + proceeds) / step) * step;
-    if (room < marketing) {
-      marketing = room;
-      cashCut = true;
-    }
+  const room = marketingRoom(company, { ...wanted, goPublic, raisePercent }, climateMultiplier, rules);
+  if (room !== null && room < marketing) {
+    marketing = room;
+    cashCut = true;
   }
   if (cashCut) notes.push(`Marketing set to ${dollars(marketing)}: it cannot exceed the cash in hand.`);
   else if (marketing !== wanted.marketing) notes.push(`Marketing set to ${dollars(marketing)}.`);
