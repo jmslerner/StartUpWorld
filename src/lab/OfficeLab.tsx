@@ -3,7 +3,7 @@ import { TEAMS, type OfficeIndex } from "../world/types/scene";
 import { WorldBoundary, WorldPlaceholder, WorldUnavailableNote } from "../world/ui/WorldShell";
 import type { Lab } from "./lab";
 import { headCount, MAX_COUNT, type SceneEdit } from "./labScene";
-import { figureLines, headCountLine, LAB_WORDS, OFFICE_NAMES, officeChoice } from "./labWords";
+import { figureLines, fitChoice, headCountLine, LAB_WORDS, OFFICE_NAMES, officeChoice } from "./labWords";
 
 /**
  * The lab page: one office made of numbers, and the controls that change them. Everything that decides anything is
@@ -91,7 +91,7 @@ const Controls = ({ lab }: LabProps) => {
       </section>
 
       <section>
-        <div className="lab-row">
+        <div className="lab-row lab-stacked">
           <label htmlFor="lab-office">{LAB_WORDS.office}</label>
           <select
             id="lab-office"
@@ -99,9 +99,7 @@ const Controls = ({ lab }: LabProps) => {
             value={fitOffice ? "fit" : String(scene.office)}
             onChange={(event) => lab.setOffice(event.target.value === "fit" ? "fit" : (Number(event.target.value) as OfficeIndex))}
           >
-            <option value="fit">
-              {LAB_WORDS.fitOffice}: {OFFICE_NAMES[scene.office]}
-            </option>
+            <option value="fit">{fitChoice(scene.office)}</option>
             {OFFICE_NAMES.map((name, office) => (
               <option key={name} value={office}>
                 {officeChoice(office as OfficeIndex)}

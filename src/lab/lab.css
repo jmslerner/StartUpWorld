@@ -153,6 +153,18 @@ body {
   width: auto;
 }
 
+/* A label above a list as wide as the panel, so that the office it shows is never cut. */
+.lab-stacked {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.25rem;
+}
+
+.lab-stacked .lab-wide {
+  flex: 0 0 auto;
+  width: 100%;
+}
+
 .lab-buttons {
   display: flex;
   gap: 0.5rem;

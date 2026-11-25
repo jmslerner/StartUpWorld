@@ -92,6 +92,15 @@ describe("the lab's scene", () => {
     });
   });
 
+  it("a count of any number of digits is at most the largest count", () => {
+    const huge = "9".repeat(400);
+    expect(Number(huge)).toBe(Infinity);
+    expect(sceneFromQuery(`?office=4&product=${huge}&growth=${"9".repeat(20)}&away=${"1".repeat(330)}&seed=${huge}`)).toMatchObject({
+      teams: { product: 9999, growth: 9999 }, away: 9999, seed: 0xffffffff,
+    });
+    expect(sceneFromQuery(`?office=4&product=${"0".repeat(400)}7`)).toMatchObject({ teams: { product: 7 } });
+  });
+
   it("a seed may be any 32-bit number, and no more", () => {
     expect(sceneFromQuery("?seed=4000000000")).toMatchObject({ seed: 4000000000, runId: "lab:4000000000" });
     expect(sceneFromQuery("?seed=99999999999")).toMatchObject({ seed: 0xffffffff });
@@ -100,6 +109,28 @@ describe("the lab's scene", () => {
   it("an era is cut to 40 letters, and an empty one is the first era", () => {
     expect(sceneFromQuery(`?era=${"a".repeat(60)}`).era).toBe("a".repeat(40));
     expect(sceneFromQuery("?era=%20%20").era).toBe("flat");
+  });
+
+  it("an era is cut by whole letters: one ending in an emoji keeps it whole and still makes an address", () => {
+    const era = `${"a".repeat(39)}😀`;
+    const tooLong = `${era}b`;
+    const fromAddress = sceneFromQuery(`?era=${encodeURIComponent(tooLong)}`);
+    const fromEdit = editScene(sceneFromQuery(""), { era: tooLong }, false);
+    for (const scene of [fromAddress, fromEdit]) {
+      expect(scene.era).toBe(era);
+      expect(sceneFromQuery(queryFromScene(scene)).era).toBe(era);
+    }
+  });
+
+  it("a half letter never reaches the address, by any route", () => {
+    const half = "\uD83D";
+    expect(editScene(sceneFromQuery(""), { era: `boom${half}` }, false).era).toBe("boom");
+    expect(editScene(sceneFromQuery(""), { era: half }, false).era).toBe("flat");
+    expect(sceneFromQuery("?era=%ED%A0%BDboom").era).not.toMatch(/[\uD800-\uDFFF]/);
+    // A scene handed in whole, as the checks do, with half a letter in its era: the address is still written.
+    const handed = { ...sceneFromQuery("?era=bust"), era: `\uDE00bust${half}` };
+    expect(() => queryFromScene(handed)).not.toThrow();
+    expect(sceneFromQuery(queryFromScene(handed)).era).toBe("bust");
   });
 
   it("an era with odd letters in it survives the address", () => {

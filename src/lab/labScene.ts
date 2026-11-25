@@ -45,7 +45,15 @@ const whole = (value: number, max: number, fallback = 0): number => {
   return Math.min(max, Math.max(0, Math.floor(value)));
 };
 
-const cleanEra = (era: string): string => era.trim().slice(0, MAX_ERA_LENGTH).trim() || FIRST_ERA;
+/** Half of a letter that takes two UTF-16 units (an emoji, say) with its other half missing. */
+const HALF_LETTER = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g;
+
+/** `text` without any half letter: what is left can always be written into an address. */
+const wholeLetters = (text: string): string => text.replace(HALF_LETTER, "");
+
+/** An era of at most 40 letters, counted as letters (an emoji is one), never cut through one. */
+const cleanEra = (era: string): string =>
+  Array.from(wholeLetters(era).trim()).slice(0, MAX_ERA_LENGTH).join("").trim() || FIRST_ERA;
 
 /** Everyone the office has to hold this year: people at work, away and leaving. People expected are not in yet. */
 export const headCount = (scene: OfficeScene): number =>
@@ -98,10 +106,16 @@ const params = (query: string): URLSearchParams => {
   }
 };
 
-/** A count in the address: digits only. Left out, it is `missing`; anything else given is nobody. */
+/**
+ * A count in the address: digits only, and at most `max` however many digits there are. Left out, it is `missing`;
+ * anything else given is nobody.
+ */
 const readCount = (given: string | null, missing: number, max = MAX_COUNT): number => {
   if (given === null) return missing;
-  return /^\d+$/.test(given) ? whole(Number(given), max) : 0;
+  if (!/^\d+$/.test(given)) return 0;
+  // Hundreds of digits make Infinity, which is no number: past the largest, every count is the largest.
+  const value = Number(given);
+  return value > max ? max : whole(value, max);
 };
 
 const readOffice = (given: string | null): OfficeIndex | null => (given !== null && /^[0-4]$/.test(given) ? (Number(given) as OfficeIndex) : null);
@@ -136,10 +150,13 @@ export const sceneFromQuery = (query: string): OfficeScene => {
   );
 };
 
-/** The address of a scene, always with every part and always in the same order. */
+/**
+ * The address of a scene, always with every part and always in the same order. An era handed in whole (by the
+ * checks' `setScene`) may hold half a letter, which no address can carry: it is left out.
+ */
 export const queryFromScene = (of: OfficeScene): string =>
   `?office=${of.office}&product=${of.teams.product}&growth=${of.teams.growth}&recruiting=${of.teams.recruiting}` +
-  `&away=${of.away}&leaving=${of.leaving}&arriving=${of.arriving}&year=${of.year}&era=${encodeURIComponent(of.era)}&seed=${of.seed}`;
+  `&away=${of.away}&leaving=${of.leaving}&arriving=${of.arriving}&year=${of.year}&era=${encodeURIComponent(wholeLetters(of.era))}&seed=${of.seed}`;
 
 /** What an address says besides the scene: `fit=1` (or no office at all) and `panel=0`. */
 export const labOptionsFromQuery = (query: string): LabOptions => {

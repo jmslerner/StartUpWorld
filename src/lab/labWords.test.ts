@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { OfficeIndex } from "../world/types/scene";
 import { DESKS } from "../world/office/layouts";
 import type { LabStats } from "./lab";
-import { figureLines, headCountLine, LAB_WORDS, OFFICE_NAMES, officeChoice } from "./labWords";
+import { figureLines, fitChoice, headCountLine, LAB_WORDS, OFFICE_NAMES, officeChoice } from "./labWords";
 
 const stats = (over: Partial<LabStats> = {}): LabStats => ({
   drawCalls: 630, triangles: 123456, geometries: 9, textures: 4, figures: 50, hidden: 100, framesDrawn: 77, framesLastSecond: 0, status: "running", ...over,
@@ -24,6 +24,12 @@ describe("the lab's words", () => {
       "Full floor (holds 40)",
       "Campus (holds 150)",
     ]);
+  });
+
+  it("names the office the head count picked first, in words short enough to show whole", () => {
+    expect(fitChoice(2)).toBe("Fits all: Own office");
+    // The longest, "Fits all: Shared office", shows whole in the office list at 1280 and at 390 wide (checked in Chromium).
+    for (const office of [0, 1, 2, 3, 4] as OfficeIndex[]) expect(fitChoice(office).length).toBeLessThanOrEqual(24);
   });
 
   it("counts heads in plain words", () => {

@@ -314,6 +314,23 @@ describe("what the browser checks get", () => {
     expect(lab.api.scene()).toEqual(scene);
     expect(lab.source.get()).toEqual(scene);
   });
+
+  it("an era cut at an emoji, or holding half of one, never stops the address being written", () => {
+    const era = `${"a".repeat(39)}😀`;
+    const opened = labAt(`?era=${encodeURIComponent(`${era}b`)}`).lab;
+    expect(opened.getState().scene.era).toBe(era);
+    expect(sceneFromQuery(opened.query()).era).toBe(era);
+
+    const { lab } = labAt();
+    const written: string[] = [];
+    followAddress(lab, (query) => written.push(query));
+    lab.edit({ era: `${era}b` });
+    expect(lab.getState().scene.era).toBe(era);
+    expect(sceneFromQuery(written[written.length - 1]).era).toBe(era);
+    // The checks hand in a whole scene, whatever its era says.
+    expect(() => lab.api.setScene({ ...sceneFromQuery(""), era: `${"a".repeat(39)}\uD83D` })).not.toThrow();
+    expect(sceneFromQuery(written[written.length - 1]).era).toBe("a".repeat(39));
+  });
 });
 
 describe("the frames since a second ago", () => {

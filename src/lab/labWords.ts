@@ -21,7 +21,7 @@ export const LAB_WORDS = {
   fewer: "One fewer",
   more: "One more",
   office: "Office",
-  fitOffice: "Whichever fits the head count",
+  fitOffice: "Fits all",
   year: "Year",
   era: "Era",
   seed: "Seed",
@@ -50,6 +50,9 @@ const number = (value: number): string => value.toLocaleString("en-US");
 
 /** An office as the list of offices names it: "Own office (holds 22)". */
 export const officeChoice = (office: OfficeIndex): string => `${OFFICE_NAMES[office]} (holds ${number(CAPACITY[office])})`;
+
+/** The office the head count picks, as the list of offices names it: "Fits all: Own office". */
+export const fitChoice = (office: OfficeIndex): string => `${LAB_WORDS.fitOffice}: ${OFFICE_NAMES[office]}`;
 
 /** "24 people. This office holds 22." */
 export const headCountLine = (people: number, capacity: number): string =>
