@@ -11,7 +11,13 @@ export { PITCHES };
 const CPU_KINDS: readonly CpuKind[] = ["blitzscaler", "bootstrapper", "incumbent"];
 const DEFAULT_PLAYER_NAME = "Your Startup";
 
-export const newGameSetup = (seed: number, playerName: string, playerController: "human" | "baseline" = "human"): GameSetup => {
+/** A new game's seats. The rivals' lines come from `pitchLists`: the race's by default, `CAREER_PITCHES` in a career. */
+export const newGameSetup = (
+  seed: number,
+  playerName: string,
+  playerController: "human" | "baseline" = "human",
+  pitchLists: Readonly<Record<CpuKind, readonly string[]>> = PITCHES,
+): GameSetup => {
   // Draws for a new game come from one stream, turn 0, so they never touch a turn's rolls.
   const pick = picker(streamSeed(seed, 0, STREAM.names));
   const player = playerName.trim() || DEFAULT_PLAYER_NAME;
@@ -28,7 +34,7 @@ export const newGameSetup = (seed: number, playerName: string, playerController:
   for (const kind of kinds) {
     const name = drawName(pick, taken);
     taken.add(name.toLowerCase());
-    const pitches = PITCHES[kind];
+    const pitches = pitchLists[kind];
     seats.push({ controller: kind, archetype: kind === "incumbent" ? "incumbent" : "startup", name, pitch: pitches[pick(pitches.length - 1)] });
   }
   return { seats };

@@ -7,8 +7,8 @@
 // (Also bump SAVE_VERSION in save.ts, so saves without the new field start a new game.)
 //
 // The career's own fields are the optional ones. A race game has none of them, so a race save has
-// the shape it always had and SAVE_VERSION stays as it is. Where one is present it is checked like
-// any other field, and a game checked against a career's config must have its career fields.
+// the shape it always had and SAVE_VERSION stays as it is. A game checked against a career's config
+// must have its career fields; one checked against a race's config must not have them.
 
 import { PRICE_TIERS } from "../engine/types";
 import type {
@@ -111,8 +111,9 @@ const quarterStats = shape<QuarterStats>({
 
 const exit = shape<Exit>({ turn: count, reason: outReason, users: count, headcount: count });
 
-/** One of the career's fields: a game checked against a career's config must have it, any other game need not. */
-const careerField = (config: RulesConfig, check: Check): Check => (config.career === undefined ? optional(check) : check);
+/** One of the career's fields: a game checked against a career's config must have it; a race game must not, so a race
+ *  load refuses a career's game. */
+const careerField = (config: RulesConfig, check: Check): Check => (config.career === undefined ? (value) => value === undefined : check);
 
 const listing = shape<Listing>({ turn: count, valuation: number, amount: number });
 const rescue = shape<Rescue>({ turn: count, reason: outReason });

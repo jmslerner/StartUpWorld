@@ -35,6 +35,15 @@ export const PITCHES: Readonly<Record<CpuKind, readonly string[]>> = {
   ],
 };
 
+/** A career's starting rivals' lines: the race's lists, but for the lines that speak of quarters. Same lengths, so the
+ *  draws, and every name, are the race's. */
+export const CAREER_PITCHES: Readonly<Record<CpuKind, readonly string[]>> = {
+  ...PITCHES,
+  incumbent: PITCHES.incumbent.map((line) =>
+    line === "Why switch? We'll have that feature next quarter." ? "Why switch? We'll have that feature by next year." : line,
+  ),
+};
+
 /** A newcomer's line: it hints at how the company will play, and claims no age, size or users, since it has none. */
 export const ENTRANT_PITCHES: Readonly<Record<CpuKind, readonly string[]>> = {
   blitzscaler: [
