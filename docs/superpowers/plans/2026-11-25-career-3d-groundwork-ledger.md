@@ -29,7 +29,8 @@ skill for this method is not installed on this machine; the method is followed b
 | 1 | done | a6ed44b | approved; four minor points, three fixed with Task 2 |
 | 2 | done | a79793a, 2fb6113 | approved; one minor point, fixed with Task 5 |
 | 3 | done | 1fecaab (merge), 996c1a0 | approved; four minor points, fixed with Task 5 |
-| 4 | done, in review | 0b2fc50 | pending |
+| 4 | done | 0b2fc50 | approved; five minor points, four fixed with Task 6 |
+| 5 | done, in review | a103c6c, 5cd04ed | pending |
 
 ## Task notes
 
@@ -127,3 +128,44 @@ nothing of the building" tests and "frames the building, not the ground tile". D
 assets: the five "with outdoor assets" framing tests and "frames owned outdoor assets but not the ones merely for
 sale". Lighting tests about the day running out, the event flicker and the setup dimness are dropped with those
 behaviours and replaced by tests of the resting look, the absence of a clock, the ending's fade and coming to rest.
+
+Review: approved. Every path of the lighting was shown to come to rest (a year's sweep in about 1.5 s, an ending's
+fade in about 7 s, at once under reduced motion). Minor points, fixed in a small commit at the start of Task 6: a
+frame time that is not a number must not keep the lighting busy for good; a frame that arrives during an ending's
+fade must not cut the fade short; the dusk look's sun direction gets its assertion back; a comment loses its old
+role names. Left as it is: comments in files restored byte for byte (`textures.ts`, `palette.ts`) that still say
+"terminal font", "calendar week" and "per-phase". The inventory's verdict for those files is "as is", and no player
+reads a comment. Task 9 must draw a frame after `setBounds` while at rest, since the lighting does not report busy
+for it.
+
+### Task 5
+
+How each plan gets its desks: the garage has the table for two and the facing pair (the desk jammed in at an angle
+is dropped), 4; the shared office has its island of 8 and one wall desk, 9; the own office has 20 bench desks and two
+corner desks, 22; the full floor has benches of 14, 12 and 12 and two wall desks, 40; the campus has six benches of
+8 and two corner desks, 50. The clash the inventory records was confirmed (the full floor's new pair lands on a
+plant) and fixed as it says (the plant moves to 3.825, 4.5).
+
+Decisions the implementer took:
+
+- Waiting spots are clear floor, not obstacles, sorted nearest the door first: 4, 6, 8, 10 and 12 of them.
+- `OfficeSystem` works without a seating plan (every desk free and neutral, no sign), since Task 7 supplies one.
+- The office is rebuilt when the layout or the look differs, or on a reset.
+- Every desk style shows its team's colour. Two styles drew no accent at all, so `parts.ts`, which the inventory
+  lists as unchanged, gained an accent mat and accent pads. A desk no team has is grey.
+- The stations are furniture with plain labels (Whiteboard, Marketing corner, Phone corner, Board table, Wall
+  calendar, Coffee machine, Server rack, Price board). The calendar is a page with no words or numbers; the server
+  rack blinks at a fixed rate.
+- The sign reads "+N"; its label is "N more people work here".
+- No company name reaches the world, because the scene has none. The four name signs carry fixed words ("hello",
+  "welcome", "onwards", "HQ"). When the game is wired in, a company name would be a new field of the scene.
+- `interaction/hitProxy.ts` and `interaction/footprint.ts` came back in this task, byte for byte, because the office
+  needs them.
+- While the loop rests, the coffee's steam and the server's lights stand still.
+
+Tests dropped with their behaviour: everything about purchasable assets, founders' seats, the event beacon and
+alarm, command plates, beanbags, upgraded desks, the sign's rename and the end-of-run block. Replaced by tests that
+no station, door or wall writes a word, that the sign writes a plus and a number, and by the plan's own.
+
+Noted: the built stylesheet grew by about 0.3 kB though `src/index.css` is untouched. To be explained by the
+whole-branch review.
