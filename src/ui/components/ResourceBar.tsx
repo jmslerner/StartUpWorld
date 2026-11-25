@@ -1,7 +1,8 @@
 import type { ReactNode } from "react";
-import { count, money, percent, quartersLeft, runwayText, signed } from "../format";
+import { count, money, percent, signed } from "../format";
 import { TONE } from "../styles";
 import type { ResourceView } from "../viewModel";
+import type { Words } from "../words";
 import { Tooltip } from "./Tooltip";
 
 interface StatProps {
@@ -40,27 +41,38 @@ const CONTROL_SHORT: Record<ResourceView["board"]["control"], string> = {
 
 interface ResourceBarProps {
   view: ResourceView;
-  /** Runway under this many turns is what an investor-led board calls a bad quarter. */
+  /** Runway under this many turns is what an investor-led board calls a bad quarter or year. */
   boardRunwayTurns: number;
+  words: Words;
+  /** A career's one rescue is spent: the next year below $0 ends it. Always false in a race. */
+  rescueUsed: boolean;
 }
 
 /** The company's three resources and what follows from them, across the top of the game. */
-export const ResourceBar = ({ view, boardRunwayTurns }: ResourceBarProps) => {
+export const ResourceBar = ({ view, boardRunwayTurns, words, rescueUsed }: ResourceBarProps) => {
   const runwayTone = view.runway === null ? TONE.good : view.runway < boardRunwayTurns ? TONE.danger : view.runway < boardRunwayTurns + 1 ? TONE.caution : "text-gray-100";
   const change = view.usersChange;
   const changeTone = change === null ? undefined : change > 0 ? TONE.good : change < 0 ? TONE.danger : undefined;
   const { climate } = view;
+  const { career, period } = words;
+  /** The last year, by name: only a career reads it. */
+  const lastYear = words.when(view.maxTurns);
+  const belowZero = !career
+    ? "End a quarter below $0 and you are bankrupt."
+    : rescueUsed
+      ? "End a year below $0 and your career ends."
+      : "End a year below $0 and the company is rescued once; a second time ends your career.";
   return (
     <section aria-label="Your company" className="panel-surface grid grid-cols-4 gap-x-3 gap-y-2 rounded-xl px-3 py-2.5 lg:grid-cols-8">
       <Stat
         label="Cash"
         value={money(view.cash)}
-        sub={view.runway === null ? "profitable" : `runway ${runwayText(view.runway)}`}
-        subShort={runwayText(view.runway)}
+        sub={view.runway === null ? "profitable" : `runway ${words.runway(view.runway)}`}
+        subShort={words.runway(view.runway)}
         tone={runwayTone}
         tip={
           <>
-            Cash in the bank. Runway is how many quarters it lasts at last quarter&apos;s burn: {runwayText(view.runway)}. End a quarter below $0 and you are bankrupt.
+            Cash in the bank. Runway is how many {words.periods} it lasts at last {period}&apos;s burn: {words.runway(view.runway)}. {belowZero}
           </>
         }
       />
@@ -78,12 +90,23 @@ export const ResourceBar = ({ view, boardRunwayTurns }: ResourceBarProps) => {
       <Stat
         label="Users"
         value={count(view.users)}
-        sub={change === null ? `${count(view.ipoUsers)} to go public` : <span className={changeTone}>{signed(change, count)} last quarter</span>}
+        sub={change === null ? `${count(view.ipoUsers)} to go public` : <span className={changeTone}>
+              {signed(change, count)} last {period}
+            </span>}
         subShort={change === null ? `of ${count(view.ipoUsers)}` : <span className={changeTone}>{signed(change, count)}</span>}
         tip={
           <>
-            Paying users. Reach {count(view.ipoUsers)} and finish that quarter in profit to go public and win.
-            {change !== null && <> Over last quarter, as its report showed: {signed(change, count)}.</>}
+            {career ? (
+              <>Paying users. Close a year with {count(view.ipoUsers)} users and a profit, and you may go public.</>
+            ) : (
+              <>Paying users. Reach {count(view.ipoUsers)} and finish that quarter in profit to go public and win.</>
+            )}
+            {change !== null && (
+              <>
+                {" "}
+                Over last {period}, as its report showed: {signed(change, count)}.
+              </>
+            )}
           </>
         }
       />
@@ -99,17 +122,23 @@ export const ResourceBar = ({ view, boardRunwayTurns }: ResourceBarProps) => {
           </>
         }
       />
-      <Stat label="Hype" value={Math.floor(view.hype)} sub="fades each quarter" subShort="fades" tip="Hype, 0 to 100. It multiplies how many users you win and your valuation, puts you ahead in the queue for candidates, and improves your odds when poaching. It fades every quarter." />
+      <Stat
+        label="Hype"
+        value={Math.floor(view.hype)}
+        sub={`fades each ${period}`}
+        subShort="fades"
+        tip={`Hype, 0 to 100. It multiplies how many users you win and your valuation, puts you ahead in the queue for candidates, and improves your odds when poaching. It fades every ${period}.`}
+      />
       <Stat
         label="Valuation"
         value={money(view.valuation)}
-        sub={climate === null ? "normal funding" : `×${climate.multiplier}, ${quartersLeft(climate.turnsLeft)}`}
-        subShort={climate === null ? "normal" : `×${climate.multiplier}, ${climate.turnsLeft} ${climate.turnsLeft === 1 ? "qtr" : "qtrs"}`}
+        sub={climate === null ? "normal funding" : `×${climate.multiplier}, ${words.left(climate.turnsLeft)}`}
+        subShort={climate === null ? "normal" : `×${climate.multiplier}, ${words.short(climate.turnsLeft)}`}
         tone={climate === null ? "text-gray-100" : climate.multiplier < 1 ? TONE.caution : TONE.good}
         tip={
           <>
             What investors say the company is worth: users and hype
-            {climate === null ? "." : `, times ${climate.multiplier} while this funding climate lasts: ${quartersLeft(climate.turnsLeft)}.`} It sets how much a raise brings in.
+            {climate === null ? "." : `, times ${climate.multiplier} while this funding climate lasts: ${words.left(climate.turnsLeft)}.`} It sets how much a raise brings in.
           </>
         }
       />
@@ -120,7 +149,15 @@ export const ResourceBar = ({ view, boardRunwayTurns }: ResourceBarProps) => {
         subShort={money(view.stake)}
         tip={
           <>
-            The share of the company you still own. Your stake, {money(view.stake)}, is equity times valuation: if nobody goes public by the last quarter, the largest stake wins.
+            {career ? (
+              <>
+                The share of the company you still own. Your stake, {money(view.stake)}, is equity times valuation. After {lastYear}, the largest founder&apos;s stake wins.
+              </>
+            ) : (
+              <>
+                The share of the company you still own. Your stake, {money(view.stake)}, is equity times valuation: if nobody goes public by the last quarter, the largest stake wins.
+              </>
+            )}
           </>
         }
       />
@@ -132,7 +169,7 @@ export const ResourceBar = ({ view, boardRunwayTurns }: ResourceBarProps) => {
         tone={view.board.control === "investors" ? TONE.danger : view.board.control === "tied" ? TONE.caution : "text-gray-100"}
         tip={
           <>
-            Board seats: {view.board.founderSeats} for founders, {view.board.investorSeats} for investors. Every raise adds an investor. Once investors hold more seats, they may fire you after a quarter in which users fell or runway dropped under {boardRunwayTurns} turns.
+            Board seats: {view.board.founderSeats} for founders, {view.board.investorSeats} for investors. Every raise adds an investor. Once investors hold more seats, they may fire you after a {period} in which users fell or runway dropped under {words.units(boardRunwayTurns)}.
           </>
         }
       />
