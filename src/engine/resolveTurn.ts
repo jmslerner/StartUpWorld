@@ -339,13 +339,35 @@ export const resolveTurn = (state: GameState, plans: PlanSet, seed: number, conf
     desk.valuation = valuationOf(desk.users, end, climate, rules);
   }
 
-  // 11–13. Endings. An IPO ends the game at once; otherwise bankruptcy, the board, then who is left.
+  // 11–13. Endings.
   const stakeOf = (desk: Desk): number => founderStake(desk.equity, desk.valuation);
   let outcome: Outcome | null = null;
-  const listing = desks.filter((desk) => desk.users >= rules.ipo.users && desk.profitable);
-  if (listing.length > 0) {
-    outcome = { kind: "ipo", turn, winnerId: best(listing, (d) => d.valuation, stakeOf).company.id };
+  if (rules.career === undefined) {
+    // The race: an IPO ends the game at once; otherwise bankruptcy, the board, then who is left.
+    const listing = desks.filter((desk) => desk.users >= rules.ipo.users && desk.profitable);
+    if (listing.length > 0) {
+      outcome = { kind: "ipo", turn, winnerId: best(listing, (d) => d.valuation, stakeOf).company.id };
+    } else {
+      for (const desk of desks) {
+        if (desk.cash < 0) {
+          desk.out = "bankrupt";
+          continue;
+        }
+        if (desk.investorSeats <= desk.company.founderSeats) continue;
+        const usersFell = desk.users < desk.company.usersAtLastClose;
+        const lowRunway = desk.runway !== null && desk.runway < rules.board.runwayTurns;
+        const fired = (usersFell || lowRunway) && firstFloat(seed, turn, STREAM.board, desk.company.id) < rules.board.fireChance;
+        desk.board = { usersFell, lowRunway, fired };
+        if (fired) desk.out = "fired";
+      }
+      const survivors = desks.filter((desk) => desk.out === null);
+      if (survivors.length === 0) outcome = { kind: "wipeout", turn, winnerId: null };
+      else if (survivors.length === 1) outcome = { kind: "lastStanding", turn, winnerId: survivors[0].company.id };
+      else if (turn >= rules.game.maxTurns) outcome = { kind: "turnLimit", turn, winnerId: best(survivors, stakeOf, (d) => d.valuation).company.id };
+    }
   } else {
+    // A career: bankruptcy and the board vote as in the race. Reaching the bar ends nothing, nor does one company
+    // left or none; the career gets its outcome only after its last year, on the largest founder's stake.
     for (const desk of desks) {
       if (desk.cash < 0) {
         desk.out = "bankrupt";
@@ -358,10 +380,11 @@ export const resolveTurn = (state: GameState, plans: PlanSet, seed: number, conf
       desk.board = { usersFell, lowRunway, fired };
       if (fired) desk.out = "fired";
     }
-    const survivors = desks.filter((desk) => desk.out === null);
-    if (survivors.length === 0) outcome = { kind: "wipeout", turn, winnerId: null };
-    else if (survivors.length === 1) outcome = { kind: "lastStanding", turn, winnerId: survivors[0].company.id };
-    else if (turn >= rules.game.maxTurns) outcome = { kind: "turnLimit", turn, winnerId: best(survivors, stakeOf, (d) => d.valuation).company.id };
+    if (turn >= rules.game.maxTurns) {
+      const survivors = desks.filter((desk) => desk.out === null);
+      if (survivors.length === 0) outcome = { kind: "wipeout", turn, winnerId: null };
+      else outcome = { kind: "turnLimit", turn, winnerId: best(survivors, stakeOf, (d) => d.valuation).company.id };
+    }
   }
 
   // Close the books: every company as it stands after this turn. Companies that go out release
