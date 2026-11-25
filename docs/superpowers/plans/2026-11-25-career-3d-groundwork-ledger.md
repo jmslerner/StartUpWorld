@@ -22,6 +22,10 @@ skill for this method is not installed on this machine; the method is followed b
 - Nothing in this plan registers a team's area as something to tap. Task 6 makes picking ready for it and tests it;
   the area itself belongs with "moving a person by touching a team's area", which the plan leaves for the wiring.
   Whoever registers it must keep the box low (about 0.1 high), or it wins the tap ahead of the figures inside it.
+- People wander to the coffee machine only while the loop is kept running (the lab's switch). As Task 7 left it, a
+  trip could start within 15 seconds of any new scene and the office came to rest within 90; Task 11 asks for rest
+  within 15 seconds of a year's end, and the design asks for a view drawn only when something changes. So Task 9
+  gates wandering behind the same switch that keeps the loop awake, off by default.
 - Someone back from being away takes the first team that is short, in the order Product, Growth, Recruiting, which
   need not be the team they left (ruling 4, as written). Kept: the plan's ruling is explicit.
 
@@ -34,7 +38,8 @@ skill for this method is not installed on this machine; the method is followed b
 | 3 | done | 1fecaab (merge), 996c1a0 | approved; four minor points, fixed with Task 5 |
 | 4 | done | 0b2fc50 | approved; five minor points, four fixed with Task 6 |
 | 5 | done | a103c6c, 5cd04ed | approved; minor points, two fixed with Task 7 |
-| 6 | done, in review | b5e5a27, 182fad9 | pending |
+| 6 | done | b5e5a27, 182fad9 | approved; no findings |
+| 7 | done, in review | bb811ab, aab5a0c | pending |
 
 ## Task notes
 
@@ -195,3 +200,41 @@ Five files are byte for byte the old ones (`HighlightRing.ts`, `gestures.ts`, `p
 36 tests, the old 34 and the plan's two. The nine station literals in the test stay as they were: the inventory
 expected `station` to leave the union, and Task 2 kept it. The desk literals and the founder ids were the ones to
 change.
+
+Review: approved with no findings. Both new picking tests fail under mutation; the lighting's fade logic was probed
+through ten scenarios (a reset or a new year during the fade, won then lost, an endless frame length) and came to
+rest in each.
+
+### Task 7
+
+Part A replaced the arcade screen's picture with stars over coloured bars. The people: 169 tests in the folder, the
+path follower's 14 byte for byte.
+
+Decisions the implementer took:
+
+- The world owns the seating plan and reconciles it before the systems get the frame, as the old world did; that is
+  what lets the office see this frame's seating. The people read it from the context.
+- The sign counts the cast's hidden people plus people working without a desk, not people away or at the door.
+- A team's area ends at its last desk. Waiting spots are handed out afresh each time, leavers first.
+- Everyone at the door stands; the floor pose and the lap laptop are gone with the beanbags.
+- A face never changes with the shirt: accessories have the same odds for every team. A team shows on the shirt:
+  Product a pocket, Growth a light panel, Recruiting a lanyard. Someone no team has wears grey. Someone let go keeps
+  the last team's shirt and carries the box while standing at the door.
+- Someone going away walks out empty-handed and walks back in on return.
+- Staff who were on the sign and take a drawn place appear at the desk with a short scale-in, without a walk.
+- Under reduced motion everyone is placed on every frame.
+- `busy()` is movement only: waiting for a turn, walking, settling, appearing, leaving, a rolling chair. Typing and
+  swaying do not count.
+- Nobody reacts to an ending in this task. No sound calls.
+- One figure is 8 meshes on one shared material: 8 draw calls, and 2 to 6 more in the shadow pass. 56 figures are
+  448 calls, which a test pins.
+
+Slip, reported by the implementer: `seating.ts` was drafted before its tests were run, so those tests were not seen
+failing first. The review is asked to mutate `seating.ts`.
+
+Old tests dropped with their behaviour: founders' seats and outfits, names, morale and stress, every scripted
+reaction, the win and loss scenes, the floor pose, id reuse. The crew's tests are rewritten on scenes and casts.
+
+For Task 9: the order in `setScene` is cast, layout, `seating.reconcile`, then the frame to the systems, office
+before people. One `update` must run between `setScene` and the first drawn frame, or someone away shows a lit desk
+for a frame. A big year can take 20 to 40 seconds to play out with the old limits (arrivals 0.4 s apart).
