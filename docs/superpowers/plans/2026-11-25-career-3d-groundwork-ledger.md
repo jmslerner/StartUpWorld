@@ -26,6 +26,11 @@ skill for this method is not installed on this machine; the method is followed b
   trip could start within 15 seconds of any new scene and the office came to rest within 90; Task 11 asks for rest
   within 15 seconds of a year's end, and the design asks for a view drawn only when something changes. So Task 9
   gates wandering behind the same switch that keeps the loop awake, off by default.
+- Task 11's "fail on any console error or warning" allows one message: the graphics driver's "GPU stall due to
+  ReadPixels", which headless Chromium's software renderer logs whenever the world draws. The world never reads
+  pixels back. Every other warning fails the check.
+- Task 11 restores a lost context through "Reload 3D view", as the plan says. Restoring in place and then unmounting
+  logs driver warnings about objects of the old context; the picture is right, and the button's path is clean.
 - Someone back from being away takes the first team that is short, in the order Product, Growth, Recruiting, which
   need not be the team they left (ruling 4, as written). Kept: the plan's ruling is explicit.
 
@@ -41,6 +46,7 @@ skill for this method is not installed on this machine; the method is followed b
 | 6 | done | b5e5a27, 182fad9 | approved; no findings |
 | 7 | done | bb811ab, aab5a0c, 9ca7013 (fixes) | approved with two important points, fixed before Task 9 |
 | 8 | done | 3dbd554 | approved; three minor points, fixed with Task 9 |
+| 9 | done, in review | b47bf0c, 98e73bf | pending |
 
 ## Task notes
 
@@ -289,3 +295,33 @@ every case tried on both sides of the cap; the system always came to rest and re
 page exists nothing reaches the shell, so `world.css` is not in the build at all. Minor points, fixed in a small
 commit at the start of Task 9: a frame time that is not a number, and a bubble asked to last for ever, must not
 keep the effects busy for good; two comments lose old-game words.
+
+### Task 9
+
+Decisions the implementer took:
+
+- `WorldView` has one optional prop besides its source, `onState`, which reports the status and the world's handle
+  together. The lab needs both.
+- `WorldHandle` gains `setKeepAwake(on)`, `stats()` (draw calls, triangles, geometries, textures, figures, hidden,
+  frames drawn), `loseContext()` and `restoreContext()`.
+- A second mount disposes the first, with a warning in the console. The old code enforced nothing.
+- The teardown never throws: a failing step is logged and the rest still run.
+- What could leave `World.ts` lives in two pure, tested modules: `core/FrameLoop.ts` (rest, pause, lost context,
+  keep-awake, the one frame request) and `core/sceneFrames.ts` (cast, events, layout, seating, in that order).
+- A frame's time is clamped to between 0.001 and 0.1 s. The first frame after a stop counts as 1/60 s.
+- Busy is any system, a camera move or shake, or a camera that changed since the last frame. Highlight rings pulse
+  without end, so they do not count and stand still at rest.
+- Wandering reads `signals.keepAwake`; off, no trip ever starts.
+- The shell's new words: "Reload 3D view"; "The 3D office stopped drawing. The game carries on without it."; and
+  the canvas's label, "A 3D view of the company's office and the people who work in it. The game is complete
+  without it."
+
+The implementer's own run in headless Chromium, before Task 11's script: no frame drawn in a quiet second; a year
+with three hires and two layoffs at rest 8.9 s after it advanced; the campus with 150 people at 390 by 844 drew 50
+figures, counted 100 on the sign, and took 630 draw calls.
+
+Slip, reported by the implementer: `sceneFrames.ts` was written with its test, not after it; checked by mutation
+afterwards (5 of 5 caught).
+
+To look at in Task 11's screenshots: in the shared office at 900 by 600 the neighbours' half of the loft crops at
+the right edge. The camera frames the company's own floor.
