@@ -17,7 +17,10 @@
  *   is not: the compiler keeps the import itself, so it counts as a real one.
  * - `import("…")` is a dynamic import: it breaks rules 1 to 3 like any other, and is where a chain of rule 4 stops.
  * - An `import()` of anything but a plain string, and `import.meta.glob`, cannot be followed and are refused.
- * - A relative import that resolves to no file is refused too: an import the fence cannot follow is a hole in it.
+ * - A relative import that resolves to no file under src is refused too: an import the fence cannot follow is a hole
+ *   in it. One that points outside src (the package's own file, say) is outside like a package, and is not judged.
+ * - `require("…")` counts as a real import. A call to something named `require` with anything but a plain string is
+ *   some other function and is left alone.
  */
 /// <reference types="node" />
 import { readdirSync, readFileSync } from "node:fs";
@@ -32,7 +35,7 @@ interface Import {
   readonly from: string;
   readonly specifier: string;
   readonly kind: ImportKind;
-  /** The file a relative import resolves to, from the repository's root. Null for a package. */
+  /** The file a relative import resolves to, from the repository's root. Null for a package or a file outside src. */
   readonly target: string | null;
 }
 
@@ -77,6 +80,7 @@ const resolve = (tree: Tree, from: string, specifier: string): string | null => 
     base.replace(/\.jsx?$/, ".ts"),
     base.replace(/\.jsx?$/, ".tsx"),
   ];
+  if (!base.startsWith("src/")) return null;
   const found = candidates.find((candidate) => tree.has(candidate));
   if (found === undefined) throw new Error(`${from} imports ${specifier}, which is no file the fence can find`);
   return found;
@@ -103,7 +107,8 @@ const importsOfFile = (tree: Tree, from: string, source: string): Import[] => {
     } else if (ts.isCallExpression(node) && node.expression.kind === ts.SyntaxKind.ImportKeyword) {
       add(node.arguments[0], "dynamic");
     } else if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === "require") {
-      add(node.arguments[0], "value");
+      const [first] = node.arguments;
+      if (first !== undefined && ts.isStringLiteralLike(first)) add(first, "value");
     } else if (ts.isPropertyAccessExpression(node) && ts.isMetaProperty(node.expression) && node.name.text.startsWith("glob")) {
       throw new Error(`${from} uses import.meta.glob, which the fence cannot follow`);
     }
@@ -113,13 +118,20 @@ const importsOfFile = (tree: Tree, from: string, source: string): Import[] => {
   return found;
 };
 
-const parsed = new WeakMap<Tree, Import[]>();
+/** A tree is parsed once, whatever the outcome: an import that cannot be followed is refused the same way each time. */
+const parsed = new WeakMap<Tree, { readonly found: Import[] } | { readonly refused: unknown }>();
 const importsOf = (tree: Tree): Import[] => {
-  const known = parsed.get(tree);
-  if (known !== undefined) return known;
-  const found = [...tree].filter(([path]) => isCode(path)).flatMap(([path, source]) => importsOfFile(tree, path, source));
-  parsed.set(tree, found);
-  return found;
+  let known = parsed.get(tree);
+  if (known === undefined) {
+    try {
+      known = { found: [...tree].filter(([path]) => isCode(path)).flatMap(([path, source]) => importsOfFile(tree, path, source)) };
+    } catch (refused) {
+      known = { refused };
+    }
+    parsed.set(tree, known);
+  }
+  if ("refused" in known) throw known.refused;
+  return known.found;
 };
 
 const say = (found: Import): string =>
@@ -394,6 +406,53 @@ describe("the boundary can fail", () => {
     expect(() => worldLookingOut(made({ "src/world/a.ts": `const where = "../engine/types"; export const y = () => import(where);` }))).toThrow("not a plain string");
     expect(() => worldLookingOut(made({ "src/world/a.ts": `export const all = import.meta.glob("../engine/*.ts");` }))).toThrow("import.meta.glob");
     expect(() => firstLoadReachingTheWorld(new Map([["src/App.tsx", ""]]))).toThrow("is not there");
+  });
+
+  it("leaves alone a call to require that is not an import, and counts one that is", () => {
+    const tree = made({
+      "src/ui/a.ts": `declare const require: (name: string) => unknown; const name = "three"; export const a = [require(name), require(), require(\`\${name}/x\`)];`,
+      "src/ui/b.ts": `declare const require: (name: string) => unknown; export const b = require("three");`,
+    });
+    expect(threeOutsideTheWorld(tree)).toEqual(["src/ui/b.ts imports three"]);
+  });
+
+  it("treats a relative import that leaves src as outside, and still refuses one inside src that is no file", () => {
+    const tree = made({
+      "src/world/a.ts": `import pkg from "../../package.json"; import "/vite.config.ts"; import "../../scripts/gone"; export const a = pkg;`,
+      "src/world/b.ts": `import "../engine/../../src-old/x";`,
+    });
+    expect(worldLookingOut(tree)).toEqual([]);
+    expect(firstLoadReachingTheWorld(tree)).toEqual([]);
+    expect(() => worldLookingOut(made({ "src/world/a.ts": `import "../../src/engine/gone";` }))).toThrow("no file the fence can find");
+    expect(() => worldLookingOut(made({ "src/world/a.ts": `import "./gone.css";` }))).toThrow("no file the fence can find");
+  });
+
+  it("parses a tree once, and refuses a bad one the same way every time without reading it again", () => {
+    let reads = 0;
+    const counted = (files: Record<string, string>): Tree => {
+      const tree = new Map(made(files));
+      const entries = tree.entries.bind(tree);
+      tree[Symbol.iterator] = () => {
+        reads += 1;
+        return entries();
+      };
+      return tree;
+    };
+    const good = counted({ "src/world/a.ts": `export const a = 1;` });
+    for (const rule of [threeOutsideTheWorld, worldLookingOut, sceneBuilderOverTheFence, firstLoadReachingTheWorld]) expect(rule(good)).toEqual([]);
+    expect(reads).toBe(1);
+    const bad = counted({ "src/world/a.ts": `import "../engine/gone";` });
+    const refusals = [threeOutsideTheWorld, worldLookingOut, sceneBuilderOverTheFence, firstLoadReachingTheWorld].map((rule) => {
+      try {
+        rule(bad);
+        return null;
+      } catch (refused) {
+        return refused;
+      }
+    });
+    expect(refusals[0]).toBeInstanceOf(Error);
+    expect(refusals.every((refused) => refused === refusals[0])).toBe(true);
+    expect(reads).toBe(2);
   });
 
   it("follows an address from the root, a query on a file, and a folder's index", () => {
