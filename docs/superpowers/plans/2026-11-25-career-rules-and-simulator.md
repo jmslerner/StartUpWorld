@@ -214,11 +214,14 @@ Two conventions hold everywhere:
 
 **Files:**
 - Create: `src/sim/raceGolden.test.ts`
+- Modify: `eslint.config.js` (lint leaves the tool folders `.claude` and `.superpowers` alone)
 
 **Interfaces:**
 - Consumes: `createGame`, `resolveTurn` (`src/engine`), `choosePlans` (`src/ai/choosePlans`), `newGameSetup`
   (`src/ai/names`), `CONFIG`, `DESIGN`.
-- Produces: a test that fails if any race state or log changes by one character.
+- Produces: a test that fails if any race state or log changes by one character. And a lint run that reads this
+  checkout only: the two tool folders can hold whole scratch copies of the repository, which `npx eslint .` would
+  otherwise walk (measured: 35 seconds instead of 8, and a scratch copy's lint errors would fail this checkout's check).
 
 - [ ] **Step 1: Write the test**
 
@@ -269,10 +272,17 @@ const RECORDED_DESIGN = ["5e71db35", "c13dd7cc", "7980b414", "4afc7c73", "f0be30
 In `src/engine/formulas.ts` change `round4` to round to 3 digits. Run the test. Expected: both tests FAIL. Undo the
 change (`git checkout src/engine/formulas.ts`). Run again. Expected: PASS.
 
-- [ ] **Step 4: Run the checks and commit**
+- [ ] **Step 4: Keep the tool folders out of lint**
+
+In `eslint.config.js` change `globalIgnores(['dist'])` to `globalIgnores(['dist', '.claude', '.superpowers'])`.
+
+Run: `npx eslint . --max-warnings=0 --debug 2>&1 | grep -c "\.claude/"`
+Expected: `0`.
+
+- [ ] **Step 5: Run the checks and commit**
 
 ```bash
-git add src/sim/raceGolden.test.ts && git commit -m "sim: a golden record of the race, so the career cannot change it"
+git add src/sim/raceGolden.test.ts eslint.config.js && git commit -m "sim: a golden record of the race, so the career cannot change it"
 ```
 
 ---
