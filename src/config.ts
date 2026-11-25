@@ -327,10 +327,10 @@ export const CAREER: CareerGameConfig = {
       users: 10 * K,
       quality: 30,
       hype: 20,
-      founderEquity: 0.6,
+      founderEquity: 0.9,
       founderSeats: 2,
       investorSeats: 1,
-      workExponent: 0.625,
+      workExponent: 0.78,
       catchUpMultiplier: 1.5,
       allocation: { product: 5, growth: 2, recruiting: 1 },
     },
@@ -359,9 +359,9 @@ export const CAREER: CareerGameConfig = {
   churn: { base: 0.3, perQualityPoint: 0.002, min: 0.05 },
 
   // ── Money ──
-  raise: { minUsers: 1 * K, cooldownTurns: 1, options: [10, 20, 30] },
+  raise: { minUsers: 1 * K, cooldownTurns: 2, options: [10, 20, 30] },
   valuation: { perUser: 27 },
-  board: { fireChance: 0.3, runwayTurns: 1 },
+  board: { fireChance: 0.3, runwayTurns: 2 },
 
   // ── Hype ──
   hype: { decay: 0.4, launch: 15, raise: 10, growth: 5, growthThreshold: 0.25 },
@@ -407,7 +407,7 @@ export const CAREER: CareerGameConfig = {
         price: "premium",
         raise: { when: "runway", runway: 1, percents: [10, 20, 30] },
         poachRunway: null,
-        teamCap: 9,
+        teamCap: 11,
         hireRunway: 2,
         marketingShares: [0, 0.081, 0.162],
         productShares: [1, 0.8, 0.6],
@@ -474,7 +474,7 @@ export const CAREER: CareerGameConfig = {
           archetypes: { startup: { cash: 400 * K } },
           // Magazine adverts, trade shows and disks in the post buy little.
           pull: { maxMarketing: 1 * M, marketingCoefficient: 0.2 },
-          cpu: { personalities: { blitzscaler: { teamCap: 12 }, bootstrapper: { teamCap: 9 }, incumbent: { teamCap: 18 } } },
+          cpu: { personalities: { blitzscaler: { teamCap: 12 }, bootstrapper: { teamCap: 11 }, incumbent: { teamCap: 18 } } },
           events: {
             deck: [
               {
@@ -544,7 +544,7 @@ export const CAREER: CareerGameConfig = {
           ipo: { users: 300 * K },
           archetypes: { startup: { cash: 600 * K } },
           pull: { maxMarketing: 5 * M },
-          cpu: { personalities: { blitzscaler: { teamCap: 22 }, bootstrapper: { teamCap: 14 }, incumbent: { teamCap: 30 } } },
+          cpu: { personalities: { blitzscaler: { teamCap: 22 }, bootstrapper: { teamCap: 18 }, incumbent: { teamCap: 30 } } },
           // Hiring is a fight: staff leave for share options.
           poach: { baseChance: 0.6 },
           events: {
@@ -617,7 +617,7 @@ export const CAREER: CareerGameConfig = {
           ipo: { users: 1.2 * M },
           archetypes: { startup: { cash: 500 * K } },
           pull: { maxMarketing: 5 * M },
-          cpu: { personalities: { blitzscaler: { teamCap: 22 }, bootstrapper: { teamCap: 14 }, incumbent: { teamCap: 30 } } },
+          cpu: { personalities: { blitzscaler: { teamCap: 22 }, bootstrapper: { teamCap: 18 }, incumbent: { teamCap: 30 } } },
           events: {
             deck: [
               {
@@ -684,12 +684,12 @@ export const CAREER: CareerGameConfig = {
           valuation: { perUser: 16 },
           priceTiers: { budget: { price: 1.6 }, standard: { price: 2.4 }, premium: { price: 4 } },
           hiring: { candidatesPerTurn: 5 },
-          ipo: { users: 2.6 * M },
+          ipo: { users: 2.3 * M },
           archetypes: { startup: { cash: 600 * K } },
           // Rented servers: each builder ships more. Store charts and sharing make Growth work count for more.
           quality: { gainPerWork: 11 },
           pull: { maxMarketing: 10 * M, growthCoefficient: 0.4 },
-          cpu: { personalities: { blitzscaler: { teamCap: 38 }, bootstrapper: { teamCap: 21 }, incumbent: { teamCap: 52 } } },
+          cpu: { personalities: { blitzscaler: { teamCap: 38 }, bootstrapper: { teamCap: 27 }, incumbent: { teamCap: 52 } } },
           events: {
             deck: [
               {
@@ -766,7 +766,7 @@ export const CAREER: CareerGameConfig = {
           ipo: { users: 6 * M },
           archetypes: { startup: { cash: 1 * M } },
           pull: { maxMarketing: 30 * M },
-          cpu: { personalities: { blitzscaler: { teamCap: 75 }, bootstrapper: { teamCap: 38 }, incumbent: { teamCap: 105 } } },
+          cpu: { personalities: { blitzscaler: { teamCap: 75 }, bootstrapper: { teamCap: 49 }, incumbent: { teamCap: 105 } } },
           // Users move between rivals.
           churn: { base: 0.35 },
           events: {
@@ -840,7 +840,7 @@ export const CAREER: CareerGameConfig = {
           // Coding assistants build faster; features are copied in weeks.
           quality: { gainPerWork: 12, decay: 8 },
           pull: { maxMarketing: 30 * M },
-          cpu: { personalities: { blitzscaler: { teamCap: 75 }, bootstrapper: { teamCap: 38 }, incumbent: { teamCap: 105 } } },
+          cpu: { personalities: { blitzscaler: { teamCap: 75 }, bootstrapper: { teamCap: 49 }, incumbent: { teamCap: 105 } } },
           events: {
             deck: [
               {
@@ -903,7 +903,7 @@ export const CAREER: CareerGameConfig = {
         invented: true,
         values: {
           market: { newUsersTurn1: 2 * M, growthPerTurn: 0.06 },
-          salary: 300 * K,
+          salary: 365 * K,
           valuation: { perUser: 4 },
           priceTiers: { budget: { price: 1.2 }, standard: { price: 1.8 }, premium: { price: 3 } },
           hiring: { candidatesPerTurn: 2 },
@@ -913,7 +913,7 @@ export const CAREER: CareerGameConfig = {
           quality: { gainPerWork: 18 },
           churn: { perQualityPoint: 0.003 },
           pull: { maxMarketing: 40 * M, marketingCoefficient: 0.15 },
-          cpu: { personalities: { blitzscaler: { teamCap: 45 }, bootstrapper: { teamCap: 22 }, incumbent: { teamCap: 60 } } },
+          cpu: { personalities: { blitzscaler: { teamCap: 45 }, bootstrapper: { teamCap: 29 }, incumbent: { teamCap: 60 } } },
           events: {
             deck: [
               {
@@ -978,7 +978,7 @@ export const CAREER: CareerGameConfig = {
           // Trust is worth more than reach: adverts hardly move users, a launch moves them more.
           pull: { maxMarketing: 60 * M, marketingCoefficient: 0.1 },
           hype: { launch: 25 },
-          cpu: { personalities: { blitzscaler: { teamCap: 90 }, bootstrapper: { teamCap: 45 }, incumbent: { teamCap: 135 } } },
+          cpu: { personalities: { blitzscaler: { teamCap: 90 }, bootstrapper: { teamCap: 58 }, incumbent: { teamCap: 135 } } },
           events: {
             deck: [
               {
@@ -1157,7 +1157,7 @@ export const CAREER: CareerGameConfig = {
         year: 2011,
         name: "Cloud outage",
         text: "A fault in one region of the largest cloud provider knocks many well-known startups offline, some for more than a day; full recovery takes about four days.",
-        target: { pick: "random", launched: true, qualityBelow: 50, minUsers: 1 },
+        target: { pick: "random", launched: true, qualityBelow: 87, minUsers: 1 },
         effects: [
           { kind: "targetUsers", fraction: 0.1 },
           { kind: "targetHype", delta: -10 },
@@ -1305,7 +1305,7 @@ export const CAREER: CareerGameConfig = {
         year: 2035,
         name: "Home-helper recall",
         text: "A home-robot model is recalled after a software fault, and a weak product in the market takes the blame.",
-        target: { pick: "random", launched: true, qualityBelow: 60, minUsers: 1 },
+        target: { pick: "random", launched: true, qualityBelow: 101, minUsers: 1 },
         effects: [
           { kind: "targetUsers", fraction: 0.2 },
           { kind: "targetHype", delta: -15 },
