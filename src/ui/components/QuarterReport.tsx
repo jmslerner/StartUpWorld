@@ -41,7 +41,7 @@ export const QuarterReport = ({ companyName, view, over, onClose }: QuarterRepor
   const titleId = useId();
   const closeRef = useRef<HTMLButtonElement | null>(null);
 
-  useDialog(onClose, closeRef);
+  const close = useDialog(onClose, closeRef);
 
   const { books, users, people: team, product, hype } = view;
   const net = books.revenue - books.costs.total;
@@ -52,7 +52,7 @@ export const QuarterReport = ({ companyName, view, over, onClose }: QuarterRepor
     hype.layoffs !== 0 && `layoffs ${signed(hype.layoffs, String)}`,
   ].filter((part): part is string => part !== false);
   const teamParts = [
-    team.lostToEvent > 0 && `${team.lostToEvent} lost to burnout`,
+    team.lostToEvent > 0 && `${team.lostToEvent} lost to the event`,
     team.laidOff > 0 && `${team.laidOff} laid off`,
     team.poachedOut > 0 && `${team.poachedOut} poached away`,
     team.poachedIn > 0 && `${team.poachedIn} poached in`,
@@ -182,7 +182,7 @@ export const QuarterReport = ({ companyName, view, over, onClose }: QuarterRepor
             </p>
           )}
 
-          <button ref={closeRef} type="button" onClick={onClose} className={`${PRIMARY} mt-4 w-full`}>
+          <button ref={closeRef} type="button" onClick={close} className={`${PRIMARY} mt-4 w-full`}>
             {over ? "See how it ended" : `Plan ${quarter(view.turn + 1)}`}
           </button>
         </article>

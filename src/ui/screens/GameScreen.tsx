@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { CONFIG } from "../../config";
 import type { Plan } from "../../engine/types";
 import { PLAYER_ID } from "../../state/player";
@@ -43,8 +43,13 @@ export const GameScreen = () => {
 
   const onChange = useCallback((plan: Plan) => setDraft(plan), [setDraft]);
 
+  const titleRef = useRef<HTMLHeadingElement | null>(null);
+
   const onEndQuarter = useCallback(() => {
     SFX.tick();
+    // Focus leaves the button before the report opens over it: when the report closes, focus comes back to
+    // the top of the page, not to a button that a key held down would press again and again.
+    titleRef.current?.focus({ preventScroll: true });
     endQuarter();
     setTab("plan");
     window.scrollTo({ top: 0 });
@@ -70,10 +75,10 @@ export const GameScreen = () => {
   return (
     <>
       <div inert={report !== null || helpOpen}>
-        <main className="mx-auto w-full max-w-6xl space-y-3 px-3 pb-28 pt-3">
+        <main className="mx-auto w-full max-w-6xl space-y-3 px-3 pb-44 pt-3 md:pb-28">
           <header className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
             <p className={LABEL}>StartUpWorld</p>
-            <h1 className="order-last w-full min-w-0 truncate text-sm font-semibold text-gray-100 sm:order-none sm:w-auto sm:flex-1">
+            <h1 ref={titleRef} tabIndex={-1} className="order-last w-full min-w-0 truncate text-sm font-semibold text-gray-100 outline-none sm:order-none sm:w-auto sm:flex-1">
               {resource.companyName} <span className="font-normal text-mist/70">· {quarter(game.turn)} of {resource.maxTurns}</span>
             </h1>
             <div className="flex items-center gap-1.5">
@@ -136,6 +141,8 @@ export const GameScreen = () => {
 
         {/* Always in reach: what the plan does to cash, the most serious warning, and the button that ends the quarter. */}
         <div className="panel-surface fixed inset-x-0 bottom-0 z-30 rounded-t-xl border-b-0" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
+          {/* Narrow screens have no room beside the button: the warning gets lines of its own above it. */}
+          {headline !== undefined && <p className={`mx-auto line-clamp-3 w-full max-w-6xl px-3 pt-2 text-[0.7rem] leading-snug md:hidden ${TONE[headline.level]}`}>{headline.text}</p>}
           <div className="mx-auto flex w-full max-w-6xl items-center gap-3 px-3 py-2.5">
             <div className="min-w-0 shrink-0 text-xs">
               <div className="text-[0.6rem] uppercase tracking-[0.16em] text-mist/60">Cash after {quarter(game.turn)}</div>

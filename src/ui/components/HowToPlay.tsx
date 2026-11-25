@@ -14,6 +14,8 @@ export const HowToPlay = ({ config }: HowToPlayProps) => {
   const prices = config.priceTiers;
   const sizes = config.raise.options;
   const raiseSizes = sizes.length > 1 ? `${sizes.slice(0, -1).join(", ")} or ${sizes[sizes.length - 1]}` : String(sizes[0]);
+  // A few cards by name, straight from the deck: add or rename one in the config and this follows.
+  const eventNames = config.events.deck.slice(0, 3).map((card) => card.name);
   return (
     <dl className="space-y-2.5 text-xs leading-relaxed text-mist">
       <div>
@@ -53,10 +55,15 @@ export const HowToPlay = ({ config }: HowToPlayProps) => {
           {Math.abs(config.layoff.hype)} hype.
         </dd>
       </div>
-      <div>
-        <dt className="font-semibold text-gray-100">Events</dt>
-        <dd>From quarter {config.events.firstTurn} on, a quarter may open with an event: a funding winter, a viral moment, a security breach. You see it before you plan.</dd>
-      </div>
+      {eventNames.length > 0 && config.events.chance > 0 && (
+        <div>
+          <dt className="font-semibold text-gray-100">Events</dt>
+          <dd>
+            From quarter {config.events.firstTurn} on, a quarter may open with an event ({eventNames.join(", ")}
+            {config.events.deck.length > eventNames.length && " and others"}). You see it before you plan.
+          </dd>
+        </div>
+      )}
     </dl>
   );
 };
@@ -70,7 +77,7 @@ export const HowToPlayDialog = ({ config, onClose }: HowToPlayDialogProps) => {
   const titleId = useId();
   const closeRef = useRef<HTMLButtonElement | null>(null);
 
-  useDialog(onClose, closeRef);
+  const close = useDialog(onClose, closeRef);
 
   return (
     <div className="fixed inset-0 z-40 overflow-y-auto bg-ink/90 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby={titleId}>
@@ -80,7 +87,7 @@ export const HowToPlayDialog = ({ config, onClose }: HowToPlayDialogProps) => {
             How to play
           </h2>
           <HowToPlay config={config} />
-          <button ref={closeRef} type="button" onClick={onClose} className={`${PRIMARY} mt-4 w-full`}>
+          <button ref={closeRef} type="button" onClick={close} className={`${PRIMARY} mt-4 w-full`}>
             Back to the game
           </button>
         </div>
