@@ -147,7 +147,7 @@ class NavGrid {
    * the one closest to (towardX, towardZ) — the other end of the walk — is used.
    *
    * Snapping only considers the main region of the floor: the nearest free cell
-   * is sometimes a sliver sealed in between waiting spots, and a route cannot leave it.
+   * is sometimes a sliver sealed in between pieces of furniture, and a route cannot leave it.
    * With `mainOnly`, a point standing in such a sliver is snapped out of it too.
    */
   anchor(x: number, z: number, towardX: number, towardZ: number, mainOnly = false): Anchor | null {
@@ -156,8 +156,9 @@ class NavGrid {
       return { cell: own, snapped: false, clean: true };
     }
 
-    // Furniture the point is in (its own chair, its own waiting spot). The step may
-    // pass through that — but not through the desk in front of the chair.
+    // Furniture the point is in (a seat is inside its own chair). The step may pass
+    // through that — but not through the desk in front of the chair. (A waiting spot
+    // is clear floor: it is in no furniture.)
     const home: Obstacle[] = [];
     for (const obstacle of this.obstacles) {
       if (footprintContains(obstacle, x, z, APPROACH_CLEARANCE)) home.push(obstacle);
@@ -451,7 +452,7 @@ const routeOnFloor = (layout: OfficeLayout, fromX: number, fromZ: number, destin
   let end = grid.anchor(toX, toZ, fromX, fromZ);
   if (start !== null && end !== null && !grid.connected(start.cell, end.cell)) {
     // One end stands in a pocket of free floor that furniture seals off (a gap
-    // between waiting spots, say). If it can simply step out onto the main floor, the
+    // between two pieces of furniture, say). If it can simply step out onto the main floor, the
     // walk goes ahead from there; if something solid is in the way there really
     // is no route.
     start = grid.anchor(fromX, fromZ, toX, toZ, true);
@@ -516,10 +517,11 @@ const routeOnFloor = (layout: OfficeLayout, fromX: number, fromZ: number, destin
  * Waypoints (excluding `from`, including `to`) for walking between two points
  * without cutting through desks, chairs, stations or set dressing.
  *
- * Either end may be somewhere a person cannot stand — a seat or a waiting spot. The
+ * Either end may be somewhere a person cannot stand — a seat at a desk. (A waiting
+ * spot is clear floor: a person stands on it like anywhere else.) The
  * route then uses nearby walkable floor on the side the walk comes from and
  * makes one direct step for that end, through nothing but the piece of
- * furniture the end point is itself in (the walker's own chair or waiting spot —
+ * furniture the end point is itself in (the walker's own chair —
  * never their desk, and never anybody else's furniture).
  *
  * An end outside the floor is connected through the door: people arrive and

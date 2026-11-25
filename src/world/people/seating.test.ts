@@ -69,13 +69,22 @@ describe("SeatingPlan", () => {
       expect(moves(plan.lastChanges())).toEqual(["p3: desk3 → desk5", "p5: - → desk3"]);
     });
 
-    it("when one person changes team, at most two people walk", () => {
+    it("when one person changes between neighbouring teams, at most two people walk", () => {
       const plan = new SeatingPlan();
       // p0 … p3 Product, p4 … p6 Growth, p7 Recruiting; then one of Growth's goes to Product.
       const cast = play(plan, scene([4, 3, 1]), scene([5, 2, 1]));
       expect(cast.people.find((p) => p.id === "p6")?.team).toBe("product");
       expect(plan.lastChanges().length).toBeLessThanOrEqual(2);
       expect(moves(plan.lastChanges())).toEqual(["p4: desk4 → desk6", "p6: desk6 → desk4"]);
+    });
+
+    it("when one person changes between Product and Recruiting, three people can walk", () => {
+      const plan = new SeatingPlan();
+      // p0 Product, p1 Growth, p2 and p3 Recruiting; then one of Recruiting's goes to Product. Growth's area lies
+      // between the two and moves along by a desk, so its one person walks as well.
+      const cast = play(plan, scene([1, 1, 2]), scene([2, 1, 1]));
+      expect(cast.people.map((p) => p.team)).toEqual(["product", "growth", "recruiting", "product"]);
+      expect(moves(plan.lastChanges())).toEqual(["p1: desk1 → desk2", "p2: desk2 → desk3", "p3: desk3 → desk1"]);
     });
 
     it("someone away keeps the desk", () => {
@@ -185,12 +194,27 @@ describe("SeatingPlan", () => {
       expect(plan.hiddenCount()).toBe(110);
     });
 
-    it("a fresh cast seats everyone afresh, like another office", () => {
-      const plan = new SeatingPlan();
-      play(plan, scene([3, 2, 0]), scene([4, 2, 0]));
-      const again = nextCast(null, scene([4, 2, 0], { runId: "another" }));
-      plan.reconcile(again, shared);
-      expect(seats(plan, again)).toEqual(["p0:desk0", "p1:desk1", "p2:desk2", "p3:desk3", "p4:desk4", "p5:desk5"]);
+    it("a fresh cast seats everyone afresh, like another office: another run, or an earlier year", () => {
+      // The remembered desks would seat these people differently: p3 at desk 5 and p5 at desk 3, both of which are
+      // in Growth's area in the cast that follows.
+      const scattered = (): { plan: SeatingPlan; cast: Cast } => {
+        const plan = new SeatingPlan();
+        const cast = play(plan, scene([3, 2, 0]), scene([4, 2, 0]));
+        expect(seats(plan, cast).slice(3)).toEqual(["p3:desk5", "p4:desk4", "p5:desk3"]);
+        return { plan, cast };
+      };
+      const afresh = ["p0:desk0", "p1:desk1", "p2:desk2", "p3:desk3", "p4:desk4", "p5:desk5"];
+
+      const run = scattered();
+      const another = nextCast(run.cast, scene([3, 3, 0], { runId: "another" }));
+      run.plan.reconcile(another, shared);
+      expect(seats(run.plan, another)).toEqual(afresh);
+
+      const year = scattered();
+      const earlier = nextCast(year.cast, scene([3, 3, 0], { year: 1989 }));
+      expect(earlier.runId).toBe(year.cast.runId);
+      year.plan.reconcile(earlier, shared);
+      expect(seats(year.plan, earlier)).toEqual(afresh);
     });
   });
 
@@ -210,6 +234,27 @@ describe("SeatingPlan", () => {
       const cast = play(plan, scene([3, 2, 1]), scene([3, 2, 2]));
       expect(moves(plan.lastChanges())).toEqual(["p6: - → desk6"]);
       expect(seats(plan, cast).slice(0, 6)).toEqual(["p0:desk0", "p1:desk1", "p2:desk2", "p3:desk3", "p4:desk4", "p5:desk5"]);
+    });
+
+    it("someone at the door who is gone has no seat any more, and that is reported once", () => {
+      // p2 is expected and never joins; p3 is let go and the year plays out.
+      for (const [door, after] of [
+        [scene([2, 0, 0], { arriving: 1 }), scene([2, 0, 0])],
+        [scene([2, 0, 0], { leaving: 1 }), scene([2, 0, 0], { year: 1991 })],
+      ]) {
+        const plan = new SeatingPlan();
+        const before = play(plan, door);
+        expect(seats(plan, before)[2]).toBe("p2:waiting0");
+        const cast = nextCast(before, after);
+        plan.reconcile(cast, shared);
+        expect(cast.left).toEqual(["p2"]);
+        expect(plan.seatOf("p2")).toBeNull();
+        expect(plan.waitingOccupant(0)).toBeNull();
+        expect(moves(plan.lastChanges())).toEqual(["p2: waiting0 → -"]);
+        plan.reconcile(cast, shared);
+        expect(plan.seatOf("p2")).toBeNull();
+        expect(plan.lastChanges()).toEqual([]);
+      }
     });
 
     it("lists the people who are gone before anybody who moved because of it", () => {
@@ -325,6 +370,9 @@ describe("SeatingPlan", () => {
       const cast = nextCast(null, scene([2, 0, 0]));
       plan.reconcile({ ...cast, people: [cast.people[0], cast.people[0], cast.people[1]] }, shared);
       expect([plan.deskOccupant(0), plan.deskOccupant(1), plan.deskOccupant(2)]).toEqual(["p0", "p1", null]);
+      // Counted twice, the person would widen Product's area by a desk.
+      expect([plan.teamOfDesk(1), plan.teamOfDesk(2)]).toEqual(["product", null]);
+      expect(plan.hiddenCount()).toBe(0);
     });
 
     it("ignores a hidden count that is not a count", () => {

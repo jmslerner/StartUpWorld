@@ -13,6 +13,9 @@
  *   • on a fresh cast, a reset or reduced motion everyone is simply placed, and in another office everyone pops in
  *     at the new seats once the building is up.
  *
+ * There are never more than MAX_FIGURES figures, the ones walking out counted: when the people in the office and the
+ * people on their way out of it would be more, the last ones told to go are removed at once (see `capLeavers`).
+ *
  * Between frames it runs a little ambient life: now and then somebody wanders to the coffee machine and back. That
  * only happens for a while after a frame, so the office always comes to rest (see `busy`).
  *
@@ -20,6 +23,7 @@
  * with real characters and which tests implement with a recorder. All randomness comes from seeded generators, so a
  * given sequence of frames always plays out the same way.
  */
+import { MAX_STAFF_DRAWN, MAX_WAITING_DRAWN } from "../cast";
 import type { Cast, CastMember } from "../cast";
 import { doorExterior } from "../office/layouts";
 import { REBUILD_POP_SECONDS, REBUILD_POP_START } from "../office/timing";
@@ -65,6 +69,11 @@ export const DOOR_QUEUE_GAP = 0.65;
  * trip on a watchdog the office is still within a minute of the last frame, and the drawing loop can rest.
  */
 export const LIVELY_SECONDS = 15;
+/**
+ * Never more figures than this at once, people walking out included: as many as a cast draws. A cast that fills the
+ * office leaves no figure to spare, so whoever leaves it then is gone at once instead of walking out.
+ */
+export const MAX_FIGURES = MAX_STAFF_DRAWN + MAX_WAITING_DRAWN;
 
 type ReconcileMode =
   /** A fresh cast, a reset or reduced motion: everyone simply is where they belong. */
@@ -265,6 +274,23 @@ export class Crew implements ActorStage {
     for (const actor of this.actors.values()) {
       if (!seen.has(actor.id)) this.dismiss(actor, left.has(actor.id) ? "left" : "unseated", mode);
     }
+    this.capLeavers();
+  }
+
+  /**
+   * Keep to MAX_FIGURES. The people on their way out are figures too, and the cast alone may already be that many
+   * (at the cap, people counted on the sign take the places of those who leave, at once). So when there are more
+   * leavers than figures to spare, the last ones told to go lose their walk and are simply gone: whoever is already
+   * on the way to the door keeps going for as long as there is room.
+   */
+  private capLeavers(): void {
+    const { leavers } = this;
+    const room = Math.max(0, MAX_FIGURES - this.order.length);
+    while (leavers.length > room) {
+      const actor = leavers[leavers.length - 1];
+      leavers.length -= 1;
+      this.host.despawn(actor);
+    }
   }
 
   /**
@@ -350,7 +376,6 @@ export class Crew implements ActorStage {
   /** A new year: everyone back to their places while the light sweeps round. */
   private startYear(): void {
     for (const actor of this.order) {
-      actor.clearEmote();
       if (actor.away) actor.hurry(YEAR_SNAP, this);
     }
     for (const actor of this.leavers) actor.hurry(YEAR_SNAP, this);
@@ -380,7 +405,7 @@ export class Crew implements ActorStage {
     for (const actor of this.order) {
       if (actor.errand === "wander") out += 1;
       // Only people at a desk wander: whoever stands at the door is waiting there.
-      else if (actor.home.kind === "desk" && actor.seatedIdle && actor.mood === "work" && actor !== this.lastWanderer) pool.push(actor);
+      else if (actor.home.kind === "desk" && actor.seatedIdle && actor !== this.lastWanderer) pool.push(actor);
     }
     if (out >= wanderCap(people) || pool.length === 0) return;
 
@@ -425,6 +450,9 @@ export class Crew implements ActorStage {
   // ── Per frame ───────────────────────────────────────────────────────────────
 
   update(dt: number): void {
+    // A step that is not a positive, finite time moves nothing. One NaN added to the clock or to a timer would never
+    // leave it again, and nobody would come to rest.
+    if (!(dt > 0) || !Number.isFinite(dt)) return;
     this.time += dt;
 
     for (let i = 0; i < this.order.length; i += 1) this.order[i].update(dt, this);
@@ -462,10 +490,15 @@ export class Crew implements ActorStage {
   // doorway, and lets leavers step into the person ahead. With at most 56 people,
   // a scan of cheap checks per asking actor is affordable, and it allocates nothing.
 
-  /** Newcomers wait outside while anybody is on their way out, so the two never meet in the doorway. */
+  /**
+   * Newcomers wait outside while anybody is on their way out, so the two never meet in the doorway. Somebody who
+   * went away and is back at once also waits for their own earlier figure to be gone, even if it has not got up
+   * yet: one person is never seen twice.
+   */
   holdArrival(actor: Actor): boolean {
-    void actor;
-    for (const leaver of this.leavers) if (leaver.exiting) return true;
+    for (const leaver of this.leavers) {
+      if (leaver.exiting || (leaver.id === actor.id && leaver.visible)) return true;
+    }
     return false;
   }
 

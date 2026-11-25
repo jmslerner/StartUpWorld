@@ -354,6 +354,98 @@ describe("EmployeeSystem", () => {
     expect(h.system.busy()).toBe(false);
   });
 
+  it("never has more than 56 figures, even while the people let go walk out of a full campus", () => {
+    const h = harness();
+    const campus = { office: 4 as const, capacity: 150 };
+    h.apply([150, 0, 0], campus);
+    h.apply([120, 0, 0], { ...campus, leaving: 30 });
+    let most = h.system.figureCount;
+    const watch = (): void => {
+      most = Math.max(most, h.system.figureCount);
+      expect(h.people().length).toBe(h.system.figureCount);
+    };
+    h.run(10, watch);
+    // The year plays out: ten drawn people leave, and ten who were counted on the sign are at their desks at once.
+    h.apply([120, 0, 0], { ...campus, year: 1991 });
+    expect(h.studio.cast?.left).toHaveLength(10);
+    watch();
+    let walkingOut = 0;
+    h.run(SETTLED, () => {
+      watch();
+      walkingOut = Math.max(walkingOut, h.system.figureCount - MAX_STAFF_DRAWN);
+    });
+    expect(most).toBe(MAX_STAFF_DRAWN + MAX_WAITING_DRAWN);
+    // As many of them walk out as there are figures to spare.
+    expect(walkingOut).toBe(MAX_WAITING_DRAWN);
+    expect(h.system.figureCount).toBe(MAX_STAFF_DRAWN);
+    expect(h.registry.people()).toHaveLength(MAX_STAFF_DRAWN);
+    expect(h.system.busy()).toBe(false);
+  });
+
+  it("someone back before they are out of the door stays clickable while the earlier figure walks out", () => {
+    const h = harness();
+    h.apply([2, 1, 0]);
+    const old = h.body("p2") as THREE.Object3D;
+    h.apply([2, 0, 0], { away: 1 });
+    expect(h.body("p2")).toBeNull();
+    h.run(1);
+    expect(old.visible).toBe(true);
+    // Undone within the year: the same person is at work again, with a figure of their own.
+    h.apply([2, 1, 0]);
+    const fresh = h.body("p2") as THREE.Object3D;
+    expect(fresh).not.toBeNull();
+    expect(fresh).not.toBe(old);
+    expect(h.system.figureCount).toBe(4);
+    expect(h.people()).toHaveLength(4);
+    expect(h.registry.people().sort()).toEqual(["person:p0", "person:p1", "person:p2"]);
+    let together = 0;
+    let unregistered = 0;
+    h.run(30, () => {
+      if (old.parent !== null && old.visible && fresh.visible) together += 1;
+      if (h.body("p2") !== fresh) unregistered += 1;
+    });
+    // The earlier figure's removal did not take the registration with it, and the two were never seen at once.
+    expect([together, unregistered]).toEqual([0, 0]);
+    expect(old.parent).toBeNull();
+    expect(h.system.figureCount).toBe(3);
+    h.run(SETTLED);
+    const seat = h.studio.seating.seatOf("p2");
+    expect([fresh.visible, fresh.position.x, fresh.position.z]).toEqual([true, seat?.x, seat?.z]);
+    expect(h.registry.entries.get("person:p2")?.options.label).toBe("Growth");
+    expect(h.system.busy()).toBe(false);
+  });
+
+  it("a frame time that is not one moves nobody and spoils nothing", () => {
+    const h = harness();
+    h.apply([2, 0, 0]);
+    h.apply([3, 0, 0]);
+    h.run(1.5);
+    const body = h.body("p2") as THREE.Object3D;
+    const sitting = h.body("p0") as THREE.Object3D;
+    const at = body.position.clone();
+    for (const dt of [Number.NaN, 0, -1, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY]) {
+      h.system.update(dt, 2);
+      expect(body.position.equals(at), String(dt)).toBe(true);
+    }
+    const finite = (root: THREE.Object3D): boolean => {
+      let ok = true;
+      root.traverse((node) => {
+        const { position, rotation, scale } = node;
+        const sum = position.x + position.y + position.z + rotation.x + rotation.y + rotation.z + scale.x + scale.y + scale.z;
+        if (!Number.isFinite(sum)) ok = false;
+      });
+      return ok;
+    };
+    h.run(0.5);
+    expect([finite(body), finite(sitting)]).toEqual([true, true]);
+    expect(body.position.distanceTo(at)).toBeGreaterThan(0.3);
+    h.run(SETTLED);
+    const seat = h.studio.seating.seatOf("p2");
+    expect([body.position.x, body.position.z]).toEqual([seat?.x, seat?.z]);
+    expect([finite(body), finite(sitting)]).toEqual([true, true]);
+    expect(h.system.busy()).toBe(false);
+  });
+
   it("someone whose desk changed walks to it; nobody else gets up", () => {
     const h = harness();
     h.apply([3, 2, 0]);

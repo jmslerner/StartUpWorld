@@ -11,7 +11,8 @@
  *    as it has people working or away. That run of desks is the team's area, and `teamOfDesk` reports it.
  * 2. A person whose desk is still in their team's area keeps it. The others give their desks up first, and then
  *    take, in id order, the lowest free desk of their team's area. So when one person changes team, at most two
- *    people walk.
+ *    people walk if the two teams are neighbours in that order, and at most three between Product and Recruiting:
+ *    Growth's area lies between them and moves along by a desk, so one of Growth's may have to walk as well.
  * 3. Someone away keeps a desk and is not drawn at it: the chair is empty and the screen dark.
  * 4. People leaving stand on the waiting spots nearest the door, then people expected. More of them than spots: the
  *    rest have no seat and are not drawn.

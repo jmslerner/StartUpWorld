@@ -12,7 +12,7 @@ import {
 } from "../office/layouts";
 import type { CastMember } from "../cast";
 import type { BubbleIcon, OfficeIndex, OfficeLayout, Placement, Seat, SeatKind } from "../types";
-import { Actor, CELEBRATE_SETTLE, CHAIR_SECONDS, HURRY_FACTOR, POP_SECONDS, RISE_SECONDS, WALK_SPEED } from "./actor";
+import { Actor, CHAIR_SECONDS, HURRY_FACTOR, POP_SECONDS, RISE_SECONDS, WALK_SPEED } from "./actor";
 import { chairApproach } from "./approach";
 import type { ActorStage, ErrandLeg } from "./actor";
 
@@ -104,79 +104,6 @@ describe("Actor at rest", () => {
     actor.packed = false;
     actor.resolvePose();
     expect(actor.carrying).toBe(false);
-  });
-
-  it("shows the routine and the mood in the pose", () => {
-    const stage = new TestStage(layout);
-    const actor = new Actor(person(), desk(0));
-    actor.routine = "defeat";
-    actor.update(DT, stage);
-    expect(actor.pose).toBe("slump");
-    actor.routine = "work";
-    actor.mood = "sleep";
-    actor.update(DT, stage);
-    expect(actor.pose).toBe("sleep");
-    actor.mood = "slump";
-    actor.update(DT, stage);
-    expect(actor.pose).toBe("slump");
-  });
-
-  it("cheers in waves when the run is won, then calms down to the odd cheer without ever stopping", () => {
-    const stage = new TestStage(layout);
-    const actor = new Actor(person(), desk(0));
-    actor.routine = "celebrate";
-    const share = (seconds: number): number => {
-      let cheering = 0;
-      let frames = 0;
-      run(actor, stage, seconds, () => {
-        frames += 1;
-        if (actor.pose === "cheer") cheering += 1;
-      });
-      return cheering / frames;
-    };
-    const party = share(CELEBRATE_SETTLE - 1);
-    expect(party).toBeGreaterThan(0.5);
-    expect(party).toBeLessThan(1);
-    expect(actor.poseSeated).toBe(true);
-    run(actor, stage, 1.5);
-    const calm = share(60);
-    expect(calm).toBeGreaterThan(0.05);
-    expect(calm).toBeLessThan(0.3);
-    // A party that never ends keeps nobody awake: the loop may rest on it.
-    expect(actor.busy).toBe(false);
-  });
-
-  it("plays an emote over the routine and then goes back to work", () => {
-    const stage = new TestStage(layout);
-    const actor = new Actor(person(), desk(0));
-    actor.emote("cheer", 1);
-    actor.update(DT, stage);
-    expect([actor.pose, actor.poseSeated]).toEqual(["cheer", true]);
-    expect(actor.seatedIdle).toBe(false);
-    expect(actor.busy).toBe(true);
-    run(actor, stage, 1.1);
-    expect(actor.pose).toBe("type");
-    expect(actor.seatedIdle).toBe(true);
-    expect(actor.busy).toBe(false);
-
-    actor.emote("slump", 0.5);
-    actor.update(DT, stage);
-    expect(actor.pose).toBe("slump");
-    actor.emote("phone", 0.5);
-    actor.update(DT, stage);
-    expect([actor.pose, actor.poseSeated]).toEqual(["phone", true]);
-  });
-
-  it("plays the emotes on their feet at the door", () => {
-    const stage = new TestStage(layout);
-    const actor = new Actor(person(), doorSpot(1));
-    for (const emote of ["cheer", "phone", "slump"] as const) {
-      actor.emote(emote, 1);
-      actor.update(DT, stage);
-      expect([actor.pose, actor.poseSeated]).toEqual([emote, false]);
-    }
-    run(actor, stage, 1.1);
-    expect(actor.pose).toBe("stand");
   });
 });
 
@@ -406,7 +333,7 @@ describe("Actor on an errand", () => {
     const b = layout.wanderSpots[1];
     const visited: string[] = [];
     actor.runErrand(
-      "pace",
+      "wander",
       [
         { x: a.x, z: a.z, facing: null, pause: 0.3, bubble: "stress" },
         { x: b.x, z: b.z, facing: null, pause: 0.3, bubble: null },
@@ -426,41 +353,6 @@ describe("Actor on an errand", () => {
     );
     expect(visited).toEqual(["a", "b"]);
     expect(actor.mode).toBe("seated");
-  });
-
-  it("stops in its tracks to cheer, then carries on", () => {
-    const stage = new TestStage(layout);
-    const actor = new Actor(person(), desk(0));
-    actor.runErrand("wander", [coffee], stage);
-    runUntil(actor, stage, () => actor.mode === "walking");
-    run(actor, stage, 0.5);
-    const { x, z } = actor;
-    actor.emote("cheer", 1);
-    run(actor, stage, 0.9);
-    expect([actor.x, actor.z]).toEqual([x, z]);
-    expect([actor.pose, actor.poseSeated, actor.walkSpeed]).toEqual(["cheer", false, 0]);
-    run(actor, stage, 0.5);
-    expect(actor.pose).toBe("walk");
-    expect(Number.isFinite(runUntil(actor, stage, () => actor.mode === "seated"))).toBe(true);
-  });
-
-  it("is snapped back to the seat if the trip somehow never ends", () => {
-    const stage = new TestStage(layout);
-    const seat = desk(0);
-    const actor = new Actor(person(), seat);
-    actor.runErrand("wander", [coffee], stage);
-    runUntil(actor, stage, () => actor.mode === "walking");
-    // Held up for ever (here: by a cheer that keeps being renewed).
-    const seconds = runUntil(
-      actor,
-      stage,
-      () => actor.mode === "seated",
-      120,
-      () => actor.emote("cheer", 1)
-    );
-    expect(seconds).toBeLessThan(60);
-    expectAtSeat(actor, seat);
-    expect(actor.errand).toBeNull();
   });
 
   it("cannot be stranded by an absurdly long pause either", () => {
@@ -674,12 +566,11 @@ describe("Actor leaving", () => {
     expect(seconds).toBeLessThan(0.5);
   });
 
-  it("ignores errands, emotes and seat moves once leaving", () => {
+  it("ignores errands and seat moves once leaving", () => {
     const stage = new TestStage(layout);
     const actor = new Actor(person(), desk(7));
     actor.leave(exterior, 0, true);
     run(actor, stage, 0.6);
-    actor.emote("cheer", 5);
     actor.runErrand("wander", [{ x: 0, z: 0, facing: null, pause: 1, bubble: null }], stage);
     actor.rehome(desk(0), stage);
     actor.update(DT, stage);
@@ -703,15 +594,6 @@ describe("Actor robustness", () => {
     expect(Number.isFinite(actor.x + actor.z + actor.facing)).toBe(true);
   });
 
-  it("gives different people different rhythms but the same person the same one", () => {
-    const a = new Actor(person("p0", 1), desk(0));
-    const b = new Actor(person("p1", 2), desk(1));
-    const again = new Actor(person("p0", 1), desk(0));
-    const draws = (actor: Actor): number[] => [actor.rng.next(), actor.rng.next(), actor.rng.next()];
-    const first = draws(a);
-    expect(draws(again)).toEqual(first);
-    expect(draws(b)).not.toEqual(first);
-  });
 });
 
 describe("Actor coming to rest", () => {

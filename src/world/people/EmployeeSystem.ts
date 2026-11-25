@@ -7,7 +7,8 @@
  * which are pure and unit-tested; who sits where is the seating plan's to say (ctx.seating), which the World
  * reconciles before any system is handed a frame.
  *
- * One figure is drawn for each cast member with a seat who is not away: at most 56. A figure is eight meshes, so
+ * One figure is drawn for each cast member with a seat who is not away, and one for each person still walking out:
+ * never more than 56 in all, which the Crew sees to (MAX_FIGURES). A figure is eight meshes, so
  * eight draw calls, plus two in the shadow pass while sitting and six while on their feet (see ./Character.ts).
  */
 import * as THREE from "three";
@@ -95,7 +96,7 @@ export class EmployeeSystem implements WorldSystem, CrewHost {
     this.crew = new Crew(this, ctx.getLayout(), { reducedMotion: ctx.reducedMotion });
   }
 
-  /** How many figures there are right now: the people in the office and the people still walking out of it. */
+  /** How many figures there are right now: the people in the office and the people still walking out of it. At most 56. */
   get figureCount(): number {
     return this.bodies.size;
   }
@@ -113,6 +114,9 @@ export class EmployeeSystem implements WorldSystem, CrewHost {
 
   update(dt: number, elapsed: number): void {
     if (this.disposed) return;
+    // A step that is not a positive, finite time moves nothing: one NaN in a walk's timer or a figure's animation
+    // clock would never leave it again. (The crew has the same guard for whoever steps it directly.)
+    if (!(dt > 0) || !Number.isFinite(dt)) return;
     this.crew.update(dt);
     this.syncAll(dt, elapsed);
   }

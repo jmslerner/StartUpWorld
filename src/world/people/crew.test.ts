@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { nextCast } from "../cast";
+import { MAX_STAFF_DRAWN, nextCast } from "../cast";
 import type { Cast } from "../cast";
 import { doorExterior } from "../office/layouts";
 import type { OfficeIndex, OfficeScene } from "../types";
 import { POP_SECONDS } from "./actor";
 import type { Actor } from "./actor";
-import { alreadyInside, Crew, DOOR_QUEUE_GAP, ENTRY_STAGGER, LIVELY_SECONDS, wanderCap, YEAR_DELAY } from "./crew";
+import { alreadyInside, Crew, DOOR_QUEUE_GAP, ENTRY_STAGGER, LIVELY_SECONDS, MAX_FIGURES, wanderCap, YEAR_DELAY } from "./crew";
 import { RecordingHost, run, scene, Studio } from "./testKit";
 
 type Teams = readonly [number, number, number];
@@ -437,6 +437,64 @@ describe("Crew: someone away", () => {
     expect(back.pose).toBe("type");
   });
 
+  it("back before they are out of the door: the earlier figure walks out, and the two are never seen together", () => {
+    const r = office([2, 1, 0]);
+    const going = must(r.crew, "p2");
+    r.apply([2, 0, 0], { away: 1 });
+    run(r.crew, 1);
+    expect([going.mode, going.exiting]).toEqual(["walking", true]);
+    // The plan is undone within the year: the same person, at work again.
+    r.apply([2, 1, 0]);
+    expect(r.studio.cast?.arrived).toEqual([]);
+    const back = must(r.crew, "p2");
+    expect(back).not.toBe(going);
+    // Two figures for one person for a while: the one on the way out, and the one waiting outside to come in.
+    expect([r.host.alive.has(going), r.host.alive.has(back)]).toEqual([true, true]);
+    expect([going.visible, back.visible]).toEqual([true, false]);
+    expect(r.host.retired.has(going)).toBe(true);
+    expect(r.host.retired.has(back)).toBe(false);
+    let together = 0;
+    let most = 0;
+    let cameIn = false;
+    run(r.crew, 30, () => {
+      const seen = [...r.host.alive].filter((actor) => actor.id === "p2" && actor.visible);
+      if (seen.length > 1) together += 1;
+      most = Math.max(most, r.host.alive.size);
+      if (back.arriving) cameIn = true;
+    });
+    expect(together).toBe(0);
+    expect(most).toBeLessThanOrEqual(MAX_FIGURES);
+    expect(cameIn).toBe(true);
+    expect(going.gone).toBe(true);
+    expect(r.host.alive.has(going)).toBe(false);
+    run(r.crew, SETTLED);
+    expectAllSeated(r);
+    expect(must(r.crew, "p2")).toBe(back);
+    expect(r.crew.departing).toHaveLength(0);
+    expect(r.crew.busy()).toBe(false);
+    expectBodiesMatch(r);
+  });
+
+  it("back before they have even got up: the newcomer still waits outside until the earlier figure is gone", () => {
+    const r = office([2, 1, 0]);
+    const going = must(r.crew, "p2");
+    // Both scenes land between two frames.
+    r.apply([2, 0, 0], { away: 1 });
+    r.apply([2, 1, 0]);
+    const back = must(r.crew, "p2");
+    expect(back).not.toBe(going);
+    let together = 0;
+    run(r.crew, 30, () => {
+      if (going.visible && !going.gone && back.visible) together += 1;
+    });
+    expect(together).toBe(0);
+    expect(going.gone).toBe(true);
+    run(r.crew, SETTLED);
+    expectAllSeated(r);
+    expect(r.crew.busy()).toBe(false);
+    expectBodiesMatch(r);
+  });
+
   it("is simply not there on a fresh cast, and simply back under reduced motion", () => {
     const r = office([2, 0, 0], { away: 1 }, { reducedMotion: true });
     expect(ids(r.crew.cast)).toEqual(["p0", "p1"]);
@@ -447,6 +505,94 @@ describe("Crew: someone away", () => {
     r.apply([2, 0, 0], { away: 1 });
     expect(ids(r.crew.cast)).toEqual(["p0", "p1"]);
     expect(r.crew.departing).toHaveLength(0);
+    expect(r.crew.busy()).toBe(false);
+  });
+});
+
+describe("Crew: never more figures than are drawn", () => {
+  /** Step the crew, checking the number of bodies after every frame. Returns the most there were. */
+  const watch = (r: Rig, seconds: number, most = 0): number => {
+    let peak = Math.max(most, r.host.alive.size);
+    run(r.crew, seconds, () => {
+      peak = Math.max(peak, r.host.alive.size);
+    });
+    return peak;
+  };
+
+  it("the campus's layoff year: the people let go and the people who take their places are never more than 56", () => {
+    const campus = { office: 4 as OfficeIndex, capacity: 150 };
+    const r = office([150, 0, 0], campus);
+    r.apply([120, 0, 0], { ...campus, leaving: 30 });
+    let peak = watch(r, 20);
+    // The year plays out: the ten drawn people who were let go leave, and ten counted on the sign take their desks.
+    r.apply([120, 0, 0], { ...campus, year: 1991 });
+    expect(r.studio.cast?.left).toHaveLength(10);
+    expect(r.crew.cast).toHaveLength(MAX_STAFF_DRAWN);
+    // Six of the ten still walk out; for the last four to be told to go there is no figure to spare.
+    expect(ids(r.crew.departing)).toEqual(["p40", "p41", "p42", "p43", "p44", "p45"]);
+    expectBodiesMatch(r);
+    let walkedOut = false;
+    run(r.crew, SETTLED, () => {
+      peak = Math.max(peak, r.host.alive.size);
+      if (r.crew.departing.some((actor) => actor.pose === "walk" && actor.carrying)) walkedOut = true;
+    });
+    expect(peak).toBe(MAX_FIGURES);
+    expect(walkedOut).toBe(true);
+    expectAllSeated(r);
+    expect(r.crew.departing).toHaveLength(0);
+    expect(r.crew.busy()).toBe(false);
+    expectBodiesMatch(r);
+  });
+
+  it("keeps to 56 through layoffs, hires, people away and years one on top of another, and comes to rest", () => {
+    const campus = { office: 4 as OfficeIndex, capacity: 150 };
+    const r = office([150, 0, 0], { ...campus, arriving: 9 }, { seed: 4 });
+    let peak = r.host.alive.size;
+    let leaving = 0;
+    let year = 1990;
+    for (let round = 0; round < 40; round += 1) {
+      // A round of layoffs, somebody away or back, people at the door or none — and every third round a year on
+      // top, so new leavers are told to go while the last ones are still filing out.
+      leaving = (round * 7) % 31;
+      if (round % 3 === 2) year += 1;
+      r.apply([150 - leaving - (round % 2), 0, 0], { ...campus, year, leaving, away: round % 2, arriving: round % 4 === 0 ? 0 : 9 });
+      expect(r.host.alive.size, `round ${round}`).toBeLessThanOrEqual(MAX_FIGURES);
+      expectBodiesMatch(r);
+      peak = watch(r, 0.2 + (round % 5) * 0.4, peak);
+    }
+    expect(peak).toBe(MAX_FIGURES);
+    r.apply([150, 0, 0], { ...campus, year: year + 1 });
+    peak = watch(r, 100, peak);
+    expect(peak).toBe(MAX_FIGURES);
+    expectAllSeated(r);
+    expect(r.crew.departing).toHaveLength(0);
+    expect(r.crew.busy()).toBe(false);
+    expectBodiesMatch(r);
+  });
+
+  it("gives up the walk of whoever was told to go last, and keeps the first of them walking", () => {
+    const campus = { office: 4 as OfficeIndex, capacity: 150 };
+    // 60 people, 50 of them drawn and ten on the sign, and four at the door. Two are let go, and the year plays out:
+    // two from the sign take their desks at once, so the two walking out make it 56.
+    const r = office([60, 0, 0], { ...campus, arriving: 4 });
+    r.apply([58, 0, 0], { ...campus, arriving: 4, leaving: 2 });
+    r.apply([58, 0, 0], { ...campus, arriving: 4, year: 1991 });
+    expect(ids(r.crew.departing)).toEqual(["p48", "p49"]);
+    const [first, second] = r.crew.departing;
+    // They give way to the two newcomers at the door first, and then set off.
+    for (let i = 0; i < 30 && second.mode !== "walking"; i += 1) run(r.crew, 0.5);
+    expect([first.mode, second.mode]).toEqual(["walking", "walking"]);
+    expect(r.host.alive.size).toBe(MAX_FIGURES);
+    // Somebody goes away and two more are expected: 55 in the office, so one figure to spare for three leavers.
+    r.apply([57, 0, 0], { ...campus, arriving: 6, away: 1, year: 1991 });
+    expect(r.crew.cast).toHaveLength(55);
+    expect(r.crew.departing).toEqual([first]);
+    expect([r.host.alive.has(first), r.host.alive.has(second)]).toEqual([true, false]);
+    expect(r.host.alive.size).toBe(MAX_FIGURES);
+    expectBodiesMatch(r);
+    expect(watch(r, SETTLED)).toBe(MAX_FIGURES);
+    expect(first.gone).toBe(true);
+    expectAllSeated(r);
     expect(r.crew.busy()).toBe(false);
   });
 });
@@ -799,6 +945,32 @@ describe("Crew: the door", () => {
   });
 });
 
+describe("Crew: a frame time that is not one", () => {
+  it("ignores a step of no time, of negative time and of no number at all, and still comes to rest", () => {
+    const r = office([2, 0, 0]);
+    r.apply([3, 0, 0], { arriving: 1 });
+    r.apply([2, 0, 0], { arriving: 1 });
+    run(r.crew, 1.2);
+    expect(r.crew.cast.some((actor) => actor.mode === "walking")).toBe(true);
+    const before = r.crew.cast.map((actor) => [actor.mode, actor.x, actor.z]);
+    const now = r.crew.now;
+    for (const dt of [Number.NaN, 0, -1, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY]) {
+      r.crew.update(dt);
+      expect(r.crew.now, String(dt)).toBe(now);
+      expect(r.crew.cast.map((actor) => [actor.mode, actor.x, actor.z]), String(dt)).toEqual(before);
+      for (const actor of [...r.crew.cast, ...r.crew.departing]) {
+        expect(Number.isFinite(actor.x + actor.z + actor.facing + actor.scale + actor.chairOut), `${actor.id} after ${dt}`).toBe(true);
+      }
+    }
+    expect(r.crew.busy()).toBe(true);
+    run(r.crew, SETTLED);
+    expectAllSeated(r);
+    expect(r.crew.departing).toHaveLength(0);
+    expect(r.crew.busy()).toBe(false);
+    expectBodiesMatch(r);
+  });
+});
+
 describe("Crew: lifecycle", () => {
   it("dispose frees every body, including people who were walking out", () => {
     const r = office([4, 0, 0]);
@@ -894,6 +1066,7 @@ describe("Crew: lifecycle", () => {
       for (let i = 0; i < frames; i += 1) r.crew.update(roll(4) === 0 ? 0.1 : 1 / 60);
 
       expectBodiesMatch(r);
+      expect(r.host.alive.size, `step ${step}`).toBeLessThanOrEqual(MAX_FIGURES);
       const cast = r.studio.cast!;
       const drawn = cast.people.filter((person) => person.standing !== "away" && r.studio.seating.seatOf(person.id) !== null);
       expect(ids(r.crew.cast)).toEqual(drawn.map((person) => person.id));

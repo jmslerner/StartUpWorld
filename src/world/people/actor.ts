@@ -4,7 +4,7 @@
  *
  * An Actor is a small state machine with no three.js in it. The EmployeeSystem
  * copies its public state (position, facing, pose, scale …) onto a Character
- * every frame; the Crew tells it what to do next (walk in, run an errand, cheer,
+ * every frame; the Crew tells it what to do next (walk in, run an errand,
  * leave). Keeping it pure is what lets the awkward cases — a scene landing
  * mid-walk, a seat changing under someone, a person being let go on their way to
  * the coffee machine — be unit-tested without a renderer.
@@ -25,7 +25,6 @@ import type { BubbleIcon, OfficeLayout, Seat, Team, Vec2 } from "../types";
 import { CHAIR_SIDESTEP, chairApproach } from "./approach";
 import type { CharacterPose } from "./Character";
 import { angleDelta, PathFollower, turnToward, TURN_RATE } from "./pathFollower";
-import { Rng } from "./random";
 
 /** Normal walking pace, in world units per second. */
 export const WALK_SPEED = 1.6;
@@ -59,13 +58,6 @@ const WALK_SLACK = 1.7;
 const WALK_GRACE = 2;
 /** Nobody stays away from their seat longer than this, whatever chain of errands they are on. */
 const TRIP_LIMIT = 45;
-/** Winners cheer in waves rather than without pause: this long with arms up, out of every cycle. */
-const CELEBRATE_CYCLE = 4.4;
-const CELEBRATE_UP = 3;
-/** After this long the party calms down to the odd cheer: a short one, now and then. */
-export const CELEBRATE_SETTLE = 20;
-const CELEBRATE_CALM_CYCLE = 9;
-const CELEBRATE_CALM_UP = 1.6;
 
 export type ActorMode =
   /** Not on stage yet: waiting for their turn to walk in or pop in. Invisible. */
@@ -86,18 +78,8 @@ export type ActorMode =
 
 /** Where the current trip ends. */
 export type ActorGoal = "home" | "errand" | "exit";
-export type ErrandKind = "wander" | "pace" | "coffee";
-/** The day-to-day baseline for everyone in the office. */
-export type Routine =
-  | "work"
-  /** The run was won. */
-  | "celebrate"
-  /** The run was lost. */
-  | "defeat";
-/** Colouring of the "work" routine at a desk. */
-export type Mood = "work" | "slump" | "sleep";
-/** A short reaction that temporarily overrides the routine. */
-export type Emote = "cheer" | "slump" | "phone";
+/** Why somebody is away from their seat of their own accord: a wander to the coffee machine or another spot. */
+export type ErrandKind = "wander";
 
 export interface ErrandLeg {
   x: number;
@@ -149,8 +131,6 @@ export class Actor {
   team: Team | null;
   /** This person as the latest cast has them. */
   person: CastMember;
-  /** Per-person random source, so ambient behaviour differs between people but not between sessions. */
-  readonly rng: Rng;
 
   /** The seat this person belongs in. */
   home: Seat;
@@ -158,10 +138,6 @@ export class Actor {
   goal: ActorGoal = "home";
   /** Why they are away from their seat, when it is an errand. Cleared when they sit back down. */
   errand: ErrandKind | null = null;
-  routine: Routine = "work";
-  mood: Mood = "work";
-  /** Seconds until the Crew re-rolls `mood`. */
-  moodTimer = 0;
   /** Set by the Crew once this actor is off the books (leaving, or already removed). */
   dismissed = false;
 
@@ -201,8 +177,6 @@ export class Actor {
   private walkLimit = 0;
   /** Seconds spent away from the seat on the current trip. */
   private awayFor = 0;
-  private emoteKind: Emote | null = null;
-  private emoteLeft = 0;
   /** While positive the actor hurries; when it runs out they are snapped to where they were going. */
   private hurryLeft = 0;
   /** 0 … 1 progress of the scale-in (or, while vanishing, what is left of the scale-out). */
@@ -220,10 +194,6 @@ export class Actor {
   private heldFor = 0;
   /** Standing still mid-walk, giving way (this frame). */
   private holding = false;
-  /** How long the current routine has been in force (the win party calms down after a while). */
-  private routineFor = 0;
-  private routineSeen: Routine = "work";
-  private clock: number;
 
   constructor(person: CastMember, home: Seat) {
     this.id = person.id;
@@ -231,9 +201,6 @@ export class Actor {
     this.look = person.look;
     this.person = person;
     this.home = home;
-    this.rng = new Rng(person.look ^ 0x5eed1e55);
-    // Out of step with everyone else, so a celebrating room does not move as one.
-    this.clock = this.rng.range(0, CELEBRATE_CYCLE);
     this.placeAtHome();
   }
 
@@ -256,9 +223,9 @@ export class Actor {
   }
 
   /**
-   * Still doing something that will come to an end: waiting for a turn, on their feet, appearing, leaving, playing
-   * a reaction, or the chair still rolling. Somebody at their place and merely alive (typing, swaying, breathing,
-   * a party that goes on) is not busy: the loop may rest on them.
+   * Still doing something that will come to an end: waiting for a turn, on their feet, appearing, leaving, or the
+   * chair still rolling. Somebody at their place and merely alive (typing, swaying, breathing) is not busy: the
+   * loop may rest on them.
    */
   get busy(): boolean {
     if (this.mode === "gone") return false;
@@ -266,7 +233,6 @@ export class Actor {
       this.mode !== "seated" ||
       this.exitDelay >= 0 ||
       this.growth < 1 ||
-      this.emoteLeft > 0 ||
       this.hurryLeft > 0 ||
       this.chairOut !== 0
     );
@@ -274,9 +240,7 @@ export class Actor {
 
   /** In the seat, undisturbed and fully arrived: available for ambient behaviour. */
   get seatedIdle(): boolean {
-    return (
-      this.mode === "seated" && this.goal === "home" && this.emoteKind === null && this.exitDelay < 0 && this.growth >= 1
-    );
+    return this.mode === "seated" && this.goal === "home" && this.exitDelay < 0 && this.growth >= 1;
   }
 
   /** Away from the seat (or not yet arrived at it). */
@@ -313,10 +277,6 @@ export class Actor {
     return this.mode === "gone";
   }
 
-  get emoting(): Emote | null {
-    return this.emoteKind;
-  }
-
   /** The errand stop this actor is heading for or standing at, if any. */
   get errandStop(): ErrandLeg | null {
     return this.goal === "errand" && this.leg < this.legs.length ? this.legs[this.leg] : null;
@@ -332,8 +292,6 @@ export class Actor {
     this.errand = null;
     this.legs = NO_LEGS;
     this.leg = 0;
-    this.emoteKind = null;
-    this.emoteLeft = 0;
     this.hurryLeft = 0;
     this.awayFor = 0;
     this.growth = 1;
@@ -449,28 +407,6 @@ export class Actor {
     this.walkSpeed = 0;
   }
 
-  /** Give up on whatever is in progress and be in the seat. */
-  snapHome(): void {
-    const routine = this.routine;
-    const mood = this.mood;
-    this.placeAtHome();
-    this.routine = routine;
-    this.mood = mood;
-    this.resolvePose();
-  }
-
-  /** Play a short reaction. Ignored by people who are on their way out. */
-  emote(kind: Emote, seconds: number): void {
-    if (this.goal === "exit" || seconds <= 0) return;
-    this.emoteKind = kind;
-    this.emoteLeft = seconds;
-  }
-
-  clearEmote(): void {
-    this.emoteKind = null;
-    this.emoteLeft = 0;
-  }
-
   /**
    * Wrap up within `seconds`: abandon any errand and head for the seat (or the
    * exit) at a trot; whoever has not made it by then is snapped there.
@@ -492,17 +428,6 @@ export class Actor {
 
   update(dt: number, stage: ActorStage): void {
     if (this.mode === "gone") return;
-    this.clock += dt;
-    if (this.routine !== this.routineSeen) {
-      this.routineSeen = this.routine;
-      this.routineFor = 0;
-    }
-    this.routineFor += dt;
-
-    if (this.emoteLeft > 0) {
-      this.emoteLeft -= dt;
-      if (this.emoteLeft <= 0) this.clearEmote();
-    }
 
     if (this.hurryLeft > 0) {
       this.hurryLeft -= dt;
@@ -678,8 +603,6 @@ export class Actor {
   }
 
   private walk(dt: number, stage: ActorStage): void {
-    // A cheer stops people in their tracks; the walk (and its watchdog) resumes afterwards.
-    if (this.emoteKind === "cheer" && this.goal !== "exit") return;
     // On the way out, people give way at the door (and keep a step behind whoever is ahead).
     this.holding =
       this.goal === "exit" && (this.held(dt, stage.holdExit?.(this)) || stage.queueBehind?.(this) === true);
@@ -747,7 +670,6 @@ export class Actor {
     this.leg = 0;
     this.hurryLeft = 0;
     this.carryingOut = this.carryOnExit;
-    this.clearEmote();
     if (this.mode === "seated") this.beginRising();
     else if (this.mode !== "rising" && this.mode !== "vanishing") this.setOff(stage);
   }
@@ -758,7 +680,7 @@ export class Actor {
       this.visible = false;
       this.mode = "gone";
     } else {
-      this.snapHome();
+      this.placeAtHome();
     }
   }
 
@@ -766,7 +688,7 @@ export class Actor {
 
   /**
    * Work out `pose` from the current state. `update` does this every frame; call
-   * it directly after changing `routine` or `mood` when the result must be right
+   * it directly after changing `packed` or the seat when the result must be right
    * before the next frame (a scene is shown as soon as it is applied).
    */
   resolvePose(): void {
@@ -778,16 +700,11 @@ export class Actor {
         this.walkSpeed = 0;
         break;
       case "walking":
-        if (this.emoteKind === "cheer" && this.goal !== "exit") this.setPose("cheer", false, 0);
-        else if (this.holding) this.setPose("stand", false, 0);
+        if (this.holding) this.setPose("stand", false, 0);
         else this.setPose("walk", false, this.motion.speed);
         break;
       case "pausing":
-        // Reactions that work on their feet still play when somebody is caught away from their desk.
-        if (this.emoteKind === "cheer") this.setPose("cheer", false, 0);
-        else if (this.emoteKind === "phone") this.setPose("phone", false, 0);
-        else if (this.emoteKind === "slump") this.setPose("slump", false, 0);
-        else this.setPose("stand", false, 0);
+        this.setPose("stand", false, 0);
         break;
       case "rising":
         // Still sitting while the chair is pushed back, then up.
@@ -806,26 +723,9 @@ export class Actor {
   }
 
   private resolveSeatedPose(): void {
-    // At a desk people sit; at a spot by the door they stand, and wait.
-    const chair = this.home.kind === "desk";
-    if (this.emoteKind === "cheer") return this.setPose("cheer", chair, 0);
-    if (this.emoteKind === "phone") return this.setPose("phone", chair, 0);
-    if (this.emoteKind === "slump") return this.setPose("slump", chair, 0);
-    switch (this.routine) {
-      case "celebrate": {
-        const calm = this.routineFor > CELEBRATE_SETTLE;
-        const cycle = calm ? CELEBRATE_CALM_CYCLE : CELEBRATE_CYCLE;
-        if (this.clock % cycle < (calm ? CELEBRATE_CALM_UP : CELEBRATE_UP)) return this.setPose("cheer", chair, 0);
-        return this.setPose(chair ? "sit" : "stand", chair, 0);
-      }
-      case "defeat":
-        return this.setPose("slump", chair, 0);
-      case "work":
-        if (!chair) return this.setPose("stand", false, 0);
-        if (this.mood === "sleep") return this.setPose("sleep", true, 0);
-        if (this.mood === "slump") return this.setPose("slump", true, 0);
-        return this.setPose("type", true, 0);
-    }
+    // At a desk people sit and work; at a spot by the door they stand, and wait.
+    if (this.home.kind === "desk") this.setPose("type", true, 0);
+    else this.setPose("stand", false, 0);
   }
 
   private setPose(pose: CharacterPose, seated: boolean, walkSpeed: number): void {
