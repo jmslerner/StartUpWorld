@@ -125,6 +125,19 @@ describe("game store", () => {
     expect(store.getState().over).toBe(true);
   });
 
+  it("keeps an error from ending the quarter for the crash screen, instead of throwing it at the button", () => {
+    // A config with no Blitzscaler personality: the planner throws when it is that rival's turn to plan.
+    const broken = { ...NO_EVENTS, cpu: { ...NO_EVENTS.cpu, personalities: { ...NO_EVENTS.cpu.personalities, blitzscaler: undefined } } } as unknown as typeof NO_EVENTS;
+    const store = createGameStore(new MemoryStorage(), broken);
+    store.getState().startGame("Acme", 11);
+    expect(store.getState().failure).toBeNull();
+    const before = store.getState().game;
+    expect(() => store.getState().endQuarter()).not.toThrow();
+    expect(store.getState().failure).toBeInstanceOf(Error);
+    expect(store.getState().game).toBe(before);
+    expect(store.getState().reportOpen).toBe(false);
+  });
+
   it("goes back to the new-game screen and forgets the game", () => {
     const storage = new MemoryStorage();
     const store = started(storage);

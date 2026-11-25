@@ -10,6 +10,9 @@ const Screen = () => {
   const over = useGame((state) => state.over);
   // The last quarter's report is read first; closing it reveals the ending.
   const reading = useGame((state) => state.reportOpen && state.lastLog !== null);
+  // A quarter that could not be played goes to the crash screen, which can clear the save and start over.
+  const failure = useGame((state) => state.failure);
+  if (failure !== null) throw failure;
   if (!playing) return <NewGameScreen />;
   if (over && !reading) return <EndScreen />;
   return <GameScreen />;

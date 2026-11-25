@@ -31,6 +31,8 @@ export interface GameStore {
   readonly reportOpen: boolean;
   /** The player's game has ended: someone won, or their own company is out. */
   readonly over: boolean;
+  /** What went wrong ending a quarter, if anything did. The app shows its crash screen for it. */
+  readonly failure: Error | null;
   startGame(name: string, seed: number): void;
   setDraft(patch: Partial<Plan>): void;
   endQuarter(): void;
@@ -59,10 +61,11 @@ export const createGameStore = (storage: StorageLike | null, config: GameConfig 
     lastLog: saved?.lastLog ?? null,
     reportOpen: saved?.reportOpen ?? false,
     over: isOver(saved?.game ?? null),
+    failure: null,
 
     startGame: (name, seed) => {
       const game = createGame(newGameSetup(seed, name), config);
-      set({ seed, game, draft: defaultPlan(game.companies[PLAYER_ID]), lastLog: null, reportOpen: false, over: false });
+      set({ seed, game, draft: defaultPlan(game.companies[PLAYER_ID]), lastLog: null, reportOpen: false, over: false, failure: null });
     },
 
     setDraft: (patch) => {
@@ -74,12 +77,18 @@ export const createGameStore = (storage: StorageLike | null, config: GameConfig 
       const { game, draft, seed, over } = get();
       if (game === null || draft === null || seed === null || over) return;
       const human: (Plan | null)[] = game.companies.map((company) => (company.id === PLAYER_ID ? draft : null));
-      const result = resolveTurn(game, choosePlans(game, seed, config, human), seed, config);
-      const player = result.state.companies[PLAYER_ID];
+      let result;
+      try {
+        result = resolveTurn(game, choosePlans(game, seed, config, human), seed, config);
+      } catch (error) {
+        // Thrown from a click, an error would reach nobody and leave a button that does nothing.
+        set({ failure: error instanceof Error ? error : new Error(String(error)) });
+        return;
+      }
       set({
         game: result.state,
         // Default: last turn's split, refitted to the team the player now has.
-        draft: player.out === null ? defaultPlan(player) : draft,
+        draft: defaultPlan(result.state.companies[PLAYER_ID]),
         lastLog: result.log,
         reportOpen: true,
         over: isOver(result.state),
@@ -92,7 +101,7 @@ export const createGameStore = (storage: StorageLike | null, config: GameConfig 
       if (get().lastLog !== null) set({ reportOpen: true });
     },
 
-    abandon: () => set({ seed: null, game: null, draft: null, lastLog: null, reportOpen: false, over: false }),
+    abandon: () => set({ seed: null, game: null, draft: null, lastLog: null, reportOpen: false, over: false, failure: null }),
   }));
 
   if (storage) {
