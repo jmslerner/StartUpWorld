@@ -2490,5 +2490,7 @@ Left to that plan on purpose, from the spec's sections in scope here:
   record is collected by the store from each year's log, which carries what it needs: `quality.launchedNow`,
   `career.office`, `career.listing`, `career.rescue`, `out` and the log's `entrants`.
 - Every text a player reads about a year, a card or a note in the screens, and the timeline's mark where history
-  ends (`EraConfig.invented`).
+  ends (`EraConfig.invented`). Two wordings found by this plan's reviews need care there: the annual report says
+  "fired you" whenever the board's report has `fired`, which after a board rescue is no longer the end; and the
+  marketing note says "cash in hand" also when the room includes what a raise or a listing brings.
 - Reading the year's numbers in the view model and the screens, which read the config directly today.
