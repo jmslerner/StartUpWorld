@@ -37,6 +37,12 @@ export interface WorldSignals {
    * modified — whenever its contents change, so readers can compare by reference.
    */
   vacated?: ReadonlySet<string>;
+  /**
+   * The world is being kept awake (WorldHandle.setKeepAwake): its loop draws every frame whether or not anything
+   * moves. Written by the world; the people read it, and only while it is set does anybody wander from a desk.
+   * Absent or false, no such trip ever starts, so the world comes to rest once the walks a scene asked for are done.
+   */
+  keepAwake?: boolean;
 }
 
 export interface WorldContext {

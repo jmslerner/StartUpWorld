@@ -53,6 +53,23 @@ export interface WorldCallbacks {
   onZoom?(factor: number): void;
 }
 
+/** Figures read from the renderer and the systems: what the lab page shows and the browser checks measure. */
+export interface WorldStats {
+  /** Draw calls of the last frame drawn, the shadow pass included. */
+  readonly drawCalls: number;
+  /** Triangles of the last frame drawn. */
+  readonly triangles: number;
+  /** Geometries and textures the renderer holds right now. Still readable after dispose, when both should be 0. */
+  readonly geometries: number;
+  readonly textures: number;
+  /** Figures drawn: the people in the office and those still walking out of it. At most 56; 0 once disposed. */
+  readonly figures: number;
+  /** People of the company who are not drawn: the count on the sign beside the door. */
+  readonly hidden: number;
+  /** Frames drawn since the world was created. It stands still while the world is at rest. */
+  readonly framesDrawn: number;
+}
+
 export interface WorldHandle {
   /** Show this scene. The world works out the people (nextCast) and what changed (sceneEvents) by itself. */
   setScene(scene: OfficeScene): void;
@@ -79,5 +96,20 @@ export interface WorldHandle {
   resetCamera(): void;
   /** Pause/resume the render loop (tab hidden, canvas off-screen). */
   setPaused(paused: boolean): void;
+  /**
+   * Keep the world awake (true) or let it rest (false, which is how it starts). At rest, a second after the last
+   * thing stopped moving, nothing is drawn until something changes. Kept awake, a frame is drawn every time the
+   * page offers one, and people wander from their desks now and then; without it nobody ever does, so after any
+   * scene the world comes to rest once the walks are done. For looking at the office's idle movement.
+   */
+  setKeepAwake(on: boolean): void;
+  /** What the renderer and the systems count right now. */
+  stats(): WorldStats;
+  /**
+   * Take the graphics context away, as a browser may at any time, and give it back. For checking what the view
+   * does then; nothing in the game calls them. Losing reports onContextLost; restoring, onContextRestored.
+   */
+  loseContext(): void;
+  restoreContext(): void;
   dispose(): void;
 }

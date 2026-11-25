@@ -44,3 +44,83 @@
   border: 1px solid var(--panel-border, rgba(255, 255, 255, 0.08));
   box-shadow: var(--panel-shadow, 0 0 0 1px rgba(255, 255, 255, 0.02), 0 12px 30px rgba(0, 0, 0, 0.35));
 }
+
+/*
+ * The view itself (src/world/WorldView.tsx): one box that fills whatever it is put in, the canvas filling the box,
+ * and what is laid over the canvas when it cannot draw.
+ */
+.world-stage {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border-radius: 0.75rem;
+}
+
+/* The canvas takes its size from the box; the world only sizes what is drawn on it. */
+.world-canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* In the canvas's place when this device cannot draw the world: the shell's note, in the middle of the box. */
+.world-stage-note {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+}
+
+/* Over the canvas when its graphics context is lost: a dimmed picture, one line and the way back. */
+.world-lost {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  display: grid;
+  place-items: center;
+  padding: 0 1rem;
+  background: rgba(13, 15, 18, 0.7);
+}
+
+.world-lost-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  max-width: 24rem;
+  border-radius: 0.75rem;
+  padding: 0.75rem 1rem;
+  text-align: center;
+  font-size: 0.75rem;
+  color: rgba(169, 179, 191, 0.85);
+  background: linear-gradient(145deg, var(--panel-bg-a, rgba(26, 31, 38, 0.9)), var(--panel-bg-b, rgba(18, 22, 28, 0.95)));
+  border: 1px solid var(--panel-border, rgba(255, 255, 255, 0.08));
+  box-shadow: var(--panel-shadow, 0 0 0 1px rgba(255, 255, 255, 0.02), 0 12px 30px rgba(0, 0, 0, 0.35));
+}
+
+/* "Reload 3D view". Big enough for a thumb: at least 44 pixels high. */
+.world-reload {
+  min-height: 2.75rem;
+  border: 1px solid rgba(125, 211, 252, 0.4);
+  border-radius: 0.5rem;
+  padding: 0.25rem 0.875rem;
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--neon, #7dd3fc);
+  background: rgba(125, 211, 252, 0.15);
+  cursor: pointer;
+}
+
+.world-reload:hover {
+  background: rgba(125, 211, 252, 0.25);
+}
+
+.world-reload:focus-visible {
+  outline: 2px solid var(--neon, #7dd3fc);
+  outline-offset: 2px;
+}

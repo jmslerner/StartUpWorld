@@ -16,8 +16,9 @@
  * There are never more than MAX_FIGURES figures, the ones walking out counted: when the people in the office and the
  * people on their way out of it would be more, the last ones told to go are removed at once (see `capLeavers`).
  *
- * Between frames it runs a little ambient life: now and then somebody wanders to the coffee machine and back. That
- * only happens for a while after a frame, so the office always comes to rest (see `busy`).
+ * While it is told to (`setRoaming`, the world's "keep awake" switch) it runs a little ambient life: now and then
+ * somebody wanders to the coffee machine and back. Otherwise, which is how it starts, nobody leaves a desk of their
+ * own accord, so the office always comes to rest once the walks a frame asked for are done (see `busy`).
  *
  * It is pure: no three.js and no DOM. Everything visible goes through CrewHost, which the EmployeeSystem implements
  * with real characters and which tests implement with a recorder. All randomness comes from seeded generators, so a
@@ -64,11 +65,6 @@ export const YEAR_DELAY = 1.3;
  */
 const DOOR_QUEUE_RANGE = 3.5;
 export const DOOR_QUEUE_GAP = 0.65;
-/**
- * For this long after a frame somebody may still set off to wander. After it nobody starts a trip, so with every
- * trip on a watchdog the office is still within a minute of the last frame, and the drawing loop can rest.
- */
-export const LIVELY_SECONDS = 15;
 /**
  * Never more figures than this at once, people walking out included: as many as a cast draws. A cast that fills the
  * office leaves no figure to spare, so whoever leaves it then is gone at once instead of walking out.
@@ -162,8 +158,8 @@ export class Crew implements ActorStage {
 
   private wanderTimer: number;
   private lastWanderer: Actor | null = null;
-  /** Nobody sets off to wander after this time. */
-  private livelyUntil = 0;
+  /** May people set off to wander? Off until `setRoaming` says otherwise. */
+  private roaming = false;
 
   constructor(host: CrewHost, layout: OfficeLayout, options: CrewOptions) {
     this.host = host;
@@ -218,7 +214,6 @@ export class Crew implements ActorStage {
 
     this.reconcile(next.cast, prev?.cast ?? null, seating, mode);
     this.batchHold = 0;
-    this.livelyUntil = mode === "instant" ? 0 : this.time + LIVELY_SECONDS;
   }
 
   /** Bring the actors in line with who is drawn where right now. */
@@ -386,9 +381,18 @@ export class Crew implements ActorStage {
 
   // ── Ambient life ────────────────────────────────────────────────────────────
 
+  /**
+   * Let people wander, or stop them. While it is off no trip ever starts, so the office comes to rest once the walks
+   * are done; a trip already under way is finished. On, trips start for as long as it stays on, whatever the last
+   * frame was and however long ago: whoever switches it on is keeping the drawing loop awake to watch them.
+   */
+  setRoaming(on: boolean): void {
+    this.roaming = on;
+  }
+
   /** Is this a moment when people may leave their desks of their own accord? */
   private canRoam(): boolean {
-    return !this.reducedMotion && this.time < this.livelyUntil;
+    return this.roaming && !this.reducedMotion;
   }
 
   private tickWander(dt: number): void {

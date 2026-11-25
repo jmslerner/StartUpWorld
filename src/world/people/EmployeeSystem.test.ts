@@ -674,3 +674,34 @@ describe("EmployeeSystem", () => {
     expect(h.system.busy()).toBe(false);
   });
 });
+
+describe("EmployeeSystem: the switch that keeps the world awake", () => {
+  /** Seconds, out of `seconds`, during which the people said they were busy. */
+  const busyFor = (h: Harness, seconds: number): number => {
+    let frames = 0;
+    h.run(seconds, () => {
+      if (h.system.busy()) frames += 1;
+    });
+    return frames / 60;
+  };
+
+  it("without it nobody ever leaves a desk of their own accord, so a still office stays at rest", () => {
+    const h = harness();
+    h.apply([14, 6, 4], { office: 3, capacity: 40 });
+    h.apply([14, 6, 4], { office: 3, capacity: 40 });
+    expect(h.signals.keepAwake).toBeUndefined();
+    expect(busyFor(h, 300)).toBe(0);
+    expect(h.fx.bubbles).toEqual([]);
+  });
+
+  it("with it people wander to the coffee machine and back, and without it again they come to rest", () => {
+    const h = harness();
+    h.apply([14, 6, 4], { office: 3, capacity: 40 });
+    h.signals.keepAwake = true;
+    expect(busyFor(h, 300)).toBeGreaterThan(10);
+    expect(h.fx.bubbles.length).toBeGreaterThan(0);
+    h.signals.keepAwake = false;
+    h.run(SETTLED);
+    expect(busyFor(h, 300)).toBe(0);
+  });
+});

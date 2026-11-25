@@ -5,7 +5,7 @@ import { doorExterior } from "../office/layouts";
 import type { OfficeIndex, OfficeScene } from "../types";
 import { POP_SECONDS } from "./actor";
 import type { Actor } from "./actor";
-import { alreadyInside, Crew, DOOR_QUEUE_GAP, ENTRY_STAGGER, LIVELY_SECONDS, MAX_FIGURES, wanderCap, YEAR_DELAY } from "./crew";
+import { alreadyInside, Crew, DOOR_QUEUE_GAP, ENTRY_STAGGER, MAX_FIGURES, wanderCap, YEAR_DELAY } from "./crew";
 import { RecordingHost, run, scene, Studio } from "./testKit";
 
 type Teams = readonly [number, number, number];
@@ -801,8 +801,67 @@ describe("Crew: a new year", () => {
 });
 
 describe("Crew: wandering", () => {
-  it("lets a few people wander for a while after a frame — never more than the cap, never the same person twice running", () => {
+  it("with the switch off, which is how it starts, no trip ever begins, however lively the office is kept", () => {
     const r = office([14, 6, 4], { office: 3, capacity: 40 }, { seed: 5 });
+    let trips = 0;
+    // A scene every ten seconds for two minutes, then ten minutes of quiet.
+    for (let round = 0; round < 12; round += 1) {
+      r.apply([14, 6, 4], { office: 3, capacity: 40 });
+      run(r.crew, 10, () => {
+        trips += r.crew.cast.filter((actor) => actor.errand !== null).length;
+      });
+    }
+    run(r.crew, 600, () => {
+      trips += r.crew.cast.filter((actor) => actor.errand !== null).length;
+    });
+    expect(trips).toBe(0);
+    expect(r.host.icons()).toEqual([]);
+    expect(r.crew.busy()).toBe(false);
+    expectAllSeated(r);
+  });
+
+  it("with the switch on, people wander however long ago the last scene was, a first scene included", () => {
+    const r = office([14, 6, 4], { office: 3, capacity: 40 }, { seed: 5 });
+    r.crew.setRoaming(true);
+    // Nothing has happened since the first scene, and nothing will: the trips are the crew's own.
+    const tripsIn = (seconds: number): number => {
+      let trips = 0;
+      const out = new Set<string>();
+      run(r.crew, seconds, () => {
+        const wandering = r.crew.cast.filter((actor) => actor.errand === "wander");
+        for (const actor of wandering) if (!out.has(actor.id)) trips += 1;
+        out.clear();
+        for (const actor of wandering) out.add(actor.id);
+      });
+      return trips;
+    };
+    expect(tripsIn(120)).toBeGreaterThan(3);
+    // Ten minutes on they still do.
+    run(r.crew, 600);
+    expect(tripsIn(120)).toBeGreaterThan(3);
+  });
+
+  it("switched off again, whoever is out walks back and nobody else sets off: the office comes to rest", () => {
+    const r = office([14, 6, 4], { office: 3, capacity: 40 }, { seed: 5 });
+    r.crew.setRoaming(true);
+    for (let i = 0; i < 600 && !r.crew.cast.some((actor) => actor.errand === "wander"); i += 1) run(r.crew, 0.5);
+    expect(r.crew.cast.some((actor) => actor.errand === "wander")).toBe(true);
+    expect(r.crew.busy()).toBe(true);
+    r.crew.setRoaming(false);
+    const out = new Set(r.crew.cast.filter((actor) => actor.errand === "wander").map((actor) => actor.id));
+    let busyFor = 0;
+    run(r.crew, 600, (time) => {
+      if (r.crew.busy()) busyFor = time;
+      for (const actor of r.crew.cast) if (actor.errand !== null) expect(out.has(actor.id), actor.id).toBe(true);
+    });
+    expect(busyFor).toBeGreaterThan(0);
+    expect(busyFor).toBeLessThan(60);
+    expectAllSeated(r);
+  });
+
+  it("lets a few people wander while the switch is on — never more than the cap, never the same person twice running", () => {
+    const r = office([14, 6, 4], { office: 3, capacity: 40 }, { seed: 5 });
+    r.crew.setRoaming(true);
     const cap = wanderCap(r.crew.cast.length);
     let most = 0;
     const trips: string[] = [];
@@ -828,12 +887,14 @@ describe("Crew: wandering", () => {
     expect(r.host.icons()).toContain("coffee");
     // Coming back from a wander is not worth a puff of dust.
     expect(r.host.puffs).toEqual([]);
+    r.crew.setRoaming(false);
     run(r.crew, SETTLED);
     expectAllSeated(r);
   });
 
   it("sends two wanderers to different spots", () => {
     const r = office([20, 10, 6], { office: 3, capacity: 40 }, { seed: 11 });
+    r.crew.setRoaming(true);
     let checked = 0;
     for (let round = 0; round < 12; round += 1) {
       r.apply([20, 10, 6], { office: 3, capacity: 40 });
@@ -850,20 +911,20 @@ describe("Crew: wandering", () => {
     expect(checked).toBeGreaterThan(0);
   });
 
-  it("nobody at the door wanders, and nobody at all once the office has been quiet for a while", () => {
+  it("nobody at the door wanders, switch or no switch", () => {
     const r = office([1, 0, 0], { arriving: 4 }, { seed: 2 });
+    r.crew.setRoaming(true);
     r.apply([1, 0, 0], { arriving: 4 });
     let wandered = new Set<string>();
-    run(r.crew, LIVELY_SECONDS + 60, () => {
+    run(r.crew, 300, () => {
       wandered = new Set([...wandered, ...r.crew.cast.filter((actor) => actor.errand === "wander").map((actor) => actor.id)]);
     });
-    expect([...wandered].every((id) => id === "p0")).toBe(true);
-    expect(r.crew.busy()).toBe(false);
-    run(r.crew, 300, () => expect(r.crew.cast.every((actor) => actor.errand === null)).toBe(true));
+    expect([...wandered]).toEqual(["p0"]);
   });
 
-  it("keeps everyone at their desks under reduced motion", () => {
+  it("keeps everyone at their desks under reduced motion, switch or no switch", () => {
     const r = office([14, 6, 4], { office: 3, capacity: 40 }, { reducedMotion: true });
+    r.crew.setRoaming(true);
     for (let round = 0; round < 6; round += 1) {
       r.apply([14, 6, 4], { office: 3, capacity: 40 });
       run(r.crew, 10, () => expect(r.crew.cast.every((actor) => actor.mode === "seated")).toBe(true));

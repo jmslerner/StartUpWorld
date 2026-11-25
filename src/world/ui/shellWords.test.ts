@@ -7,6 +7,13 @@ describe("the shell's words", () => {
     expect(SHELL_WORDS.unavailable).toBe("The 3D office cannot be shown on this device. The game is complete without it.");
   });
 
+  it("say what the view is, that it stopped, and how to get it back", () => {
+    expect(SHELL_WORDS.view).toBe("A 3D view of the company's office and the people who work in it. The game is complete without it.");
+    expect(SHELL_WORDS.lost).toBe("The 3D office stopped drawing. The game carries on without it.");
+    expect(SHELL_WORDS.reload).toBe("Reload 3D view");
+    expect(Object.keys(SHELL_WORDS).sort()).toEqual(["lost", "opening", "reload", "unavailable", "view"]);
+  });
+
   it("mention no terminal, no commands and nothing of the old game", () => {
     const old = /terminal|command|console|type |typed|prompt|week|action point|\bAP\b|founder|WebGL|browser|error|crash/i;
     for (const words of Object.values(SHELL_WORDS)) expect(words).not.toMatch(old);

@@ -117,6 +117,8 @@ export class EmployeeSystem implements WorldSystem, CrewHost {
     // A step that is not a positive, finite time moves nothing: one NaN in a walk's timer or a figure's animation
     // clock would never leave it again. (The crew has the same guard for whoever steps it directly.)
     if (!(dt > 0) || !Number.isFinite(dt)) return;
+    // People wander only while the world is being kept awake to watch them; otherwise the office comes to rest.
+    this.crew.setRoaming(this.ctx.signals.keepAwake === true);
     this.crew.update(dt);
     this.syncAll(dt, elapsed);
   }
