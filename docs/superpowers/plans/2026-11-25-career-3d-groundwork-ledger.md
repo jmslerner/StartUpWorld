@@ -58,8 +58,9 @@ skill for this method is not installed on this machine; the method is followed b
 | 7 | done | bb811ab, aab5a0c, 9ca7013 (fixes) | approved with two important points, fixed before Task 9 |
 | 8 | done | 3dbd554 | approved; three minor points, fixed with Task 9 |
 | 9 | done | b47bf0c, 98e73bf | approved; no findings |
-| 10 | done | 1847d99, and a fix commit | changes required: one important point, fixed after Task 11 |
-| 11 | done but for two limits, being fixed | 747e01f (merge), aba5cd1, f23d8aa | pending |
+| 10 | done | 1847d99, db943e7 (fixes) | changes required for one fault, since fixed and reviewed again with Task 11 |
+| 11 | done | 747e01f (merge), aba5cd1, f23d8aa, 6e4db8d, aae7869, f01f51d | approved; four minor points, fixed |
+| Whole branch | reviewed | 8945173, 3c563fc, 89e232f (fixes) | ready; two points about this ledger and eight minor ones |
 
 ## Task notes
 
@@ -202,8 +203,9 @@ whole-branch review.
 Review: approved. The reviewer checked all five plans with rectangle maths of its own (no overlap, 0.9 clear behind
 every seat, every seat, waiting spot and wander spot reachable from the door), read the plans' coordinates against
 the old ones (nothing moved beyond the plan's six points), and showed the office system always comes to rest and
-leaves nothing behind when disposed. The stylesheet's growth is the CSS framework finding the words "sticky" and
-"invert" in the new source files and emitting those two unused utilities: harmless. Minor points:
+leaves nothing behind when disposed. The stylesheet's growth is the CSS framework finding words such as "sticky" and
+"invert" in the new source files and emitting unused utilities for them: harmless (the whole-branch review has the
+full count). Minor points:
 
 - The arcade cabinet's screen, carried over from the old code, drew rows of blocky invaders, a cannon and a shot.
   That reads as a nod to one existing game, so it is replaced by an abstract picture at the start of Task 7.
@@ -277,7 +279,7 @@ the crew; two tests return for someone who comes back while still walking out; d
 ### Task 8
 
 The particle simulation's 23 tests and the placement's 14 are among the passing ones. Five effect files and the
-placement test are byte for byte the old ones.
+placement test were byte for byte the old ones at that task; `FloatTextLayer.ts` changed later, for reduced motion.
 
 Decisions the implementer took:
 
@@ -366,7 +368,7 @@ Decisions the implementer took:
 - The lab has its own stylesheet and its words in `labWords.ts`; it uses nothing of the game's.
 
 The build: the game's first load is now three files instead of one (the two pages share React), 349.49 kB in all
-against 350.53 kB before, and its stylesheet is byte for byte the same. The lab's own script is 12.66 kB. The one
+against 350.53 kB before (both figures as measured at that task). The lab's own script is 12.66 kB. The one
 file that contains three (826.66 kB) loads lazily from the lab page only.
 
 In headless Chromium: the plan's example scene drew 22 people in 302 draw calls; after twenty mounts and unmounts
@@ -396,3 +398,63 @@ the controls are hidden for the screenshots; the 5 : 4 : 1 split is rounded by l
 
 The measurements are in `docs/superpowers/specs/3d-groundwork-check.md`. The design's phone budget of 300 draw
 calls is first crossed by the own office with 22 people (301).
+
+The two limits, after the fixes: the campus's year comes to rest 10.9 seconds after it advances (it was 18.0), and
+under reduced motion nothing moves after 0.7 to 0.8 seconds (it was 1.3 to 1.4). A walk in, out or to a new desk
+now goes at the usual pace or faster, so that it lasts at most 9 seconds; on the campus the fastest walker goes
+2.3 times the usual pace. Wandering keeps the usual pace. Under reduced motion no dust rises, and the numbers at
+the door stand still for 0.8 seconds; for that `FloatTextLayer.ts` gained two optional settings, and without them
+it behaves as it did.
+
+Review (of Task 11, of the fixes to the lab page, and of the two limits): approved. The reviewer ran the script
+from a checkout of its own and got the report's numbers. It judged the three readings honest: years are timed in
+the world's seconds, because this machine draws so slowly that a frame is clamped; only the end of the year is held
+to 15 seconds, and the walk to the door before it measured at most 11.1; and "rests within 1 second" under reduced
+motion is read as "nothing moves after 1 second". Minor points, all fixed: the reduced-motion margin was thin (the
+numbers at the door now last 0.8 seconds, and the script compares the measured value, not a rounded one); the
+report now says how that limit is read; the script refuses to start when its port is taken, and a check that
+throws is recorded as a failure instead of losing the summary.
+
+## Whole-branch review
+
+Verdict: ready, with nothing critical. On the final tree: the game's files are untouched; `package.json` changes
+by the two `three` lines and `vite.config.ts` by the two entries; no model, image or font file was added; none of
+the files the game loads first contains three; every rule of the fence failed when broken on purpose; the shared
+contract matches name for name, with additions only, each recorded above; no test is skipped; three runs of the
+suite in a row were green; nothing under "After this plan" was started. The reviewer's own tests through the whole
+stack passed for all five points of the plan's review focus.
+
+What it asked for, and what was done:
+
+- This ledger was behind and wrong in one place: it called the game's stylesheet byte for byte the same. It is
+  not. The CSS framework scans every source file for class names and finds words in the world's and the lab's
+  sources, which adds nine unused utilities (`!grid`, `contents`, `inline`, `invert`, `invisible`, `outline`,
+  `shadow`, `sticky`, `transform`): 20.90 kB against 20.05 kB. No markup of the game uses them. Keeping
+  `src/world` and `src/lab` out of the framework's scan would remove them; that is a change to the game's build
+  configuration and is left to the owner.
+- The fence's rule for the world looked at direct imports only (the first task's review had noted it). It now
+  follows the world's imports all the way, so the world cannot reach the rules through an open folder.
+- Removed, as nothing calls them: `magnitudeIntensity` and `formatMoneyDelta`. Kept as seams for the work listed
+  under "After this plan": the sound types and plumbing, the effects' stream and burst kinds, the dusk, night and
+  sunrise looks, and `onDusk`, which the world still reports every frame.
+- A test now checks the lab's own list of office sizes against the game's.
+- Decided here, since nothing said so before: the old `dev/PropGallery.tsx` is not restored, though the inventory
+  would restore it. Its data, `office/props/catalog.ts`, is kept, because the props' tests are written on it. The
+  old `dev/WorldPreview.tsx`, which the inventory would rewrite, is replaced by the lab page.
+- Left as it is: the head count is summed in three places (the cast, the effects, the lab), each a line or two.
+
+The final measurements (the report has the full tables): 82, 160, 300 to 301, 519 and 629 draw calls for the five
+offices full, the same at both sizes; 2,419 tests; the game's first load 356.31 kB of script in three files, the
+lab's own script 12.86 kB, and the chunk with three, loaded only by the lab page, 827.05 kB.
+
+## For the owner
+
+Choices that were this plan's to make and that you may want to look at:
+
+- Walks hurry on large floors so that none lasts more than 9 seconds.
+- Nobody wanders unless the view is kept awake; by default the office is still between scenes.
+- At the cap of 50, people who were counted on the sign take freed desks without a walk from the door.
+- Someone back from being away joins the first team that is short, which need not be the team they left.
+- No company name reaches the 3D view: the scene has none, so the signs carry fixed words.
+- The lab page and the chunk with three are in the production build, at `/office-lab.html`, linked from nowhere.
+- The two merges of the rules branch carry git's default message, which includes the repository's address.
