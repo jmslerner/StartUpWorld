@@ -1081,7 +1081,7 @@ export const CAREER: CareerGameConfig = {
         text: "The browser turns the internet into a mass market, and a sixteen-month-old browser maker with no profits sells shares that more than double on the first day.",
         effects: [
           { kind: "qualityCeiling", ceiling: 30, turns: 1 },
-          { kind: "userWave", multiplier: 1.3, turns: 3 },
+          { kind: "userWave", multiplier: 1.3, turns: 5 },
           { kind: "fundingClimate", multiplier: 1.5, turns: 3 },
         ],
       },
@@ -1136,7 +1136,7 @@ export const CAREER: CareerGameConfig = {
         text: "A touchscreen phone with a full web browser goes on sale and buyers queue overnight.",
         effects: [
           { kind: "qualityCeiling", ceiling: 30, turns: 1 },
-          { kind: "userWave", multiplier: 1.3, turns: 3 },
+          { kind: "userWave", multiplier: 1.3, turns: 5 },
         ],
       },
       // Lehman Brothers files for bankruptcy, 15 September 2008.
@@ -1238,7 +1238,7 @@ export const CAREER: CareerGameConfig = {
         text: "A research lab's free chatbot, out since late last year, is said to reach 100 million users in two months, while three of the largest technology companies announce 40,000 job cuts.",
         effects: [
           { kind: "qualityCeiling", ceiling: 30, turns: 1 },
-          { kind: "userWave", multiplier: 1.3, turns: 3 },
+          { kind: "userWave", multiplier: 1.3, turns: 5 },
           { kind: "candidates", extra: 4 },
         ],
       },
@@ -1296,7 +1296,7 @@ export const CAREER: CareerGameConfig = {
         text: "For the first time more smart glasses than handsets are sold in a year.",
         effects: [
           { kind: "qualityCeiling", ceiling: 30, turns: 1 },
-          { kind: "userWave", multiplier: 1.3, turns: 3 },
+          { kind: "userWave", multiplier: 1.3, turns: 5 },
         ],
       },
       // Invented.
