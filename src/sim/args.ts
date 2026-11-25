@@ -10,9 +10,11 @@ export interface SimArgs {
   readonly strict: boolean;
   /** Config numbers changed for this run only, by dotted path. */
   readonly overrides: Readonly<Record<string, number | string>>;
+  /** Play careers instead of races. Present only for mode=career: the race's arguments have no such key. */
+  readonly mode?: "career";
 }
 
-export const USAGE = "Usage: npm run sim -- [games=1000] [seed=1] [set=path=value ...] [strict=1]";
+export const USAGE = "Usage: npm run sim -- [mode=race|mode=career] [games=1000] [seed=1] [set=path=value ...] [strict=1]";
 
 const YES = ["1", "true", "yes"];
 const NO = ["0", "false", "no"];
@@ -27,6 +29,7 @@ export const parseSimArgs = (argv: readonly string[]): SimArgs => {
   let games: number | null = null;
   let seed: number | null = null;
   let strict = false;
+  let career = false;
   const overrides: Record<string, number | string> = {};
 
   for (const arg of argv) {
@@ -40,6 +43,9 @@ export const parseSimArgs = (argv: readonly string[]): SimArgs => {
     } else if (key === "strict") {
       if (value !== null && !YES.includes(value) && !NO.includes(value)) throw new Error(`strict=${value} is neither yes nor no: use strict=1 or strict=0`);
       strict = value === null || YES.includes(value);
+    } else if (key === "mode" && value !== null) {
+      if (value !== "race" && value !== "career") throw new Error(`mode=${value} is not a mode: use mode=race or mode=career`);
+      career = value === "career";
     } else if (key === "set" && value !== null) {
       const at = value.indexOf("=");
       const path = at === -1 ? "" : value.slice(0, at);
@@ -50,5 +56,5 @@ export const parseSimArgs = (argv: readonly string[]): SimArgs => {
       throw new Error(`Unknown argument: ${arg}`);
     }
   }
-  return { games, seed, strict, overrides };
+  return career ? { games, seed, strict, overrides, mode: "career" } : { games, seed, strict, overrides };
 };

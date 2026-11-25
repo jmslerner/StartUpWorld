@@ -174,6 +174,33 @@ Resolution, in this order:
 41. A moving bill is a cost of its own year only. What a company carries into the next year as last year's costs,
     which the opening runway reads, leaves the bill out, because it cannot recur.
 
+## How the simulator measures the targets
+
+`npm run sim:career` plays `sim.careers` whole careers, 1990 to 2038, with the baseline bot in the player's seat, and
+plays the same seeds again for each pilot and measure (`src/sim/runCareer.ts`, `src/sim/pilots.ts`,
+`src/sim/careerReport.ts`). These are its rulings.
+
+1. A win is counted under the style the winning company plays, a newcomer's included.
+2. The baseline bot's career "ends early" when its company is out at the end, which takes two failures; a second
+   failure in 2038 itself counts, because the company is out when the standings are drawn.
+3. It "goes public" if it lists in any year.
+4. The leader of 2010 is the company not out with the largest founder's stake as 2010 closes; it "wins" if the winner
+   of 2038 is that same company, same seat and same founding year; careers with no company in the game in 2010 are
+   left out of the figure.
+5. A loophole pilot is flagged when its win share beats the baseline bot's on the same seeds by more than
+   `loopholeMargin`; a flag is reported, not counted as a failed target.
+6. A range target passes on its bounds; the lead target passes only under its figure.
+7. The control for the lead target is the same batch with every platform shift switched off (ceilings at 100, waves
+   at 1): the difference between the two lead figures is what the shifts do.
+8. Whether a pilot is flagged is decided on 5,000 careers (Task 17, Step 4): at 1,000 the difference between two win
+   shares moves by one to two points from chance alone.
+9. The pilot that plays the final year for its stake alone and the pilot that reads the timeline are measures, not
+   loophole checks, and are never flagged.
+10. The board votes at the end of the final year as in any other, so the end-game pilot never takes a plan that could
+    leave it below $0.
+11. A style's win share pools the company of 1990 with newcomers that play its style; the target is on the pooled
+    figure, and the report shows the two parts.
+
 ## Starting numbers
 
 The career ships with `CAREER` in `src/config.ts`; `CAREER_DESIGN` in `src/config.design.ts` holds the same numbers,
