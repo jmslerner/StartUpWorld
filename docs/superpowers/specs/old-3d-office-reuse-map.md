@@ -1,7 +1,9 @@
 # The old 3D office: what can be reused
 
 Research notes from a read of the three.js office that this project had until the turn-based rebuild removed it. The
-code is still on `main` under `src/world` (read a file with `git show origin/main:src/world/<path>`). These notes are
+code is no longer on `main`: the turn-based game was merged there on 25 November 2026. It is in the commit just before
+that merge, `63b4bed`, under `src/world` (read a file with `git show 63b4bed:src/world/<path>`). Where these notes say
+`63b4bed` they first said `origin/main`, which pointed at that commit when they were written. These notes are
 reference material for the 3D plans; where they differ from the approved design (`2026-11-25-career-3d-design.md`),
 the design wins.
 
@@ -11,7 +13,7 @@ November 2026.
 
 ## In short
 
-The old 3D office (origin/main, src/world: 125 files, 40,590 lines, three ^0.187.0, no react-three-fiber) is well
+The old 3D office (63b4bed, src/world: 125 files, 40,590 lines, three ^0.187.0, no react-three-fiber) is well
 suited to reuse: about two thirds of its source is generic or needs only type changes. The parts tied to the old game
 are narrow: the snapshot and event diff, the inspector cards, the reaction scripts for the staff, and the eight work
 stations named after old commands. Its office already grew through five hand-drawn tiers (garage 3 desks, coworking 8,
@@ -23,7 +25,7 @@ and the game was fully playable without it, so a 3D main screen needs its non-We
 designed first. Furniture was the main cost (the office folder is 10,908 source lines, 42% of source), so eras should
 be a theme and prop swap over a tier table, not new hand-drawn plans per era.
 
-## 1. Architecture in ten lines (all paths are on origin/main; read with: git show origin/main:<path>)
+## 1. Architecture in ten lines (all paths are on 63b4bed; read with: git show 63b4bed:<path>)
 
 1. React entry: src/world/WorldView.tsx (87 lines), default export so the shell loads it and three.js lazily;
    src/world/ui/WorldShell.tsx (61) holds the placeholder, the 'unavailable' note and an error boundary
@@ -294,21 +296,21 @@ from the start.
 
 ## Measured
 
-- git ls-tree -r --name-only origin/main src/world, then wc -l on each file via git show: 125 files, 40,590 lines
+- git ls-tree -r --name-only 63b4bed src/world, then wc -l on each file via git show: 125 files, 40,590 lines
 - Split by kind: 26,236 source, 12,881 tests (.test.ts plus people/testKit.ts 178), 1,473 dev sandbox
   (dev/PropGallery.tsx 610, dev/WorldPreview.tsx 863)
 - By folder, source/test lines: office 10,908/2,285; people 4,089 incl. test kit/3,678; core 3,196/1,464; ui
   2,471/1,704; fx 2,411/628; interaction 1,335/714; root 1,322/2,230; types 682/0
 - office/props/*: nine files, 6,430 lines (stations 1,607; decor 993; building 952; assets 746; shared 606;
   workstations 526; catalog 396; parts 350; markers 254)
-- git rev-parse --short: origin/main = 63b4bed, HEAD (claude/trusting-ramanujan-gd0yok) = b0d38b0
-- origin/main package.json: three ^0.187.0, @types/three ^0.187.0, no react-three-fiber or drei; current branch
+- git rev-parse --short: main before the merge = 63b4bed, HEAD (claude/trusting-ramanujan-gd0yok) = b0d38b0
+- 63b4bed package.json: three ^0.187.0, @types/three ^0.187.0, no react-three-fiber or drei; current branch
   package.json has no three and node_modules/three is absent
 - Fully read: WorldView.tsx, mountWorld.ts, core/World.ts, types/system.ts, types/handle.ts, types/snapshot.ts,
   phase.ts, engine/progression.ts, core/rendererLook.ts, core/sharedResources.ts, core/palette.ts,
   core/lightingState.ts, ui/environment.ts, office/timing.ts, ui/WorldShell.tsx
-- Phase thresholds read from origin/main:src/engine/progression.ts; desk counts read from
-  origin/main:src/world/office/layouts.test.ts lines 58-63 (3/8/20/36/48 desks, 4/6/8/10/12 overflow)
+- Phase thresholds read from 63b4bed:src/engine/progression.ts; desk counts read from
+  63b4bed:src/world/office/layouts.test.ts lines 58-63 (3/8/20/36/48 desks, 4/6/8/10/12 overflow)
 - git grep TODO|FIXME|HACK|XXX in src/world: no real hits (19 matches, all the word 'hacker')
 - git grep InstancedMesh in src/world: only fx/ParticleRenderer.ts, fx/particles.ts (comment) and people/markers.ts;
   mergeGeometries only in office/mergeStatic.ts
