@@ -254,7 +254,7 @@ Notes on the table:
 ## 7. Numbers and the config
 
 - One config file still holds every number: `src/config.ts` gains a `CAREER` section next to today's race numbers
-  (eras, C1 to C10, the career's own rival and baseline-bot numbers, the career's balance targets, and the office
+  (eras, C1 to C11, the career's own rival and baseline-bot numbers, the career's balance targets, and the office
   sizes the 3D world draws).
 - Starting values are the tuned race numbers read per year instead of per quarter, with the era table on top. They
   are then tuned by the simulator until the career's targets pass, and each change is logged with its reason in a
@@ -300,7 +300,7 @@ is out, and going public no longer ends anything). Proposed career targets, for 
 
 ### 10.1 Approach: bring back and extend this project's own 3D office
 
-Until this branch removed it, the app had a three.js office (still on `main`: 125 files, about 26,000 lines of source
+Until this branch removed it, the app had a three.js office (still on `main`: 125 files, about 28,000 lines of source
 and 13,000 of tests, three.js r187, no other 3D library). Reading it for this design showed that about two thirds is
 generic and well tested: the renderer set-up, a fixed isometric camera with pan, zoom and phone framing, touch
 gestures, picking with generous hit areas, lighting, a builder that makes every prop in code (there are no model or
@@ -384,7 +384,7 @@ cannot use starts a new career. The career's record (milestones by year) is part
 
 ## 13. How it will be tested
 
-- **Rules:** unit tests for every new rule (C1 to C10), written first, on frozen starting numbers so tuning never
+- **Rules:** unit tests for every new rule (C1 to C11), written first, on frozen starting numbers so tuning never
   breaks them; the race's tests keep running unchanged.
 - **Independent check:** black-box tests of the new rules written from this document alone, as was done for the race.
 - **Balance:** the simulator's career mode against the targets in section 9, on five batches of 1,000 careers.
@@ -425,8 +425,9 @@ cannot use starts a new career. The career's record (milestones by year) is part
 
 Five steps, each leaving something that works and is tested. **(proposal)**
 
-1. **Career rules, no screen.** The engine switches, eras, dated cards, platform shifts, going public as a milestone,
-   the rescue, replacement rivals, offices; the career config; rivals adapted; tests. The race still passes.
+1. **Career rules, no screen.** The engine switches, eras, dated cards, platform shifts, going public as a choice
+   in the plan, the rescue, replacement rivals, offices, the limit on marketing; the career config; rivals adapted;
+   tests. The race still passes.
 2. **Career simulator and tuning** to the targets the owner confirms.
 3. **The career in the existing 2D screens**: years instead of quarters, the timeline strip, milestones, the rescue,
    the short summary and annual report, the end screen. Playable and shippable; this is also the permanent no-3D way
@@ -464,7 +465,7 @@ request unless the owner would rather merge the finished race first.
 ## 18. Left to the builder
 
 - Exact starting values for the era table's market, prices and bars before tuning.
-- How the office's team areas are laid out on each of the five plans, and the three era looks' props.
+- How the office's team areas are laid out on each of the five plans, and each era look's props.
 - The wording of every card, warning and report line.
 - The internal shape of the scene model and of the career section of the config.
 - Which of the old world's tests are restored as they are and which are rewritten for the new seam.
