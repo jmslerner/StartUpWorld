@@ -1,7 +1,7 @@
 // Plans: the default for a new turn, and the check that turns any plan into a legal one.
 // An illegal part is fixed up or dropped at no cost, with a note for the quarterly report.
 
-import { rulesForTurn } from "./career";
+import { listingBlocker, rulesForTurn } from "./career";
 import { poachFloor, refitAllocation } from "./formulas";
 import { PRICE_TIERS } from "./types";
 import type { Allocation, Company, CompanyId, GameState, Plan, PublicCompany, RulesConfig } from "./types";
@@ -17,11 +17,12 @@ export const defaultPlan = (company: Company): Plan => ({
   hireLimit: company.lastPlan.hireLimit,
 });
 
-export type RaiseBlocker = "users" | "cooldown";
+export type RaiseBlocker = "users" | "cooldown" | "public";
 
-/** Why this company cannot raise this turn, or null if it can, by that turn's numbers. */
+/** Why this company cannot raise this turn, or null if it can, by that turn's numbers. A public company never can. */
 export const raiseBlocker = (company: Company, turn: number, config: RulesConfig): RaiseBlocker | null => {
   const rules = rulesForTurn(config, turn);
+  if (company.career !== undefined && company.career.listed !== null) return "public";
   if (company.users < rules.raise.minUsers) return "users";
   if (company.lastRaise !== null && turn - company.lastRaise.turn <= rules.raise.cooldownTurns) return "cooldown";
   return null;
@@ -65,11 +66,27 @@ export const normalizePlanFor = (
   const price = PRICE_TIERS.includes(wanted.price) ? wanted.price : company.price;
   if (price !== wanted.price) notes.push("Unknown price tier: the price stays where it was.");
 
+  // In a career a plan may take the company public. Outside one the wish is not read, and the key is never written.
+  let goPublic = false;
+  if (rules.career !== undefined && wanted.goPublic === true) {
+    const blocker = listingBlocker(company, turn, rules);
+    if (blocker === null) goPublic = true;
+    else if (blocker === "users") notes.push(`Going public dropped: it takes a year that closes with ${rules.ipo.users.toLocaleString("en-US")} users and a profit.`);
+    else if (blocker === "profit") notes.push("Going public dropped: no year has yet closed at the bar with a profit.");
+    else if (blocker === "listed") notes.push("Going public dropped: the company is already public.");
+  }
+
   let raisePercent = wanted.raisePercent;
   if (raisePercent !== 0) {
     const blocker = raiseBlocker(company, turn, rules);
     if (!rules.raise.options.includes(raisePercent)) {
       notes.push(`Raise dropped: ${raisePercent}% is not on offer.`);
+      raisePercent = 0;
+    } else if (blocker === "public") {
+      notes.push("Raise dropped: a public company cannot raise privately.");
+      raisePercent = 0;
+    } else if (goPublic) {
+      notes.push("Raise dropped: a company cannot raise privately in the year it goes public.");
       raisePercent = 0;
     } else if (blocker === "users") {
       notes.push(`Raise dropped: it needs ${rules.raise.minUsers.toLocaleString("en-US")} users.`);
@@ -104,7 +121,8 @@ export const normalizePlanFor = (
   const hireLimit = wanted.hireLimit === null ? null : whole(wanted.hireLimit);
   if (hireLimit !== wanted.hireLimit) notes.push(`Hire limit set to ${hireLimit}: it has to be a whole number of people.`);
 
-  return { plan: { allocation, marketing, price, raisePercent, poachTarget, layoffs, hireLimit }, notes };
+  const resolved: Plan = { allocation, marketing, price, raisePercent, poachTarget, layoffs, hireLimit };
+  return { plan: rules.career === undefined ? resolved : { ...resolved, goPublic }, notes };
 };
 
 export const normalizePlan = (state: GameState, id: CompanyId, plan: Plan | null, config: RulesConfig): CheckedPlan =>

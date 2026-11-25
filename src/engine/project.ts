@@ -6,7 +6,7 @@
 // from public information only.
 
 import { CONFIG } from "../config";
-import { heldCeiling, marketTurn, rulesForTurn } from "./career";
+import { closingValuation, heldCeiling, listingEffects, listingOf, marketTurn, rulesForTurn } from "./career";
 import {
   churnRate,
   clamp,
@@ -27,7 +27,7 @@ import {
 } from "./formulas";
 import { handOutCandidates } from "./hiring";
 import { normalizePlanFor } from "./plan";
-import type { CompanyReport, CompanyView, CostBreakdown, Plan, PublicCompany, RulesConfig } from "./types";
+import type { CareerReport, CompanyReport, CompanyView, CostBreakdown, Plan, PublicCompany, RulesConfig } from "./types";
 
 /** What the rivals are expected to do to this turn's market. */
 export interface RivalEstimate {
@@ -74,6 +74,8 @@ export interface Projection {
   readonly poachChance: number | null;
   /** Chance the board fires the founder at the end of this turn. */
   readonly boardRisk: number;
+  /** Career only: the listing as the turn would close it, and the office move (set by the office rules). */
+  readonly career?: { readonly listing: CareerReport["listing"]; readonly office: CareerReport["office"] };
 }
 
 const inPlay = (rival: PublicCompany): boolean => rival.out === null && rival.launched;
@@ -163,8 +165,11 @@ export const projectTurn = (
     const valuation = valuationOf(self.users, self.hype, view.climate.multiplier, rules);
     raise = { percent: resolved.raisePercent, valuation, amount: raiseAmount(valuation, resolved.raisePercent) };
   }
-  const equity = raise ? round6(self.founderEquity * (1 - raise.percent / 100)) : self.founderEquity;
-  const investorSeats = self.investorSeats + (raise ? 1 : 0);
+  // In a career a listing closes with the raise step, as in the turn.
+  const listing = resolved.goPublic === true ? listingOf(self, view.climate.multiplier, rules) : null;
+  const listed = listing === null ? null : listingEffects(self, rules);
+  const equity = listed !== null ? listed.equity : raise ? round6(self.founderEquity * (1 - raise.percent / 100)) : self.founderEquity;
+  const investorSeats = listed !== null ? listed.investorSeats : self.investorSeats + (raise ? 1 : 0);
 
   const effective = effectiveWork(payroll, archetype.workExponent);
   const work = {
@@ -205,7 +210,7 @@ export const projectTurn = (
   const poaching = odds === null ? 0 : rules.poach.cost;
   const severance = resolved.layoffs * rules.layoff.severance;
   const costs: CostBreakdown = { salaries, marketing: resolved.marketing, hiring, poaching, severance, total: salaries + resolved.marketing + hiring + poaching + severance };
-  const cash = self.cash + (raise?.amount ?? 0) + revenue - costs.total;
+  const cash = self.cash + (raise?.amount ?? 0) + (listing?.amount ?? 0) + revenue - costs.total;
   const runway = runwayOf(cash, revenue, costs.total);
 
   const grew = self.usersAtLastClose > 0 && users >= self.usersAtLastClose * (1 + rules.hype.growthThreshold);
@@ -215,7 +220,8 @@ export const projectTurn = (
         (launchedNow ? rules.hype.launch : 0) +
         (raise ? rules.hype.raise : 0) +
         (grew ? rules.hype.growth : 0) +
-        (resolved.layoffs > 0 ? rules.layoff.hype : 0),
+        (resolved.layoffs > 0 ? rules.layoff.hype : 0) +
+        (listed !== null ? listed.hype : 0),
       0,
       100,
     ),
@@ -224,7 +230,7 @@ export const projectTurn = (
   const badQuarter = users < self.usersAtLastClose || (runway !== null && runway < rules.board.runwayTurns);
   const boardRisk = investorSeats > self.founderSeats && badQuarter ? rules.board.fireChance : 0;
 
-  return {
+  const projection: Projection = {
     plan: resolved,
     notes: checked.notes,
     work,
@@ -243,15 +249,17 @@ export const projectTurn = (
     revenue,
     costs,
     cash,
-    cashFloor: self.cash + (raise?.amount ?? 0) + revenueOf(self.users - usersChurned, resolved.price, rules) - costs.total,
+    cashFloor: self.cash + (raise?.amount ?? 0) + (listing?.amount ?? 0) + revenueOf(self.users - usersChurned, resolved.price, rules) - costs.total,
     profitable: revenue >= costs.total,
     runway,
     hype,
-    valuation: valuationOf(users, hype, view.climate.multiplier, rules),
+    valuation: closingValuation(valuationOf(users, hype, view.climate.multiplier, rules), self, listing !== null, rules),
     hiresWanted,
     hires,
     headcount: payroll + hires,
     poachChance: odds,
     boardRisk,
   };
+  // A career's projection says what the year would do to the company's career; a race projection has no such key.
+  return rules.career === undefined ? projection : { ...projection, career: { listing, office: null } };
 };

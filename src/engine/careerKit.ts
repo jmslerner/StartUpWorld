@@ -5,8 +5,10 @@
 
 import type { GameConfig, PlayEra } from "../config";
 import { DESIGN } from "../config.design";
+import { rulesForTurn } from "./career";
+import { revenueOf } from "./formulas";
 import { createGame } from "./setup";
-import { FOUR_SEATS, withCompany } from "./testKit";
+import { FOUR_SEATS, launchedCompany, withCompany } from "./testKit";
 import type { CareerRules, CompanyCareer, CompanyId, GameState, OfficeConfig } from "./types";
 
 /** The five offices at the sizes the career's design starts from. */
@@ -58,3 +60,15 @@ export const careerOf = (state: GameState, id: CompanyId): CompanyCareer => {
 /** A copy of the state with some of one company's career facts replaced. */
 export const withCareerOf = (state: GameState, id: CompanyId, patch: Partial<CompanyCareer>): GameState =>
   withCompany(state, id, { career: { ...careerOf(state, id), ...patch } });
+
+/**
+ * A company that may go public: launched, with the users of the turn's bar, a last year whose revenue covered its
+ * costs (its payroll), and `career.qualified` set.
+ */
+export const qualify = (state: GameState, id: CompanyId, config: GameConfig = CAREER_TEST): GameState => {
+  const rules = rulesForTurn(config, state.turn);
+  const company = state.companies[id];
+  const users = rules.ipo.users;
+  const launched = launchedCompany(state, id, { users, lastRevenue: revenueOf(users, company.price, rules), lastCosts: company.headcount * rules.salary });
+  return withCareerOf(launched, id, { qualified: true });
+};

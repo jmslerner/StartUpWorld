@@ -5,7 +5,7 @@
 // docs/turn-based-design.md, "Order of a turn".
 
 import { CONFIG } from "../config";
-import { heldCeiling, marketTurn, rulesForTurn } from "./career";
+import { closingValuation, heldCeiling, listingEffects, listingOf, marketTurn, rulesForTurn } from "./career";
 import { NEUTRAL_MODIFIERS, applyEvent, drawEvent, type EventContext } from "./events";
 import {
   churnRate,
@@ -32,6 +32,7 @@ import { resolveMarket } from "./market";
 import { normalizePlan } from "./plan";
 import { STREAM, firstFloat } from "./rng";
 import type {
+  CareerReport,
   Climate,
   Company,
   CompanyId,
@@ -60,6 +61,8 @@ interface Desk {
   /** People on payroll this turn: headcount less layoffs. */
   readonly payroll: number;
   readonly raise: CompanyReport["raise"];
+  /** Career only: set in the year the company goes public. */
+  readonly listing: CareerReport["listing"];
   readonly equity: number;
   readonly investorSeats: number;
   effective: number;
@@ -89,6 +92,8 @@ interface Desk {
   profitable: boolean;
   runway: number | null;
   hype: CompanyReport["hype"];
+  /** Career only: the hype going public brought this year. */
+  listingHype: number;
   headcountEnd: number;
   valuation: number;
   board: CompanyReport["board"];
@@ -97,7 +102,7 @@ interface Desk {
 
 const NO_COSTS: CostBreakdown = { salaries: 0, marketing: 0, hiring: 0, poaching: 0, severance: 0, total: 0 };
 
-/** Steps 1–3: check the plan, lay people off, close the raise. */
+/** Steps 1–3: check the plan, lay people off, close the raise, or in a career the listing in its place. */
 const openDesk = (state: GameState, company: Company, plan: Plan | null, rules: RulesConfig): Desk => {
   const checked = normalizePlan(state, company.id, plan, rules);
   const percent = checked.plan.raisePercent;
@@ -106,14 +111,17 @@ const openDesk = (state: GameState, company: Company, plan: Plan | null, rules: 
     const valuation = valuationOf(company.users, company.hype, state.climate.multiplier, rules);
     raise = { percent, valuation, amount: raiseAmount(valuation, percent) };
   }
+  const listing = checked.plan.goPublic === true ? listingOf(company, state.climate.multiplier, rules) : null;
+  const listed = listing === null ? null : listingEffects(company, rules);
   return {
     company,
     plan: checked.plan,
     notes: [...checked.notes],
     payroll: company.headcount - checked.plan.layoffs,
     raise,
-    equity: raise ? round6(company.founderEquity * (1 - percent / 100)) : company.founderEquity,
-    investorSeats: company.investorSeats + (raise ? 1 : 0),
+    listing,
+    equity: listed !== null ? listed.equity : raise ? round6(company.founderEquity * (1 - percent / 100)) : company.founderEquity,
+    investorSeats: listed !== null ? listed.investorSeats : company.investorSeats + (raise ? 1 : 0),
     effective: 0,
     productWork: 0,
     growthWork: 0,
@@ -141,6 +149,7 @@ const openDesk = (state: GameState, company: Company, plan: Plan | null, rules: 
     profitable: false,
     runway: null,
     hype: { start: company.hype, end: company.hype, launch: 0, raise: 0, growth: 0, layoffs: 0 },
+    listingHype: listed !== null ? listed.hype : 0,
     headcountEnd: company.headcount,
     valuation: 0,
     board: null,
@@ -232,7 +241,7 @@ const reportOf = (desk: Desk, rules: RulesConfig): CompanyReport => {
   // A career's report says what the career did to the company this year; a race report has no such key.
   if (company.career === undefined) return report;
   const qualityLostToEvent = Math.max(0, company.career.qualityAtLastClose - company.quality);
-  return { ...report, career: { listing: null, rescue: null, office: null, hype: { listing: 0, rescue: 0 }, qualityLostToEvent } };
+  return { ...report, career: { listing: desk.listing, rescue: null, office: null, hype: { listing: desk.listingHype, rescue: 0 }, qualityLostToEvent } };
 };
 
 const closedLog = (state: GameState): TurnLog => ({
@@ -254,7 +263,7 @@ export const resolveTurn = (state: GameState, plans: PlanSet, seed: number, conf
   const rules = rulesForTurn(config, turn);
   const climate = state.climate.multiplier;
 
-  // 1–3. Plans, layoffs, raise.
+  // 1–3. Plans, layoffs, raise. In a career a listing closes here too, at the year's opening valuation.
   const desks = state.companies.filter((company) => company.out === null).map((company) => openDesk(state, company, plans[company.id] ?? null, rules));
   const deskOf = (id: CompanyId): Desk | undefined => desks.find((desk) => desk.company.id === id);
 
@@ -318,7 +327,8 @@ export const resolveTurn = (state: GameState, plans: PlanSet, seed: number, conf
     desks.map((desk) => ({ id: desk.company.id, hype: desk.company.hype, tieKey: firstFloat(seed, turn, STREAM.hiringOrder, desk.company.id), wanted: desk.wanted })),
   );
 
-  // 9–10. Revenue and costs, then hype.
+  // 9–10. Revenue and costs, then hype. In a career a listing's cash came in before the year's work, its hype joins
+  // the year's, and a public company's valuation carries the premium.
   for (const desk of desks) {
     const { company, plan } = desk;
     desk.hired = hiring.hired[company.id] ?? 0;
@@ -336,7 +346,7 @@ export const resolveTurn = (state: GameState, plans: PlanSet, seed: number, conf
       severance,
       total: salaries + plan.marketing + hiringFees + desk.poachFee + severance,
     };
-    desk.cash = company.cash + (desk.raise?.amount ?? 0) + desk.revenue - desk.costs.total;
+    desk.cash = company.cash + (desk.raise?.amount ?? 0) + (desk.listing?.amount ?? 0) + desk.revenue - desk.costs.total;
     desk.profitable = desk.revenue >= desk.costs.total;
     desk.runway = runwayOf(desk.cash, desk.revenue, desk.costs.total);
 
@@ -345,9 +355,9 @@ export const resolveTurn = (state: GameState, plans: PlanSet, seed: number, conf
     const grew = company.usersAtLastClose > 0 && desk.users >= company.usersAtLastClose * (1 + rules.hype.growthThreshold);
     const growth = grew ? rules.hype.growth : 0;
     const layoffs = plan.layoffs > 0 ? rules.layoff.hype : 0;
-    const end = round4(clamp(company.hype * (1 - rules.hype.decay) + launch + raise + growth + layoffs, 0, 100));
+    const end = round4(clamp(company.hype * (1 - rules.hype.decay) + launch + raise + growth + layoffs + desk.listingHype, 0, 100));
     desk.hype = { start: company.hype, end, launch, raise, growth, layoffs };
-    desk.valuation = valuationOf(desk.users, end, climate, rules);
+    desk.valuation = closingValuation(valuationOf(desk.users, end, climate, rules), company, desk.listing !== null, rules);
   }
 
   // 11–13. Endings.
@@ -436,8 +446,18 @@ export const resolveTurn = (state: GameState, plans: PlanSet, seed: number, conf
       lastRevenue: desk.revenue,
       lastCosts: desk.costs.total,
       lastPull: desk.launched ? desk.pull : null,
-      // A career keeps the quality the year closed with, before next year's card can touch it.
-      ...(company.career === undefined ? {} : { career: { ...company.career, qualityAtLastClose: desk.quality } }),
+      // A career keeps the quality the year closed with, before next year's card can touch it, records a listing,
+      // and qualifies a company for one once a year closes at that year's bar with a profit; it stays qualified.
+      ...(company.career === undefined
+        ? {}
+        : {
+            career: {
+              ...company.career,
+              qualityAtLastClose: desk.quality,
+              listed: desk.listing === null ? company.career.listed : { turn, ...desk.listing },
+              qualified: company.career.qualified || (desk.users >= rules.ipo.users && desk.profitable),
+            },
+          }),
     };
   });
 

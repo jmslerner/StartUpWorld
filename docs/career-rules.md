@@ -25,8 +25,15 @@ Resolution, in this order:
 
 1. Plans are checked. Anything illegal is fixed up or dropped at no cost, and the report says so.
    - Limits and prices are those of this year (ruling 5).
+   - A plan may go public. It is dropped, with the reason, unless the company has qualified and is not yet public;
+     until it qualifies the reason names what it still needs against this year's bar (rulings 18 and 19). A plan
+     that both raises and goes public loses the raise (ruling 21), and a public company cannot raise privately
+     (ruling 22). The resolved plan always says whether the company goes public.
 2. Layoffs.
 3. The raise closes.
+   - A listing closes here, in place of a raise: the company sells `listing.percent` of itself at the year's opening
+     valuation, without the premium; the cash comes in before the year's work, the founder's equity shrinks by the
+     same share and investors gain `listing.investorSeats` seats. No raise cooldown starts (ruling 20).
 4. Work is done.
 5. Product quality: gain, then decay, then the launch test.
    - In a shift's year, when its ceiling has `turns` 1, no company's quality is above the ceiling after gain and
@@ -41,6 +48,10 @@ Resolution, in this order:
    - Candidates on the market are never fewer than none (ruling 11).
 9. Revenue and costs.
 10. Hype.
+    - In the year it lists, a company gains `listing.hype`, added with the year's other hype before the cap at 100.
+    - The valuation the year closes at carries the listing premium for a company that is public or listed this year,
+      rounded to whole dollars after it (ruling 20). The one-year projection shows the listing, the equity, the
+      seats, the hype and the premium exactly as the turn will play them.
 11. IPO check.
     - No IPO check: reaching the bar with a profit ends nothing (ruling 6).
 12. Bankruptcy, then the board vote. Companies that go out release their users and staff.
@@ -49,6 +60,8 @@ Resolution, in this order:
       the companies still in the game wins; with nobody left the outcome is `wipeout` (ruling 6).
     - Closing the books, after the endings: each company's quality as the year closes is kept, public, before next
       year's card can cut it (ruling 17).
+    - Closing the books also records a listing, and marks a company qualified when the year closed with that
+      year's bar in users and with revenue that covered its costs (ruling 18).
 14. The funding climate ticks down and next year's card is drawn.
     - A wave of new users ticks down with the funding climate, before next year's card can set a new one (ruling 15).
     - The card is drawn from next year's numbers, so a new era's deck is in play from its first year.
@@ -82,6 +95,14 @@ Resolution, in this order:
 16. A shift is announced in the `shiftNoticeYears` years before it, not in its own year.
 17. The quality a company closed last year with is public, and a rival's pull is carried forward from it, not from
     the quality a shift has just left it with.
+18. A company qualifies when a year closes with that year's bar in users and with revenue that covered its costs.
+    Once qualified it stays qualified, whatever happens later, and may list in any later year, once.
+19. Until it qualifies, what a company is told it still needs is measured against the bar of the year being planned:
+    users while it has fewer than that bar, a profitable year once it has them.
+20. A listing closes with the raise step, at the opening valuation without the premium; the premium applies from the
+    end of that year, rounded to whole dollars after it.
+21. A plan that both raises and goes public loses the raise.
+22. A public company cannot raise privately. A race plan that asks to go public is played as if it did not.
 
 ## Starting numbers
 

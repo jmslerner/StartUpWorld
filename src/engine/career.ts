@@ -1,7 +1,8 @@
 // The career's own rules, as pure functions. They apply only to a config that has a `career` block; the race's
 // config has none. The rules are recorded in docs/career-rules.md.
 
-import type { ActiveEvent, CareerRules, DatedCard, EventCard, EventEffect, RulesConfig } from "./types";
+import { raiseAmount, round6, valuationOf } from "./formulas";
+import type { ActiveEvent, CareerRules, Company, DatedCard, EventCard, EventEffect, RulesConfig } from "./types";
 
 /** The calendar year a turn is played in: turn 1 is the career's first year. */
 export const yearOf = (turn: number, career: CareerRules): number => career.firstYear + turn - 1;
@@ -121,3 +122,47 @@ export const officeFor = (headcount: number, career: CareerRules): number => {
   const smallest = career.offices.findIndex((office) => office.capacity >= headcount);
   return smallest === -1 ? career.offices.length - 1 : smallest;
 };
+
+/**
+ * Why a company may not go public, or null when it may. "unavailable": not a career. "listed": already public.
+ * Otherwise, until it has qualified, what it still needs, by the bar of the year being planned: "users" while it has
+ * fewer users than that bar, else "profit": a year that closes at the bar with revenue that covers its costs.
+ */
+export type ListingBlocker = "unavailable" | "listed" | "users" | "profit";
+
+export const listingBlocker = (company: Company, turn: number, config: RulesConfig): ListingBlocker | null => {
+  const rules = rulesForTurn(config, turn);
+  if (rules.career === undefined || company.career === undefined) return "unavailable";
+  if (company.career.listed !== null) return "listed";
+  if (company.career.qualified) return null;
+  return company.users < rules.ipo.users ? "users" : "profit";
+};
+
+/** The year's listing rules; throws outside a career, where no company can go public. */
+const listingRules = (rules: RulesConfig): CareerRules["listing"] => {
+  if (rules.career === undefined) throw new Error("only a career has listings");
+  return rules.career.listing;
+};
+
+/** A listing as it closes with the raise step: the company valued at the year's opening, no premium, and what it sells. */
+export const listingOf = (company: Company, climateMultiplier: number, rules: RulesConfig): { valuation: number; amount: number } => {
+  const valuation = valuationOf(company.users, company.hype, climateMultiplier, rules);
+  return { valuation, amount: raiseAmount(valuation, listingRules(rules).percent) };
+};
+
+/** What going public does in its year beside the cash: the founder's equity after the sale, the board, the hype gained. */
+export const listingEffects = (company: Company, rules: RulesConfig): { equity: number; investorSeats: number; hype: number } => {
+  const listing = listingRules(rules);
+  return {
+    equity: round6(company.founderEquity * (1 - listing.percent / 100)),
+    investorSeats: company.investorSeats + listing.investorSeats,
+    hype: listing.hype,
+  };
+};
+
+/**
+ * A valuation as the year closes: that of a company that is public, or went public this year, carries the listing
+ * premium, rounded to whole dollars after it. Any other company's is the valuation as given.
+ */
+export const closingValuation = (valuation: number, company: Company, listsNow: boolean, rules: RulesConfig): number =>
+  listsNow || (company.career !== undefined && company.career.listed !== null) ? Math.round(valuation * listingRules(rules).premium) : valuation;
