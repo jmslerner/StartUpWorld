@@ -10,6 +10,7 @@ import { ProjectionCard } from "../components/ProjectionCard";
 import { QuarterReport } from "../components/QuarterReport";
 import { ResourceBar } from "../components/ResourceBar";
 import { careerEndView } from "../careerEnd";
+import { listingView, officeMoveView } from "../careerPlan";
 import { careerStatusView, datedYear, timelineView } from "../careerTimeline";
 import { CareerStatus } from "../components/CareerStatus";
 import { RivalsPanel } from "../components/RivalsPanel";
@@ -56,6 +57,9 @@ export const GameScreen = () => {
   // A career's timeline and the year's status; null in a race.
   const timeline = useMemo(() => (game === null ? null : timelineView(game, record, config)), [game, record, config]);
   const status = useMemo(() => (game === null ? null : careerStatusView(game, config)), [game, config]);
+  // Going public and the coming office move, as the plan offers them; null in a race.
+  const listing = useMemo(() => (game === null || draft === null ? null : listingView(game, draft, config)), [game, draft, config]);
+  const move = useMemo(() => (planning === null ? null : officeMoveView(planning.projection, config)), [planning, config]);
 
   const onChange = useCallback((plan: Plan) => setDraft(plan), [setDraft]);
 
@@ -162,11 +166,11 @@ export const GameScreen = () => {
           {/* Wide screens: the plan on the left; its projection and the rivals on the right. Phones: one tab at a time. */}
           <div className="grid items-start gap-3 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
             <div className={tab === "plan" ? "" : "hidden lg:block"}>
-              <PlanningPanel company={company} turn={game.turn} draft={draft} view={planning} config={rulesForTurn(config, game.turn)} onChange={onChange} />
+              <PlanningPanel company={company} turn={game.turn} draft={draft} view={planning} config={rulesForTurn(config, game.turn)} words={words} listing={listing} onChange={onChange} />
             </div>
             <div className="space-y-3">
               <div className={tab === "plan" ? "" : "hidden lg:block"}>
-                <ProjectionCard company={company} view={planning} />
+                <ProjectionCard company={company} view={planning} words={words} move={move} />
               </div>
               <div className={tab === "rivals" ? "" : "hidden lg:block"}>
                 <RivalsPanel you={resource} rivals={rivals} />
