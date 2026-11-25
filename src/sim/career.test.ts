@@ -65,9 +65,34 @@ const HARSH: CareerGameConfig = {
   },
 };
 
+/** The leader is taken in 1995, not 2010: in seed 1 the company that leads then does not win. */
+const EARLY_LEADER: CareerGameConfig = { ...CAREER_DESIGN, sim: { ...CAREER_DESIGN.sim, leaderYear: 1995 } };
+
+/** Startups found with two people and $5M, a hundred years of their salaries: rivals that sit idle. */
+const IDLE: CareerGameConfig = {
+  ...CAREER_DESIGN,
+  archetypes: { ...CAREER_DESIGN.archetypes, startup: { ...CAREER_DESIGN.archetypes.startup, headcount: 2, cash: 5_000_000 } },
+  career: {
+    ...CAREER_DESIGN.career,
+    eras: CAREER_DESIGN.career.eras.map((era, i) => (i === 0 ? { ...era, values: { ...era.values, archetypes: { startup: { cash: 5_000_000 } } } } : era)),
+  },
+};
+
+/** The dated cards that hit one company may hit any launched product, so each finds one. */
+const ANY_TARGET: CareerGameConfig = {
+  ...CAREER_DESIGN,
+  career: {
+    ...CAREER_DESIGN.career,
+    dated: CAREER_DESIGN.career.dated.map((card) => (card.target === undefined ? card : { ...card, target: { pick: "random", launched: true } })),
+  },
+};
+
 const CASES: readonly { readonly name: string; readonly seed: number; readonly config: CareerGameConfig }[] = [
   ...[1, 2, 3, 4, 5].map((seed) => ({ name: `seed ${seed}`, seed, config: CAREER_DESIGN })),
   { name: "seed 1 at four times the salaries", seed: 1, config: HARSH },
+  { name: "seed 1 with the leader taken in 1995", seed: 1, config: EARLY_LEADER },
+  { name: "seed 1 with idle rivals", seed: 1, config: IDLE },
+  { name: "seed 1 with cards that hit any launched product", seed: 1, config: ANY_TARGET },
 ];
 
 const cache = new Map<string, { readonly played: Played; readonly career: SimCareer }>();
@@ -124,6 +149,32 @@ const leaderOf = (log: TurnLog): CompanyReport | undefined =>
     .filter((report): report is CompanyReport => report !== null && report.out === null)
     .sort((a, b) => founderStake(b.equity, b.valuation) - founderStake(a.equity, a.valuation) || b.valuation - a.valuation || a.companyId - b.companyId)[0];
 
+/** Whether the leader of `sim.leaderYear`, read off that year's log, is the company that won; null with no leader. */
+const leaderHeldByHand = ({ states, logs }: Played, config: CareerGameConfig): boolean | null => {
+  const i = turnOf(config.sim.leaderYear, config.career) - 1;
+  const leader = leaderOf(logs[i]);
+  if (leader === undefined) return null;
+  const final = states[states.length - 1];
+  const winnerId = final.outcome?.winnerId ?? null;
+  return winnerId === leader.companyId && careerFacts(final, winnerId).founded === careerFacts(states[i], leader.companyId).founded;
+};
+
+/** Rivals in the game with one or two people and ten years of their salaries in cash, counted as each year opens. */
+const idleByHand = ({ states, logs }: Played, config: CareerGameConfig): number =>
+  logs.reduce((sum, log, i) => {
+    const rules = rulesForTurn(config, log.turn);
+    const opening = states[i].companies.filter(
+      (company) => company.id !== 0 && company.out === null && company.headcount >= 1 && company.headcount <= 2 && company.cash >= 10 * company.headcount * rules.salary,
+    );
+    return sum + opening.length;
+  }, 0);
+
+/** For each dated card that hits one company, whether that year's log names a target. */
+const hitsByHand = ({ logs }: Played, config: CareerGameConfig): { year: number; hit: boolean }[] =>
+  config.career.dated
+    .filter((card) => card.target !== undefined)
+    .map((card) => ({ year: card.year, hit: (logs[turnOf(card.year, config.career) - 1].event?.targetId ?? null) !== null }));
+
 it("plays a whole career with the baseline bot in the player's seat", () => {
   const career = runCareer(1, CAREER_DESIGN);
   expect(career.player).toMatchObject({ seat: 0, founded: 1, controller: "baseline" });
@@ -146,35 +197,16 @@ describe.each(CASES)("a career, $name", ({ name, seed, config }) => {
     expect(career.winnerFounded).toBe(winnerId === null ? null : careerFacts(final, winnerId).founded);
   });
 
-  it("says whether the leader of 2010 won", () => {
+  it("says whether the leader of its lead year won", () => {
     const { played, career } = both(name, seed, config);
-    const i = turnOf(config.sim.leaderYear, config.career) - 1;
-    const leader = leaderOf(played.logs[i]);
-    const final = played.states[played.states.length - 1];
-    const winnerId = final.outcome?.winnerId ?? null;
-    if (leader === undefined) {
-      expect(career.leaderHeld).toBeNull();
-      return;
-    }
-    const founded = careerFacts(played.states[i], leader.companyId).founded;
-    expect(career.leaderHeld).toBe(winnerId === leader.companyId && careerFacts(final, winnerId).founded === founded);
+    expect(career.leaderHeld).toBe(leaderHeldByHand(played, config));
   });
 
   it("records the dated cards that hit one company, the idle rivals and the checkpoint years", () => {
     const { played, career } = both(name, seed, config);
-    const targeted = config.career.dated.filter((card) => card.target !== undefined);
-    expect(targeted.length).toBeGreaterThan(0);
-    expect(career.targetedCards).toEqual(
-      targeted.map((card) => ({ year: card.year, hit: (played.logs[turnOf(card.year, config.career) - 1].event?.targetId ?? null) !== null })),
-    );
-    const idle = played.logs.reduce((sum, log, i) => {
-      const rules = rulesForTurn(config, log.turn);
-      const opening = played.states[i].companies.filter(
-        (company) => company.id !== 0 && company.out === null && company.headcount >= 1 && company.headcount <= 2 && company.cash >= 10 * company.headcount * rules.salary,
-      );
-      return sum + opening.length;
-    }, 0);
-    expect(career.idleRivalYears).toBe(idle);
+    expect(config.career.dated.some((card) => card.target !== undefined)).toBe(true);
+    expect(career.targetedCards).toEqual(hitsByHand(played, config));
+    expect(career.idleRivalYears).toBe(idleByHand(played, config));
     for (const year of config.sim.checkpointYears) {
       const i = turnOf(year, config.career) - 1;
       const log = played.logs[i];
@@ -207,6 +239,26 @@ it("the harsh career has companies going out, a rescue and a newcomer, so the st
   expect(career.companies.length).toBeGreaterThan(4);
   expect(career.companies.some((company) => company.outYear !== null)).toBe(true);
   expect(career.companies.some((company) => company.rescuedYear !== null)).toBe(true);
+});
+
+it("the built careers give each figure both its values, so the tests above can tell a wrong one", () => {
+  const byName = (name: string) => {
+    const each = CASES.find((one) => one.name === name)!;
+    return { played: both(each.name, each.seed, each.config).played, config: each.config };
+  };
+  const shipped = byName("seed 1");
+  const early = byName("seed 1 with the leader taken in 1995");
+  const idle = byName("seed 1 with idle rivals");
+  const anyTarget = byName("seed 1 with cards that hit any launched product");
+  // The leader of 2010 wins seed 1; the leader of 1995 does not.
+  expect(leaderHeldByHand(shipped.played, shipped.config)).toBe(true);
+  expect(leaderHeldByHand(early.played, early.config)).toBe(false);
+  // No rival sits idle in seed 1; with two people and $5M each, some do for years.
+  expect(idleByHand(shipped.played, shipped.config)).toBe(0);
+  expect(idleByHand(idle.played, idle.config)).toBeGreaterThan(1);
+  // The cards that hit a weak product find none in seed 1; those that hit any launched product find one.
+  expect(hitsByHand(shipped.played, shipped.config).map((card) => card.hit)).toEqual([false, false]);
+  expect(hitsByHand(anyTarget.played, anyTarget.config).map((card) => card.hit)).toEqual([true, true]);
 });
 
 // ── The summary ──
@@ -488,9 +540,11 @@ describe("the pilots", () => {
     expect(PILOT_NAMES.shiftAware).toBe("Reads the timeline");
   });
 
-  it("one waits to go public until the final year, unless it runs short of cash first", () => {
-    expect(listLastPilot(qualifiedView, CAREER_TEST)).toEqual({ ...baselinePlan(qualifiedView, CAREER_TEST), goPublic: false });
-    expect(listLastPilot(qualifiedViewShortOfCash, CAREER_TEST)).toEqual(baselinePlan(qualifiedViewShortOfCash, CAREER_TEST));
+  it("one plays as the pilot that never goes public until the final year, short of cash or not, and lists in it", () => {
+    expect(listLastPilot(qualifiedView, CAREER_TEST)).toEqual(neverListPilot(qualifiedView, CAREER_TEST));
+    // Short of cash it raises, as the pilot that never goes public does, and does not list.
+    expect(listLastPilot(qualifiedViewShortOfCash, CAREER_TEST)).toEqual(neverListPilot(qualifiedViewShortOfCash, CAREER_TEST));
+    expect(listLastPilot(qualifiedViewShortOfCash, CAREER_TEST)).toMatchObject({ goPublic: false, raisePercent: 20 });
     expect(listLastPilot(qualifiedViewIn2038, CAREER_TEST)).toEqual(baselinePlan(qualifiedViewIn2038, CAREER_TEST));
     expect(baselinePlan(qualifiedViewIn2038, CAREER_TEST).goPublic).toBe(true);
   });
@@ -593,4 +647,15 @@ it("the report speaks in years and shows every target, the three loophole pilots
   expect(text).toContain("Reads the timeline");
   expect(text).not.toMatch(/\bturn \d/i);
   expect(text.split("\n").filter((line) => /PASS|FAIL/.test(line))).toHaveLength(5);
+});
+
+it("the loophole table says, under 5,000 careers, that flags are decided on 5,000", () => {
+  const loopholes = [checkLoophole(PILOT_NAMES.neverList, passing, passing, 0.03)];
+  const header = (careers: number): string =>
+    formatCareerReport({ ...passing, careers }, [], loopholes, CAREER_DESIGN, {})
+      .split("\n")
+      .find((line) => line.startsWith("Loophole checks"))!;
+  expect(header(20)).toContain("(decided on 5,000 careers: games=5000)");
+  expect(header(4_999)).toContain("(decided on 5,000 careers: games=5000)");
+  expect(header(5_000)).not.toContain("decided on");
 });

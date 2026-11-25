@@ -286,8 +286,10 @@ export const formatCareerReport = (
   lines.push("");
 
   const overspender = PILOT_NAMES.overspend(config.sim.overspendYear);
+  // Ruling 8: a flag is decided on 5,000 careers; on fewer, two win shares move a point or two from chance.
+  const decidedOn = summary.careers < 5_000 ? " (decided on 5,000 careers: games=5000)" : "";
   lines.push(
-    `Loophole checks: the pilot in the player's seat on the same seeds, flagged above the baseline bot's wins by more than ${percent(config.sim.loopholeMargin)}`,
+    `Loophole checks: the pilot in the player's seat on the same seeds, flagged above the baseline bot's wins by more than ${percent(config.sim.loopholeMargin)}${decidedOn}`,
     row("", "wins", "baseline bot", "stake ratio", "rescued", "verdict"),
   );
   if (loopholes.length === 0) lines.push("  none run");

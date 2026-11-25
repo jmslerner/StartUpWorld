@@ -7,6 +7,9 @@ React, TypeScript, Zustand and Tailwind CSS.
 The rules, the rulings on points the design left open and the tuning log are in
 [docs/turn-based-design.md](docs/turn-based-design.md).
 
+A second mode, the career (one company from 1990 to 2038, a turn a year), has no screens yet; its rules, rulings and
+tuning log are in [docs/career-rules.md](docs/career-rules.md).
+
 ## Local setup
 
 ```bash
@@ -24,6 +27,7 @@ quarter you were planning.
 | `npm run dev` | Runs the game locally. |
 | `npm test` | Runs the unit tests: rules engine, computer players, simulator, save format and the logic behind the screens. |
 | `npm run sim` | Plays 1,000 seeded games without a screen and prints the balance report. |
+| `npm run sim:career` | Plays 1,000 seeded careers, 1990 to 2038, without a screen and prints the career's balance report. |
 | `npm run build` | Typechecks and builds for production. |
 | `npm run lint` | Runs ESLint. |
 

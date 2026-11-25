@@ -80,8 +80,9 @@ Resolution, in this order:
       salaries at the closing year's salary for the people who were on the payroll during the year and are still
       there as it ends, rounded to whole dollars. The valuation, with its listing
       premium, and the runway are then worked out again from what the rescue leaves (rulings 26 to 30).
-    - In the year after a rescue the board does not vote: its report says what it saw, with `fired: false`, and the
-      one-year projection puts the board's risk at 0. It does not predict a rescue (ruling 25).
+    - In the year after a rescue the board does not vote: its report says what it saw, with `fired: false`, unless
+      the company goes bankrupt that year, when the board is null (ruling 48); and the one-year projection puts the
+      board's risk at 0. It does not predict a rescue (ruling 25).
 13. Last company standing, then the ranking at the last turn.
     - One company left, or none, ends nothing. After the last year (turn 49, 2038) the largest founder's stake among
       the companies still in the game wins; with nobody left the outcome is `wipeout` (ruling 6).
@@ -297,8 +298,10 @@ plays the same seeds again for each pilot and measure (`src/sim/runCareer.ts`, `
 
 ## Starting numbers
 
-The career ships with `CAREER` in `src/config.ts`; `CAREER_DESIGN` in `src/config.design.ts` holds the same numbers,
-written out a second time and never tuned. Neither reads the race's numbers, so tuning one game never moves the other.
+`CAREER_DESIGN` in `src/config.design.ts` holds the numbers the career started from, never tuned, and the tables below
+show those. `CAREER` in `src/config.ts`, which ships, holds the tuned numbers: it differs from them in every number
+listed under "Numbers changed" in the Tuning log (`npm run sim:career` prints the list). Neither reads the race's
+numbers, so tuning one game never moves the other.
 Everything is per year.
 
 **Base values.** These are the race's tuned numbers read per year instead of per quarter, with the spec's own numbers
@@ -477,16 +480,19 @@ stopped at their caps; and it won on equity, never having to raise.
 
 ### What reading of C4 the career is tuned on
 
-Measured on 300 careers (seed 1) at the numbers of the end of stage 1 below, the lead figure three ways:
+Measured on 300 careers (seed 1) at the numbers of the end of stage 1 below, the lead figure three ways, with the
+lead figure at the final numbers (seed 1) beside it:
 
-| Reading | Leader of 2010 wins | Timeline reader wins | Baseline bot wins |
-|---|---|---|---|
-| Shifts switched off (the control) | 95.3% | - | - |
-| Every ceiling's `turns` 0: the cut is made once, as the year opens | 74.7% | 33.0% | 5.7% |
-| Every ceiling's `turns` 1: the ceiling holds through its year | 62.3% | 65.7% | 26.0% |
+| Reading | Leader of 2010 wins | Timeline reader wins | Baseline bot wins | Leader of 2010 wins, final numbers |
+|---|---|---|---|---|
+| Shifts switched off (the control) | 95.3% | - | - | 18.4% |
+| Every ceiling's `turns` 0: the cut is made once, as the year opens | 74.7% | 33.0% | 5.7% | 49.0% |
+| Every ceiling's `turns` 1: the ceiling holds through its year | 62.3% | 65.7% | 26.0% | 22.8% |
 
 The ceiling held for its year lowers the lead figure more, so the career keeps `turns` 1 (as the config already had
-it). As in the review's trial, that reading also leaves a player who does not read the timeline further behind: +39.7
+it). At the final numbers neither reading lowers the lead figure below the 18.4% of the control: the cut made once
+raises it by about 30 points and the ceiling held for its year by 4.4, so `turns` 1 is still the reading that leaves
+the leader of 2010 the least. As in the review's trial, that reading also leaves a player who does not read the timeline further behind: +39.7
 points of wins for the timeline reader, against +27.3 with the cut made once.
 
 ### Numbers changed
@@ -512,11 +518,13 @@ In the order `npm run sim:career` lists them. Where several eras moved the same 
 | `career.eras.agents.values.salary` | 220K | 365K | The agents era is the one where small teams build fast; at this salary a large team that cannot raise (public, or private at 4 a user) runs out of cash. It is where most rescues and second failures come, and the number that sets how often the bot's career ends early (stages 1 and 4). |
 | `career.dated.*.effects.1.turns` (the four shifts' waves) | 3 | 5 | Stage 2: of the shift numbers, the length of the wave moved the lead figure most for one number per card (62.3% to 49.0% on the stage-1 numbers). |
 | `career.dated.cloud-outage.target.qualityBelow` | 50 | 87 | It found a target in no career: every product is above 85 by 2011. At 87 it finds one in about two careers in three. |
-| `career.dated.home-helper-recall.target.qualityBelow` | 60 | 101 | It found a target in no career: products are rebuilt to 100 the year after the 2033 shift, and the target is chosen on the quality the year opens with. At 100 it found one in 29 to 41%; 101 lets it fall on any launched product. Its text says a weak product takes the blame; the screens plan may want to word it for any product. |
+| `career.dated.home-helper-recall.target.qualityBelow` | 60 | 101 | It found a target in no career: products are rebuilt to 100 the year after the 2033 shift, and the target is chosen on the quality the year opens with. At 100 it found one in 29 to 41%. A `qualityBelow` of 101 does not tune the card's condition but removes it: every launched product is below 101, so the card falls on any launched product with users. |
+| `career.dated.home-helper-recall.text` | "… and a weak product in the market takes the blame." | "… and the scare costs one product in the market a fifth of its users." | Not a number, but `npm run sim:career` lists it with them. With its condition removed (above), the card no longer picks out a weak product, so its text was changed in `CAREER` to say only what is so of whatever product it hits. `CAREER_DESIGN` keeps the starting text. |
 
 `cpu.ipo`, `cpu.ipoPushLayoffs`, `listing.hype`, `sim.overspendYear` and every other number are as they started: no
 computer player laid anyone off to qualify for a listing (100 careers checked on the final numbers: 29 years of pushing for a profitable year at the bar, no layoffs), the pilot that lists in the final year
-is not flagged at listing.hype 20, and the overspending pilot is rescued in every career.
+(raising privately until then, and listing in 2038 when it may) is not flagged at listing.hype 20 (5,000 careers: 9.5%
+of wins against the bot's 29.0%), and the overspending pilot is rescued in every career.
 
 ### The five batches
 
@@ -532,8 +540,10 @@ is not flagged at listing.hype 20, and the overspending pilot is rescued in ever
 
 And 5,000 careers from seed 200001 (`games=5000 seed=200001`), where a flag is decided: all five targets PASS
 (Bootstrapper 26.78%, bot 28.98%, ends early 18.18%, goes public 63.82%, leader of 2010 23.4% with 18.1% shifts off),
-and no pilot is flagged: never goes public 0.4% (rescued 69.9%), goes public in the final year 14.1% (rescued 81.2%),
-overspends from 1993 0.0% (rescued 100%), against the bot's 29.0%.
+and no pilot is flagged: never goes public 0.4% (rescued 69.9%), goes public in the final year 9.5% (rescued 69.9%,
+median stake x0.74 of the bot's; it listed in 2038 in 54.2% of careers and never in the rest), overspends from 1993
+0.0% (rescued 100%), against the bot's 29.0%. Waiting to list until the last year, raising privately until then, is
+no loophole at these numbers: the pilot wins about a third as often as the bot, with a smaller median stake.
 
 ### What the balance rests on
 

@@ -9,7 +9,6 @@ import { heldCeiling, listingOf, peopleCap, rulesForTurn, upcomingShift, yearOf 
 import { founderStake, poachFloor, raiseAmount, valuationOf } from "../engine/formulas";
 import { projectTurn } from "../engine/project";
 import type { CompanyView, Plan, PriceTier } from "../engine/types";
-import { companyRunway } from "../engine/view";
 import type { Pilot } from "./runCareer";
 
 /** The names the report gives the pilots. The script and the tests both take them from here. */
@@ -61,15 +60,11 @@ export const neverListPilot: Pilot = (view, config) => {
   return { ...plan, goPublic: false };
 };
 
-/** Waits to go public until the final year, or until a year it opens with less than `baseline.raiseRunway` years of cash. */
-export const listLastPilot: Pilot = (view, config) => {
-  const base = baselinePlan(view, config);
-  if (base.goPublic !== true || finalYear(view, config)) return base;
-  const rules = rulesForTurn(config, view.turn);
-  const runway = companyRunway(view.self, rules);
-  if (runway !== null && runway < rules.baseline.raiseRunway) return base;
-  return neverListPilot(view, config);
-};
+/**
+ * Goes public in the final year: until then it plans as the pilot that never goes public, raising when short of cash,
+ * and in the final year it is the baseline bot, which lists if the rules let it.
+ */
+export const listLastPilot: Pilot = (view, config) => (finalYear(view, config) ? baselinePlan(view, config) : neverListPilot(view, config));
 
 /**
  * In the final year it plays for its stake alone: of its own price or Budget, and of marketing at nothing, a quarter,

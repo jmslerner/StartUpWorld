@@ -293,8 +293,9 @@ export const CONFIG: GameConfig = {
 };
 
 // ── The career ──
-// The second game: one company from 1990 to 2038, a turn a year. Its rules are in docs/career-rules.md, and the
-// starting numbers below, with where each group came from, under "Starting numbers" there. Each era's `values` are
+// The second game: one company from 1990 to 2038, a turn a year. Its rules are in docs/career-rules.md; the numbers
+// below are the tuned ones. Their starting values, and where each group came from, are under "Starting numbers"
+// there (and in CAREER_DESIGN, src/config.design.ts); what tuning changed, under "Tuning log". Each era's `values` are
 // laid over the numbers above them for the era's years; whatever an era leaves out keeps the value above. Nothing
 // here is read from the race's CONFIG: tuning one game never moves the other.
 
@@ -1304,7 +1305,7 @@ export const CAREER: CareerGameConfig = {
         id: "home-helper-recall",
         year: 2035,
         name: "Home-helper recall",
-        text: "A home-robot model is recalled after a software fault, and a weak product in the market takes the blame.",
+        text: "A home-robot model is recalled after a software fault, and the scare costs one product in the market a fifth of its users.",
         target: { pick: "random", launched: true, qualityBelow: 101, minUsers: 1 },
         effects: [
           { kind: "targetUsers", fraction: 0.2 },
