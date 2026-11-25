@@ -1,9 +1,10 @@
 # StartUpWorld: the career game, in 3D
 
-Status: draft for the owner's approval. Nothing in this document is built yet.
+Status: approved by the owner on 25 November 2026, as written. Nothing in this document is built yet; the build
+plans are in `docs/superpowers/plans/`.
 
-Items marked **(owner)** were decided by the owner. Items marked **(proposal)** are the implementer's calls: each
-says why, and each can be changed before building starts. Section 16 lists the proposals that most need a yes or no.
+Items marked **(owner)** were decided by the owner. Items marked **(proposal)** were the implementer's calls, each
+with its reason; the owner approved them with the document. Section 16 lists the ones that most needed a yes or no.
 
 ## 1. What this is, and why
 
@@ -439,7 +440,7 @@ Five steps, each leaving something that works and is tested. **(proposal)**
 In size this is about as much work as everything built so far. It continues on the same branch and draft pull
 request unless the owner would rather merge the finished race first.
 
-## 16. Proposals that need the owner's yes
+## 16. Proposals that needed the owner's yes (all approved)
 
 1. The new rules that are proposals: an era may set any number (C2); crashes and booms that reach every company
    (C3); a platform shift as a ceiling on quality (C4); what a rescue costs, including control of the board (C7); who
