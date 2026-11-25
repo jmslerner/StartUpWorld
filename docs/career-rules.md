@@ -370,3 +370,213 @@ texts follow the research notes with the fact-check's corrections; a comment bes
 | one weak product loses F of its users and H hype | `target: { pick: "random", launched: true, qualityBelow: 50, minUsers: 1 }` (60 for 2035) with `targetUsers` F and `targetHype` −H |
 
 ## Tuning log
+
+Task 17 tuned `CAREER` to the five targets. Only numbers moved: no rule, no computer player's logic. Trials were tried
+with `set=` on 300 careers (some on 1,000) before a number was kept; the trial-by-trial record is in the task's report.
+
+### Where the starting numbers stood
+
+`npm run sim:career`, 1,000 careers from seed 1, on the starting numbers. The lead figure here (100.0%, and 99.8% with
+the shifts switched off) is the first measurement of C4.
+
+```
+Career simulation: 1,000 careers, 1990 to 2038
+
+Who wins, by the style the winner plays
+                                                      wins  the 1990 one     newcomers
+  Baseline bot                                      100.0%        100.0%             -
+  Blitzscaler                                         0.0%          0.0%          0.0%
+  Bootstrapper                                        0.0%          0.0%          0.0%
+  Incumbent                                           0.0%          0.0%          0.0%
+  Won by a newcomer, in all                           0.0%
+
+The baseline bot's career
+  Ends early (out for good)                           0.0%      median -
+  Rescued                                             0.0%
+  Goes public                                       100.0%   median 2005
+  Median founder's stake, 2038                      $2.40B
+
+Leads
+  The leader of 2010 wins                           100.0%
+    with the platform shifts switched off            99.8%
+
+Rivals
+  Out, per career                                     0.00
+  Years spent doing nothing, per career               0.00
+
+Typical position as the year closes (medians of companies in the game)
+                                                 companies        public         users          cash          team       quality     founder's
+  1995 Baseline bot                                   1.00          0.0%         53.4K         $529K             7            30         80.0%
+  1995 Blitzscaler                                    1.00          0.0%        100.5K        $4.75M             5            30         34.3%
+  1995 Bootstrapper                                   1.00          0.0%         64.2K        $2.01M             5            30        100.0%
+  1995 Incumbent                                      1.00        100.0%        148.9K        $3.28M            11            30         48.0%
+  2000 Baseline bot                                   1.00         30.5%        336.1K        $6.80M            25            79         80.0%
+  2000 Blitzscaler                                    1.00        100.0%        670.0K       $51.97M            12            70         19.2%
+  2000 Bootstrapper                                   1.00         13.1%        307.6K       $14.98M             9            86        100.0%
+  2000 Incumbent                                      1.00        100.0%        502.2K       $14.39M            14            84         48.0%
+  2010 Baseline bot                                   1.00        100.0%         3.12M      $138.14M            93           100         64.0%
+  2010 Blitzscaler                                    1.00        100.0%         2.93M      $110.59M            20            89         19.2%
+  2010 Bootstrapper                                   1.00         17.2%         1.16M       $89.76M            14            94        100.0%
+  2010 Incumbent                                      1.00        100.0%         1.59M       $67.66M            23            92         48.0%
+  2020 Baseline bot                                   1.00        100.0%         6.67M      $597.23M           150           100         64.0%
+  2020 Blitzscaler                                    1.00        100.0%         9.07M      $288.40M            49            93         19.2%
+  2020 Bootstrapper                                   1.00         77.8%         3.31M      $331.91M            25            95         80.0%
+  2020 Incumbent                                      1.00        100.0%         4.11M      $196.36M            36            94         48.0%
+  2030 Baseline bot                                   1.00        100.0%        12.50M        $1.44B           150           100         64.0%
+  2030 Blitzscaler                                    1.00        100.0%        17.50M      $970.04M            47            94         19.2%
+  2030 Bootstrapper                                   1.00        100.0%         5.95M      $885.48M            25           100         80.0%
+  2030 Incumbent                                      1.00        100.0%         7.60M      $495.40M            48            94         48.0%
+  2038 Baseline bot                                   1.00        100.0%        24.95M        $2.93B           150           100         64.0%
+  2038 Blitzscaler                                    1.00        100.0%        32.99M        $2.01B            58           100         19.2%
+  2038 Bootstrapper                                   1.00        100.0%         9.63M        $1.65B            30            95         80.0%
+  2038 Incumbent                                      1.00        100.0%        12.14M      $895.32M            56            94         48.0%
+
+Dated cards that hit one company
+                                                 found one
+  2011                                                0.0%
+  2035                                                0.0%
+
+Loophole checks: the pilot in the player's seat on the same seeds, flagged above the baseline bot's wins by more than 3.0%
+                                                      wins  baseline bot   stake ratio       rescued       verdict
+  Never goes public                                 100.0%        100.0%         x1.00          0.0%   not flagged
+  Goes public in the final year                     100.0%        100.0%         x1.20          0.0%   not flagged
+  Overspends from 1993 until rescued                  0.0%        100.0%         x0.40        100.0%   not flagged
+
+What the final year alone is worth
+                                                      wins  baseline bot  median stake  baseline bot
+  Spends everything in the final year               100.0%        100.0%        $2.54B        $2.40B
+
+What reading the timeline is worth
+                                                      wins  baseline bot  median stake  baseline bot
+  Reads the timeline                                100.0%        100.0%        $2.56B        $2.40B
+
+Targets
+  PASS  No CPU type wins more than 40.0%                     highest: Blitzscaler 0.0% (1990 company 0.0%)
+  FAIL  Baseline bot wins 15.0% to 35.0%                     100.0%
+  FAIL  Baseline bot's career ends early in 10.0% to 30.0%   0.0%
+  FAIL  Baseline bot goes public in 40.0% to 80.0%           100.0%
+  FAIL  The leader of 2010 wins in less than 60.0%           100.0%
+
+Seeds 1 to 1000, seven batches, 211.9s:
+  Baseline bot                                     27.4s
+  Never goes public                                26.3s
+  Goes public in the final year                    29.0s
+  Overspends from 1993 until rescued               28.2s
+  Baseline bot, platform shifts switched off       33.3s
+  Spends everything in the final year              34.8s
+  Reads the timeline                               32.8s
+
+Numbers changed from the design's starting values: none.
+```
+
+Every career looked the same: every company was profitable from the 1990s on, because users brought in far more than
+people cost (in 2010 a user brought $12 a year, against about $3 of salaries per user held), and a
+raise or a listing at the era's valuation brought years of costs at once. Nobody ever ran short, so nobody failed; the
+baseline bot, with no team cap, hired every candidate it could and ran to 150 people by 2020 while the computer players
+stopped at their caps; and it won on equity, never having to raise.
+
+### What reading of C4 the career is tuned on
+
+Measured on 300 careers (seed 1) at the numbers of the end of stage 1 below, the lead figure three ways:
+
+| Reading | Leader of 2010 wins | Timeline reader wins | Baseline bot wins |
+|---|---|---|---|
+| Shifts switched off (the control) | 95.3% | - | - |
+| Every ceiling's `turns` 0: the cut is made once, as the year opens | 74.7% | 33.0% | 5.7% |
+| Every ceiling's `turns` 1: the ceiling holds through its year | 62.3% | 65.7% | 26.0% |
+
+The ceiling held for its year lowers the lead figure more, so the career keeps `turns` 1 (as the config already had
+it). As in the review's trial, that reading also leaves a player who does not read the timeline further behind: +39.7
+points of wins for the timeline reader, against +27.3 with the cut made once.
+
+### Numbers changed
+
+In the order `npm run sim:career` lists them. Where several eras moved the same number, they are on one line.
+
+| Number | Start | Now | Why |
+|---|---|---|---|
+| `archetypes.incumbent.founderEquity` | 0.6 | 0.9 | The Incumbent never won (its median stake in 2038 was a third of the others'). With more of itself it leads in 2010 in every career (1,000 of 1,000 on seed 1) and then wins in about a fifth (stage 4). |
+| `archetypes.incumbent.workExponent` | 0.625 | 0.78 | Less coordination drag: at 0.625 the Incumbent stalled near 30 people and 6M users; at 0.78 it grows to 66 people and 15M users by 2038 (stage 4). |
+| `hiring.candidatesPerTurn` (base, and each era: dial-up 4 → 2, gold rush 6 → 4, bust 9 → 5, phones 8 → 5, cheap money 16 → 10, winter 12 → 7, agents 4 → 2, ambient 16 → 10) | 4 | 2 | About 0.6 of the start, so that candidates are scarce and handed round between every company that wants one: the head counts level out (2020: bot 56, Blitzscaler 33, Bootstrapper 41, Incumbent 50, against 150, 49, 25, 36) (stage 1). |
+| `priceTiers` (base, and each era sets its own: budget / standard / premium, dial-up 5.44 / 8.16 / 13.6, gold rush 3.6 / 5.4 / 9, bust 2.8 / 4.2 / 7, phones 1.6 / 2.4 / 4, cheap money and winter 1.44 / 2.16 / 3.6, agents 1.2 / 1.8 / 3, ambient 1.12 / 1.68 / 2.8) | 8 / 12 / 20 | 5.44 / 8.16 / 13.6 | Revenue per user falls era by era as the market grows (x0.68 of the start in the first era, x0.14 in the last), so that a company's people cost about what its users bring and growth has to be paid for. Each era keeps the three tiers' ratios (stage 1). |
+| `raise.cooldownTurns` | 1 | 2 | The Blitzscaler raises 30% whenever it may until it lists; with a year's wait it lists owning 27.4% instead of 19.2%, enough to win some careers (stage 4). |
+| `valuation.perUser` (base, and each era: dial-up 40 → 27, gold rush 200 → 90, bust 50 → 18, phones 80 → 16, cheap money 130 → 23, winter 100 → 18, agents 60 → 4, ambient 80 → 11) | 40 | 27 | Scaled with each era's price, keeping each era's multiple of a year's revenue, so that a raise or a listing buys a year or two of costs, not ten (stage 1). The agents era's 4 (stage 3) makes a private company unable to raise its way through that era's costs, so staying private is no shelter there. |
+| `board.runwayTurns` | 1 | 2 | The board looks harder at a company short of cash: a rescued bot (whose board the investors control) is fired more often in the lean years after, which is what makes a career end early (stage 4). |
+| `cpu.recruiters.shares` | 0.1, 0.2 | 0.2, 0.3 | The computer players weigh sending a fifth or three tenths of their people to recruit, so that they grow their teams as the bot does (stage 1). |
+| `cpu.teamGrowthShare` | 0.5 | 1 | The same: a computer player values a larger team twice as much as before (stage 1). |
+| `cpu.personalities.*.teamCap` (base and each era; Blitzscaler / Bootstrapper / Incumbent) | 8 / 6 / 12 | 12 / 11 / 18 | Every era's caps x1.5 for the Blitzscaler and the Incumbent (stage 1) and about x2 for the Bootstrapper (stage 4), still below the other two in every era: dial-up 12 / 11 / 18, gold rush and bust 22 / 18 / 30, phones 38 / 27 / 52, cheap money and winter 75 / 49 / 105, agents 45 / 29 / 60, ambient 90 / 58 / 135. Larger teams level the head counts; the larger Bootstrapper brings its stake level with the Blitzscaler's. |
+| `career.eras.*.values.priceTiers` | (not there) | added | See `priceTiers` above. |
+| `career.eras.bust.values.ipo.users` | 800K | 1.2M | Listing (stage 3): the bot used to qualify in every career as the bust closed. Now only the Incumbent and the Blitzscaler reach the bars of the first two eras, and the bot lists in the phones era or not at all. |
+| `career.eras.phones.values.ipo.users` | 1.5M | 2.3M | The bar that decides whether the bot lists: its users as the phones era closes lie in a narrow band (2013, seed 1: 2.14M to 2.68M for the middle 60%), and 2.3M puts it inside, so it lists in about two careers in three. |
+| `career.eras.cheap-money` / `winter-ai` / `agents` / `ambient` `.values.ipo.users` | 3M / 4M / 5M / 8M | 6M / 8M / 10M / 25M | Out of the bot's reach after the phones era (a few still reach them), so that listing stays a mid-career decision. |
+| `career.eras.agents.values.salary` | 220K | 365K | The agents era is the one where small teams build fast; at this salary a large team that cannot raise (public, or private at 4 a user) runs out of cash. It is where most rescues and second failures come, and the number that sets how often the bot's career ends early (stages 1 and 4). |
+| `career.dated.*.effects.1.turns` (the four shifts' waves) | 3 | 5 | Stage 2: of the shift numbers, the length of the wave moved the lead figure most for one number per card (62.3% to 49.0% on the stage-1 numbers). |
+| `career.dated.cloud-outage.target.qualityBelow` | 50 | 87 | It found a target in no career: every product is above 85 by 2011. At 87 it finds one in about two careers in three. |
+| `career.dated.home-helper-recall.target.qualityBelow` | 60 | 101 | It found a target in no career: products are rebuilt to 100 the year after the 2033 shift, and the target is chosen on the quality the year opens with. At 100 it found one in 29 to 41%; 101 lets it fall on any launched product. Its text says a weak product takes the blame; the screens plan may want to word it for any product. |
+
+`cpu.ipo`, `cpu.ipoPushLayoffs`, `listing.hype`, `sim.overspendYear` and every other number are as they started: no
+computer player laid anyone off to qualify for a listing (100 careers checked on the final numbers: 29 years of pushing for a profitable year at the bar, no layoffs), the pilot that lists in the final year
+is not flagged at listing.hype 20, and the overspending pilot is rescued in every career.
+
+### The five batches
+
+`npm run sim:career` with each seed, 1,000 careers. The lead figure is given with the shifts switched off beside it.
+
+| Seed | No CPU type over 40% | Bot wins 15 to 35% | Ends early 10 to 30% | Goes public 40 to 80% | Leader of 2010 under 60% (shifts off) | Flags |
+|---|---|---|---|---|---|---|
+| 1 | PASS, Bootstrapper 30.0% | PASS, 28.1% | PASS, 18.9% | PASS, 62.7% | PASS, 22.8% (18.4%) | none |
+| 100001 | PASS, Bootstrapper 27.2% | PASS, 30.7% | PASS, 15.7% | PASS, 66.1% | PASS, 23.3% (20.0%) | none |
+| 110001 | PASS, Bootstrapper 27.4% | PASS, 27.3% | PASS, 17.7% | PASS, 64.1% | PASS, 23.3% (18.3%) | none |
+| 120001 | PASS, Bootstrapper 29.1% | PASS, 30.9% | PASS, 16.9% | PASS, 66.0% | PASS, 21.8% (17.9%) | none |
+| 130001 | PASS, Bootstrapper 27.1% | PASS, 30.5% | PASS, 16.3% | PASS, 67.1% | PASS, 22.7% (19.0%) | none |
+
+And 5,000 careers from seed 200001 (`games=5000 seed=200001`), where a flag is decided: all five targets PASS
+(Bootstrapper 26.78%, bot 28.98%, ends early 18.18%, goes public 63.82%, leader of 2010 23.4% with 18.1% shifts off),
+and no pilot is flagged: never goes public 0.4% (rescued 69.9%), goes public in the final year 14.1% (rescued 81.2%),
+overspends from 1993 0.0% (rescued 100%), against the bot's 29.0%.
+
+### What the balance rests on
+
+- **Who wins** is decided by stakes that are alike from career to career: equity x users x (1 + hype) x the premium of
+  a listing. In 2038 (seed 1, medians) the bot holds 21.8M users at 32% (64% when it has not been rescued), the
+  Blitzscaler 35.8M at 27.4%, the Bootstrapper 13.7M at 100% (80% once listed), the Incumbent 15.1M at 72%. Each
+  style's share of wins leans on one habit: the Blitzscaler's on raising only every other year until it lists
+  (`raise.cooldownTurns`), the Bootstrapper's on keeping its equity and its larger caps, the Incumbent's on its
+  starting equity and its lighter coordination drag.
+- **The bot's wins and its early ends** both lean on the agents era (2027 to 2032): a large team at 365K a head, with
+  no raise to be had, runs out. The bot is rescued in about two careers in three (most in 2030 to 2032), and a
+  rescued bot, at half its stake, rarely wins. The bot wins when it gets through the agents era whole; it ends early
+  when its board (investors' since the rescue, and stricter at `board.runwayTurns` 2) fires it (151 of the 189 early
+  ends on seed 1) or it runs out again (38).
+- **Listing** leans on one bar, the phones era's, against the bot's users as that era closes.
+- **The lead target** leans on the Incumbent: it leads in 2010 in every career and goes on to win in about a fifth. **The platform shifts are not what overturns leads**: with them the leader of 2010 wins 22.8%, switched off
+  18.4% (seed 1; the other batches give the same picture). The shifts help the leader a little; how is not
+  pinned down (the Incumbent's catch-up bonus and its larger team after each cut are the likely means). With the stage-2 numbers on the stage-1 career the shifts had lowered
+  the figure from 95.3% to 49.0%; the balance of stage 4 moved the lead to the Incumbent, and no shift number tried
+  afterwards (waves for 3 years again, ceilings 20 or 50) brought the figure with shifts five points under the figure
+  without.
+
+- **Two measures** (5,000 careers, seed 200001): the pilot that plays the final year for its stake alone wins 29.6%
+  against the bot's 29.0% (median stake x1.04), so the final year alone decides little; the pilot that reads the
+  timeline wins 58.1% (median stake x1.95), so a player who does not read the announced shifts gives up a great
+  deal. In 2038 the rivals own, as medians, 27.4% of themselves (Blitzscaler), 100% (Bootstrapper; 80% once it
+  lists, which it does in under half of careers) and 72% (Incumbent).
+
+### What was tried and did not work
+
+- Cutting prices alone (by half, by three quarters, era by era): every company stayed rich, because raises and
+  listings are priced off valuations, not revenue.
+- Raising every CPU team cap three-fold alone: the leader of 2010 changed, the bot still won on equity.
+- `hiring.capacityPerWork` lowered (to 1 or 1.5): it starved the computer players, who recruit with one or two people,
+  far more than the bot, which recruits with a fifth of its team.
+- A smooth price curve, price following salary and deflated a few percent a year: every career profitable again.
+- More noise in the computer players' choices (`cpu.noise` 0.3 or 1): the Incumbent failed often, which only helped
+  the bot.
+- Harsher random cards and a card every year: the careers' spread barely widened.
+- `quality.decay` 10: no startup builds a product worth launching in the first era.
+- Larger waves (x1.6) or deeper ceilings (20, 10) in stage 2: lower lead figures, but each also kept the bot alive
+  through the agents era and so tilted the wins towards it.
+- `board.fireChance` 0.5 or 0.6: hardly more early ends, since few of a rescued bot's later years look bad to a board
+  that reads a year of runway.
+- `rescue.salaryYears` 0.5 passed all five targets, but C7 itself says the rescue resets cash to one year of salaries,
+  so it was left at 1.

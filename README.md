@@ -56,6 +56,31 @@ does. An argument it does not know, or a `set=` path that is not in the config, 
 To add an event, add a card to `events.deck` in `src/config.ts`, built from the effects listed under `EventEffect` in
 `src/engine/types.ts`. It needs no code, and `npm run sim` lists it as added.
 
+### The career
+
+The career's numbers are `CAREER` in `src/config.ts`, apart from the race's: the base values first, then each era's
+`values`, laid over the base for that era's years, then the dated cards, the offices and the numbers of the career's own
+rules (listing, rescue, replacement, moving). `CAREER_DESIGN` in `src/config.design.ts` is the career's frozen starting
+numbers; leave it as it is. The career's five targets are in `CAREER.sim.targets`.
+
+```bash
+npm run sim:career                                             # 1,000 careers, 1990 to 2038
+npm run sim:career -- games=300 seed=5001                      # a different batch
+npm run sim:career -- set=career.eras.6.values.salary=300000   # one era's number, for this run only
+npm run sim:career -- strict=1                                 # exit with code 1 if a target fails
+```
+
+The baseline bot plays the player's seat against the three computer players and the newcomers that take the seats of
+rivals that go out. The same seeds are then played again by three loophole pilots and for three measures (the shifts
+switched off, the final year played for the stake alone, the timeline read ahead), and the report ends with the five
+targets and every number that differs from `CAREER_DESIGN`. 1,000 careers take a few minutes.
+
+`set=` can be given more than once. A number that every era sets is set per era, not at the base:
+`set=career.eras.<n>.values.<path>=<value>`, with `<n>` counted from 0 for the first era. An era may be given a number
+it does not set yet. A dated card is `career.dated.<n>`, counted from 0 in the order of the cards. Note each change and
+its reason in the Tuning log in `docs/career-rules.md`. A target is read on batches of 1,000 careers; whether a loophole
+pilot is flagged is decided on 5,000 (`games=5000`).
+
 ## Structure
 
 ```
