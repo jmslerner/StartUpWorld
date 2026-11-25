@@ -1,9 +1,11 @@
 // A new game: every company at its archetype's starting state, turn 1, no event.
-// With a career's config each company also gets its career facts, and the state its wave of new users.
+// With a career's config each company also gets its career facts, the state its wave of new users, and the first
+// year's dated card, if it has one, is dealt with the game.
 
 import { CONFIG } from "../config";
-import { officeFor } from "./career";
-import type { Company, GameSetup, GameState, RulesConfig } from "./types";
+import { datedCardFor, officeFor } from "./career";
+import { applyEvent } from "./events";
+import type { ActiveEvent, Company, GameSetup, GameState, RulesConfig } from "./types";
 
 export const createGame = (setup: GameSetup, config: RulesConfig = CONFIG): GameState => {
   if (setup.seats.length < 2) throw new Error("A game needs at least two companies.");
@@ -61,6 +63,13 @@ export const createGame = (setup: GameSetup, config: RulesConfig = CONFIG): Game
     modifiers: { newUsers: 1, marketing: 1, extraCandidates: 0 },
     outcome: null,
   };
+  if (career === undefined) return state;
   // The same for the state's wave of new users: at rest until a platform shift sets one off.
-  return career === undefined ? state : { ...state, wave: { multiplier: 1, turnsLeft: 0 } };
+  const started: GameState = { ...state, wave: { multiplier: 1, turnsLeft: 0 } };
+  const card = datedCardFor(1, config);
+  if (card === null) return started;
+  // There is no seed to pick a target with yet, so the first year's card hits no one company.
+  const event: ActiveEvent = { cardId: card.id, targetId: null };
+  const dealt = applyEvent(started, event, config);
+  return { ...started, companies: dealt.companies, carryOverUsers: dealt.carryOverUsers, climate: dealt.climate, event, modifiers: dealt.modifiers };
 };

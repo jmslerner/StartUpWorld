@@ -1,7 +1,7 @@
 // The career's own rules, as pure functions. They apply only to a config that has a `career` block; the race's
 // config has none. The rules are recorded in docs/career-rules.md.
 
-import type { CareerRules, RulesConfig } from "./types";
+import type { CareerRules, DatedCard, RulesConfig } from "./types";
 
 /** The calendar year a turn is played in: turn 1 is the career's first year. */
 export const yearOf = (turn: number, career: CareerRules): number => career.firstYear + turn - 1;
@@ -61,6 +61,14 @@ export const marketTurn = (config: RulesConfig, turn: number): number => {
   const career = config.career;
   if (career === undefined) return turn;
   return yearOf(turn, career) - career.eras[eraIndexOf(turn, career)].firstYear + 1;
+};
+
+/** The card dated to a turn's year, or null: always null without a career. */
+export const datedCardFor = (turn: number, config: RulesConfig): DatedCard | null => {
+  const career = config.career;
+  if (career === undefined) return null;
+  const year = yearOf(turn, career);
+  return career.dated.find((card) => card.year === year) ?? null;
 };
 
 /** The office for a team of this size: the smallest that holds it, or the last one when none does. */

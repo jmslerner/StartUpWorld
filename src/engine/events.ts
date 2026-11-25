@@ -2,7 +2,7 @@
 // An event is drawn at the end of one turn for the next, and its instant effects are applied
 // straight away, so the state a turn starts from already shows it.
 
-import { rulesForTurn } from "./career";
+import { datedCardFor, rulesForTurn } from "./career";
 import { clamp, round4 } from "./formulas";
 import { STREAM, firstFloat, nextIntInclusive, pickWeightedIndex, streamSeed } from "./rng";
 import type { ActiveEvent, Climate, Company, CompanyId, EventCard, RulesConfig, TargetRule, TurnModifiers } from "./types";
@@ -17,9 +17,9 @@ export interface EventContext {
   readonly carryOverUsers: number;
 }
 
-/** A card by id: in the config's deck, or in the deck of any of a career's eras. */
-export const findCard = (cardId: string, config: RulesConfig): EventCard | undefined =>
-  [config.events.deck, ...(config.career?.eras ?? []).map((era) => era.values.events?.deck ?? [])]
+/** A card by id: in the config's deck, in the deck of any of a career's eras, or among a career's dated cards. */
+export const findCard = (cardId: string, config: RulesConfig): Omit<EventCard, "weight"> | undefined =>
+  [config.events.deck, ...(config.career?.eras ?? []).map((era) => era.values.events?.deck ?? []), config.career?.dated ?? []]
     .flat()
     .find((card) => card.id === cardId);
 
@@ -36,8 +36,27 @@ export const eligibleTargets = (rule: TargetRule, companies: readonly Company[])
     )
     .map((company) => company.id);
 
-/** The event for `turn`, or null, drawn on that turn's numbers. Cards with no valid target are left out of the draw. */
+/** The company a card hits, picked by its target rule from those that qualify; null when it needs none or none qualifies. */
+const targetOf = (card: Omit<EventCard, "weight">, companies: readonly Company[], turn: number, seed: number): CompanyId | null => {
+  if (card.target === undefined) return null;
+  let candidates = eligibleTargets(card.target, companies);
+  if (candidates.length === 0) return null;
+  if (card.target.pick === "highestQuality") {
+    const best = Math.max(...candidates.map((id) => companies[id].quality));
+    candidates = candidates.filter((id) => companies[id].quality === best);
+  }
+  const index = nextIntInclusive(streamSeed(seed, turn, STREAM.eventTarget), 0, candidates.length - 1).value;
+  return candidates[index];
+};
+
+/**
+ * The event for `turn`, or null. A card dated to the turn's year is always the event, without a roll. Otherwise the
+ * card is drawn on that turn's numbers, leaving out cards with no valid target.
+ */
 export const drawEvent = (companies: readonly Company[], turn: number, seed: number, config: RulesConfig): ActiveEvent | null => {
+  const dated = datedCardFor(turn, config);
+  if (dated !== null) return { cardId: dated.id, targetId: targetOf(dated, companies, turn, seed) };
+
   const { events } = rulesForTurn(config, turn);
   if (turn < events.firstTurn) return null;
   if (firstFloat(seed, turn, STREAM.eventRoll) >= events.chance) return null;
@@ -49,15 +68,7 @@ export const drawEvent = (companies: readonly Company[], turn: number, seed: num
   ).value;
   if (picked === null) return null;
   const card = playable[picked];
-  if (card.target === undefined) return { cardId: card.id, targetId: null };
-
-  let candidates = eligibleTargets(card.target, companies);
-  if (card.target.pick === "highestQuality") {
-    const best = Math.max(...candidates.map((id) => companies[id].quality));
-    candidates = candidates.filter((id) => companies[id].quality === best);
-  }
-  const index = nextIntInclusive(streamSeed(seed, turn, STREAM.eventTarget), 0, candidates.length - 1).value;
-  return { cardId: card.id, targetId: candidates[index] };
+  return { cardId: card.id, targetId: targetOf(card, companies, turn, seed) };
 };
 
 /** Apply a card's effects. Users a company loses join the pool, so users stay conserved. */

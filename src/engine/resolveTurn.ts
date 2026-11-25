@@ -297,7 +297,9 @@ export const resolveTurn = (state: GameState, plans: PlanSet, seed: number, conf
 
   // 8. Hiring: one candidate at a time in hype order.
   const laidOff = desks.reduce((sum, desk) => sum + desk.plan.layoffs, 0);
-  const candidates = rules.hiring.candidatesPerTurn + state.modifiers.extraCandidates + state.freedPeople + laidOff;
+  const offered = rules.hiring.candidatesPerTurn + state.modifiers.extraCandidates + state.freedPeople + laidOff;
+  // In a career a card that takes candidates away can leave none on the market, never fewer.
+  const candidates = rules.career === undefined ? offered : Math.max(0, offered);
   for (const desk of desks) {
     desk.capacity = hiringCapacity(desk.recruitingWork, rules);
     desk.wanted = Math.min(desk.capacity, desk.plan.hireLimit ?? desk.capacity);

@@ -14,6 +14,8 @@ what the career changes there; a step with no line is played as in the race.
 Before planning, already part of the state a year starts from:
 
 - The year's card is revealed and its instant effects are applied.
+  - A card dated to the year is the year's card, whatever the dice say (ruling 8). The first year's card is dealt
+    with the game, and hits no one company (ruling 9).
 
 Resolution, in this order:
 
@@ -27,6 +29,7 @@ Resolution, in this order:
    - The year's new users follow its era's curve, counted from the era's first year (ruling 4).
 7. Poach attempts, in hype order.
 8. Hiring, one candidate at a time in hype order.
+   - Candidates on the market are never fewer than none (ruling 11).
 9. Revenue and costs.
 10. Hype.
 11. IPO check.
@@ -37,6 +40,8 @@ Resolution, in this order:
       the companies still in the game wins; with nobody left the outcome is `wipeout` (ruling 6).
 14. The funding climate ticks down and next year's card is drawn.
     - The card is drawn from next year's numbers, so a new era's deck is in play from its first year.
+    - A card dated to next year replaces the draw, without a roll; its target is picked as for a random card, and when
+      no company qualifies it is still in force and hits nobody (rulings 8 and 10).
 
 ## Rulings on open points
 
@@ -50,6 +55,10 @@ Resolution, in this order:
    outcome is `wipeout`.
 7. As in the race, the engine plays on when the player's company is out. Ending the player's session after a second
    failure is the app's job (the screens plan); the simulator plays every career to 2038.
+8. A dated card replaces the random draw of its year. `events.firstTurn` and `events.chance` govern random draws only.
+9. The first year's card is dealt with the game, so it cannot be a card that hits one company.
+10. A dated card whose target rule no company meets is still in force; the effects that need a target hit nobody.
+11. Candidates on the market are never fewer than none.
 
 ## Starting numbers
 
