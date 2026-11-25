@@ -728,7 +728,8 @@ git add src scripts docs package.json README.md && git commit -m "engine: dated 
 ### Task 6: Platform shifts (C4)
 
 **Files:**
-- Modify: `src/engine/events.ts` (`applyEvent`, `EventContext`), `src/engine/career.ts`, `src/engine/resolveTurn.ts`
+- Modify: `src/engine/events.ts` (`applyEvent`, `EventContext`), `src/engine/setup.ts` (the first year's card),
+  `src/engine/career.ts`, `src/engine/resolveTurn.ts`
   (step 6, the market; step 14; closing the books; the report), `src/engine/project.ts`, `src/engine/view.ts`
   (`viewFor`, `publicCompany`), `src/engine/types.ts`, `src/engine/career.setup.test.ts`, `docs/career-rules.md`
 - Test: `src/engine/career.shift.test.ts`
@@ -744,7 +745,8 @@ export interface ShiftNotice { readonly cardId: string; readonly year: number; r
   A platform shift is two effects on one dated card. `applyEvent` handles `qualityCeiling`: every company still in
   the game has its quality cut to the ceiling if it is above it. It also handles `userWave`: the state's `wave`
   becomes `{ multiplier, turnsLeft: turns }`, replacing a wave still running (`EventContext` gains an optional
-  `wave`). While a wave runs, a year's new users are
+  `wave`). Both places that deal a card write the context's wave into the state: the end of a year, and `createGame`
+  for the first year's card. While a wave runs, a year's new users are
   `newUsersForTurn(marketTurn(config, turn), modifiers.newUsers × wave.multiplier, rules)`, in the turn and in the
   projection alike (`viewFor` passes `wave` on). It ticks down at the end of each year exactly as the funding climate
   does. Closing the books sets `career.qualityAtLastClose` to the year's closing quality. Each career report carries
@@ -792,6 +794,9 @@ it("brings more new users for the years the card says, and then no more", () => 
   expect([played1995, played1996, played1997, played1998].map((result) => result.log.market.newUsers)).toEqual(
     [1.5, 1.5, 1.5, 1].map((times, i) => newUsersForTurn(6 + i, times, CAREER_TEST)));
   expect(played1997.state.wave).toEqual({ multiplier: 1, turnsLeft: 0 });
+});
+it("a shift dated in the first year sets its wave with the game", () => {
+  expect(newCareer(withCareer({ dated: [{ ...SHIFT, year: 1990 }] })).wave).toEqual({ multiplier: 1.5, turnsLeft: 3 });
 });
 it("a card's one-year change in new users multiplies with a running wave", () => {
   // the same, with modifiers.newUsers 0.8 in 1996
@@ -844,11 +849,14 @@ quality a shift has just left it with."
 The design's sentence "in that year no product is worth more than the new platform allows" can also be read as a
 ceiling that holds for the whole year. This plan builds the reading above because the rest of the design's paragraph
 describes it: "preparing means having the cash and the people to put on Product when it lands". The plan's review
-tried both on throwaway numbers, 300 careers each. The leader of 2010 won 57% of careers with the shifts switched
-off, 50% with this reading at a ceiling of 30, 35% with it at a ceiling of 10, and 34% with the ceiling held all
-year. So the height of the ceiling is the first number Task 17 tunes, the simulator reports the lead figure with the
-shifts switched off beside the real one (Task 15), and the other reading is what goes to the owner if numbers are
-not enough (Task 17, Step 3).
+tried both readings on two sets of throwaway numbers, 300 careers each, and the result is a warning. Where teams
+stayed small, the shifts did their job: the leader of 2010 won 57% of careers with the shifts switched off, 50% with
+this reading at a ceiling of 30, 35% at a ceiling of 10, and 34% with the ceiling held all year. Where one company
+had by far the largest team, the shifts helped it: 77% without them, 89% with this reading, 92% with the ceiling
+held all year, because the largest team rebuilds fastest. So what the rule does depends on who leads, and neither
+reading is safe by itself. That is why the simulator reports the lead figure with the shifts switched off beside
+the real one (Task 15), why the shifts are the first thing Task 17 measures once careers work, and why the rule
+goes back to the owner if numbers cannot make it overturn leads (Task 17, Step 3).
 
 - [ ] **Step 4: Run the tests, then the checks.** Expected: PASS.
 
@@ -1037,6 +1045,12 @@ it("the opening valuation follows the funding climate, in the turn and in the pr
   // climate { multiplier: 0.5, turnsLeft: 2 }: the raise is half as large, and so is the room for marketing
   expect(report.plan.marketing).toBe(Math.floor((100_000 + Math.round(raised / 2)) / step) * step);
   expect(projectTurn(viewFor(state, 0), plan, CAREER_TEST).plan.marketing).toBe(report.plan.marketing);
+});
+it("a raise the rules drop brings nothing: the limit is the cash alone, and each fix-up has its note", () => {
+  // seat 0 raised last year, has $100,000, and asks for a 20% raise and $500,000 of marketing
+  expect(report.raise).toBeNull();
+  expect(report.plan.marketing).toBe(Math.floor(100_000 / step) * step);
+  expect(report.notes.filter((note) => note.startsWith("Raise dropped") || note.startsWith("Marketing set"))).toHaveLength(2);
 });
 it("a company with no cash can spend nothing", () => { expect(report.plan.marketing).toBe(0); });
 it("a budget within the cash in hand is left alone, with no note", () => { /* notes has no line starting "Marketing set" */ });
@@ -1893,6 +1907,8 @@ export const runCareerBatch: (careers: number, firstSeed: number, config?: Caree
 export const neverListPilot: Pilot;                         // never goes public
 export const listLastPilot: Pilot;                          // waits to go public until the final year, or until a year it opens
                                                             // with less than `baseline.raiseRunway` years of cash
+export const endgamePilot: Pilot;                           // in the final year it plays for its stake alone: Budget price and
+                                                            // the largest marketing budget the rules allow
 export const overspendPilot: (fromYear: number) => Pilot;   // from `fromYear` until it has been rescued it spends all it can: the
                                                             // largest marketing budget the rules allow, a third of its people
                                                             // (at least one) recruiting with no hire limit, taken from Growth
@@ -1928,7 +1944,9 @@ export interface LoopholeResult {
 export const summarizeCareers: (careers: readonly SimCareer[]) => CareerSummary;
 export const checkCareerTargets: (summary: CareerSummary, targets: CareerTargets, leaderYear: number) => CareerCheck[];
 export const checkLoophole: (name: string, pilot: CareerSummary, baseline: CareerSummary, margin: number) => LoopholeResult;
-export const formatCareerReport: (summary: CareerSummary, checks: readonly CareerCheck[], loopholes: readonly LoopholeResult[], config: CareerGameConfig, withoutShifts?: CareerSummary) => string;
+/** The two batches that measure rather than check: the same careers without shifts, and the end-game pilot's. */
+export interface CareerMeasures { readonly withoutShifts?: CareerSummary; readonly endgame?: CareerSummary }
+export const formatCareerReport: (summary: CareerSummary, checks: readonly CareerCheck[], loopholes: readonly LoopholeResult[], config: CareerGameConfig, measures?: CareerMeasures) => string;
 
 // src/sim/args.ts: SimArgs gains `readonly mode?: "career"`, present only for mode=career
 ```
@@ -1940,7 +1958,10 @@ export const formatCareerReport: (summary: CareerSummary, checks: readonly Caree
   reported, not counted as failed targets. Given a summary of the same batch played without shifts, the report's
   section on leads also says in what share of careers the leader of `leaderYear` wins there: the lead target can
   pass for reasons that have nothing to do with C4, and the two figures side by side show how much is the shifts'
-  doing.
+  doing. Given a summary of the end-game pilot's batch, the report says what the final year alone is worth: that
+  pilot's win share and median final stake beside the baseline bot's. It is a measure, not a loophole check, and is
+  never flagged: at the end of a career cash is worth nothing, so spending all of it is simply right, and how much
+  one year should decide is a question for the owner.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -1996,7 +2017,7 @@ describe("the five targets", () => {
   });
 });
 
-describe("the three pilots that look for loopholes", () => {
+describe("the pilots", () => {
   it("one is the baseline bot that never goes public", () => {
     expect(baselinePlan(qualifiedView, CAREER_TEST).goPublic).toBe(true);
     expect(neverListPilot(qualifiedView, CAREER_TEST)).toEqual({ ...baselinePlan(qualifiedView, CAREER_TEST), goPublic: false });
@@ -2006,6 +2027,12 @@ describe("the three pilots that look for loopholes", () => {
     expect(listLastPilot(qualifiedView, CAREER_TEST)).toEqual({ ...baselinePlan(qualifiedView, CAREER_TEST), goPublic: false });
     expect(listLastPilot(qualifiedViewShortOfCash, CAREER_TEST)).toEqual(baselinePlan(qualifiedViewShortOfCash, CAREER_TEST));
     expect(listLastPilot(qualifiedViewIn2038, CAREER_TEST)).toEqual(baselinePlan(qualifiedViewIn2038, CAREER_TEST));
+  });
+  it("one plays the final year for its stake alone, and is the baseline bot until then", () => {
+    // viewIn2038: a company that is already public, with less cash than the largest marketing budget
+    expect(endgamePilot(viewIn2038, CAREER_TEST)).toEqual(
+      { ...baselinePlan(viewIn2038, CAREER_TEST), price: "budget", marketing: Math.floor(viewIn2038.self.cash / step) * step });
+    expect(endgamePilot(qualifiedView, CAREER_TEST)).toEqual(baselinePlan(qualifiedView, CAREER_TEST));
   });
   it("one spends all it can from its year on, until it has been rescued", () => {
     // viewIn1993: not raising, with less cash than the largest marketing budget, and a rival it may poach from
@@ -2049,13 +2076,14 @@ it("an override of a base number that every era sets is refused, with the way to
   expect(() => applyOverrides(CAREER_DESIGN, { salary: 90_000 })).toThrow(
     "salary has no effect: every era sets its own (use career.eras.<n>.values.salary)");
 });
-it("the report speaks in years and shows every target, the three pilots and the control", () => {
+it("the report speaks in years and shows every target, the three loophole pilots and both measures", () => {
   expect(text.split("\n")[0]).toBe("Career simulation: 20 careers, 1990 to 2038");
   for (const check of checks) expect(text).toContain(check.label);
   expect(text).toContain("Never goes public");
   expect(text).toContain("Goes public in the final year");
   expect(text).toContain("Overspends from 1993 until rescued");
   expect(text).toContain("with the platform shifts switched off");
+  expect(text).toContain("Spends everything in the final year");
   expect(text).not.toMatch(/\bturn \d/i);
 });
 ```
@@ -2086,8 +2114,9 @@ The three modules and the `mode` argument. `applyOverrides` learns two things ab
 changes nothing for one without: a path under `career.eras.<n>.values.` may name a number the era does not set yet,
 as long as the base config has it (the era gains it); and a path that names a base number every era sets is refused,
 because it would change nothing. `scripts/sim.ts` with `mode=career`: applies the overrides to `CAREER`,
-runs five batches on the same seeds (the baseline bot; `neverListPilot`; `listLastPilot`;
-`overspendPilot(sim.overspendYear)`; and the baseline bot again on `withoutShifts` of the config),
+runs six batches on the same seeds (the baseline bot; the loophole pilots `neverListPilot`, `listLastPilot` and
+`overspendPilot(sim.overspendYear)`; and the two measures: the baseline bot on `withoutShifts` of the config, and
+`endgamePilot`),
 prints `formatCareerReport`, the seeds and the time taken, the overrides, then
 `formatChanges(changedNumbers(CAREER_DESIGN, CAREER))`. `games=` sets the number of careers. `strict=1` exits with 1
 when a target fails. Without `mode=career` the script does exactly what it does today. Update `USAGE`. The report's
@@ -2095,7 +2124,8 @@ sections, in order: who wins (by style, and how many winners were newcomers); th
 with the same figure for the batch without shifts; rivals; typical position at each checkpoint year; dated cards
 that hit one company, with how often each found one; loophole checks, one line a pilot (its win share beside the
 baseline bot's, its median final stake as a multiple of the baseline bot's, in what share of careers it was
-rescued, and whether it is flagged: an overspending pilot that is never rescued has not tried the loophole);
+rescued, and whether it is flagged: an overspending pilot that is never rescued has not tried the loophole); what
+the final year alone is worth (the end-game pilot's win share and median final stake beside the baseline bot's);
 targets.
 
 `docs/career-rules.md` gains a section "How the simulator measures the targets", with these as rulings: "A win is
@@ -2109,7 +2139,8 @@ than `loopholeMargin`; a flag is reported, not counted as a failed target." "A r
 the lead target passes only under its figure." "The control for the lead target is the same batch with every
 platform shift switched off (ceilings at 100, waves at 1): the difference between the two lead figures is what the
 shifts do." "Whether a pilot is flagged is decided on 5,000 careers (Task 17, Step 4): at 1,000 the difference
-between two win shares moves by one to two points from chance alone."
+between two win shares moves by one to two points from chance alone." "The pilot that spends everything in the
+final year is a measure, not a loophole check, and is never flagged."
 
 - [ ] **Step 4: Run the tests, the checks, and the script both ways**
 
@@ -2123,7 +2154,7 @@ Expected: exit code 0; the first line is `Career simulation: 20 careers, 1990 to
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src scripts docs package.json README.md && git commit -m "sim: a career mode with the five targets, three loophole pilots and a control for the lead"
+git add src scripts docs package.json README.md && git commit -m "sim: a career mode with the five targets, three loophole pilots and two measures"
 ```
 
 ---
@@ -2211,9 +2242,10 @@ target without breaking a passing one. Work in this order, because each stage de
 2. Leads, which is the test of C4: with careers working, vary only the shifts' numbers (the ceiling first, down to
    the launch bar; then the wave), the eras' markets and the quality numbers, until the leader of 2010 wins in
    under 60%. This stage has a budget of 30 trial settings. Nothing else is tuned until it holds or has gone to the
-   owner (Step 3). Record the figure without shifts beside it each time. If the target holds but the two figures are
-   within five points of each other, the shifts are not what overturns leads: say so in the Tuning log and in the
-   report to the owner.
+   owner (Step 3). Record the figure without shifts beside it each time. If the target holds but the figure with
+   shifts is not at least five points under the figure without them, the shifts are not what overturns leads (in the
+   review's trial they helped a leader with a far larger team): say so in the Tuning log and in the report to the
+   owner.
 3. Listing: bars and markets such that the baseline bot goes public in 40% to 80%, and the computer players'
    appetite for it (`cpu.ipo`, `cpu.ipoPushLayoffs`) such that none guts its team to list. Then `listing.hype`,
    until the pilot that waits for the final year is not flagged: the review measured a final stake about 20% larger
@@ -2264,7 +2296,13 @@ git add src scripts docs package.json README.md && git commit -m "config: the ca
 ```
 
 Then update the pull request's description with the career's report, and report to the owner: the report of
-`npm run sim:career`, the numbers that moved and why, and what is still open.
+`npm run sim:career`, the numbers that moved and why, and what is still open. Three things are the owner's to weigh
+whatever the targets say. How much of the lead target is the shifts' doing. How much the final year alone decides
+(the end-game pilot's line): if spending everything in 2038 is worth more than the owner likes, the cures are rules,
+not numbers, such as counting cash in a company's final worth or ranking on the last few years together. And what a
+careful player can do that the computer players do not: in the review's trial a player who moved Product people to
+Growth in the two announced years before a shift gained five to eight points on the baseline bot, which is the
+announcement doing its job.
 
 ---
 
