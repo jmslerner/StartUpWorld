@@ -32,6 +32,8 @@ Resolution, in this order:
    - Marketing is cut to the room the company has: its opening cash, never counted below $0, plus this year's raise
      or listing at the opening valuation (a raise the rules drop brings nothing), rounded down to the marketing step.
      When this cut applies, its note is the only marketing note (ruling 23).
+   - A poach by a company whose payroll (its head count less layoffs) already fills the last office is dropped, with
+     the note "Poach dropped: the campus is full." naming that office (ruling 34).
 2. Layoffs.
 3. The raise closes.
    - A listing closes here, in place of a raise: the company sells `listing.percent` of itself at the year's opening
@@ -49,7 +51,14 @@ Resolution, in this order:
 7. Poach attempts, in hype order.
 8. Hiring, one candidate at a time in hype order.
    - Candidates on the market are never fewer than none (ruling 11).
+   - The hires a company wants are capped so that its payroll, plus a poach that worked, less anyone poached from it,
+     plus its hires never exceed the last office's capacity; never fewer than none (ruling 34).
 9. Revenue and costs.
+   - A team whose head count as the year ends is over its office's capacity moves to the smallest office that holds
+     it, however many sizes that skips, and pays one bill: `moving.salaryYears` of the year's salary for everyone on
+     the team. The bill is the report's `costs.moving`, 0 without a move, and is counted in the year's total, so it
+     counts against the profit and the cash and can bankrupt. The one-year projection works the move out the same way
+     on its payroll plus every hire it wants plus the poach it plans (rulings 31 to 33 and 35).
 10. Hype.
     - In the year it lists, a company gains `listing.hype`, added with the year's other hype before the cap at 100.
     - The valuation the year closes at carries the listing premium for a company that is public or listed this year,
@@ -76,6 +85,8 @@ Resolution, in this order:
     - Closing the books also records a listing, and marks a company qualified when the year closed with that
       year's bar in users and with revenue that covered its costs (ruling 18).
     - Closing the books also records a rescue, its turn and what it was from; a company is rescued once (ruling 24).
+    - Closing the books also records a move: the company's office is the one it moved to. Offices are never given up
+      (ruling 31).
 14. The funding climate ticks down and next year's card is drawn.
     - A wave of new users ticks down with the funding climate, before next year's card can set a new one (ruling 15).
     - The card is drawn from next year's numbers, so a new era's deck is in play from its first year.
@@ -133,6 +144,11 @@ Resolution, in this order:
 29. A company that lists and is rescued in the same year keeps its listing: both changes to its equity, seats and hype
     apply.
 30. After a rescue the report's runway is worked out again from the cash the rescue leaves.
+31. The office is checked once a year, on the head count as the year ends. A team that shrinks keeps its office.
+32. One bill, however many sizes are skipped: `moving.salaryYears` of that year's salary for everyone who moves.
+33. The bill is one of the year's costs.
+34. Hires are capped so that a team never exceeds the last office, and a poach that would overfill it is dropped.
+35. The projection assumes every wanted hire and the planned poach arrive.
 
 ## Starting numbers
 

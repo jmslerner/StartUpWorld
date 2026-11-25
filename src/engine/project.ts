@@ -6,7 +6,18 @@
 // from public information only.
 
 import { CONFIG } from "../config";
-import { boardPaused, closingValuation, heldCeiling, listingEffects, listingOf, marketTurn, rulesForTurn } from "./career";
+import {
+  boardPaused,
+  closingValuation,
+  heldCeiling,
+  hiresWithinCap,
+  listingEffects,
+  listingOf,
+  marketTurn,
+  officeMove,
+  rulesForTurn,
+  withMoving,
+} from "./career";
 import {
   churnRate,
   clamp,
@@ -201,7 +212,13 @@ export const projectTurn = (
   const target = resolved.poachTarget === null ? undefined : view.rivals.find((rival) => rival.id === resolved.poachTarget);
   const odds = target === undefined ? null : poachChance(self.hype, target.hype, rules);
 
-  const hiresWanted = Math.min(hiringCapacity(work.recruiting, rules), resolved.hireLimit ?? Number.MAX_SAFE_INTEGER);
+  // In a career the hires wanted are capped by the last office as in the turn, counting the planned poach as a success.
+  const poachedIn = odds === null ? 0 : 1;
+  const hiresWanted = hiresWithinCap(
+    Math.min(hiringCapacity(work.recruiting, rules), resolved.hireLimit ?? Number.MAX_SAFE_INTEGER),
+    payroll + poachedIn,
+    rules,
+  );
   const hires = expectedHires(view, hiresWanted, resolved.layoffs, rules);
 
   const revenue = revenueOf(users, resolved.price, rules);
@@ -209,7 +226,12 @@ export const projectTurn = (
   const hiring = hiresWanted * rules.hiring.fee;
   const poaching = odds === null ? 0 : rules.poach.cost;
   const severance = resolved.layoffs * rules.layoff.severance;
-  const costs: CostBreakdown = { salaries, marketing: resolved.marketing, hiring, poaching, severance, total: salaries + resolved.marketing + hiring + poaching + severance };
+  const yearCosts: CostBreakdown = { salaries, marketing: resolved.marketing, hiring, poaching, severance, total: salaries + resolved.marketing + hiring + poaching + severance };
+  // In a career the office move is worked out as in the turn, on the team it would end with if every wanted hire and
+  // the planned poach arrive, so its bill errs high.
+  const career = rules.career === undefined ? undefined : self.career;
+  const office = career === undefined ? null : officeMove(career.office, payroll + hiresWanted + poachedIn, rules);
+  const costs = career === undefined ? yearCosts : withMoving(yearCosts, office);
   const cash = self.cash + (raise?.amount ?? 0) + (listing?.amount ?? 0) + revenue - costs.total;
   const runway = runwayOf(cash, revenue, costs.total);
 
@@ -262,5 +284,5 @@ export const projectTurn = (
     boardRisk,
   };
   // A career's projection says what the year would do to the company's career; a race projection has no such key.
-  return rules.career === undefined ? projection : { ...projection, career: { listing, office: null } };
+  return rules.career === undefined ? projection : { ...projection, career: { listing, office } };
 };

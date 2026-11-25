@@ -1,7 +1,7 @@
 // Plans: the default for a new turn, and the check that turns any plan into a legal one.
 // An illegal part is fixed up or dropped at no cost, with a note for the quarterly report.
 
-import { listingBlocker, listingOf, rulesForTurn } from "./career";
+import { listingBlocker, listingOf, peopleCap, rulesForTurn } from "./career";
 import { poachFloor, raiseAmount, refitAllocation, valuationOf } from "./formulas";
 import { PRICE_TIERS } from "./types";
 import type { Allocation, Company, CompanyId, GameState, Plan, PublicCompany, RulesConfig } from "./types";
@@ -126,7 +126,12 @@ export const normalizePlanFor = (
   if (poachTarget !== null) {
     const wantedTarget = poachTarget;
     const target = others.find((other) => other.id === wantedTarget);
-    if (target === undefined || target.id === company.id || target.out !== null) {
+    // In a career no team grows beyond the last office: one that already fills it cannot take anyone in.
+    const career = rules.career;
+    if (career !== undefined && company.headcount - layoffs >= peopleCap(career)) {
+      notes.push(`Poach dropped: the ${career.offices[career.offices.length - 1].name.toLowerCase()} is full.`);
+      poachTarget = null;
+    } else if (target === undefined || target.id === company.id || target.out !== null) {
       notes.push("Poach dropped: that company cannot be poached from.");
       poachTarget = null;
     } else if (target.headcount < poachFloor(rules)) {

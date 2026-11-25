@@ -2,7 +2,7 @@
 // config has none. The rules are recorded in docs/career-rules.md.
 
 import { clamp, raiseAmount, round4, round6, valuationOf } from "./formulas";
-import type { ActiveEvent, CareerRules, Company, DatedCard, EventCard, EventEffect, RulesConfig } from "./types";
+import type { ActiveEvent, CareerReport, CareerRules, Company, CostBreakdown, DatedCard, EventCard, EventEffect, RulesConfig } from "./types";
 
 /** The calendar year a turn is played in: turn 1 is the career's first year. */
 export const yearOf = (turn: number, career: CareerRules): number => career.firstYear + turn - 1;
@@ -121,6 +121,41 @@ export const upcomingShift = (turn: number, config: RulesConfig): ShiftNotice | 
 export const officeFor = (headcount: number, career: CareerRules): number => {
   const smallest = career.offices.findIndex((office) => office.capacity >= headcount);
   return smallest === -1 ? career.offices.length - 1 : smallest;
+};
+
+/** The most people a company may have: the last office's capacity. */
+export const peopleCap = (career: CareerRules): number => career.offices[career.offices.length - 1].capacity;
+
+/** The year's career rules; throws outside a career. */
+const careerRules = (rules: RulesConfig): CareerRules => {
+  if (rules.career === undefined) throw new Error("only a career has offices");
+  return rules.career;
+};
+
+/** The one bill for a move: `moving.salaryYears` of the year's salary for everyone who moves. Throws outside a career. */
+export const movingBill = (headcount: number, rules: RulesConfig): number => careerRules(rules).moving.salaryYears * headcount * rules.salary;
+
+/**
+ * The hires a company may make, from those it wants and the head count it will have before them: in a career no
+ * more than leave room up to the last office, never fewer than none. In a race, the hires it wants.
+ */
+export const hiresWithinCap = (wanted: number, headcount: number, rules: RulesConfig): number =>
+  rules.career === undefined ? wanted : Math.min(wanted, Math.max(0, peopleCap(rules.career) - headcount));
+
+/**
+ * The move a team makes as its year ends, or null: none while the office holds it. Otherwise it moves to the office
+ * for its size, however many sizes that skips, for one bill. Offices are never given up. Throws outside a career.
+ */
+export const officeMove = (office: number, headcount: number, rules: RulesConfig): CareerReport["office"] => {
+  const career = careerRules(rules);
+  if (headcount <= career.offices[office].capacity) return null;
+  return { from: office, to: officeFor(headcount, career), bill: movingBill(headcount, rules) };
+};
+
+/** The year's costs with a career's moving bill: `moving` after the other lines and counted in the total. */
+export const withMoving = (costs: CostBreakdown, move: CareerReport["office"]): CostBreakdown => {
+  const moving = move === null ? 0 : move.bill;
+  return { ...costs, total: costs.total + moving, moving };
 };
 
 /**
