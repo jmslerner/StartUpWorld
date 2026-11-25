@@ -1,5 +1,5 @@
 /**
- * Where an inspector card goes relative to the thing it describes.
+ * Where a card goes relative to the thing it describes.
  *
  * Pure geometry in CSS pixels, in the coordinate space of the world viewport
  * (origin top-left) — the same space WorldHandle.project() reports in.

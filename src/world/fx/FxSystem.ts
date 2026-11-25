@@ -114,6 +114,9 @@ const RISE_SHAKE = 0.4;
  */
 export const SHAKE_SECONDS = 0.8;
 
+/** The longest a bubble may be asked to show. */
+const MAX_BUBBLE_SECONDS = 60;
+
 const DEFAULT_STREAM_COUNT = 8;
 const MAX_STREAM_COUNT = 40;
 const MAX_INTENSITY = 4;
@@ -200,7 +203,9 @@ export class FxSystem implements WorldSystem, FxApi {
     seconds = DEFAULT_BUBBLE_SECONDS,
     heightOffset = DEFAULT_BUBBLE_HEIGHT
   ): void {
-    if (!this.bubbles.show(anchor, icon, seconds, heightOffset) || !this.deps.onBubble) return;
+    // A length that is not a number, or one without end, would keep the bubble (and so the loop) alive for good.
+    const lasting = Number.isFinite(seconds) ? Math.min(seconds, MAX_BUBBLE_SECONDS) : DEFAULT_BUBBLE_SECONDS;
+    if (!this.bubbles.show(anchor, icon, lasting, heightOffset) || !this.deps.onBubble) return;
     this.deps.onBubble(anchor.getWorldPosition(this.bubbleAt));
   }
 
@@ -234,7 +239,10 @@ export class FxSystem implements WorldSystem, FxApi {
   }
 
   update(dt: number, elapsed: number): void {
-    if (dt > 0 && this.shakeLeft > 0) this.shakeLeft = Math.max(0, this.shakeLeft - dt);
+    // A frame whose length is not a positive, finite number passes no time. Added to an age it would stay there
+    // (nothing is ever older than "not a number"), and the effects would report themselves busy for good.
+    if (!(dt > 0) || !Number.isFinite(dt)) return;
+    if (this.shakeLeft > 0) this.shakeLeft = Math.max(0, this.shakeLeft - dt);
     this.fireScheduled(dt);
     const pool = this.particles;
     pool.step(dt);

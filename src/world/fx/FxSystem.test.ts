@@ -859,6 +859,49 @@ describe("FxSystem at rest", () => {
     expect(fx.busy()).toBe(false);
   });
 
+  it("a frame whose length is not a positive, finite number passes no time and poisons nothing", () => {
+    stubDocument();
+    for (const bad of [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY, -1, 0]) {
+      const { fx, scene } = makeFx();
+      const head = new THREE.Object3D();
+      scene.add(head);
+      fx.applyFrame(frameOf({ ...plain, office: 2 }, { arrived: ["p6"], left: ["p2"] }, [moved]), still);
+      fx.bubble(head, "idea", 2);
+      fx.burst("confetti", ORIGIN);
+      fx.shake(1);
+      const alive = fx.particles.activeCount;
+      fx.update(bad, 1);
+      fx.update(bad, Number.NaN);
+      // Nothing has aged: everything that was playing still is.
+      expect(fx.busy(), String(bad)).toBe(true);
+      expect(fx.particles.activeCount, String(bad)).toBe(alive);
+      // And ordinary frames after it bring the effects to rest in their ordinary time.
+      const seconds = secondsToRest(fx);
+      expect(seconds, String(bad)).toBeGreaterThan(REBUILD_RISE_DELAY + REBUILD_RISE_SECONDS);
+      expect(seconds, String(bad)).toBeLessThan(10);
+      expect(fx.busy(), String(bad)).toBe(false);
+    }
+  });
+
+  it("a bubble cannot last for ever: no length that is not a number, none without end, none beyond a minute", () => {
+    stubDocument();
+    for (const [asked, least, most] of [
+      [Number.NaN, 1.5, 3],
+      [Number.POSITIVE_INFINITY, 1.5, 3],
+      [Number.NEGATIVE_INFINITY, 1.5, 3],
+      [1e9, 59, 61],
+    ] as const) {
+      const { fx, scene } = makeFx();
+      const head = new THREE.Object3D();
+      scene.add(head);
+      fx.bubble(head, "coffee", asked);
+      expect(fx.busy(), String(asked)).toBe(true);
+      const seconds = secondsToRest(fx, 120);
+      expect(seconds, String(asked)).toBeGreaterThan(least);
+      expect(seconds, String(asked)).toBeLessThan(most);
+    }
+  });
+
   it("is at rest once disposed, whatever was playing", () => {
     const { fx } = makeFx();
     fx.applyFrame(frameOf({ ...plain, office: 2 }, {}, [moved]), still);
