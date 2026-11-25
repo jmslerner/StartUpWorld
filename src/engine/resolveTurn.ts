@@ -5,7 +5,7 @@
 // docs/turn-based-design.md, "Order of a turn".
 
 import { CONFIG } from "../config";
-import { marketTurn, rulesForTurn } from "./career";
+import { heldCeiling, marketTurn, rulesForTurn } from "./career";
 import { NEUTRAL_MODIFIERS, applyEvent, drawEvent, type EventContext } from "./events";
 import {
   churnRate,
@@ -148,8 +148,8 @@ const openDesk = (state: GameState, company: Company, plan: Plan | null, rules: 
   };
 };
 
-/** Steps 4–5: do the work, then gain, decay and the launch test. */
-const build = (desk: Desk, bestRivalQuality: number, marketingModifier: number, rules: RulesConfig): void => {
+/** Steps 4–5: do the work, then gain, decay, the year's ceiling on quality if one holds, and the launch test. */
+const build = (desk: Desk, bestRivalQuality: number, marketingModifier: number, ceiling: number | null, rules: RulesConfig): void => {
   const { company, plan, payroll } = desk;
   const archetype = rules.archetypes[company.archetype];
   desk.effective = effectiveWork(payroll, archetype.workExponent);
@@ -160,6 +160,7 @@ const build = (desk: Desk, bestRivalQuality: number, marketingModifier: number, 
   desk.catchUp = archetype.catchUpMultiplier > 1 && company.quality < bestRivalQuality;
   desk.gain = qualityGain(company.quality, desk.productWork, desk.catchUp ? archetype.catchUpMultiplier : 1, rules);
   desk.quality = nextQuality(company.quality, desk.gain, rules);
+  if (ceiling !== null) desk.quality = Math.min(desk.quality, ceiling);
   desk.launchedNow = !company.launched && desk.quality >= rules.quality.launchAt;
   desk.launched = company.launched || desk.launchedNow;
   desk.pull = desk.launched
@@ -177,12 +178,13 @@ const best = (desks: readonly Desk[], ...keys: ((desk: Desk) => number)[]): Desk
     return a.company.id - b.company.id;
   })[0];
 
+/** The funding climate one year on; a career's wave of new users ticks down the same way. */
 const tickClimate = (climate: Climate): Climate =>
   climate.turnsLeft <= 1 ? { multiplier: 1, turnsLeft: 0 } : { multiplier: climate.multiplier, turnsLeft: climate.turnsLeft - 1 };
 
 const reportOf = (desk: Desk, rules: RulesConfig): CompanyReport => {
   const { company } = desk;
-  return {
+  const report: CompanyReport = {
     companyId: company.id,
     plan: desk.plan,
     notes: desk.notes,
@@ -227,6 +229,10 @@ const reportOf = (desk: Desk, rules: RulesConfig): CompanyReport => {
     equity: desk.equity,
     out: desk.out,
   };
+  // A career's report says what the career did to the company this year; a race report has no such key.
+  if (company.career === undefined) return report;
+  const qualityLostToEvent = Math.max(0, company.career.qualityAtLastClose - company.quality);
+  return { ...report, career: { listing: null, rescue: null, office: null, hype: { listing: 0, rescue: 0 }, qualityLostToEvent } };
 };
 
 const closedLog = (state: GameState): TurnLog => ({
@@ -252,17 +258,20 @@ export const resolveTurn = (state: GameState, plans: PlanSet, seed: number, conf
   const desks = state.companies.filter((company) => company.out === null).map((company) => openDesk(state, company, plans[company.id] ?? null, rules));
   const deskOf = (id: CompanyId): Desk | undefined => desks.find((desk) => desk.company.id === id);
 
-  // 4–5. Work and product. The catch-up bonus looks at rivals' quality as the turn started.
+  // 4–5. Work and product. The catch-up bonus looks at rivals' quality as the turn started. In a career, a ceiling
+  // that holds through the year caps the quality Product work reaches.
+  const ceiling = heldCeiling(state.event, config);
   for (const desk of desks) {
     const rivals = desks.filter((other) => other !== desk && other.company.launched).map((other) => other.company.quality);
-    build(desk, rivals.length > 0 ? Math.max(...rivals) : -1, state.modifiers.marketing, rules);
+    build(desk, rivals.length > 0 ? Math.max(...rivals) : -1, state.modifiers.marketing, ceiling, rules);
   }
 
-  // 6. Market: churn, then the pool is split by pull among launched companies.
+  // 6. Market: churn, then the pool is split by pull among launched companies. A career's wave of new users
+  // multiplies with the card's change in new users.
   const entrants = desks.filter((desk) => desk.launched);
   const market = resolveMarket(
     entrants.map((desk) => ({ id: desk.company.id, users: desk.company.users, churnRate: churnRate(desk.quality, desk.plan.price, rules), pull: desk.pull })),
-    newUsersForTurn(marketTurn(config, turn), state.modifiers.newUsers, rules),
+    newUsersForTurn(marketTurn(config, turn), state.modifiers.newUsers * (state.wave?.multiplier ?? 1), rules),
     state.carryOverUsers,
   );
   for (const [i, desk] of entrants.entries()) {
@@ -297,7 +306,9 @@ export const resolveTurn = (state: GameState, plans: PlanSet, seed: number, conf
 
   // 8. Hiring: one candidate at a time in hype order.
   const laidOff = desks.reduce((sum, desk) => sum + desk.plan.layoffs, 0);
-  const candidates = rules.hiring.candidatesPerTurn + state.modifiers.extraCandidates + state.freedPeople + laidOff;
+  const offered = rules.hiring.candidatesPerTurn + state.modifiers.extraCandidates + state.freedPeople + laidOff;
+  // In a career a card that takes candidates away can leave none on the market, never fewer.
+  const candidates = rules.career === undefined ? offered : Math.max(0, offered);
   for (const desk of desks) {
     desk.capacity = hiringCapacity(desk.recruitingWork, rules);
     desk.wanted = Math.min(desk.capacity, desk.plan.hireLimit ?? desk.capacity);
@@ -425,14 +436,17 @@ export const resolveTurn = (state: GameState, plans: PlanSet, seed: number, conf
       lastRevenue: desk.revenue,
       lastCosts: desk.costs.total,
       lastPull: desk.launched ? desk.pull : null,
+      // A career keeps the quality the year closed with, before next year's card can touch it.
+      ...(company.career === undefined ? {} : { career: { ...company.career, qualityAtLastClose: desk.quality } }),
     };
   });
 
-  // 14. If the game goes on: the climate ticks down, and next turn's event is drawn and applied.
+  // 14. If the game goes on: the climate (and a career's wave) ticks down, and next turn's event is drawn and applied.
   let next: GameState = { ...state, companies: closed, carryOverUsers, freedPeople, outcome };
   if (outcome === null) {
     const event = drawEvent(closed, turn + 1, seed, config);
     let context: EventContext = { companies: closed, climate: tickClimate(state.climate), modifiers: NEUTRAL_MODIFIERS, carryOverUsers };
+    if (state.wave !== undefined) context = { ...context, wave: tickClimate(state.wave) };
     if (event !== null) context = applyEvent(context, event, config);
     next = {
       turn: turn + 1,
@@ -444,8 +458,8 @@ export const resolveTurn = (state: GameState, plans: PlanSet, seed: number, conf
       modifiers: context.modifiers,
       outcome: null,
     };
-    // A career's wave of new users is carried over as it stands. A race state has none, and gains no such key.
-    if (state.wave !== undefined) next = { ...next, wave: state.wave };
+    // A career's wave of new users, as the card left it. A race state has none, and gains no such key.
+    if (context.wave !== undefined) next = { ...next, wave: context.wave };
   }
 
   const log: TurnLog = {
