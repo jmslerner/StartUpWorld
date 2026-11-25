@@ -124,6 +124,11 @@ export interface Check {
 }
 
 const percent = (value: number): string => `${(value * 100).toFixed(1)}%`;
+/** A measured share: one decimal, or two when one would round it onto a figure it is not (40.04% is over a 40.0% cap). */
+const measured = (value: number): string => {
+  const points = value * 100;
+  return Math.abs(Number(points.toFixed(1)) - points) < 1e-9 ? percent(value) : `${points.toFixed(2)}%`;
+};
 const within = (value: number, [low, high]: readonly [number, number]): boolean => value >= low && value <= high;
 
 export const checkTargets = (summary: SimSummary, targets: BalanceTargets): Check[] => {
@@ -133,13 +138,13 @@ export const checkTargets = (summary: SimSummary, targets: BalanceTargets): Chec
       id: "cpu-cap",
       label: `No CPU type wins more than ${percent(targets.maxCpuWinShare)}`,
       pass: summary.winShare[topCpu] <= targets.maxCpuWinShare,
-      detail: `highest: ${SEAT_LABEL[topCpu]} ${percent(summary.winShare[topCpu])}`,
+      detail: `highest: ${SEAT_LABEL[topCpu]} ${measured(summary.winShare[topCpu])}`,
     },
     {
       id: "baseline",
       label: `Baseline bot wins ${percent(targets.baselineWinShare[0])} to ${percent(targets.baselineWinShare[1])}`,
       pass: within(summary.winShare.baseline, targets.baselineWinShare),
-      detail: percent(summary.winShare.baseline),
+      detail: measured(summary.winShare.baseline),
     },
     {
       id: "length",
@@ -151,7 +156,7 @@ export const checkTargets = (summary: SimSummary, targets: BalanceTargets): Chec
       id: "ipo",
       label: `${percent(targets.ipoShare[0])} to ${percent(targets.ipoShare[1])} of games end in an IPO`,
       pass: within(summary.endingShare.ipo, targets.ipoShare),
-      detail: percent(summary.endingShare.ipo),
+      detail: measured(summary.endingShare.ipo),
     },
   ];
 };

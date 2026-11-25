@@ -33,7 +33,7 @@ export interface CpuPersonality {
   };
   /** Attempts a poach whenever projected runway stays at or above this; null = never poaches. */
   readonly poachRunway: number | null;
-  /** Stops hiring at this team size. */
+  /** Stops recruiting at this team size. People it poaches come on top. */
   readonly teamCap: number;
   /** Recruits only while projected runway stays at or above this. */
   readonly hireRunway: number;

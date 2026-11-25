@@ -120,6 +120,17 @@ describe("targets and the printed report", () => {
     expect(edge.every((check) => check.pass)).toBe(true);
   });
 
+  it("never prints a failing figure as if it sat on the bound", () => {
+    // 1,001 wins in 2,500 games is 40.04%: over the cap, and one decimal would print it as 40.0%.
+    const over = checkTargets({ ...healthy, winShare: { ...healthy.winShare, blitzscaler: 1_001 / 2_500 } }, DESIGN.sim.targets).find((check) => check.id === "cpu-cap")!;
+    expect(over.pass).toBe(false);
+    expect(over.detail).toBe("highest: Blitzscaler 40.04%");
+    const under = checkTargets({ ...healthy, winShare: { ...healthy.winShare, baseline: 374 / 2_500 } }, DESIGN.sim.targets).find((check) => check.id === "baseline")!;
+    expect(under).toMatchObject({ pass: false, detail: "14.96%" });
+    // Shares that one decimal shows exactly stay as they were.
+    expect(checkTargets(healthy, DESIGN.sim.targets).map((check) => check.detail)).toEqual(["highest: Blitzscaler 30.0%", "25.0%", "17 turns", "60.0%"]);
+  });
+
   it("prints win rates, endings, game length, bankruptcy rate and a PASS or FAIL line per target", () => {
     const text = formatReport(healthy, checkTargets(healthy, DESIGN.sim.targets), 20);
     for (const phrase of ["Baseline bot", "Blitzscaler", "Bootstrapper", "Incumbent", "IPO", "Turn 20", "Last one standing", "Median", "bankrupt"]) {

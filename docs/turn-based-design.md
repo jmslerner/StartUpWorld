@@ -72,7 +72,8 @@ Online multiplayer, a map or multiple markets, talent roles, difficulty levels, 
 These fill gaps the design leaves open. Where a ruling and the design disagree, the design wins. Items marked
 (owner) were decided by the owner; the rest are the implementer's calls and can be changed.
 
-Most rulings only settle timing or an edge case. Five go further and add to what the design says:
+Most rulings only settle timing or an edge case. Five go further and add to what the design says, and one leaves a
+question open for the owner (ruling 29):
 
 - Users lost to a security breach rejoin the pool, like churned users (ruling 1).
 - A poach or a burnout can never take a company's last person, and the poach floor is a tunable number (rulings 10, 11).
@@ -180,10 +181,16 @@ Resolution, in this order:
     its price tier and how it plays show it, and the end screen names it. Rivals are seated in a random order.
 22. **Projected cash.** The planning panel cannot know how many users a quarter will bring, so it shows two figures:
     a floor (no users won, every wanted hire made), which is exact, and an expected figure built from rivals'
-    public results.
+    public results. The expected figure runs high more often than not, so the panel's warnings about the board
+    and about going public also look at a cautious case, 25% fewer new users than expected: a quarter that is
+    only bad in the cautious case is "a close call", and one that only lists on the expected figure "could" go
+    public.
 23. **Baseline bot details.** 40 / 40 / 20 is split in whole people by largest remainder (3 people → 1 / 1 / 1,
     5 → 2 / 2 / 1). When it raises, the fundraiser comes out first and the rest are split. It hires k people only
-    if (cash − $10K × k) ÷ (last quarter's burn + $40K × k) stays at 3 turns or more.
+    if (cash − $10K × k) ÷ (last quarter's burn + $40K × k) stays at 3 turns or more. That is 3 turns at last
+    quarter's burn, on the cash it starts the quarter with: it does not count this quarter's own burn, so after
+    about four hiring quarters in ten it is left with less than 3 turns at its new payroll. This is the bot the
+    targets were tuned on.
 24. **Precision and rounding.** Quality and hype are kept to four decimals and effective work to six, and every
     threshold reads the stored figure: a product that works out at 9.99997 is stored, shown and launched as 10.
     Users and dollars are whole numbers, rounded to the nearest; a fraction of exactly one half may fall either
@@ -192,18 +199,33 @@ Resolution, in this order:
     Recruiting. A plan that places nobody puts everyone on Product.
 26. **Default plan.** A new turn starts from last turn's split, marketing budget, price and "hire at most"
     setting. A raise, a poach and layoffs are one-off and start switched off. A marketing budget therefore stays
-    in force until the player changes it; the planning panel shows it and counts it in projected cash.
+    in force until the player changes it; the planning panel shows it and counts it in projected cash. A number
+    in "hire at most" is a limit and stays where the player put it; "No limit" follows what recruiting can find.
 27. **Who the Incumbent poaches from.** The rival with the most users that is big enough to lose someone. Rivals
     that are level (every startup on turn 1) are picked between by the seeded RNG, never by seat, so the player is
-    not the one who always gets raided first.
+    not the one who always gets raided first. It does not poach on the last turn: the person would start in a
+    quarter that is never played. Its team cap limits recruiting only; the people it poaches come on top.
+28. **Counts that are part of a rule.** One person runs a raise, a raise adds one investor seat, a poach takes one
+    person, there is at most one event a turn, candidates are handed out one at a time, every company starts on
+    Standard, and quality and hype run from 0 to 100. These are rules, not tunable numbers, and are not in the
+    config. Events cannot start before turn 2: turn 1 is dealt before anything is rolled.
+29. **The Blitzscaler raises on the last turn too.** "Raises 30% whenever eligible" is applied to the letter, so
+    it sells 30% on turn 20 whenever its cooldown allows, although on that turn the sale only shrinks the
+    founder's stake that decides the game. Over five 1,000-game batches this costs it 0.8 to 1.6 points of win
+    rate (34.1% to 36.5% as shipped, 35.6% to 37.6% without the last-turn raise; the cap is 40%). Left as
+    designed: it is a habit a player can read, and changing a habit is the owner's call.
 
 ### Numbers the design does not name
 
 Added to `src/config.ts` because a rule needed them; all tunable like the rest.
 
-- Poach floor: a target needs at least 2 people. (Now 4: see the Tuning log.)
+- Poach floor: a target needs at least 2 people. (Now 4: see the Tuning log.) Whatever the config says, the
+  engine never lets it drop below 2.
 - Event weights: every card has weight 1.
 - Largest marketing spend the planner accepts: $5M.
+- The cautious case of the projection: 25% fewer new users than expected (ruling 22). In 400 simulated games the
+  users actually won were at least 84% of the expected figure nine times in ten; at 25% every bad quarter under an
+  investor-led board was announced, against 86% without it.
 
 ## Tuning log
 
@@ -244,7 +266,8 @@ With the starting numbers, 1,000 simulated games gave: Baseline bot 0%, Blitzsca
 These are weights and limits in how each rival scores its options. The habits the design names are untouched, and
 `src/config.test.ts` fails if tuning changes them: the Blitzscaler prices at Budget, raises 30% the moment it can and
 spends the most on marketing; the Bootstrapper prices at Premium, raises only under 2 turns of runway and keeps the
-smallest team; the Incumbent poaches whenever it can afford to.
+smallest team; the Incumbent poaches whenever it can afford to. `src/ai/habits.test.ts` plays games on the shipped
+numbers and checks that each rival still behaves that way.
 
 | Number | Start | Now | Why |
 |---|---|---|---|
@@ -273,13 +296,14 @@ was then checked on fresh seeds:
 
 | 1,000 games, seeds | Baseline | Blitzscaler | Bootstrapper | Incumbent | End in an IPO | Median turns |
 |---|---|---|---|---|---|---|
-| 1 to 1,000 (`npm run sim`) | 23.7% | 34.1% | 14.4% | 27.8% | 48.6% | 20 |
-| 100,001 to 101,000 | 19.4% | 35.1% | 17.3% | 28.2% | 47.7% | 20 |
-| 110,001 to 111,000 | 18.2% | 36.5% | 17.1% | 28.2% | 50.3% | 20 |
-| 120,001 to 121,000 | 19.3% | 35.6% | 17.2% | 27.9% | 49.9% | 20 |
-| 130,001 to 131,000 | 21.4% | 35.2% | 16.8% | 26.6% | 49.7% | 20 |
+| 1 to 1,000 (`npm run sim`) | 23.8% | 34.1% | 14.4% | 27.7% | 48.6% | 20 |
+| 100,001 to 101,000 | 19.4% | 35.1% | 17.2% | 28.3% | 47.7% | 20 |
+| 110,001 to 111,000 | 18.2% | 36.5% | 17.3% | 28.0% | 49.8% | 20 |
+| 120,001 to 121,000 | 19.2% | 35.6% | 17.4% | 27.8% | 49.7% | 20 |
+| 130,001 to 131,000 | 21.3% | 35.2% | 16.8% | 26.7% | 49.7% | 20 |
 
-All four targets hold on all five.
+All four targets hold on all five. (Figures after the final review's one change to how a rival plays: the
+Incumbent no longer poaches on the last turn. It moved no batch by more than half a point.)
 
 ### What the balance rests on
 

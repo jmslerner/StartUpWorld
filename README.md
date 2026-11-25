@@ -45,11 +45,16 @@ To change the balance:
    target. It ends with every number that differs from the design's starting values.
 3. Note the change and the reason in the Tuning log in `docs/turn-based-design.md`.
 
-`src/config.design.ts` is a frozen copy of the starting numbers. The tests run on it, so tuning `src/config.ts` never
-breaks a test. Leave that file as it is.
+`src/config.design.ts` is a frozen copy of the starting numbers. The rules' tests run on it, so tuning `src/config.ts`
+does not break them. Leave that file as it is. Two test files do read `src/config.ts`, on purpose: `src/config.test.ts`
+checks its shape, and `src/ai/habits.test.ts` plays a few games on it and fails if tuning has turned a rival into a
+different kind of player (a Blitzscaler that stops raising, an Incumbent that never poaches).
 
 Other arguments: `games=200` and `seed=5001` pick a different batch, and `strict=1` makes the command fail when a target
-does.
+does. An argument it does not know, or a `set=` path that is not in the config, stops the run with a message.
+
+To add an event, add a card to `events.deck` in `src/config.ts`, built from the effects listed under `EventEffect` in
+`src/engine/types.ts`. It needs no code, and `npm run sim` lists it as added.
 
 ## Structure
 
