@@ -67,9 +67,10 @@ export const publicReport = (report: CompanyReport): PublicReport => ({
 
 /**
  * A company's runway as a turn starts: cash ÷ last quarter's burn, or null when that quarter was
- * profitable. Before its first quarter the burn is its payroll.
+ * profitable. Before its first quarter the burn is its payroll. It has no turn to read the numbers of, so it is
+ * handed the year's numbers, `rulesForTurn(config, turn)`; in the race those are the config itself.
  */
-export const companyRunway = (company: Company, config: RulesConfig): number | null =>
+export const companyRunway = (company: Company, rules: RulesConfig): number | null =>
   company.lastCosts === null || company.lastRevenue === null
-    ? runwayOf(company.cash, 0, company.headcount * config.salary)
+    ? runwayOf(company.cash, 0, company.headcount * rules.salary)
     : runwayOf(company.cash, company.lastRevenue, company.lastCosts);

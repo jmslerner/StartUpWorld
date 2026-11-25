@@ -6,7 +6,7 @@
 // EventEffect (src/engine/types.ts).
 
 import type { BaselineConfig, CpuConfig, SimConfig } from "./ai/types";
-import type { RulesConfig } from "./engine/types";
+import type { EraConfig, Overlay, RulesConfig } from "./engine/types";
 
 const K = 1_000;
 const M = 1_000_000;
@@ -16,6 +16,9 @@ export interface PlayConfig extends RulesConfig {
   readonly cpu: CpuConfig;
   readonly baseline: BaselineConfig;
 }
+
+/** An era whose values for the computer players are type-checked too. */
+export type PlayEra = Omit<EraConfig, "values"> & { readonly values: Overlay<Omit<PlayConfig, "game" | "career">> };
 
 /** A config that can be played, plus the numbers behind the simulator. */
 export interface GameConfig extends PlayConfig {

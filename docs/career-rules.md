@@ -10,6 +10,10 @@ changed and why. Each section fills in as the build goes on.
 ## Rulings on open points
 
 1. Career-only facts are absent from a race game, not present and empty, so the race's states and logs are unchanged.
+2. A year is `firstYear + turn - 1`.
+3. The numbers of a year are the config with its era's values laid over it; lists are replaced whole.
+4. Each era's market curve starts again: its `newUsersTurn1` arrive in the era's first year.
+5. Limits, prices and the bar for going public are those of the year in which they are checked.
 
 ## Starting numbers
 

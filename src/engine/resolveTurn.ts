@@ -5,6 +5,7 @@
 // docs/turn-based-design.md, "Order of a turn".
 
 import { CONFIG } from "../config";
+import { marketTurn, rulesForTurn } from "./career";
 import { NEUTRAL_MODIFIERS, applyEvent, drawEvent, type EventContext } from "./events";
 import {
   churnRate,
@@ -97,12 +98,12 @@ interface Desk {
 const NO_COSTS: CostBreakdown = { salaries: 0, marketing: 0, hiring: 0, poaching: 0, severance: 0, total: 0 };
 
 /** Steps 1–3: check the plan, lay people off, close the raise. */
-const openDesk = (state: GameState, company: Company, plan: Plan | null, config: RulesConfig): Desk => {
-  const checked = normalizePlan(state, company.id, plan, config);
+const openDesk = (state: GameState, company: Company, plan: Plan | null, rules: RulesConfig): Desk => {
+  const checked = normalizePlan(state, company.id, plan, rules);
   const percent = checked.plan.raisePercent;
   let raise: Desk["raise"] = null;
   if (percent > 0) {
-    const valuation = valuationOf(company.users, company.hype, state.climate.multiplier, config);
+    const valuation = valuationOf(company.users, company.hype, state.climate.multiplier, rules);
     raise = { percent, valuation, amount: raiseAmount(valuation, percent) };
   }
   return {
@@ -148,21 +149,21 @@ const openDesk = (state: GameState, company: Company, plan: Plan | null, config:
 };
 
 /** Steps 4–5: do the work, then gain, decay and the launch test. */
-const build = (desk: Desk, bestRivalQuality: number, marketingModifier: number, config: RulesConfig): void => {
+const build = (desk: Desk, bestRivalQuality: number, marketingModifier: number, rules: RulesConfig): void => {
   const { company, plan, payroll } = desk;
-  const archetype = config.archetypes[company.archetype];
+  const archetype = rules.archetypes[company.archetype];
   desk.effective = effectiveWork(payroll, archetype.workExponent);
   desk.productWork = departmentWork(desk.effective, plan.allocation.product, payroll);
   desk.growthWork = departmentWork(desk.effective, plan.allocation.growth, payroll);
   desk.recruitingWork = departmentWork(desk.effective, plan.allocation.recruiting, payroll);
 
   desk.catchUp = archetype.catchUpMultiplier > 1 && company.quality < bestRivalQuality;
-  desk.gain = qualityGain(company.quality, desk.productWork, desk.catchUp ? archetype.catchUpMultiplier : 1, config);
-  desk.quality = nextQuality(company.quality, desk.gain, config);
-  desk.launchedNow = !company.launched && desk.quality >= config.quality.launchAt;
+  desk.gain = qualityGain(company.quality, desk.productWork, desk.catchUp ? archetype.catchUpMultiplier : 1, rules);
+  desk.quality = nextQuality(company.quality, desk.gain, rules);
+  desk.launchedNow = !company.launched && desk.quality >= rules.quality.launchAt;
   desk.launched = company.launched || desk.launchedNow;
   desk.pull = desk.launched
-    ? pullOf({ quality: desk.quality, growthWork: desk.growthWork, marketing: plan.marketing, tier: plan.price, hype: company.hype, marketingModifier }, config)
+    ? pullOf({ quality: desk.quality, growthWork: desk.growthWork, marketing: plan.marketing, tier: plan.price, hype: company.hype, marketingModifier }, rules)
     : 0;
 };
 
@@ -179,7 +180,7 @@ const best = (desks: readonly Desk[], ...keys: ((desk: Desk) => number)[]): Desk
 const tickClimate = (climate: Climate): Climate =>
   climate.turnsLeft <= 1 ? { multiplier: 1, turnsLeft: 0 } : { multiplier: climate.multiplier, turnsLeft: climate.turnsLeft - 1 };
 
-const reportOf = (desk: Desk, config: RulesConfig): CompanyReport => {
+const reportOf = (desk: Desk, rules: RulesConfig): CompanyReport => {
   const { company } = desk;
   return {
     companyId: company.id,
@@ -198,7 +199,7 @@ const reportOf = (desk: Desk, config: RulesConfig): CompanyReport => {
     quality: {
       start: company.quality,
       gain: desk.gain,
-      decay: config.quality.decay,
+      decay: rules.quality.decay,
       end: desk.quality,
       catchUp: desk.catchUp,
       launchedNow: desk.launchedNow,
@@ -243,23 +244,25 @@ export const resolveTurn = (state: GameState, plans: PlanSet, seed: number, conf
   if (state.outcome !== null) return { state, log: closedLog(state) };
 
   const turn = state.turn;
+  // Every number this turn is read from the year's own numbers. The next year's card is drawn on the game's config.
+  const rules = rulesForTurn(config, turn);
   const climate = state.climate.multiplier;
 
   // 1–3. Plans, layoffs, raise.
-  const desks = state.companies.filter((company) => company.out === null).map((company) => openDesk(state, company, plans[company.id] ?? null, config));
+  const desks = state.companies.filter((company) => company.out === null).map((company) => openDesk(state, company, plans[company.id] ?? null, rules));
   const deskOf = (id: CompanyId): Desk | undefined => desks.find((desk) => desk.company.id === id);
 
   // 4–5. Work and product. The catch-up bonus looks at rivals' quality as the turn started.
   for (const desk of desks) {
     const rivals = desks.filter((other) => other !== desk && other.company.launched).map((other) => other.company.quality);
-    build(desk, rivals.length > 0 ? Math.max(...rivals) : -1, state.modifiers.marketing, config);
+    build(desk, rivals.length > 0 ? Math.max(...rivals) : -1, state.modifiers.marketing, rules);
   }
 
   // 6. Market: churn, then the pool is split by pull among launched companies.
   const entrants = desks.filter((desk) => desk.launched);
   const market = resolveMarket(
-    entrants.map((desk) => ({ id: desk.company.id, users: desk.company.users, churnRate: churnRate(desk.quality, desk.plan.price, config), pull: desk.pull })),
-    newUsersForTurn(turn, state.modifiers.newUsers, config),
+    entrants.map((desk) => ({ id: desk.company.id, users: desk.company.users, churnRate: churnRate(desk.quality, desk.plan.price, rules), pull: desk.pull })),
+    newUsersForTurn(marketTurn(config, turn), state.modifiers.newUsers, rules),
     state.carryOverUsers,
   );
   for (const [i, desk] of entrants.entries()) {
@@ -277,15 +280,15 @@ export const resolveTurn = (state: GameState, plans: PlanSet, seed: number, conf
     .sort(byHypeOrder);
   for (const { desk } of poachers) {
     const target = deskOf(desk.plan.poachTarget as CompanyId);
-    if (target === undefined || target.payroll - target.poachedOut < poachFloor(config)) {
+    if (target === undefined || target.payroll - target.poachedOut < poachFloor(rules)) {
       desk.notes.push(`Poach dropped: ${target ? target.company.name : "that company"} is too small to lose anyone.`);
       desk.plan = { ...desk.plan, poachTarget: null };
       continue;
     }
-    const chance = poachChance(desk.company.hype, target.company.hype, config);
+    const chance = poachChance(desk.company.hype, target.company.hype, rules);
     const success = firstFloat(seed, turn, STREAM.poach, desk.company.id) < chance;
     desk.poach = { targetId: target.company.id, chance, success };
-    desk.poachFee = config.poach.cost;
+    desk.poachFee = rules.poach.cost;
     if (success) {
       desk.poachedIn += 1;
       target.poachedOut += 1;
@@ -294,9 +297,9 @@ export const resolveTurn = (state: GameState, plans: PlanSet, seed: number, conf
 
   // 8. Hiring: one candidate at a time in hype order.
   const laidOff = desks.reduce((sum, desk) => sum + desk.plan.layoffs, 0);
-  const candidates = config.hiring.candidatesPerTurn + state.modifiers.extraCandidates + state.freedPeople + laidOff;
+  const candidates = rules.hiring.candidatesPerTurn + state.modifiers.extraCandidates + state.freedPeople + laidOff;
   for (const desk of desks) {
-    desk.capacity = hiringCapacity(desk.recruitingWork, config);
+    desk.capacity = hiringCapacity(desk.recruitingWork, rules);
     desk.wanted = Math.min(desk.capacity, desk.plan.hireLimit ?? desk.capacity);
   }
   const hiring = handOutCandidates(
@@ -310,10 +313,10 @@ export const resolveTurn = (state: GameState, plans: PlanSet, seed: number, conf
     desk.hired = hiring.hired[company.id] ?? 0;
     desk.headcountEnd = desk.payroll + desk.hired + desk.poachedIn - desk.poachedOut;
 
-    desk.revenue = revenueOf(desk.users, plan.price, config);
-    const salaries = desk.payroll * config.salary;
-    const hiringFees = desk.hired * config.hiring.fee;
-    const severance = plan.layoffs * config.layoff.severance;
+    desk.revenue = revenueOf(desk.users, plan.price, rules);
+    const salaries = desk.payroll * rules.salary;
+    const hiringFees = desk.hired * rules.hiring.fee;
+    const severance = plan.layoffs * rules.layoff.severance;
     desk.costs = {
       salaries,
       marketing: plan.marketing,
@@ -326,20 +329,20 @@ export const resolveTurn = (state: GameState, plans: PlanSet, seed: number, conf
     desk.profitable = desk.revenue >= desk.costs.total;
     desk.runway = runwayOf(desk.cash, desk.revenue, desk.costs.total);
 
-    const launch = desk.launchedNow ? config.hype.launch : 0;
-    const raise = desk.raise ? config.hype.raise : 0;
-    const grew = company.usersAtLastClose > 0 && desk.users >= company.usersAtLastClose * (1 + config.hype.growthThreshold);
-    const growth = grew ? config.hype.growth : 0;
-    const layoffs = plan.layoffs > 0 ? config.layoff.hype : 0;
-    const end = round4(clamp(company.hype * (1 - config.hype.decay) + launch + raise + growth + layoffs, 0, 100));
+    const launch = desk.launchedNow ? rules.hype.launch : 0;
+    const raise = desk.raise ? rules.hype.raise : 0;
+    const grew = company.usersAtLastClose > 0 && desk.users >= company.usersAtLastClose * (1 + rules.hype.growthThreshold);
+    const growth = grew ? rules.hype.growth : 0;
+    const layoffs = plan.layoffs > 0 ? rules.layoff.hype : 0;
+    const end = round4(clamp(company.hype * (1 - rules.hype.decay) + launch + raise + growth + layoffs, 0, 100));
     desk.hype = { start: company.hype, end, launch, raise, growth, layoffs };
-    desk.valuation = valuationOf(desk.users, end, climate, config);
+    desk.valuation = valuationOf(desk.users, end, climate, rules);
   }
 
   // 11–13. Endings. An IPO ends the game at once; otherwise bankruptcy, the board, then who is left.
   const stakeOf = (desk: Desk): number => founderStake(desk.equity, desk.valuation);
   let outcome: Outcome | null = null;
-  const listing = desks.filter((desk) => desk.users >= config.ipo.users && desk.profitable);
+  const listing = desks.filter((desk) => desk.users >= rules.ipo.users && desk.profitable);
   if (listing.length > 0) {
     outcome = { kind: "ipo", turn, winnerId: best(listing, (d) => d.valuation, stakeOf).company.id };
   } else {
@@ -350,15 +353,15 @@ export const resolveTurn = (state: GameState, plans: PlanSet, seed: number, conf
       }
       if (desk.investorSeats <= desk.company.founderSeats) continue;
       const usersFell = desk.users < desk.company.usersAtLastClose;
-      const lowRunway = desk.runway !== null && desk.runway < config.board.runwayTurns;
-      const fired = (usersFell || lowRunway) && firstFloat(seed, turn, STREAM.board, desk.company.id) < config.board.fireChance;
+      const lowRunway = desk.runway !== null && desk.runway < rules.board.runwayTurns;
+      const fired = (usersFell || lowRunway) && firstFloat(seed, turn, STREAM.board, desk.company.id) < rules.board.fireChance;
       desk.board = { usersFell, lowRunway, fired };
       if (fired) desk.out = "fired";
     }
     const survivors = desks.filter((desk) => desk.out === null);
     if (survivors.length === 0) outcome = { kind: "wipeout", turn, winnerId: null };
     else if (survivors.length === 1) outcome = { kind: "lastStanding", turn, winnerId: survivors[0].company.id };
-    else if (turn >= config.game.maxTurns) outcome = { kind: "turnLimit", turn, winnerId: best(survivors, stakeOf, (d) => d.valuation).company.id };
+    else if (turn >= rules.game.maxTurns) outcome = { kind: "turnLimit", turn, winnerId: best(survivors, stakeOf, (d) => d.valuation).company.id };
   }
 
   // Close the books: every company as it stands after this turn. Companies that go out release
@@ -431,7 +434,7 @@ export const resolveTurn = (state: GameState, plans: PlanSet, seed: number, conf
     hiring: { candidates, picks: hiring.picks },
     companies: state.companies.map((company) => {
       const desk = deskOf(company.id);
-      return desk === undefined ? null : reportOf(desk, config);
+      return desk === undefined ? null : reportOf(desk, rules);
     }),
     nextEvent: next.outcome === null ? next.event : null,
     outcome,

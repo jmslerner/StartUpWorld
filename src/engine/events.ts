@@ -2,6 +2,7 @@
 // An event is drawn at the end of one turn for the next, and its instant effects are applied
 // straight away, so the state a turn starts from already shows it.
 
+import { rulesForTurn } from "./career";
 import { clamp, round4 } from "./formulas";
 import { STREAM, firstFloat, nextIntInclusive, pickWeightedIndex, streamSeed } from "./rng";
 import type { ActiveEvent, Climate, Company, CompanyId, EventCard, RulesConfig, TargetRule, TurnModifiers } from "./types";
@@ -16,8 +17,11 @@ export interface EventContext {
   readonly carryOverUsers: number;
 }
 
+/** A card by id: in the config's deck, or in the deck of any of a career's eras. */
 export const findCard = (cardId: string, config: RulesConfig): EventCard | undefined =>
-  config.events.deck.find((card) => card.id === cardId);
+  [config.events.deck, ...(config.career?.eras ?? []).map((era) => era.values.events?.deck ?? [])]
+    .flat()
+    .find((card) => card.id === cardId);
 
 /** Companies a card may hit: still in the game and matching every condition of the rule. */
 export const eligibleTargets = (rule: TargetRule, companies: readonly Company[]): CompanyId[] =>
@@ -32,12 +36,13 @@ export const eligibleTargets = (rule: TargetRule, companies: readonly Company[])
     )
     .map((company) => company.id);
 
-/** The event for `turn`, or null. Cards with no valid target are left out of the draw. */
+/** The event for `turn`, or null, drawn on that turn's numbers. Cards with no valid target are left out of the draw. */
 export const drawEvent = (companies: readonly Company[], turn: number, seed: number, config: RulesConfig): ActiveEvent | null => {
-  if (turn < config.events.firstTurn) return null;
-  if (firstFloat(seed, turn, STREAM.eventRoll) >= config.events.chance) return null;
+  const { events } = rulesForTurn(config, turn);
+  if (turn < events.firstTurn) return null;
+  if (firstFloat(seed, turn, STREAM.eventRoll) >= events.chance) return null;
 
-  const playable = config.events.deck.filter((card) => card.target === undefined || eligibleTargets(card.target, companies).length > 0);
+  const playable = events.deck.filter((card) => card.target === undefined || eligibleTargets(card.target, companies).length > 0);
   const picked = pickWeightedIndex(
     streamSeed(seed, turn, STREAM.eventCard),
     playable.map((card) => card.weight),

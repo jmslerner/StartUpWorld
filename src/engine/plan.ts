@@ -1,6 +1,7 @@
 // Plans: the default for a new turn, and the check that turns any plan into a legal one.
 // An illegal part is fixed up or dropped at no cost, with a note for the quarterly report.
 
+import { rulesForTurn } from "./career";
 import { poachFloor, refitAllocation } from "./formulas";
 import { PRICE_TIERS } from "./types";
 import type { Allocation, Company, CompanyId, GameState, Plan, PublicCompany, RulesConfig } from "./types";
@@ -18,10 +19,11 @@ export const defaultPlan = (company: Company): Plan => ({
 
 export type RaiseBlocker = "users" | "cooldown";
 
-/** Why this company cannot raise this turn, or null if it can. */
+/** Why this company cannot raise this turn, or null if it can, by that turn's numbers. */
 export const raiseBlocker = (company: Company, turn: number, config: RulesConfig): RaiseBlocker | null => {
-  if (company.users < config.raise.minUsers) return "users";
-  if (company.lastRaise !== null && turn - company.lastRaise.turn <= config.raise.cooldownTurns) return "cooldown";
+  const rules = rulesForTurn(config, turn);
+  if (company.users < rules.raise.minUsers) return "users";
+  if (company.lastRaise !== null && turn - company.lastRaise.turn <= rules.raise.cooldownTurns) return "cooldown";
   return null;
 };
 
@@ -40,7 +42,10 @@ export interface CheckedPlan {
   readonly notes: readonly string[];
 }
 
-/** The check itself, from what one company can see: itself, the turn, and the public side of the others. */
+/**
+ * The check itself, from what one company can see: itself, the turn, and the public side of the others. Limits are
+ * those of the turn being planned.
+ */
 export const normalizePlanFor = (
   company: Company,
   turn: number,
@@ -48,6 +53,7 @@ export const normalizePlanFor = (
   plan: Plan | null,
   config: RulesConfig,
 ): CheckedPlan => {
+  const rules = rulesForTurn(config, turn);
   const wanted = plan ?? defaultPlan(company);
   const notes: string[] = [];
 
@@ -61,12 +67,12 @@ export const normalizePlanFor = (
 
   let raisePercent = wanted.raisePercent;
   if (raisePercent !== 0) {
-    const blocker = raiseBlocker(company, turn, config);
-    if (!config.raise.options.includes(raisePercent)) {
+    const blocker = raiseBlocker(company, turn, rules);
+    if (!rules.raise.options.includes(raisePercent)) {
       notes.push(`Raise dropped: ${raisePercent}% is not on offer.`);
       raisePercent = 0;
     } else if (blocker === "users") {
-      notes.push(`Raise dropped: it needs ${config.raise.minUsers.toLocaleString("en-US")} users.`);
+      notes.push(`Raise dropped: it needs ${rules.raise.minUsers.toLocaleString("en-US")} users.`);
       raisePercent = 0;
     } else if (blocker === "cooldown") {
       notes.push("Raise dropped: the last raise was too recent.");
@@ -78,8 +84,8 @@ export const normalizePlanFor = (
   const allocation = refitAllocation(wanted.allocation, available);
   if (!sameSplit(allocation, wanted.allocation)) notes.push(`Team split refitted to ${people(available)}.`);
 
-  const step = config.pull.marketingStep;
-  const marketing = Math.min(config.pull.maxMarketing, Math.floor(whole(wanted.marketing) / step) * step);
+  const step = rules.pull.marketingStep;
+  const marketing = Math.min(rules.pull.maxMarketing, Math.floor(whole(wanted.marketing) / step) * step);
   if (marketing !== wanted.marketing) notes.push(`Marketing set to ${dollars(marketing)}.`);
 
   let poachTarget = wanted.poachTarget;
@@ -89,7 +95,7 @@ export const normalizePlanFor = (
     if (target === undefined || target.id === company.id || target.out !== null) {
       notes.push("Poach dropped: that company cannot be poached from.");
       poachTarget = null;
-    } else if (target.headcount < poachFloor(config)) {
+    } else if (target.headcount < poachFloor(rules)) {
       notes.push(`Poach dropped: ${target.name} is too small to lose anyone.`);
       poachTarget = null;
     }

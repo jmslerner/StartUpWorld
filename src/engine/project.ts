@@ -6,6 +6,7 @@
 // from public information only.
 
 import { CONFIG } from "../config";
+import { marketTurn, rulesForTurn } from "./career";
 import {
   churnRate,
   clamp,
@@ -78,12 +79,12 @@ export interface Projection {
 const inPlay = (rival: PublicCompany): boolean => rival.out === null && rival.launched;
 
 /** Where a rival's quality is heading if it keeps building as it did last quarter. */
-const nextQualityGuess = (rival: PublicCompany, config: RulesConfig): number => {
+const nextQualityGuess = (rival: PublicCompany, rules: RulesConfig): number => {
   const last = rival.lastQuarter;
   if (last === null || last.qualityAtOpen >= 100) return rival.quality;
-  const lastGain = rival.quality - last.qualityAtOpen + config.quality.decay;
+  const lastGain = rival.quality - last.qualityAtOpen + rules.quality.decay;
   const gain = Math.max(0, lastGain) * ((100 - rival.quality) / (100 - last.qualityAtOpen));
-  return clamp(rival.quality + gain - config.quality.decay, 0, 100);
+  return clamp(rival.quality + gain - rules.quality.decay, 0, 100);
 };
 
 /**
@@ -93,6 +94,7 @@ const nextQualityGuess = (rival: PublicCompany, config: RulesConfig): number => 
  * hype trend. Before that, a rival's pull is a guess from its public stats.
  */
 export const estimateRivals = (view: CompanyView, config: RulesConfig = CONFIG): RivalEstimate => {
+  const rules = rulesForTurn(config, view.turn);
   const { self } = view;
   const pullPerUserWon = self.lastPull !== null && self.lastQuarter !== null && self.lastQuarter.usersWon > 0 ? self.lastPull / self.lastQuarter.usersWon : null;
   let pull = 0;
@@ -100,18 +102,18 @@ export const estimateRivals = (view: CompanyView, config: RulesConfig = CONFIG):
   for (const rival of view.rivals) {
     if (rival.out !== null) continue;
     const guessFrom = (quality: number): number =>
-      quality * config.projection.rivalPullGuess * config.priceTiers[rival.price].pullFactor * (1 + rival.hype / 100);
+      quality * rules.projection.rivalPullGuess * rules.priceTiers[rival.price].pullFactor * (1 + rival.hype / 100);
     if (!rival.launched) {
       // Not in the market yet, but it will be if its product keeps improving at this rate.
-      const heading = nextQualityGuess(rival, config);
-      if (heading >= config.quality.launchAt) pull += guessFrom(heading);
+      const heading = nextQualityGuess(rival, rules);
+      if (heading >= rules.quality.launchAt) pull += guessFrom(heading);
       continue;
     }
-    churn += Math.min(rival.users, Math.round(rival.users * churnRate(rival.quality, rival.price, config)));
+    churn += Math.min(rival.users, Math.round(rival.users * churnRate(rival.quality, rival.price, rules)));
     const last = rival.lastQuarter;
     if (pullPerUserWon !== null && last !== null && rival.quality > 0) {
       const lastPull = pullPerUserWon * last.usersWon;
-      const qualityTrend = nextQualityGuess(rival, config) / rival.quality;
+      const qualityTrend = nextQualityGuess(rival, rules) / rival.quality;
       const hypeTrend = (1 + rival.hype / 100) / (1 + last.hypeAtOpen / 100);
       pull += lastPull * qualityTrend * hypeTrend;
     } else {
@@ -122,11 +124,11 @@ export const estimateRivals = (view: CompanyView, config: RulesConfig = CONFIG):
 };
 
 /** Hires this company can expect: the real hand-out, with every rival assumed to want a few and to win ties. */
-const expectedHires = (view: CompanyView, wanted: number, layoffs: number, config: RulesConfig): number => {
-  const candidates = config.hiring.candidatesPerTurn + view.modifiers.extraCandidates + view.freedPeople + layoffs;
+const expectedHires = (view: CompanyView, wanted: number, layoffs: number, rules: RulesConfig): number => {
+  const candidates = rules.hiring.candidatesPerTurn + view.modifiers.extraCandidates + view.freedPeople + layoffs;
   const bids = [
     { id: view.self.id, hype: view.self.hype, tieKey: 1, wanted },
-    ...view.rivals.filter((rival) => rival.out === null).map((rival) => ({ id: rival.id, hype: rival.hype, tieKey: 0, wanted: config.projection.rivalHireGuess })),
+    ...view.rivals.filter((rival) => rival.out === null).map((rival) => ({ id: rival.id, hype: rival.hype, tieKey: 0, wanted: rules.projection.rivalHireGuess })),
   ];
   return handOutCandidates(candidates, bids).hired[view.self.id] ?? 0;
 };
@@ -137,15 +139,16 @@ export const projectTurn = (
   config: RulesConfig = CONFIG,
   rivals: RivalEstimate = estimateRivals(view, config),
 ): Projection => {
+  const rules = rulesForTurn(config, view.turn);
   const { self } = view;
-  const checked = normalizePlanFor(self, view.turn, view.rivals, plan, config);
+  const checked = normalizePlanFor(self, view.turn, view.rivals, plan, rules);
   const resolved = checked.plan;
-  const archetype = config.archetypes[self.archetype];
+  const archetype = rules.archetypes[self.archetype];
   const payroll = self.headcount - resolved.layoffs;
 
   let raise: Projection["raise"] = null;
   if (resolved.raisePercent > 0) {
-    const valuation = valuationOf(self.users, self.hype, view.climate.multiplier, config);
+    const valuation = valuationOf(self.users, self.hype, view.climate.multiplier, rules);
     raise = { percent: resolved.raisePercent, valuation, amount: raiseAmount(valuation, resolved.raisePercent) };
   }
   const equity = raise ? round6(self.founderEquity * (1 - raise.percent / 100)) : self.founderEquity;
@@ -161,49 +164,49 @@ export const projectTurn = (
 
   const rivalQualities = view.rivals.filter(inPlay).map((rival) => rival.quality);
   const catchUp = archetype.catchUpMultiplier > 1 && rivalQualities.length > 0 && self.quality < Math.max(...rivalQualities);
-  const quality = nextQuality(self.quality, qualityGain(self.quality, work.product, catchUp ? archetype.catchUpMultiplier : 1, config), config);
-  const launchedNow = !self.launched && quality >= config.quality.launchAt;
+  const quality = nextQuality(self.quality, qualityGain(self.quality, work.product, catchUp ? archetype.catchUpMultiplier : 1, rules), rules);
+  const launchedNow = !self.launched && quality >= rules.quality.launchAt;
   const launched = self.launched || launchedNow;
 
   const pull = launched
-    ? pullOf({ quality, growthWork: work.growth, marketing: resolved.marketing, tier: resolved.price, hype: self.hype, marketingModifier: view.modifiers.marketing }, config)
+    ? pullOf({ quality, growthWork: work.growth, marketing: resolved.marketing, tier: resolved.price, hype: self.hype, marketingModifier: view.modifiers.marketing }, rules)
     : 0;
-  const usersChurned = launched ? Math.min(self.users, Math.round(self.users * churnRate(quality, resolved.price, config))) : 0;
-  const pool = newUsersForTurn(view.turn, view.modifiers.newUsers, config) + view.carryOverUsers + usersChurned + rivals.churn;
+  const usersChurned = launched ? Math.min(self.users, Math.round(self.users * churnRate(quality, resolved.price, rules))) : 0;
+  const pool = newUsersForTurn(marketTurn(config, view.turn), view.modifiers.newUsers, rules) + view.carryOverUsers + usersChurned + rivals.churn;
   const share = pull > 0 ? pull / (pull + rivals.pull) : 0;
   const usersWon = Math.round(pool * share);
   const users = self.users - usersChurned + usersWon;
 
   const target = resolved.poachTarget === null ? undefined : view.rivals.find((rival) => rival.id === resolved.poachTarget);
-  const odds = target === undefined ? null : poachChance(self.hype, target.hype, config);
+  const odds = target === undefined ? null : poachChance(self.hype, target.hype, rules);
 
-  const hiresWanted = Math.min(hiringCapacity(work.recruiting, config), resolved.hireLimit ?? Number.MAX_SAFE_INTEGER);
-  const hires = expectedHires(view, hiresWanted, resolved.layoffs, config);
+  const hiresWanted = Math.min(hiringCapacity(work.recruiting, rules), resolved.hireLimit ?? Number.MAX_SAFE_INTEGER);
+  const hires = expectedHires(view, hiresWanted, resolved.layoffs, rules);
 
-  const revenue = revenueOf(users, resolved.price, config);
-  const salaries = payroll * config.salary;
-  const hiring = hiresWanted * config.hiring.fee;
-  const poaching = odds === null ? 0 : config.poach.cost;
-  const severance = resolved.layoffs * config.layoff.severance;
+  const revenue = revenueOf(users, resolved.price, rules);
+  const salaries = payroll * rules.salary;
+  const hiring = hiresWanted * rules.hiring.fee;
+  const poaching = odds === null ? 0 : rules.poach.cost;
+  const severance = resolved.layoffs * rules.layoff.severance;
   const costs: CostBreakdown = { salaries, marketing: resolved.marketing, hiring, poaching, severance, total: salaries + resolved.marketing + hiring + poaching + severance };
   const cash = self.cash + (raise?.amount ?? 0) + revenue - costs.total;
   const runway = runwayOf(cash, revenue, costs.total);
 
-  const grew = self.usersAtLastClose > 0 && users >= self.usersAtLastClose * (1 + config.hype.growthThreshold);
+  const grew = self.usersAtLastClose > 0 && users >= self.usersAtLastClose * (1 + rules.hype.growthThreshold);
   const hype = round4(
     clamp(
-      self.hype * (1 - config.hype.decay) +
-        (launchedNow ? config.hype.launch : 0) +
-        (raise ? config.hype.raise : 0) +
-        (grew ? config.hype.growth : 0) +
-        (resolved.layoffs > 0 ? config.layoff.hype : 0),
+      self.hype * (1 - rules.hype.decay) +
+        (launchedNow ? rules.hype.launch : 0) +
+        (raise ? rules.hype.raise : 0) +
+        (grew ? rules.hype.growth : 0) +
+        (resolved.layoffs > 0 ? rules.layoff.hype : 0),
       0,
       100,
     ),
   );
 
-  const badQuarter = users < self.usersAtLastClose || (runway !== null && runway < config.board.runwayTurns);
-  const boardRisk = investorSeats > self.founderSeats && badQuarter ? config.board.fireChance : 0;
+  const badQuarter = users < self.usersAtLastClose || (runway !== null && runway < rules.board.runwayTurns);
+  const boardRisk = investorSeats > self.founderSeats && badQuarter ? rules.board.fireChance : 0;
 
   return {
     plan: resolved,
@@ -224,11 +227,11 @@ export const projectTurn = (
     revenue,
     costs,
     cash,
-    cashFloor: self.cash + (raise?.amount ?? 0) + revenueOf(self.users - usersChurned, resolved.price, config) - costs.total,
+    cashFloor: self.cash + (raise?.amount ?? 0) + revenueOf(self.users - usersChurned, resolved.price, rules) - costs.total,
     profitable: revenue >= costs.total,
     runway,
     hype,
-    valuation: valuationOf(users, hype, view.climate.multiplier, config),
+    valuation: valuationOf(users, hype, view.climate.multiplier, rules),
     hiresWanted,
     hires,
     headcount: payroll + hires,

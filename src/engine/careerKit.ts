@@ -3,11 +3,11 @@
 // The career's rule tests run on the race's frozen design numbers (src/config.design.ts) with the career switched
 // on, never on the numbers the career ships with, so those can be tuned without touching a single test.
 
-import type { GameConfig } from "../config";
+import type { GameConfig, PlayEra } from "../config";
 import { DESIGN } from "../config.design";
 import { createGame } from "./setup";
 import { FOUR_SEATS, withCompany } from "./testKit";
-import type { CareerRules, CompanyCareer, CompanyId, EraConfig, GameState, OfficeConfig } from "./types";
+import type { CareerRules, CompanyCareer, CompanyId, GameState, OfficeConfig } from "./types";
 
 /** The five offices at the sizes the career's design starts from. */
 export const OFFICES: readonly OfficeConfig[] = [
@@ -41,7 +41,7 @@ export const withCareer = (patch: Partial<CareerRules>, base: GameConfig = CAREE
 });
 
 /** CAREER_TEST with these eras in place of its one flat era. */
-export const withEras = (...eras: EraConfig[]): GameConfig => withCareer({ eras });
+export const withEras = (...eras: PlayEra[]): GameConfig => withCareer({ eras });
 
 export const newCareer = (config: GameConfig = CAREER_TEST): GameState => createGame(FOUR_SEATS, config);
 
