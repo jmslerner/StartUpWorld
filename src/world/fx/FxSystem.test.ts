@@ -7,7 +7,7 @@ import { scene as sceneOf, Studio } from "../people/testKit";
 import type { BurstKind, OfficeScene, QualityLevel, SceneEvent, WorldFrame } from "../types";
 import { lowestFreeSlot } from "./FloatTextLayer";
 import { formatCompact, formatCountDelta, formatHeadcountDelta, formatSignedCount } from "./format";
-import { doorCounts, FxSystem, particleBudget, SHAKE_SECONDS } from "./FxSystem";
+import { doorCounts, FxSystem, particleBudget, REDUCED_TEXT_SECONDS, SHAKE_SECONDS } from "./FxSystem";
 import {
   BURST_KINDS,
   KIND_PROFILES,
@@ -624,6 +624,7 @@ describe("FxSystem", () => {
   });
 
   it("under reduced motion the numbers at the door stand still, and are gone within a second", () => {
+    expect(REDUCED_TEXT_SECONDS).toBe(0.8);
     stubDocument();
     for (const step of [FRAME, 0.1]) {
       const { fx } = makeFx("high", true);
@@ -642,8 +643,10 @@ describe("FxSystem", () => {
           expect(sprite.scale.equals(placed[i][1]), `grew at ${t}`).toBe(true);
         });
       }
+      // 0.8 s, a step at most past it: room under the one-second limit for a slow frame in a browser.
+      expect(t, String(step)).toBeGreaterThanOrEqual(REDUCED_TEXT_SECONDS - 1e-9);
+      expect(t, String(step)).toBeLessThan(REDUCED_TEXT_SECONDS + step + 1e-9);
       expect(t, String(step)).toBeLessThan(1);
-      expect(t, String(step)).toBeGreaterThan(0.5);
       expect(kindsAlive(fx)).toEqual([]);
     }
     // With full motion they still rise, and last as long as before.

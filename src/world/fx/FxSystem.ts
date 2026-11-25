@@ -110,7 +110,7 @@ const RISE_SHAKE = 0.4;
 export const SHAKE_SECONDS = 0.8;
 
 /** Under reduced motion a float text stands still and shows this long: gone within a second of its frame. */
-export const REDUCED_TEXT_SECONDS = 0.9;
+export const REDUCED_TEXT_SECONDS = 0.8;
 
 /** The longest a bubble may be asked to show. */
 const MAX_BUBBLE_SECONDS = 60;
