@@ -177,8 +177,6 @@ export const SCALE = {
   deskTop: 0.72,
   /** Chair seat height: seated characters put their hips here. */
   seat: 0.45,
-  /** Beanbag seat height, for the cross-legged "floor-sit" pose. */
-  floorSeat: 0.24,
   /** Standing character, before the ± 8 % look variation. */
   person: 1.5,
   /** Back walls. */

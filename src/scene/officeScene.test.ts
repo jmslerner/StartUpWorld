@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { DESIGN } from "../config.design";
-import { CAREER_TEST, atTurn, newCareer, withCareer, withCareerOf, withEras } from "../engine/careerKit";
+import { CAREER_RULES, CAREER_TEST, atTurn, newCareer, withCareer, withCareerOf, withEras } from "../engine/careerKit";
 import { DEPARTMENTS, normalizePlan, resolveTurn } from "../engine/index";
 import type { CompanyId, GameState, Outcome, Plan } from "../engine/index";
 import { newGame, onlyActive, planOf, withCompany, withState } from "../engine/testKit";
+import { MAX_STAFF_DRAWN } from "../world/cast";
+import { DESKS } from "../world/office/layouts";
 import { TEAMS } from "../world/types/scene";
 import { officeSceneFor } from "./officeScene";
 import type { OfficeSceneInput } from "./officeScene";
@@ -176,6 +178,11 @@ describe("the office scene of a company", () => {
     const before = JSON.stringify(game);
     expect(sceneOf(game, 0)).toEqual(sceneOf(game, 0));
     expect(JSON.stringify(game)).toBe(before);
+  });
+
+  // The world may not read the engine, so the two sides are checked against each other here.
+  it("the world has a desk for everyone an office holds, up to the figures it draws", () => {
+    expect(DESKS).toEqual(CAREER_RULES.offices.map((office) => Math.min(office.capacity, MAX_STAFF_DRAWN)));
   });
 
   it("the world's team names are the engine's departments", () => {
