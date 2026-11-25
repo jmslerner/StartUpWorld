@@ -43,9 +43,14 @@ numbers. The race's four ending sounds are reused for the career's ending.
 - **Two saves, one game in play** (design section 12: "a race save and a career save do not disturb each other"). Each
   mode writes and removes only its own key. The store plays one game at a time; a save of the other mode stays on disk
   and the first screen offers to resume it. Abandoning a game removes only its own key.
-- **The mode the first screen preselects:** Quick race on a fresh first screen; Career after a career is left (Play
-  again or abandon) or its save was refused at load, so that "a save this build cannot use starts a new career" is one
-  click. (Decided here for the owner to confirm: whether a fresh first screen should preselect Career instead.)
+- **The mode the first screen preselects:** Career on a fresh first screen (the owner's decision, 25 November 2026:
+  the career is the main game and the race the second mode). After a game is left (Play again or abandon) the first
+  screen preselects the mode just left; after a career's save was refused at load it preselects Career. Where a test
+  below expects `preferred: "race"` for a store that has left no game, the value is `"career"`.
+- **The owner's other decisions for this plan (25 November 2026):** the timeline shows every era's name and years
+  from the start, a news card only once its year has come, and a platform shift in the years it is announced, never
+  the other dated cards ahead of time; "Save and leave" exists in a career only, and the race's screens stay as they
+  are.
 - **No jsdom or testing-library.** Logic a screen needs is in pure `.ts` modules with Vitest tests; components only lay
   it out. Screens are checked by `scripts/career-check.mjs` (Task 12) in headless Chromium.
 - **Desktop only.** Lay out for 1280 px wide. At 390 px nothing may overflow the page sideways; no other phone work.
