@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { DESIGN } from "../config.design";
 import { boardPaused } from "./career";
-import { CAREER_TEST, atTurn, newCareer, qualify, withCareerOf, withEras } from "./careerKit";
+import { CAREER_RULES, CAREER_TEST, atTurn, newCareer, qualify, withCareer, withCareerOf, withEras } from "./careerKit";
 import { clamp, round4, round6, runwayOf, valuationOf } from "./formulas";
 import { projectTurn } from "./project";
-import { HUMAN, INCUMBENT, launchedCompany, newGame, reportFor, resolve, seedWhere, withCompany } from "./testKit";
-import type { CompanyReport, GameState } from "./types";
+import { BLITZ, HUMAN, INCUMBENT, launchedCompany, newGame, reportFor, resolve, seedWhere, withCompany } from "./testKit";
+import type { CompanyReport, GameState, Plan } from "./types";
 import { publicReport, viewFor } from "./view";
 
 const RICH = 10_000_000;
@@ -55,7 +55,7 @@ describe("the first failure is a rescue", () => {
     expect(after.investorSeats).toBe(3);
     expect(report.career?.hype.rescue).toBe(-10);
     expect(report.hype.end).toBe(round4(Math.max(0, yearHype(report) - 10)));
-    expect(report.cash.end).toBe(Math.min(report.headcount.start - report.headcount.laidOff, report.headcount.end) * DESIGN.salary);
+    expect(report.cash.end).toBe((report.headcount.start - report.headcount.laidOff - report.headcount.poachedOut) * DESIGN.salary);
     expect(report.runway).toBe(runwayOf(report.cash.end, report.revenue, report.costs.total));
     expect(report.valuation).toBe(valuationOf(report.users.end, report.hype.end, 1, CAREER_TEST));
     expect(report.valuation).toBeGreaterThan(0);
@@ -146,7 +146,7 @@ describe("what a rescue resets the cash to", () => {
     const result = resolve(state, {}, 1, config);
     const report = reportFor(result, HUMAN);
     expect(report.career?.rescue?.reason).toBe("bankrupt");
-    expect(report.cash.end).toBe(Math.min(report.headcount.start - report.headcount.laidOff, report.headcount.end) * DESIGN.salary);
+    expect(report.cash.end).toBe((report.headcount.start - report.headcount.laidOff - report.headcount.poachedOut) * DESIGN.salary);
     expect(report.cash.end).toBe(5 * 40_000);
   });
 
@@ -158,6 +158,30 @@ describe("what a rescue resets the cash to", () => {
     expect(report.career?.rescue?.reason).toBe("bankrupt");
     expect(report.headcount).toMatchObject({ start: 5, hired: 3, end: 8 });
     expect(report.cash.end).toBe(5 * DESIGN.salary);
+  });
+
+  it("a rescue's cash is not for someone poached away, and not for a new hire in their place (ruling 28)", () => {
+    // Seat 1, with hype 100, poaches one of seat 0's five in the bankrupt year.
+    const state = withCompany(brokeYear(), BLITZ, { hype: 100, cash: RICH });
+    const year = (allocation: Plan["allocation"], seed: number) =>
+      reportFor(resolve(state, { [HUMAN]: { allocation }, [BLITZ]: { poachTarget: HUMAN } }, seed, CAREER_TEST), HUMAN);
+    const seed = seedWhere((s) => year({ product: 5, growth: 0, recruiting: 0 }, s).headcount.poachedOut === 1);
+    const kept = year({ product: 5, growth: 0, recruiting: 0 }, seed);
+    expect(kept.career?.rescue?.reason).toBe("bankrupt");
+    expect(kept.headcount).toMatchObject({ start: 5, hired: 0, poachedOut: 1, end: 4 });
+    expect(kept.cash.end).toBe(4 * DESIGN.salary);
+    const hiring = year({ product: 3, growth: 0, recruiting: 2 }, seed);
+    expect(hiring.career?.rescue?.reason).toBe("bankrupt");
+    expect(hiring.headcount).toMatchObject({ start: 5, hired: 3, poachedOut: 1, end: 7 });
+    expect(hiring.cash.end).toBe(4 * DESIGN.salary); // it was 5
+  });
+
+  it("the reset is a whole number of dollars", () => {
+    const config = withCareer({ rescue: { ...CAREER_RULES.rescue, salaryYears: 1 / 3 } });
+    const report = reportFor(resolve(brokeYear(), {}, 1, config), HUMAN);
+    expect(report.career?.rescue?.reason).toBe("bankrupt");
+    expect(Number.isInteger(report.cash.end)).toBe(true);
+    expect(report.cash.end).toBe(Math.round((5 * DESIGN.salary) / 3));
   });
 
   it("people laid off in the bankrupt year are not counted either", () => {

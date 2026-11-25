@@ -57,8 +57,10 @@ Resolution, in this order:
    - A team whose head count as the year ends is over its office's capacity moves to the smallest office that holds
      it, however many sizes that skips, and pays one bill: `moving.salaryYears` of the year's salary for everyone on
      the team. The bill is the report's `costs.moving`, 0 without a move, and is counted in the year's total, so it
-     counts against the profit and the cash and can bankrupt. The one-year projection works the move out the same way
-     on its payroll plus every hire it wants plus the poach it plans (rulings 31 to 33 and 35).
+     counts against the profit and the cash and can bankrupt. The bill is a whole number of dollars. The one-year
+     projection costs every hire the year can make, whether the planned poach works or not, and works the move out
+     the same way on the largest team the year can end with: its payroll plus those hires plus the poach it plans,
+     never more than the last office holds (rulings 31 to 33 and 35).
 10. Hype.
     - In the year it lists, a company gains `listing.hype`, added with the year's other hype before the cap at 100.
     - The valuation the year closes at carries the listing premium for a company that is public or listed this year,
@@ -73,7 +75,8 @@ Resolution, in this order:
     - A rescue, in this order: the founder keeps `rescue.equityKept` of their equity; investors gain
       `rescue.investorSeats` seats, or end with one more than the founders if that is more; `rescue.hype` is added
       to the year's hype once it is worked out, not below 0; cash below $0 is reset to `rescue.salaryYears` of
-      salaries at the closing year's salary for the people paid during the year. The valuation, with its listing
+      salaries at the closing year's salary for the people who were on the payroll during the year and are still
+      there as it ends, rounded to whole dollars. The valuation, with its listing
       premium, and the runway are then worked out again from what the rescue leaves (rulings 26 to 30).
     - In the year after a rescue the board does not vote: its report says what it saw, with `fired: false`, and the
       one-year projection puts the board's risk at 0. It does not predict a rescue (ruling 25).
@@ -87,6 +90,8 @@ Resolution, in this order:
     - Closing the books also records a rescue, its turn and what it was from; a company is rescued once (ruling 24).
     - Closing the books also records a move: the company's office is the one it moved to. Offices are never given up
       (ruling 31).
+    - The costs a company carries into the next year as last year's, which its opening runway reads, leave out a
+      moving bill (ruling 41).
 14. The funding climate ticks down and next year's card is drawn.
     - First, newcomers take their seats: every seat whose company is out, was played by a computer style and went
       out at least `replacement.afterYears` turns before the coming year gets a new startup, in seat order, with the
@@ -144,20 +149,27 @@ Resolution, in this order:
     report gives the change actually made.
 27. Investors end a rescue with two more seats, or one more than the founders if that is more.
 28. Cash is reset only from below $0, to a year of salaries at the salary of the year that closes, for the people who
-    were on the payroll during the year. People who join as the year ends are not counted, so hiring on the way down
-    buys nothing.
+    were on the payroll during the year and are still there as it ends: the payroll less those poached away in the
+    year. People who join as the year ends, hired or poached in, are never counted, so hiring on the way down buys
+    nothing. The cash is a whole number of dollars.
 29. A company that lists and is rescued in the same year keeps its listing: both changes to its equity, seats and hype
     apply.
 30. After a rescue the report's runway is worked out again from the cash the rescue leaves.
 31. The office is checked once a year, on the head count as the year ends. A team that shrinks keeps its office.
 32. One bill, however many sizes are skipped: `moving.salaryYears` of that year's salary for everyone who moves.
+    The bill is a whole number of dollars.
 33. The bill is one of the year's costs.
 34. Hires are capped so that a team never exceeds the last office, and a poach that would overfill it is dropped.
-35. The projection assumes every wanted hire and the planned poach arrive.
+35. The projection costs every hire the year can make and the planned poach, and works the move out on the largest
+    team the year can end with, so its cash and its bill err on the careful side.
 36. A seat is refilled only if its company was run by a computer style; the player's seat never is.
 37. Out in year Y means the newcomer plans from year Y + 2.
 38. A newcomer gets the startup numbers of the year it enters, whatever style it plays.
 39. Newcomers enter before the coming year's card is drawn, so a card can hit them.
+40. After a year in which a ceiling held, a rival that closed it at the ceiling shows no build rate. The projection
+    then assumes its whole team builds: the cautious guess, and one that does not depend on the plan in hand.
+41. A moving bill is a cost of its own year only. What a company carries into the next year as last year's costs,
+    which the opening runway reads, leaves the bill out, because it cannot recur.
 
 ## Starting numbers
 

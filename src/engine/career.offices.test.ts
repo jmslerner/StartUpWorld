@@ -1,12 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { DESIGN } from "../config.design";
 import { movingBill, peopleCap } from "./career";
-import { CAREER_RULES, CAREER_TEST, atTurn, careerOf, newCareer, withCareerOf, withEras } from "./careerKit";
+import { CAREER_RULES, CAREER_TEST, atTurn, careerOf, newCareer, withCareer, withCareerOf, withEras } from "./careerKit";
+import { runwayOf } from "./formulas";
 import { projectTurn } from "./project";
 import { BLITZ, HUMAN, newGame, reportFor, resolve, withCompany, withState } from "./testKit";
 import type { GameConfig } from "../config";
 import type { GameState, Plan } from "./types";
-import { publicReport, viewFor } from "./view";
+import { companyRunway, publicReport, viewFor } from "./view";
 
 const RICH = 10_000_000;
 
@@ -109,6 +110,36 @@ describe("outgrowing the office", () => {
     expect(after.career?.office).toBe(1);
   });
 
+  it("the year after a move opens on the costs that recur: the bill is left out (ruling 41)", () => {
+    const { report, after } = playYear(teamOf(4), recruitOne(4));
+    const moving = report.costs.moving ?? 0;
+    expect(moving).toBe(bill(5));
+    expect(after.lastCosts).toBe(report.costs.total - moving);
+    expect(companyRunway(after, CAREER_TEST)).toBe(runwayOf(after.cash, report.revenue, report.costs.total - moving));
+  });
+
+  it("in the year of the move the bill still counts against profit and runway", () => {
+    const { report } = playYear(teamOf(4), recruitOne(4));
+    expect(report.costs.moving).toBe(bill(5));
+    expect(report.profitable).toBe(report.revenue >= report.costs.total);
+    expect(report.runway).toBe(runwayOf(report.cash.end, report.revenue, report.costs.total));
+  });
+
+  it("a year without a move carries its whole costs", () => {
+    const { report, after } = playYear(teamOf(3), recruitOne(3));
+    expect(report.costs.moving).toBe(0);
+    expect(after.lastCosts).toBe(report.costs.total);
+  });
+
+  it("the bill is a whole number of dollars", () => {
+    const config = withCareer({ moving: { salaryYears: 1 / 3 } });
+    expect(movingBill(5, config)).toBe(Math.round((5 * DESIGN.salary) / 3));
+    const { report } = playYear(teamOf(4), recruitOne(4), config);
+    expect(Number.isInteger(report.costs.moving)).toBe(true);
+    expect(report.costs.moving).toBe(Math.round((5 * DESIGN.salary) / 3));
+    expect(report.career?.office?.bill).toBe(report.costs.moving);
+  });
+
   it("the bill uses the year's salary", () => {
     // two eras, the second with twice the salary: twice the bill
     const config = withEras(
@@ -159,8 +190,27 @@ describe("the last office is the largest a company grows", () => {
       if (report.poach?.success === true) succeeded.push(seed);
     }
     expect(succeeded.length).toBeGreaterThan(0);
-    // The projection counts the planned poach: no room is left for a hire.
-    expect(projectTurn(viewFor(with149, HUMAN), { ...with149.companies[HUMAN].lastPlan, ...poaching(149) }, CAREER_TEST).hiresWanted).toBe(0);
+    // The projection costs the hire the year makes if the poach fails, and the move on no more than the cap.
+    const projection = projectTurn(viewFor(with149, HUMAN), { ...with149.companies[HUMAN].lastPlan, ...poaching(149) }, CAREER_TEST);
+    expect(projection.hiresWanted).toBe(1);
+    expect(projection.career?.office).toBeNull();
+  });
+
+  it("at the people cap a year cannot end under the projection's cash floor, whether the poach works or not (ruling 35)", () => {
+    for (const people of [148, 149]) {
+      const state = teamOf(people, 4);
+      const projection = projectTurn(viewFor(state, HUMAN), { ...state.companies[HUMAN].lastPlan, ...poaching(people) }, CAREER_TEST);
+      expect(projection.costs.hiring).toBe((150 - people) * DESIGN.hiring.fee);
+      expect(projection.costs.moving).toBe(0);
+      const outcomes = new Set<boolean>();
+      for (let seed = 1; seed <= 40; seed++) {
+        const { report } = playYear(state, poaching(people), CAREER_TEST, seed);
+        outcomes.add(report.poach?.success === true);
+        expect(report.headcount.end).toBe(150);
+        expect(report.cash.end).toBeGreaterThanOrEqual(projection.cashFloor);
+      }
+      expect([...outcomes].sort()).toEqual([false, true]);
+    }
   });
 });
 

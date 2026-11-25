@@ -240,8 +240,7 @@ const rescue = (desk: Desk, reason: OutReason, climate: number, rules: RulesConf
       founderSeats: company.founderSeats,
       hype: desk.hype.end,
       cash: desk.cash,
-      payroll: desk.payroll,
-      headcount: desk.headcountEnd,
+      stayed: desk.payroll - desk.poachedOut,
     },
     rules,
   );
@@ -530,7 +529,8 @@ export const resolveTurn = (state: GameState, plans: PlanSet, seed: number, conf
       usersAtLastClose: left ? 0 : desk.users,
       headcountAtLastClose: left ? 0 : desk.headcountEnd,
       lastRevenue: desk.revenue,
-      lastCosts: desk.costs.total,
+      // In a career a moving bill is a cost of its own year only: what the next year reads leaves it out (ruling 41).
+      lastCosts: rules.career === undefined ? desk.costs.total : desk.costs.total - (desk.costs.moving ?? 0),
       lastPull: desk.launched ? desk.pull : null,
       // A career keeps the quality the year closed with, before next year's card can touch it, records a listing, a
       // rescue and a move, and qualifies a company to list once a year closes at that year's bar with a profit; it

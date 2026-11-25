@@ -218,6 +218,12 @@ describe.each([["CAREER", CAREER], ["CAREER_DESIGN", CAREER_DESIGN]] as const)("
     }
   });
 
+  it("has no card that gives a company people: the office rules and the people cap would not see them", () => {
+    for (const card of [...config.events.deck, ...allCards(config)]) {
+      for (const effect of card.effects) if (effect.kind === "targetHeadcount") expect(effect.delta, card.id).toBeLessThanOrEqual(0);
+    }
+  });
+
   it("keeps a listing from shrinking the founder's stake", () => {
     expect(config.career.listing.premium * (1 - config.career.listing.percent / 100)).toBeGreaterThanOrEqual(1);
   });

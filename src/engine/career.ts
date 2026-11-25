@@ -72,11 +72,16 @@ export const datedCardFor = (turn: number, config: RulesConfig): DatedCard | nul
   return career.dated.find((card) => card.year === year) ?? null;
 };
 
-/** A card by id: in the config's deck, in the deck of any of a career's eras, or among a career's dated cards. */
-export const findCard = (cardId: string, config: RulesConfig): Omit<EventCard, "weight"> | undefined =>
-  [config.events.deck, ...(config.career?.eras ?? []).map((era) => era.values.events?.deck ?? []), config.career?.dated ?? []]
+/**
+ * A card by id: in the game config's deck, in the deck of any of a career's eras, or among a career's dated cards.
+ * Handed one era's numbers, it looks in the config they were made from, as `rulesForTurn` does.
+ */
+export const findCard = (cardId: string, config: RulesConfig): Omit<EventCard, "weight"> | undefined => {
+  const game = configOf.get(config) ?? config;
+  return [game.events.deck, ...(game.career?.eras ?? []).map((era) => era.values.events?.deck ?? []), game.career?.dated ?? []]
     .flat()
     .find((card) => card.id === cardId);
+};
 
 type QualityCeiling = Extract<EventEffect, { kind: "qualityCeiling" }>;
 
@@ -91,6 +96,15 @@ const ceilingOf = (card: Omit<EventCard, "weight"> | null | undefined): QualityC
 export const heldCeiling = (event: ActiveEvent | null, config: RulesConfig): number | null => {
   if (config.career === undefined || event === null) return null;
   const ceiling = ceilingOf(findCard(event.cardId, config));
+  return ceiling !== undefined && ceiling.turns === 1 ? ceiling.ceiling : null;
+};
+
+/**
+ * The ceiling that held through a turn's year by its dated card, or null: public, since dated cards are. Used for
+ * the year before the one being planned. Always null without a career.
+ */
+export const datedHeldCeiling = (turn: number, config: RulesConfig): number | null => {
+  const ceiling = ceilingOf(datedCardFor(turn, config));
   return ceiling !== undefined && ceiling.turns === 1 ? ceiling.ceiling : null;
 };
 
@@ -132,8 +146,11 @@ const careerRules = (rules: RulesConfig): CareerRules => {
   return rules.career;
 };
 
-/** The one bill for a move: `moving.salaryYears` of the year's salary for everyone who moves. Throws outside a career. */
-export const movingBill = (headcount: number, rules: RulesConfig): number => careerRules(rules).moving.salaryYears * headcount * rules.salary;
+/**
+ * The one bill for a move: `moving.salaryYears` of the year's salary for everyone who moves, rounded to whole dollars.
+ * Throws outside a career.
+ */
+export const movingBill = (headcount: number, rules: RulesConfig): number => Math.round(careerRules(rules).moving.salaryYears * headcount * rules.salary);
 
 /**
  * The hires a company may make, from those it wants and the head count it will have before them: in a career no
@@ -206,17 +223,19 @@ export interface RescueInput {
   readonly founderSeats: number;
   readonly hype: number;
   readonly cash: number;
-  /** The head count the year was paid for: its start less its layoffs. */
-  readonly payroll: number;
-  /** The head count the year ends with. */
-  readonly headcount: number;
+  /**
+   * The people who were on the payroll during the year and are still there as it ends: its start less its layoffs,
+   * less those poached away. People who join as the year ends are not among them.
+   */
+  readonly stayed: number;
 }
 
 /**
  * What a rescue does, in this order: the founder keeps `equityKept` of their equity; investors gain `investorSeats`
  * seats, or end with one more than the founders if that is more; `hype` is added to the year's hype, not below 0
  * (`hypeChange` is the change actually made); cash below $0 becomes `salaryYears` of salaries, at the year's salary,
- * for the people who were on the payroll during the year and are still there. Cash at or above $0 is kept.
+ * for the people who were on the payroll during the year and are still there as it ends, rounded to whole dollars.
+ * Cash at or above $0 is kept.
  * Throws outside a career.
  */
 export const rescueEffects = (
@@ -231,7 +250,7 @@ export const rescueEffects = (
     investorSeats: Math.max(year.investorSeats + rescue.investorSeats, year.founderSeats + 1),
     hype,
     hypeChange: round4(hype - year.hype),
-    cash: year.cash < 0 ? Math.min(year.payroll, year.headcount) * rules.salary * rescue.salaryYears : year.cash,
+    cash: year.cash < 0 ? Math.round(year.stayed * rules.salary * rescue.salaryYears) : year.cash,
   };
 };
 
