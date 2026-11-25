@@ -340,22 +340,20 @@ const SCREEN_DRAW: Record<ScreenKind, CanvasDraw> = {
   arcade: (ctx, w, h) => {
     ctx.fillStyle = "#120a2a";
     ctx.fillRect(0, 0, w, h);
-    // Rows of blocky invaders, a cannon and a shot.
-    const invader = (x: number, y: number, colour: string): void => {
+    // A picture of this office's own: a night sky of scattered stars over a row of coloured bars.
+    ctx.fillStyle = "#e9e4ff";
+    for (let i = 0; i < 26; i += 1) {
+      const size = i % 5 === 0 ? 2 : 1;
+      ctx.fillRect((i * 47 + 9) % (w - 4), (i * 29 + 5) % (h - 40), size, size);
+    }
+    const colours = ["#f472b6", "#fde68a", cssColor(NEON), "#4ade80", cssColor(EMBER)];
+    const heights = [18, 30, 12, 24, 16];
+    colours.forEach((colour, i) => {
       ctx.fillStyle = colour;
-      ctx.fillRect(x + 2, y, 8, 3);
-      ctx.fillRect(x, y + 3, 12, 4);
-      ctx.fillRect(x, y + 7, 3, 3);
-      ctx.fillRect(x + 9, y + 7, 3, 3);
-    };
-    ["#f472b6", "#fde68a", cssColor(NEON)].forEach((colour, row) => {
-      for (let i = 0; i < 6; i += 1) invader(14 + i * 17 + (row % 2) * 4, 10 + row * 16, colour);
+      ctx.fillRect(16 + i * 20, h - 10 - heights[i], 14, heights[i]);
     });
-    ctx.fillStyle = "#4ade80";
-    ctx.fillRect(w / 2 - 9, h - 14, 18, 6);
-    ctx.fillRect(w / 2 - 2, h - 19, 4, 6);
-    ctx.fillStyle = cssColor(EMBER);
-    ctx.fillRect(w / 2 - 1, h - 36, 3, 9);
+    ctx.fillStyle = "#3b2a6b";
+    ctx.fillRect(0, h - 10, w, 2);
   },
 };
 
