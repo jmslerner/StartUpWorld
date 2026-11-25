@@ -614,7 +614,7 @@ export const CAREER: CareerGameConfig = {
           priceTiers: { budget: { price: 2.8 }, standard: { price: 4.2 }, premium: { price: 7 } },
           // The cheapest hiring of the career.
           hiring: { candidatesPerTurn: 5, fee: 10 * K },
-          ipo: { users: 800 * K },
+          ipo: { users: 1.2 * M },
           archetypes: { startup: { cash: 500 * K } },
           pull: { maxMarketing: 5 * M },
           cpu: { personalities: { blitzscaler: { teamCap: 22 }, bootstrapper: { teamCap: 14 }, incumbent: { teamCap: 30 } } },
@@ -684,7 +684,7 @@ export const CAREER: CareerGameConfig = {
           valuation: { perUser: 16 },
           priceTiers: { budget: { price: 1.6 }, standard: { price: 2.4 }, premium: { price: 4 } },
           hiring: { candidatesPerTurn: 5 },
-          ipo: { users: 1.5 * M },
+          ipo: { users: 2.6 * M },
           archetypes: { startup: { cash: 600 * K } },
           // Rented servers: each builder ships more. Store charts and sharing make Growth work count for more.
           quality: { gainPerWork: 11 },
@@ -763,7 +763,7 @@ export const CAREER: CareerGameConfig = {
           valuation: { perUser: 23 },
           priceTiers: { budget: { price: 1.44 }, standard: { price: 2.16 }, premium: { price: 3.6 } },
           hiring: { candidatesPerTurn: 10 },
-          ipo: { users: 3 * M },
+          ipo: { users: 6 * M },
           archetypes: { startup: { cash: 1 * M } },
           pull: { maxMarketing: 30 * M },
           cpu: { personalities: { blitzscaler: { teamCap: 75 }, bootstrapper: { teamCap: 38 }, incumbent: { teamCap: 105 } } },
@@ -835,7 +835,7 @@ export const CAREER: CareerGameConfig = {
           valuation: { perUser: 18 },
           priceTiers: { budget: { price: 1.44 }, standard: { price: 2.16 }, premium: { price: 3.6 } },
           hiring: { candidatesPerTurn: 7 },
-          ipo: { users: 4 * M },
+          ipo: { users: 8 * M },
           archetypes: { startup: { cash: 1 * M } },
           // Coding assistants build faster; features are copied in weeks.
           quality: { gainPerWork: 12, decay: 8 },
@@ -904,10 +904,10 @@ export const CAREER: CareerGameConfig = {
         values: {
           market: { newUsersTurn1: 2 * M, growthPerTurn: 0.06 },
           salary: 300 * K,
-          valuation: { perUser: 9 },
+          valuation: { perUser: 4 },
           priceTiers: { budget: { price: 1.2 }, standard: { price: 1.8 }, premium: { price: 3 } },
           hiring: { candidatesPerTurn: 2 },
-          ipo: { users: 5 * M },
+          ipo: { users: 10 * M },
           archetypes: { startup: { cash: 1.5 * M } },
           // Small teams that build fast; agents switch to the better product at once and do not watch adverts.
           quality: { gainPerWork: 18 },
@@ -973,7 +973,7 @@ export const CAREER: CareerGameConfig = {
           valuation: { perUser: 11 },
           priceTiers: { budget: { price: 1.12 }, standard: { price: 1.68 }, premium: { price: 2.8 } },
           hiring: { candidatesPerTurn: 10 },
-          ipo: { users: 8 * M },
+          ipo: { users: 25 * M },
           archetypes: { startup: { cash: 2 * M } },
           // Trust is worth more than reach: adverts hardly move users, a launch moves them more.
           pull: { maxMarketing: 60 * M, marketingCoefficient: 0.1 },
