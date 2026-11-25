@@ -14,6 +14,7 @@ import { SoundMenu } from "../components/SoundMenu";
 import { money, quarter } from "../format";
 import { SFX } from "../sound";
 import { BUTTON, BUTTON_ON, LABEL, PRIMARY, TONE } from "../styles";
+import { SETTLE_MS } from "../useDialog";
 import { endView, eventView, planningView, reportView, resourceView, rivalsView } from "../viewModel";
 
 type Tab = "plan" | "rivals";
@@ -44,8 +45,12 @@ export const GameScreen = () => {
   const onChange = useCallback((plan: Plan) => setDraft(plan), [setDraft]);
 
   const titleRef = useRef<HTMLHeadingElement | null>(null);
+  const reportClosedAt = useRef(Number.NEGATIVE_INFINITY);
 
   const onEndQuarter = useCallback(() => {
+    // The report's button can sit right over this one: the second tap of a double tap on it lands here
+    // as the report closes, and must not play a quarter nobody has planned.
+    if (performance.now() - reportClosedAt.current < SETTLE_MS) return;
     SFX.tick();
     // Focus leaves the button before the report opens over it: when the report closes, focus comes back to
     // the top of the page, not to a button that a key held down would press again and again.
@@ -60,6 +65,7 @@ export const GameScreen = () => {
     const state = gameStore.getState();
     const ending = state.over && state.game !== null ? endView(state.game, CONFIG) : null;
     if (ending !== null) SFX.gameOver(ending.sound);
+    reportClosedAt.current = performance.now();
     closeReport();
   }, [closeReport]);
 

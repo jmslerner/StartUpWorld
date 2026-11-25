@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
 
-/** A click this soon after a dialog opens was aimed at whatever stood there before it. */
-const SETTLE_MS = 400;
+/** A click this soon after the screen changed under the pointer was aimed at whatever stood there before. */
+export const SETTLE_MS = 400;
 
 /**
  * What every dialog over the game needs: focus moves to its main button without scrolling the
