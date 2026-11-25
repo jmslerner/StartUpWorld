@@ -173,6 +173,100 @@ Resolution, in this order:
     then assumes its whole team builds: the cautious guess, and one that does not depend on the plan in hand.
 41. A moving bill is a cost of its own year only. What a company carries into the next year as last year's costs,
     which the opening runway reads, leaves the bill out, because it cannot recur.
+42. New users are rounded once, to whole users, after the era's curve and every multiplier on it (the year's card and
+    a wave) have been applied.
+43. A wave "for N years" counts the shift's own year, as a funding climate does: it multiplies the new users of the
+    shift's year and the N − 1 years after it.
+44. A shift's notice is given in each of the `shiftNoticeYears` years before it, not only in the first of them.
+45. The timeline is what is built. An era may open with its platform shift, or have it later: the 2023 shift falls in
+    the second year of its era, which starts in 2022.
+46. The timeline's dated cards are the 28 that are built, eight of them invented; the design's count of 30 real events
+    checked is the research behind them, not a count of cards.
+47. The wording of a plan note is not a rule. A note is a plain sentence that names what was changed and why; a test
+    reads what it names, not its exact words (the one exception the rules fix is ruling 34's note).
+48. A company that goes bankrupt, whether rescued or out, has no board result that year: the report's `board` is null.
+    The board looks at a year, and the report keeps what it saw, only when the company is not bankrupt and investors
+    hold more seats than the founders.
+49. A newcomer's name differs from every company's name in the game as it is drawn, the company it replaces included.
+50. With no move, the one-year projection shows the moving cost as 0 and `career.office` as null, as the report does.
+51. A ceiling touches only companies still in the game; a company already out keeps the quality it went out with. A
+    ceiling with `turns` 0 does not hold: `heldCeiling` and `datedHeldCeiling` give null for its year, the turn and the
+    projection do not cap that year's Product work, and the cut as the year opens is all it does. It is still announced
+    as a shift in the years before it, as any dated ceiling is.
+
+## What the independent tests found
+
+Three authors, each reading only the documents (the design's sections 5 and 6, this file, `src/engine/types.ts`, the
+export list of `src/engine/index.ts`, `src/config.design.ts`, the two test helper files and one of the race's black-box
+files as a model) and never the engine's code or its own tests, each wrote one file of black-box tests (Task 16):
+
+| File | Rules | Tests |
+|---|---|---|
+| `src/engine/blackbox/career-years-and-cards.test.ts` | C1 to C4 | 77 |
+| `src/engine/blackbox/career-money-and-control.test.ts` | C5 to C7, C11 | 84, and 1 added for a break (85) |
+| `src/engine/blackbox/career-rivals-offices-endings.test.ts` | C8 to C10 | 80 |
+
+**Every test agreed with the engine.** All 241 passed against it as written, so no disagreement had to be settled and
+the engine was not changed. Two tests of the second author had failed at first; both were its own misreadings, which
+it corrected before the files were handed in:
+
+- An era's market curve starts again in the era's first year (ruling 4): the test had counted a later era's new users
+  along a curve that did not start again.
+- A team of 30 placed in the garage pays a moving bill: the office is checked on the head count as the year ends
+  (ruling 31), so a team set up larger than its office moves that year and pays for it.
+
+**Points the documents did not settle**, what the authors assumed, and the ruling that now settles each:
+
+1. When new users are rounded around a multiplier (a wave, a card). The tests allow one user either way. Ruling 42:
+   once, after every multiplier.
+2. Whether a wave "for 3 years" counts the shift's own year. Assumed it does, as a funding climate does. Ruling 43.
+3. Whether a shift's notice is given in each of the `shiftNoticeYears` years before it or only the first. Assumed
+   each. Ruling 44.
+4. C4 says "some eras open with a platform shift"; the timeline puts the 2023 shift in the second year of its era.
+   The tests follow the timeline. Ruling 45: the timeline is what is built.
+5. The design says 30 real events were checked; the timeline has 28 dated cards, eight of them invented. The tests
+   count 28. Ruling 46.
+6. The wording of plan notes. The tests look for what a note names (users, profit, marketing), not its words, except
+   the poach note ruling 34 spells out. Ruling 47.
+7. Whether a company rescued from bankruptcy has a board result in that year's report. The tests asked only that it
+   is not voted on. The engine checks bankruptcy before the board and records no board result: ruling 48.
+8. Whether a newcomer's name may repeat that of the company it replaces. Assumed not: it differs from that name as
+   well as from the others. Ruling 49.
+9. What the projection shows as the moving cost when there is no move. The engine shows 0 and no office move, as the
+   report does: ruling 50.
+10. Whether a ceiling touches a company that is already out, and what the engine says for a ceiling that does not
+    hold. The engine leaves a company that is out untouched, and gives no held ceiling (null) for a ceiling with
+    `turns` 0, whose cut as the year opens is all it does: ruling 51.
+
+**Each rule broken on purpose.** Each of the 21 breaks below was made alone, as one change in one place in the engine,
+the three files run, and the change undone. Twenty were caught by the authors' tests as written. The rescue's salary
+was not, because the one test of it rescues a company in an era's first year, when the closing year's salary and the
+next year's are the same; one test was added for it (marked *added*). A count of more than one is the number of tests
+that failed; the name is one of them.
+
+| # | Break | Caught by | Failed |
+|---|---|---|---|
+| 1 | The premium is not applied the year after a listing | C5 "a public company keeps the premium in later years, without the listing's hype" | 2 |
+| 2 | A listing starts a raise cooldown | C5 "going public is not a raise: no raise in the report and no raise cooldown starts" | 2 |
+| 3 | A public company may raise | C6 "a public company's raise is dropped with a note, and nothing is sold" | 5 |
+| 4 | A qualified company loses the offer after a losing year | C5 "once qualified a company stays qualified after a losing year" | 1 |
+| 5 | The market is counted from 1990, not the era's first year | C2 "starts the next era's curve again in its first year: 100,000 in 1995" | 6 |
+| 6 | A second failure is rescued again | C7 "a second failure years later is final, and releases the company's users and staff" | 9 |
+| 7 | The board votes in the year after a rescue | C7 "in the year after a rescue the board does not vote, though its report says what it saw" | 1 |
+| 8 | A rescue resets cash that was not below $0 | C7 "a board's firing is rescued too: equity halved, seats, hype, and cash not reset" | 1 |
+| 9 | The ceiling multiplies quality instead of capping it | C4 "cuts every company above the ceiling down to it as the year opens, the Incumbent included" | 10 |
+| 10 | A dated card is subject to the chance roll | C3 "comes in turn 2 although random draws start at turn 3" | 32 |
+| 11 | The marketing limit ignores the year's raise | C11 "a raise in the same year adds its amount to the room" | 2 |
+| 12 | Candidates may go below none | C3 "never offers fewer than no candidates" | 1 |
+| 13 | A newcomer enters after one year | C8 "does not refill a seat in the year its company goes out" | 4 |
+| 14 | The player's seat is refilled | C8 "never refills the player's seat" | 3 |
+| 15 | The moving bill is worked out on the head count at the start of the year | C9 "moves a team that ends the year over its office's capacity, and bills the whole team once" | 6 |
+| 16 | Hires may pass 150 | C9 "stops hiring at 150 people" | 9 |
+| 17 | A career ends when one company is left | C10 "goes on with one company left" | 8 |
+| 18 | What a company still needs to qualify is read against last year's bar | C5 "what an unqualified company still needs is measured against the bar of the year being planned" | 1 |
+| 19 | A rescue's cash is worked out at next year's salary | C7 "the reset in an era's last year is at that year's salary, not the next era's" (*added*) | 1 |
+| 20 | A rescue's cash counts the people hired as the year ends | C7 "people hired as the year ends are not counted in the reset" | 2 |
+| 21 | A ceiling with `turns` 1 lets Product work lift a product above it in its year | C4 "holds a ceiling with turns 1 through its year: Product work lifts a product to it and no further" | 3 |
 
 ## How the simulator measures the targets
 
