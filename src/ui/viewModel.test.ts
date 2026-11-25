@@ -284,6 +284,19 @@ describe("going public", () => {
   it("says nothing while the bar is out of reach", () => {
     expect(publicNote(at(100_000))).toBeUndefined();
   });
+
+  it("says nothing about the board when the plan takes the company public: a listing ends the game before any vote", () => {
+    // Investor-led, and an event took users as the quarter opened, so users end below last quarter's close:
+    // a bad quarter to the board. But the company is far above the bar and in profit, so it lists.
+    const listing = going({ users: 300_000, usersAtLastClose: 320_000, quality: 90, cash: 2_000_000, investorSeats: 3 });
+    const view = planningView(listing, draftOf(listing), DESIGN);
+    expect(view.projection.boardRisk).toBe(0.3);
+    expect(view.warnings.some((w) => /on course to go public/i.test(w.text))).toBe(true);
+    expect(view.warnings.some((w) => /board|fire/i.test(w.text))).toBe(false);
+    // The same quarter without the profit is no listing, and the board does get its vote.
+    const bloated = going({ users: 300_000, usersAtLastClose: 320_000, quality: 90, cash: 9_000_000, investorSeats: 3, headcount: 30, headcountAtLastClose: 30 });
+    expect(planningView(bloated, draftOf(bloated), DESIGN).warnings.some((w) => /30% chance they fire you/.test(w.text))).toBe(true);
+  });
 });
 
 describe("rivals panel", () => {

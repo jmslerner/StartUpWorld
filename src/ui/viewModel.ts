@@ -252,7 +252,12 @@ export const planningView = (game: GameState, draft: Plan, config: RulesConfig):
   } else if (projection.cashFloor < 0) {
     warn("caution", `Cash only stays above $0 if you win new users. With none, the quarter would end at ${money(projection.cashFloor)}.`);
   }
-  if (projection.boardRisk > 0) {
+  // Clears the bar and turns a profit even in the cautious case: the company lists, and a listing ends the game
+  // before any board gets to vote.
+  const listing = projection.users >= config.ipo.users && projection.profitable && cautious.users >= config.ipo.users && cautious.profitable;
+  if (listing) {
+    // Nothing to say about the board.
+  } else if (projection.boardRisk > 0) {
     warn("caution", `Investors control your board and this quarter looks bad to them: a ${percent(projection.boardRisk)} chance they fire you.`);
   } else if (projection.investorSeats > self.founderSeats && (cautious.usersFell || cautious.lowRunway)) {
     const what = cautious.usersFell ? "your users would fall" : `runway would drop under ${config.board.runwayTurns} turns`;
@@ -266,7 +271,7 @@ export const planningView = (game: GameState, draft: Plan, config: RulesConfig):
     const usersInHand = cautious.users >= config.ipo.users;
     if (!projection.profitable) {
       warn("caution", `${usersInHand ? "You have" : "You may reach"} the users to go public, but not the profit: revenue ${money(projection.revenue)} against costs ${money(projection.costs.total)}.`);
-    } else if (usersInHand && cautious.profitable) {
+    } else if (listing) {
       warn("note", `On course to go public this quarter: ${count(config.ipo.users)} users and a profitable quarter.`);
     } else {
       warn("note", `You could go public this quarter: it takes ${count(config.ipo.users)} users and a profit, and this plan only gets there if you win the users you expect.`);
