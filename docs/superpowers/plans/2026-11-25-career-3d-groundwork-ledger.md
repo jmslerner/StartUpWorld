@@ -11,12 +11,25 @@ skill for this method is not installed on this machine; the method is followed b
 ## Decisions
 
 - This ledger lives beside the plan, on the groundwork branch, so that it survives the machine.
+- A task's review runs in its own checkout while the next task is being implemented, to save time. Fixes a review
+  asks for go in before the task after that starts.
+- At the cap of 50, when drawn people leave and people who were counted on the sign take their places, the cast gives
+  them new ids and lists them as arrived (ruling 3, as written). They were in the building all along. So in Task 7 a
+  member of staff who arrives while the previous cast had people hidden is placed at the desk without a walk from
+  the door, for as many arrivals as there were hidden people; and in Task 8 the "+N" and "-N" at the door are worked
+  out from the head counts of the two scenes whenever either cast has hidden people, and from the cast's lists
+  otherwise.
+- Someone back from being away takes the first team that is short, in the order Product, Growth, Recruiting, which
+  need not be the team they left (ruling 4, as written). Kept: the plan's ruling is explicit.
 
 ## Tasks
 
 | Task | State | Commits | Review |
 |---|---|---|---|
 | 1 | done | a6ed44b | approved; four minor points, three fixed with Task 2 |
+| 2 | done | a79793a, 2fb6113 | approved; one minor point, fixed with Task 5 |
+| 3 | done | 1fecaab (merge), 996c1a0 | approved; four minor points, fixed with Task 5 |
+| 4 | done, in review | 0b2fc50 | pending |
 
 ## Task notes
 
@@ -40,3 +53,77 @@ an open one such as `src/audio`: left as it is, since the plan's wording is "imp
 whole-branch review; (2) a call to something named `require` with a computed argument is refused; (3) an import that
 leaves `src` is refused; (4) one bad import fails five tests and parses the tree five times. Points 2 to 4 are fixed
 in a small commit at the start of Task 2.
+
+### Task 2
+
+Decisions the implementer took, all judged sound by the review:
+
+- Counts that are not whole are rounded down; negative and non-numbers read as 0.
+- Someone who becomes away without a team gets Product. New staff ids come before new door ids.
+- The groups "away" and "leaving" may also take people from the door and then new ids, as ruling 3 says.
+- A face is worked out from the scene's seed on every cast, so the seed must stay the same for a run id.
+- `ended` is reported when the ending is set and differs from the one before. A first scene that already has an
+  ending reports nothing, so a system reads `scene.ending` for where things stand.
+- `targets.ts` is restored in this task. `types/seating.ts` is reshaped rather than restored as it was: seats are
+  `"desk" | "waiting"` with an `index`, and the seating's interface has `teamOfDesk`, `waitingOccupant` and
+  `hiddenCount`.
+- The sound types stay in `types/system.ts`, unused, as the inventory allows. The barrel uses `export *`, because
+  `TEAMS` is a value.
+
+Tests dropped with their files: the old `events.test.ts` (replaced by `sceneEvents.test.ts`), `snapshot.test.ts`
+(replaced by `cast.test.ts` and Task 3's `officeScene.test.ts`), `names.test.ts` (no replacement: people have no
+names).
+
+Review: approved. A fuzz of 400 runs of 40 scenes held every invariant: nobody invented or lost, ids never reused,
+people in id order, arrivals and departures matching the difference between two casts. One minor point (a comment
+on the wrong declaration in `types/handle.ts`).
+
+### Task 3
+
+The merge of the rules branch brought three of its commits, all in its own files, and was green on its own. The
+engine had every name the plan assumed.
+
+Decisions the implementer took:
+
+- The office index is kept within 0 to 4 and within the config's own list of offices; a config with no offices
+  gives a capacity of 0.
+- An unknown company id throws the same error as a game that is not a career.
+- A game that ends with no winner is `"lost"` for everyone.
+- Expected hires that are not a number give 0.
+
+For the other track (the rules):
+
+- `Team` and `TEAMS` must stay the engine's `Department` and `DEPARTMENTS`, in the same order. A test pins it.
+- The scene reads `CareerRules.offices[].capacity`, `.eras[].id`, `.firstYear`; `CompanyCareer.office`, `.founded`;
+  `Company.out`; `GameState.outcome.winnerId`; and the checked plan's `allocation`, `raisePercent`, `layoffs`.
+- The scene's test "the people always add up to the head count" rests on: allocation = head count - layoffs - (1 if
+  raising). If a rule ever takes another person away from work, that test goes red and the scene needs a new field.
+- The engine's plan check drops `Plan.goPublic`. The scene does not use it; noted in case it is not intended.
+- Era ids are free strings; the world gives every id the look `"classic"`.
+
+Review: approved. 21 of 24 mutations of the builder were caught, and a fuzz of 40 careers played to the end with
+hostile drafts never broke a scene. Minor points, fixed in a small commit at the start of Task 5: two tests to add
+(an office index past the fixed range under a config with six offices; a career state under a config without a
+career); a config with no eras throws the builder's own error instead of the engine's; a draft is ignored for a
+company that is out.
+
+### Task 4
+
+Eight files of the art kit and the camera came back byte for byte; `colors.ts`, `SystemRunner.ts` and `Lighting.ts`
+were edited. Decisions the implementer took:
+
+- Team colours: Product sky blue, Growth orange, Recruiting green, from the old role palette. If the game's screens
+  settle on team colours, these three constants follow. The name `ROLE_COLORS` is the plan's.
+- The theme table is keyed by look, then office: `themeFor(office, look)`. The old names `PHASE_THEMES`, `PHASES`,
+  `phaseTier` and `PhaseTheme` are kept because later folders import them.
+- The founder's and cofounder's outfits and the executive tie are gone from `colors.ts`.
+- A system whose `busy()` throws counts as at rest and is reported once, so a fault cannot keep the loop awake.
+- Lighting: one resting look for each office (morning, for the classic look); the old sweep is kept when a year
+  advances; a year that also ends the run fades to the ending without a sweep; a glide lands exactly on its goal so
+  that the lighting comes to rest; the old "setup" look is gone.
+
+Camera framing tests held back for Task 5, where the layouts are: the five "fills the binding dimension and crops
+nothing of the building" tests and "frames the building, not the ground tile". Dropped for good with the purchasable
+assets: the five "with outdoor assets" framing tests and "frames owned outdoor assets but not the ones merely for
+sale". Lighting tests about the day running out, the event flicker and the setup dimness are dropped with those
+behaviours and replaced by tests of the resting look, the absence of a clock, the ending's fade and coming to rest.
