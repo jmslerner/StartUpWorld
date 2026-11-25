@@ -40,6 +40,7 @@ skill for this method is not installed on this machine; the method is followed b
 | 5 | done | a103c6c, 5cd04ed | approved; minor points, two fixed with Task 7 |
 | 6 | done | b5e5a27, 182fad9 | approved; no findings |
 | 7 | done, in review | bb811ab, aab5a0c | pending |
+| 8 | done, in review | 3dbd554 | pending |
 
 ## Task notes
 
@@ -238,3 +239,32 @@ reaction, the win and loss scenes, the floor pose, id reuse. The crew's tests ar
 For Task 9: the order in `setScene` is cast, layout, `seating.reconcile`, then the frame to the systems, office
 before people. One `update` must run between `setScene` and the first drawn frame, or someone away shows a lit desk
 for a frame. A big year can take 20 to 40 seconds to play out with the old limits (arrivals 0.4 s apart).
+
+### Task 8
+
+The particle simulation's 23 tests and the placement's 14 are among the passing ones. Five effect files and the
+placement test are byte for byte the old ones.
+
+Decisions the implementer took:
+
+- The numbers at the door are a pure function, `doorCounts(next, prev)`, following the ledger's rule. Below the cap,
+  someone expected counts as "+1" when they appear at the door and not again when hired, and a hire called off
+  within the year shows as "-1": the cast's lists as they are, which is what the plan's test pins.
+- The old code had no dust when the office changed; it had confetti and a camera shake. "The old dust when the
+  office rises" is read as six puffs of the old dust kind across the floor while the building rises, with the old
+  shake of 0.4, which reduced motion skips.
+- `busy()` covers particles, bursts still waiting, float texts, bubbles, and 0.8 s after each shake it forwards.
+- The shell's words live in `ui/shellWords.ts` with a test. The placeholder reads "Opening the office…"; the note
+  reads "The 3D office cannot be shown on this device. The game is complete without it."
+- The shell's classes are plain CSS in `world.css`, with a fallback for every page variable, so the shell looks the
+  same on a page that does not load the game's stylesheet. The old card classes are not brought over: no card
+  exists yet. They are at lines 117 to 162 of the old `src/index.css` for whoever writes one.
+- `stage.reset()` is new: it clears the anchor and puts the store back to its first state.
+
+Known and accepted, as the rule gives them: someone who appears at the door below the cap and is hired in a year
+that takes the company past it is counted twice; a capped company that shrinks with nobody marked as leaving says
+nothing; "-N" shows when the year advances, while the people take some seconds to walk out.
+
+For Task 9: systems are registered office, people, lighting, effects; the effects need the new frame's layout
+already in place when the frame is applied; the rest state must also ask the camera rig whether it is moving; the
+frame time handed to the systems must be a positive, clamped number.
