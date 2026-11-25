@@ -33,7 +33,7 @@ export interface WorldSignals {
   chairsOut?: ReadonlyMap<number, number>;
   /**
    * People who still hold a seat in the seating plan but are not in the office (someone
-   * away raising money; after a lost run, the staff who went home). Their desks look vacant. Replaced — never
+   * away raising money). Their desks look vacant. Replaced — never
    * modified — whenever its contents change, so readers can compare by reference.
    */
   vacated?: ReadonlySet<string>;

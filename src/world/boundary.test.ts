@@ -2,7 +2,9 @@
  * The fence around the 3D code.
  *
  * 1. `three` is imported only under src/world.
- * 2. Nothing under src/world imports from the rules, the store, the screens, the scene builder or the lab.
+ * 2. Nothing under src/world imports from the rules, the store, the screens, the scene builder or the lab, nor
+ *    reaches them by a chain of imports through a folder open to it (src/audio, say). Type imports count, here as
+ *    in a direct import.
  * 3. The scene builder (src/scene) never imports three; from the world it imports types only, from
  *    src/world/types. Its tests may also import the world's pure modules: those that do not load three.
  * 4. No chain of static imports from src/main.tsx reaches src/world or three: the 3D code is not in the game's
@@ -143,21 +145,28 @@ const threeOutsideTheWorld = (tree: Tree): string[] =>
     .filter((found) => isThree(found.specifier) && !found.from.startsWith(WORLD))
     .map(say);
 
-/** Rule 2. */
-const worldLookingOut = (tree: Tree): string[] =>
-  importsOf(tree)
-    .filter((found) => found.from.startsWith(WORLD) && found.target !== null && startsWithAny(found.target, CLOSED_TO_THE_WORLD))
-    .map(say);
 
-/** The first chain of imports that are still there when the code runs, from `start` to anything `reached` accepts. */
+/** Each file's imports, worked out once per tree. */
+const bySourceOf = new WeakMap<Tree, ReadonlyMap<string, readonly Import[]>>();
+const importsBySource = (tree: Tree): ReadonlyMap<string, readonly Import[]> => {
+  let known = bySourceOf.get(tree);
+  if (known === undefined) {
+    const bySource = new Map<string, Import[]>();
+    for (const found of importsOf(tree)) bySource.set(found.from, [...(bySource.get(found.from) ?? []), found]);
+    known = bySource;
+    bySourceOf.set(tree, known);
+  }
+  return known;
+};
+
+/** The first chain of the imports `follow` accepts, from `start` to anything `reached` accepts. */
 const chainTo = (
   tree: Tree,
   start: string,
   follow: (found: Import) => boolean,
   reached: (found: Import) => boolean,
 ): string[] | null => {
-  const bySource = new Map<string, Import[]>();
-  for (const found of importsOf(tree)) bySource.set(found.from, [...(bySource.get(found.from) ?? []), found]);
+  const bySource = importsBySource(tree);
   const cameFrom = new Map<string, string | null>([[start, null]]);
   const chainOf = (path: string): string[] => {
     const before = cameFrom.get(path) ?? null;
@@ -174,6 +183,31 @@ const chainTo = (
     }
   }
   return null;
+};
+
+const closedToTheWorld = (path: string | null): boolean => path !== null && startsWithAny(path, CLOSED_TO_THE_WORLD);
+
+/**
+ * Rule 2: an import from the world straight into a closed place, and a chain of imports of any kind that leaves the
+ * world for an open place (src/audio, say) and goes on from there into a closed one. A chain is not followed back into
+ * the world: a world file it reaches is judged on its own.
+ */
+const worldLookingOut = (tree: Tree): string[] => {
+  const outOfTheWorld = importsOf(tree).filter((found) => found.from.startsWith(WORLD) && found.target !== null);
+  const direct = outOfTheWorld.filter((found) => closedToTheWorld(found.target)).map(say);
+  const throughOpenPlaces = outOfTheWorld
+    .filter((found) => found.target !== null && !found.target.startsWith(WORLD) && !closedToTheWorld(found.target))
+    .map((found) => {
+      const chain = chainTo(
+        tree,
+        found.target ?? "",
+        (next) => next.target !== null && !next.target.startsWith(WORLD),
+        (next) => closedToTheWorld(next.target),
+      );
+      return chain === null ? null : `${found.from} reaches ${chain[chain.length - 1]} through ${[found.from, ...chain].join(" -> ")}`;
+    })
+    .filter((line) => line !== null);
+  return [...direct, ...new Set(throughOpenPlaces)];
 };
 
 /** Files a chain of static imports from `start` loads, `start` included. */
@@ -346,6 +380,28 @@ describe("the boundary can fail", () => {
       "src/world/office/deep/a.test.ts imports ../../../engine/types (src/engine/types.ts)",
       "src/world/b.ts imports ../state/store (src/state/store.ts)",
       "src/world/c.ts imports ../ui/Screen (src/ui/Screen.tsx), as dynamic",
+    ]);
+  });
+
+  it("rule 2: the world reaching a closed place through an open one, by value or by type, is caught with its chain", () => {
+    const tree = made({
+      "src/engine/index.ts": `export const DEPARTMENTS = [];`,
+      "src/engine/types.ts": `export type Office = {};`,
+      "src/state/store.ts": `export const store = 1;`,
+      "src/audio/index.ts": `export * from "./engine";`,
+      "src/audio/engine.ts": `import { DEPARTMENTS } from "../engine"; export const play = DEPARTMENTS;`,
+      "src/audio/kinds.ts": `import type { Office } from "../engine/types"; export type Kind = Office;`,
+      "src/audio/back.ts": `import { a } from "../world/a"; export const back = a;`,
+      "src/audio/clean.ts": `export const clean = 1;`,
+      "src/world/a.ts": `import { play } from "../audio"; export const a = play;`,
+      "src/world/b.ts": `import type { Kind } from "../audio/kinds"; export type B = Kind;`,
+      "src/world/c.ts": `import { back } from "../audio/back"; import { clean } from "../audio/clean"; export const c = [back, clean];`,
+      "src/world/d.ts": `export const later = () => import("../audio/engine");`,
+    });
+    expect(worldLookingOut(tree)).toEqual([
+      "src/world/a.ts reaches src/engine/index.ts through src/world/a.ts -> src/audio/index.ts -> src/audio/engine.ts -> src/engine/index.ts",
+      "src/world/b.ts reaches src/engine/types.ts through src/world/b.ts -> src/audio/kinds.ts -> src/engine/types.ts",
+      "src/world/d.ts reaches src/engine/index.ts through src/world/d.ts -> src/audio/engine.ts -> src/engine/index.ts",
     ]);
   });
 

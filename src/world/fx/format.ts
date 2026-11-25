@@ -43,9 +43,6 @@ export const formatCompact = (value: number): string => {
 
 const sign = (value: number): string => (value < 0 ? MINUS : "+");
 
-/** "+$1.2M" / "−$3,000". */
-export const formatMoneyDelta = (delta: number): string => `${sign(delta)}$${formatCompact(delta)}`;
-
 /** "+340 users" / "−2 desks". */
 export const formatCountDelta = (delta: number, noun: string): string => `${sign(delta)}${formatCompact(delta)} ${noun}`;
 

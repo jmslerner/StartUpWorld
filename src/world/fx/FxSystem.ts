@@ -69,14 +69,6 @@ export const particleBudget = (quality: QualityLevel, reducedMotion: boolean): P
   return quality === "high" ? { capacity: 600, density: 1 } : { capacity: 250, density: 0.5 };
 };
 
-/**
- * Burst size for "how much just happened": grows with the order of magnitude
- * of `amount` relative to `unit`, so fifty million is clearly bigger than
- * fifty thousand without being a thousand times bigger.
- */
-export const magnitudeIntensity = (amount: number, unit: number, min: number, max: number): number =>
-  clamp(min + 0.35 * Math.log10(1 + Math.abs(amount) / unit), min, max);
-
 /** A count of people as the cast reads it: whole, and nobody for a negative or a number that is not one. */
 const whole = (count: number): number => (Number.isFinite(count) ? Math.max(0, Math.floor(count)) : 0);
 

@@ -6,8 +6,8 @@ import { REBUILD_RISE_DELAY, REBUILD_RISE_SECONDS } from "../office/timing";
 import { scene as sceneOf, Studio } from "../people/testKit";
 import type { BurstKind, OfficeScene, QualityLevel, SceneEvent, WorldFrame } from "../types";
 import { lowestFreeSlot } from "./FloatTextLayer";
-import { formatCompact, formatCountDelta, formatHeadcountDelta, formatMoneyDelta, formatSignedCount } from "./format";
-import { doorCounts, FxSystem, magnitudeIntensity, particleBudget, SHAKE_SECONDS } from "./FxSystem";
+import { formatCompact, formatCountDelta, formatHeadcountDelta, formatSignedCount } from "./format";
+import { doorCounts, FxSystem, particleBudget, SHAKE_SECONDS } from "./FxSystem";
 import {
   BURST_KINDS,
   KIND_PROFILES,
@@ -84,8 +84,6 @@ describe("float text formatting", () => {
   });
 
   it("formats signed deltas with a real minus sign", () => {
-    expect(formatMoneyDelta(1_200_000)).toBe("+$1.2M");
-    expect(formatMoneyDelta(-3000)).toBe("−$3,000");
     expect(formatCountDelta(340, "users")).toBe("+340 users");
     expect(formatCountDelta(-3, "rep")).toBe("−3 rep");
     expect(formatHeadcountDelta(1, "product")).toBe("+1 Product");
@@ -131,20 +129,6 @@ describe("particle budgets", () => {
     expect(calm.capacity).toBeLessThan(low.capacity);
     expect(calm.density).toBeLessThan(low.density);
     expect(particleBudget("low", true)).toEqual(calm);
-  });
-
-  it("scales burst intensity with the order of magnitude, within limits", () => {
-    const small = magnitudeIntensity(50_000, 25_000, 0.7, 2.4);
-    const medium = magnitudeIntensity(5_000_000, 25_000, 0.7, 2.4);
-    const large = magnitudeIntensity(500_000_000, 25_000, 0.7, 2.4);
-    expect(small).toBeGreaterThanOrEqual(0.7);
-    expect(medium).toBeGreaterThan(small);
-    expect(large).toBeGreaterThan(medium);
-    // 100× more money is a visibly bigger burst, not a 100× bigger one.
-    expect(medium / small).toBeLessThan(2.5);
-    expect(magnitudeIntensity(1e15, 25_000, 0.7, 2.4)).toBe(2.4);
-    expect(magnitudeIntensity(0, 25_000, 0.7, 2.4)).toBe(0.7);
-    expect(magnitudeIntensity(-5_000_000, 25_000, 0.7, 2.4)).toBe(medium);
   });
 });
 

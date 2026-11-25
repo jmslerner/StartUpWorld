@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { CAREER } from "../config";
+import { CAREER_RULES } from "../engine/careerKit";
 import { DESKS } from "../world/office/layouts";
 import { TEAMS } from "../world/types/scene";
 import {
@@ -46,6 +48,12 @@ describe("the lab's scene", () => {
     expect(CAPACITY).toEqual([4, 9, 22, 40, 150]);
     expect(CAPACITY.length).toBe(DESKS.length);
     CAPACITY.forEach((capacity, office) => expect(capacity).toBeGreaterThanOrEqual(DESKS[office]));
+  });
+
+  // The lab may not read the rules, so its capacities are checked against them here, in a test only.
+  it("has the capacities of the career's offices", () => {
+    expect(CAPACITY).toEqual(CAREER.career.offices.map((office) => office.capacity));
+    expect(CAPACITY).toEqual(CAREER_RULES.offices.map((office) => office.capacity));
   });
 
   it("every number of every scene read from an address is a whole number that is not negative", () => {
