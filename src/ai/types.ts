@@ -55,8 +55,9 @@ export interface CpuConfig {
   readonly layoffRunway: number;
   /** A company with almost no market share still values quality and team as if it had this much. */
   readonly minShareForGrowth: number;
-  /** Score lost for a plan that leaves less than one turn of runway, scaled by how far short it is. */
+  /** Score lost for a plan that leaves less than `shortRunwayTurns` of runway, scaled by how far short it is. */
   readonly shortRunwayPenalty: number;
+  readonly shortRunwayTurns: number;
   /** Marketing options on the last turn, as shares of cash on hand: there is no next quarter to save for. */
   readonly lastTurnMarketingShares: readonly number[];
   /** Layoffs it weighs when pushing for a profitable quarter at the IPO bar. */

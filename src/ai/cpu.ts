@@ -6,7 +6,7 @@
 // poaches, how big it lets the team get) are what a player can learn to read.
 
 import { CONFIG, type GameConfig } from "../config";
-import { founderStake, raiseAmount, valuationOf } from "../engine/formulas";
+import { founderStake, poachFloor, raiseAmount, valuationOf } from "../engine/formulas";
 import { raiseBlocker } from "../engine/plan";
 import { estimateRivals, projectTurn, type Projection } from "../engine/project";
 import { STREAM, nextFloat01, nextIntInclusive, streamSeed } from "../engine/rng";
@@ -124,7 +124,8 @@ const scoreOf = (view: CompanyView, projection: Projection, personality: CpuPers
   if (situation.lastTurn) {
     // No next quarter: what counts is the founder's stake, if the founder is still there to hold it.
     const stake = founderStake(projection.equity, projection.valuation) * (1 - projection.boardRisk);
-    return stake / (Math.max(1, projection.pool) * config.valuation.perUser) + (listed ? config.cpu.ipo.win : 0);
+    // Measured against the quarter's market; the outer floor only matters if users are worth $0 (every stake is then $0).
+    return stake / Math.max(1, Math.max(1, projection.pool) * config.valuation.perUser) + (listed ? config.cpu.ipo.win : 0);
   }
 
   const weights = personality.weights;
@@ -146,7 +147,7 @@ const scoreOf = (view: CompanyView, projection: Projection, personality: CpuPers
 
   const runway = runwayAfter(projection, config);
   score += weights.runway * (runway === null ? 1 : runway / (runway + weights.runwayHalf));
-  if (runway !== null && runway < 1) score -= config.cpu.shortRunwayPenalty * (1 - runway);
+  if (runway !== null && runway < config.cpu.shortRunwayTurns) score -= config.cpu.shortRunwayPenalty * (1 - runway / config.cpu.shortRunwayTurns);
 
   score += (weights.hype * projection.hype) / 100;
   score += weights.equity * projection.equity;
@@ -170,7 +171,7 @@ const scoreOf = (view: CompanyView, projection: Projection, personality: CpuPers
  * where they sit: the player's seat must not be the one that always gets raided first.
  */
 const poachTargetFor = (view: CompanyView, seed: number, config: GameConfig): PublicCompany | null => {
-  const open = view.rivals.filter((rival) => rival.out === null && rival.headcount >= config.poach.minTargetHeadcount);
+  const open = view.rivals.filter((rival) => rival.out === null && rival.headcount >= poachFloor(config));
   if (open.length === 0) return null;
   const ranked = [...open].sort((a, b) => b.users - a.users || b.quality - a.quality || a.id - b.id);
   const level = ranked.filter((rival) => rival.users === ranked[0].users && rival.quality === ranked[0].quality);
@@ -181,7 +182,9 @@ export const chooseCpuPlan = (view: CompanyView, kind: CpuKind, seed: number, co
   const personality = config.cpu.personalities[kind];
   const situation = situationOf(view, config);
   const rivals = estimateRivals(view, config);
-  const target = personality.poachRunway !== null && !situation.ipoPush && !situation.trouble ? poachTargetFor(view, seed, config) : null;
+  // No poach on the last turn: the person would only start in a quarter that is never played.
+  const mayPoach = personality.poachRunway !== null && !situation.ipoPush && !situation.trouble && !situation.lastTurn;
+  const target = mayPoach ? poachTargetFor(view, seed, config) : null;
 
   let noise = streamSeed(seed, view.turn, STREAM.cpuNoise, view.self.id);
   let best: Plan | null = null;

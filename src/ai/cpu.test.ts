@@ -288,6 +288,22 @@ describe("the last turn", () => {
     expect(chooseCpuPlan(viewFor(lastTurn("blitzscaler"), BLITZ), "blitzscaler", 1, DESIGN)).toMatchObject({ price: "budget", raisePercent: 30 });
     expect(chooseCpuPlan(viewFor(lastTurn("bootstrapper"), BOOT), "bootstrapper", 1, DESIGN)).toMatchObject({ price: "premium", raisePercent: 0 });
   });
+
+  it("does not poach: the person would start in a quarter that is never played", () => {
+    // The same company a turn earlier does poach, so it is the last turn that stops it.
+    const before = withState(lastTurn("incumbent"), { turn: DESIGN.game.maxTurns - 1 });
+    expect(chooseCpuPlan(viewFor(before, INCUMBENT), "incumbent", 1, DESIGN).poachTarget).not.toBeNull();
+    for (let seed = 1; seed <= 5; seed++) expect(chooseCpuPlan(viewFor(lastTurn("incumbent"), INCUMBENT), "incumbent", seed, DESIGN).poachTarget, `seed ${seed}`).toBeNull();
+  });
+
+  it("still picks a plan when users are worth nothing: every stake is then $0", () => {
+    const worthless: GameConfig = { ...DESIGN, valuation: { ...DESIGN.valuation, perUser: 0 } };
+    for (const kind of KINDS) {
+      const view = viewFor(lastTurn(kind), SEAT[kind]);
+      const plan = chooseCpuPlan(view, kind, 1, worthless);
+      expect(normalizePlanFor(view.self, view.turn, view.rivals, plan, worthless).notes, kind).toEqual([]);
+    }
+  });
 });
 
 describe("the IPO push", () => {
@@ -377,5 +393,15 @@ describe("the planner's own numbers come from the config", () => {
     const cashAfter = (config: GameConfig): number => projectTurn(view, chooseCpuPlan(view, "blitzscaler", 1, config), DESIGN).cash;
     expect(cashAfter(DESIGN)).toBeGreaterThanOrEqual(0);
     expect(cashAfter(withCpu({ bankruptScore: 1_000 }))).toBeLessThan(0);
+  });
+
+  it("how short a runway it fears: told to fear anything under 1,000 turns, it stops spending", () => {
+    const view = viewFor(established(BLITZ), BLITZ);
+    const marketing = (config: GameConfig): number => chooseCpuPlan(view, "blitzscaler", 1, config).marketing;
+    // A heavy penalty changes nothing while every plan keeps the turn of runway it asks for...
+    expect(marketing(DESIGN)).toBeGreaterThan(0);
+    expect(marketing(withCpu({ shortRunwayPenalty: 1_000 }))).toBe(marketing(DESIGN));
+    // ...and everything once the bar is out of reach: the plan that burns least wins.
+    expect(marketing(withCpu({ shortRunwayPenalty: 1_000, shortRunwayTurns: 1_000 }))).toBe(0);
   });
 });

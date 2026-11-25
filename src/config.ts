@@ -201,6 +201,7 @@ export const CONFIG: GameConfig = {
     layoffRunway: 1,
     minShareForGrowth: 0.1,
     shortRunwayPenalty: 2,
+    shortRunwayTurns: 1,
     lastTurnMarketingShares: [0, 0.2, 0.4, 0.6, 0.8, 0.95],
     /** Layoffs a CPU weighs when it has the users to go public and needs a profitable quarter. */
     ipoPushLayoffs: [0, 1, 2, 3, 5, 8, 12, 16, 20, 25, 30],
