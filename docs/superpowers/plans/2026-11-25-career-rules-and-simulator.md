@@ -1359,7 +1359,7 @@ git add src scripts docs package.json README.md && git commit -m "engine: office
   same exports, same draws),
   `src/engine/rng.ts` (`STREAM.entrant: 11`), `src/engine/setup.ts`, `src/engine/career.ts`,
   `src/engine/resolveTurn.ts` (step 14; the log), `src/engine/types.ts` (the comment on `Controller`),
-  `src/engine/index.ts`, `docs/career-rules.md`, and career test files of Tasks 4 to 10 where step 3.5 applies
+  `src/engine/index.ts`, `docs/career-rules.md`, and career test files of Tasks 4 to 10 where step 3.6 applies
 - Test: `src/engine/career.entrants.test.ts`
 
 **Interfaces:**
@@ -1458,7 +1458,9 @@ Expected: FAIL (`log.entrants` is undefined).
 4. Rulings: "A seat is refilled only if its company was run by a computer style; the player's seat never is."
    "Out in year Y means the newcomer plans from year Y + 2." "A newcomer gets the startup numbers of the year it
    enters, whatever style it plays." "Newcomers enter before the coming year's card is drawn, so a card can hit them."
-5. Career tests of Tasks 4 to 10 that empty a seat with testKit's `onlyActive` (out since turn 0) now see a newcomer
+5. While in `setup.ts`: where `createGame` writes the wave left by the first year's card, write
+   `dealt.wave ?? started.wave`, so that the state's `wave` can never be a key holding `undefined` (Task 6's review).
+6. Career tests of Tasks 4 to 10 that empty a seat with testKit's `onlyActive` (out since turn 0) now see a newcomer
    take it after one year. Where such a test's expectation depends on the seat staying empty, switch it to
    `outSince(state, id, state.turn)`. Career test files may be edited; only the race's test files are frozen.
 
