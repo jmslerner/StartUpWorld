@@ -11,11 +11,13 @@ import { QuarterReport } from "../components/QuarterReport";
 import { ResourceBar } from "../components/ResourceBar";
 import { careerEndView } from "../careerEnd";
 import { listingView, officeMoveView } from "../careerPlan";
+import { careerReportView, rivalCareerRows } from "../careerReport";
 import { careerStatusView, datedYear, timelineView } from "../careerTimeline";
 import { CareerStatus } from "../components/CareerStatus";
 import { RivalsPanel } from "../components/RivalsPanel";
 import { SoundMenu } from "../components/SoundMenu";
 import { Timeline } from "../components/Timeline";
+import { YearSummary } from "../components/YearSummary";
 import { money } from "../format";
 import { SFX } from "../sound";
 import { BUTTON, BUTTON_ON, LABEL, PRIMARY, TONE } from "../styles";
@@ -45,15 +47,25 @@ export const GameScreen = () => {
   const [tab, setTab] = useState<Tab>("plan");
   const [helpOpen, setHelpOpen] = useState(false);
   const [confirmingQuit, setConfirmingQuit] = useState(false);
+  // A career's report opens on the year in brief; the full report is one button away. Reset as the report closes,
+  // so every opening starts on the summary.
+  const [fullReport, setFullReport] = useState(false);
 
   const resource = useMemo(() => (game === null ? null : resourceView(game, config)), [game, config]);
   const planning = useMemo(() => (game === null || draft === null ? null : planningView(game, draft, config)), [game, draft, config]);
   const rivals = useMemo(() => (game === null ? [] : rivalsView(game, config)), [game, config]);
+  const rivalCareers = useMemo(() => (game === null ? [] : rivalCareerRows(game, config)), [game, config]);
   const event = useMemo(() => (game === null ? null : eventView(game.event, game, config)), [game, config]);
   const report = useMemo(
     () => (game === null || lastLog === null || !reportOpen ? null : reportView(game, lastLog, config)),
     [game, lastLog, reportOpen, config],
   );
+  // The report's career lines and the coming card's date; null in a race.
+  const careerReport = useMemo(
+    () => (game === null || lastLog === null || !reportOpen ? null : careerReportView(game, lastLog, record, config)),
+    [game, lastLog, reportOpen, record, config],
+  );
+  const datedNext = useMemo(() => (lastLog === null ? null : datedYear(lastLog.nextEvent, lastLog.turn + 1, config)), [lastLog, config]);
   // A career's timeline and the year's status; null in a race.
   const timeline = useMemo(() => (game === null ? null : timelineView(game, record, config)), [game, record, config]);
   const status = useMemo(() => (game === null ? null : careerStatusView(game, config)), [game, config]);
@@ -90,8 +102,13 @@ export const GameScreen = () => {
           : endView(state.game, state.config);
     if (ending !== null) SFX.gameOver(ending.sound);
     reportClosedAt.current = performance.now();
+    // The full report opened from the summary, whose button is gone: focus goes back to the top of the page.
+    if (fullReport) titleRef.current?.focus({ preventScroll: true });
+    setFullReport(false);
     closeReport();
-  }, [closeReport]);
+  }, [closeReport, fullReport]);
+
+  const showFullReport = useCallback(() => setFullReport(true), []);
 
   const closeHelp = useCallback(() => setHelpOpen(false), []);
 
@@ -173,7 +190,7 @@ export const GameScreen = () => {
                 <ProjectionCard company={company} view={planning} words={words} move={move} />
               </div>
               <div className={tab === "rivals" ? "" : "hidden lg:block"}>
-                <RivalsPanel you={resource} rivals={rivals} />
+                <RivalsPanel you={resource} rivals={rivals} words={words} careers={rivalCareers} />
               </div>
             </div>
           </div>
@@ -202,7 +219,12 @@ export const GameScreen = () => {
         </div>
       </div>
 
-      {report !== null && <QuarterReport companyName={resource.companyName} view={report} over={over} onClose={onCloseReport} />}
+      {report !== null &&
+        (careerReport !== null && !fullReport ? (
+          <YearSummary career={careerReport} view={report} over={over} words={words} onFull={showFullReport} onClose={onCloseReport} />
+        ) : (
+          <QuarterReport companyName={resource.companyName} view={report} over={over} words={words} career={careerReport} datedNext={datedNext} onClose={onCloseReport} />
+        ))}
       {helpOpen && <HowToPlayDialog config={config} onClose={closeHelp} />}
     </>
   );
