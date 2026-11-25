@@ -18,7 +18,7 @@ export const OFFICES: readonly OfficeConfig[] = [
   { id: "campus", name: "Campus", capacity: 150 },
 ];
 
-/** The career's rules at the design's starting numbers: one flat era from 1990 on, and no dated cards. */
+/** The career's rules at the starting numbers of the career's own design, in one flat era from 1990 on with no dated cards. */
 export const CAREER_RULES: CareerRules = {
   firstYear: 1990,
   eras: [{ id: "flat", name: "Flat", firstYear: 1990, invented: false, values: {} }],
