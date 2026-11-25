@@ -50,7 +50,14 @@ interface PlanningPanelProps {
 export const PlanningPanel = ({ company, turn, draft, view, config, onChange }: PlanningPanelProps) => {
   const { projection } = view;
   const capacity = view.hiring.capacity;
-  const hireLimit = draft.hireLimit === null ? capacity : Math.min(draft.hireLimit, capacity);
+  const { hireLimit } = draft;
+  // A number is a limit the player set and it stays put; "no limit" follows what recruiting can find.
+  const limitNote =
+    hireLimit === null
+      ? `No limit: as many as recruiting can find, ${capacity} this quarter. `
+      : hireLimit > capacity
+        ? `Recruiting can only find ${capacity} this quarter. `
+        : "";
   const marketingPull = config.pull.marketingCoefficient * Math.sqrt(draft.marketing / config.pull.marketingStep) * (view.marketing.halved ? 0.5 : 1);
   const chosenRaise = view.raise.options.find((option) => option.selected);
   const selectedTier = view.prices.find((tier) => tier.selected);
@@ -92,9 +99,16 @@ export const PlanningPanel = ({ company, turn, draft, view, config, onChange }: 
         {capacity > 0 && (
           <Row
             title="Hire at most"
-            hint={`${money(view.hiring.fee)} fee each, then ${money(config.salary)} a quarter in salary; they start next quarter. ${plural(view.hiring.candidates, "candidate", "candidates")} this quarter, most hype picks first: expect ${view.hiring.expected}.`}
+            hint={`${limitNote}${money(view.hiring.fee)} fee each, then ${money(config.salary)} a quarter in salary; they start next quarter. ${plural(view.hiring.candidates, "candidate", "candidates")} this quarter, most hype picks first: expect ${view.hiring.expected}.`}
           >
-            <Stepper label="Hire at most" value={hireLimit} onStep={(delta) => onChange(stepHireLimit(draft, delta, capacity))} canDecrease={hireLimit > 0} canIncrease={hireLimit < capacity} />
+            <Stepper
+              label="Hire at most"
+              value={hireLimit ?? "No limit"}
+              valueClassName="w-[4.5rem]"
+              onStep={(delta) => onChange(stepHireLimit(draft, delta, capacity))}
+              canDecrease={hireLimit === null || hireLimit > 0}
+              canIncrease={hireLimit !== null}
+            />
           </Row>
         )}
       </div>

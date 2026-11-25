@@ -41,8 +41,12 @@ export const stepMarketing = (plan: Plan, steps: number, config: RulesConfig): P
   marketing: Math.min(config.pull.maxMarketing, Math.max(0, plan.marketing + steps * config.pull.marketingStep)),
 });
 
-/** The "hire at most" control. At or above capacity it means "as many as recruiting can find". */
+/**
+ * The "hire at most" control: 0, 1, 2 … up to what recruiting can find today, then "no limit" (null).
+ * A number stays as the player set it from one quarter to the next; only "no limit" grows with recruiting.
+ */
 export const stepHireLimit = (plan: Plan, delta: 1 | -1, capacity: number): Plan => {
-  const next = Math.max(0, (plan.hireLimit ?? capacity) + delta);
-  return { ...plan, hireLimit: next >= capacity ? null : next };
+  const { hireLimit } = plan;
+  if (delta < 0) return { ...plan, hireLimit: hireLimit === null ? capacity : Math.max(0, hireLimit - 1) };
+  return { ...plan, hireLimit: hireLimit === null || hireLimit >= capacity ? null : hireLimit + 1 };
 };

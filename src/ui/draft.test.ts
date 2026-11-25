@@ -104,17 +104,39 @@ describe("marketing and hiring steppers", () => {
     expect(stepMarketing(plan(c, { marketing: 50_000 }), 4, DESIGN).marketing).toBe(150_000);
   });
 
-  it("lowers the hire limit from 'as many as possible' and raises it back", () => {
-    const c = company();
-    const base = plan(c);
-    expect(base.hireLimit).toBeNull();
+  describe("hire at most", () => {
+    const limit = (hireLimit: number | null): Plan => plan(company(), { hireLimit });
     // Capacity is 2 with one recruiter in a team of six.
-    const one = stepHireLimit(base, -1, 2);
-    expect(one.hireLimit).toBe(1);
-    expect(stepHireLimit(one, -1, 2).hireLimit).toBe(0);
-    expect(stepHireLimit(stepHireLimit(one, -1, 2), -1, 2).hireLimit).toBe(0);
-    expect(stepHireLimit(one, 1, 2).hireLimit).toBeNull();
-    expect(stepHireLimit(base, 1, 2).hireLimit).toBeNull();
+    const CAPACITY = 2;
+
+    it("starts with no limit, and the first step down sets it to what recruiting can find today", () => {
+      expect(plan(company()).hireLimit).toBeNull();
+      expect(stepHireLimit(limit(null), -1, CAPACITY).hireLimit).toBe(2);
+    });
+
+    it("steps one at a time down to 0 and back up to capacity", () => {
+      expect(stepHireLimit(limit(2), -1, CAPACITY).hireLimit).toBe(1);
+      expect(stepHireLimit(limit(1), -1, CAPACITY).hireLimit).toBe(0);
+      expect(stepHireLimit(limit(0), -1, CAPACITY).hireLimit).toBe(0);
+      expect(stepHireLimit(limit(0), 1, CAPACITY).hireLimit).toBe(1);
+    });
+
+    it("holds a limit equal to today's capacity as a number, so it does not rise when capacity does", () => {
+      const held = stepHireLimit(limit(1), 1, CAPACITY);
+      expect(held.hireLimit).toBe(2);
+      // Next quarter recruiting can find 5: the limit is still 2, one step up is 3.
+      expect(stepHireLimit(held, 1, 5).hireLimit).toBe(3);
+    });
+
+    it("goes back to no limit one step above capacity, and stays there", () => {
+      expect(stepHireLimit(limit(2), 1, CAPACITY).hireLimit).toBeNull();
+      expect(stepHireLimit(limit(null), 1, CAPACITY).hireLimit).toBeNull();
+    });
+
+    it("moves a kept limit that is above today's capacity by one, like any other", () => {
+      expect(stepHireLimit(limit(4), -1, CAPACITY).hireLimit).toBe(3);
+      expect(stepHireLimit(limit(4), 1, CAPACITY).hireLimit).toBeNull();
+    });
   });
 });
 
