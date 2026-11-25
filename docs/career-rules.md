@@ -161,4 +161,76 @@ Resolution, in this order:
 
 ## Starting numbers
 
+The career ships with `CAREER` in `src/config.ts`; `CAREER_DESIGN` in `src/config.design.ts` holds the same numbers,
+written out a second time and never tuned. Neither reads the race's numbers, so tuning one game never moves the other.
+Everything is per year.
+
+**Base values.** These are the race's tuned numbers read per year instead of per quarter, with the spec's own numbers
+for the career's rules (listing, rescue, replacement, offices, moving). Every era inherits them unless it sets its
+own; `salary`, `market`, `ipo`, `valuation`, `hiring.candidatesPerTurn`, `pull.maxMarketing` and the team caps are
+the first era's.
+
+```
+game.maxTurns 49
+archetypes.startup    cash 400K · 3 people · 0 users · quality 0 · hype 10 · equity 1 · seats 2 founder / 0 investor
+                      workExponent 0.9 · catchUpMultiplier 1 · allocation 3 / 0 / 0
+archetypes.incumbent  cash 1.5M · 8 people · 10K users · quality 30 · hype 20 · equity 0.6 · seats 2 / 1
+                      workExponent 0.625 · catchUpMultiplier 1.5 · allocation 5 / 2 / 1
+hiring     capacityPerWork 3 · fee 20K                       poach   cost 150K, the rest as the race
+layoff     severance 40K · hype -10                          quality gainPerWork 9 · decay 6 · launchAt 10
+pull       growthCoefficient 0.3 · marketingCoefficient 0.3 · marketingStep 50K
+priceTiers budget 8 / 1.05 / -0.05 · standard 12 / 1 / 0 · premium 20 / 0.75 / 0.03      (price / pullFactor / churnDelta)
+churn      base 0.30 · perQualityPoint 0.002 · min 0.05      raise   minUsers 1K · cooldownTurns 1 · options 10, 20, 30
+board      fireChance 0.3 · runwayTurns 1                    hype    decay 0.4 · launch 15 · raise 10 · growth 5 · growthThreshold 0.25
+projection as the race                                       events  firstTurn 2 · chance 0.5 · deck: none here,
+                                                                     each era has its own (below)
+cpu        as the race, except recruiters.shares 0.1, 0.2 · ipoPushLayoffs 0, 1, 2 ·
+           ipo win 2 / deficit 2 / nextDeficit 1 / usersShortfall 2 and, per personality:
+           blitzscaler  hireRunway 1 · horizon 3        bootstrapper  raise.runway 1 · hireRunway 2 · horizon 4
+           incumbent    raise.runway 1.5 · poachRunway 1.5 · hireRunway 1.5 · horizon 3
+           (layoffRunway and shortRunwayTurns stay 1: with a year as the turn, less than a year of cash is
+           bankruptcy this year, and layoffs have to be among the plans weighed)
+baseline   split 0.4 / 0.4 / 0.2 · standard · raisePercent 20 · raiseRunway 3 · hireRunway 3 · marketing 0
+sim        careers 1000 · firstSeed 1 · leaderYear 2010 · checkpointYears 1995, 2000, 2010, 2020, 2030, 2038
+           overspendYear 1993 · loopholeMargin 0.03 · targets: maxCpuWinShare 0.4 · baselineWinShare 0.15 to 0.35 ·
+           baselineOutShare 0.10 to 0.30 · baselineListedShare 0.40 to 0.80 · leaderHoldsBelow 0.60
+career     firstYear 1990 · shiftNoticeYears 2 · listing 20% / premium 1.25 / hype 20 / 1 investor seat ·
+           rescue equityKept 0.5 / 2 investor seats / hype -10 / 1 year of salaries · replacement after 2 years, any
+           of the three styles · moving 0.5 years of salary · offices Garage 4, Shared office 9, Own office 22,
+           Full floor 40, Campus 150
+```
+
+**The eras.** The era table is the plan's proposal, on the spec's eight eras and their years. Each era's `values` set
+these numbers for the era's years; a number set in the last column holds for that era only, and the next era goes back
+to the base value unless it sets the number again.
+
+| id | name | firstYear | market.newUsersTurn1 | growthPerTurn | salary | valuation.perUser | hiring.candidatesPerTurn | ipo.users | archetypes.startup.cash | pull.maxMarketing | teamCap blitz / boot / incumbent | also sets |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| `dial-up` | Dial-up dawn | 1990 | 20K | 0.35 | 50K | 40 | 4 | 60K | 400K | 1M | 8 / 6 / 12 | `pull.marketingCoefficient` 0.2 |
+| `gold-rush` | Browser gold rush | 1995 | 100K | 0.40 | 70K | 200 | 6 | 300K | 600K | 5M | 15 / 9 / 20 | `poach.baseChance` 0.6 |
+| `bust` | Bust and broadband | 2000 | 380K | 0.05 | 85K | 50 | 9 | 800K | 500K | 5M | 15 / 9 / 20 | `hiring.fee` 10K |
+| `phones` | Phones and cloud | 2007 | 700K | 0.10 | 100K | 80 | 8 | 1.5M | 600K | 10M | 25 / 14 / 35 | `quality.gainPerWork` 11 · `pull.growthCoefficient` 0.4 |
+| `cheap-money` | Cheap money years | 2014 | 1.3M | 0.03 | 130K | 130 | 16 | 3M | 1M | 30M | 50 / 25 / 70 | `churn.base` 0.35 |
+| `winter-ai` | Winter and AI | 2022 | 1.6M | 0.04 | 150K | 100 | 12 | 4M | 1M | 30M | 50 / 25 / 70 | `quality.gainPerWork` 12 · `quality.decay` 8 |
+| `agents` | Agent economy | 2027 | 2.0M | 0.06 | 220K | 60 | 4 | 5M | 1.5M | 40M | 30 / 15 / 40 | `quality.gainPerWork` 18 · `churn.perQualityPoint` 0.003 · `pull.marketingCoefficient` 0.15 |
+| `ambient` | Ambient age | 2033 | 3.5M | 0.10 | 280K | 80 | 16 | 8M | 2M | 60M | 60 / 30 / 90 | `pull.marketingCoefficient` 0.1 · `hype.launch` 25 |
+
+Agent economy and Ambient age are invented (`invented: true`). Each era also deals its own deck: five to seven cards
+built from the race's seven cards that do not touch funding (viral moment, burnout, press feature, security breach,
+talent glut, market boom, ad prices spike), named and worded for the era, with the race's effects. No deck card sets a
+funding climate, a quality ceiling or a wave: the dated cards own those.
+
+**The dated cards.** The 28 dated cards are the spec's section 6, each in its year with exactly the effects it lists,
+written as these effects (the wave's 1.3 for 3 years and the ceiling's `turns` of 1 are the plan's proposal). Their
+texts follow the research notes with the fact-check's corrections; a comment beside each real card names the event.
+
+| The spec says | Effect |
+|---|---|
+| valuations ×M, N years | `{ kind: "fundingClimate", multiplier: M, turns: N }` |
+| new users ×M | `{ kind: "newUsers", multiplier: M }` |
+| marketing works ×M | `{ kind: "marketingEffect", multiplier: M }` |
+| N extra candidates / N fewer candidates | `{ kind: "candidates", extra: N }` / `extra: -N` |
+| platform shift | `{ kind: "qualityCeiling", ceiling: 30, turns: 1 }` then `{ kind: "userWave", multiplier: 1.3, turns: 3 }`, listed first |
+| one weak product loses F of its users and H hype | `target: { pick: "random", launched: true, qualityBelow: 50, minUsers: 1 }` (60 for 2035) with `targetUsers` F and `targetHype` −H |
+
 ## Tuning log
