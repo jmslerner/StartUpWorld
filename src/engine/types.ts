@@ -414,5 +414,7 @@ export interface RulesConfig {
     readonly rivalPullGuess: number;
     /** How many candidates each rival is assumed to want this turn. */
     readonly rivalHireGuess: number;
+    /** The cautious case: this share fewer new users than expected. A warning that says "could" is worked out from it. */
+    readonly cautiousShortfall: number;
   };
 }

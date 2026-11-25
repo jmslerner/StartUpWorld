@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { count, money, percent, quarter, runwayText, signed } from "./format";
+import { count, money, percent, quarter, quartersLeft, runwayText, signed } from "./format";
 
 describe("money", () => {
   it("shortens to K and M", () => {
@@ -27,7 +27,20 @@ describe("count", () => {
     expect(count(9_950)).toBe("9,950");
     expect(count(12_400)).toBe("12.4K");
     expect(count(250_000)).toBe("250K");
-    expect(count(1_155_000)).toBe("1.16M");
+    expect(count(1_150_000)).toBe("1.15M");
+  });
+
+  it("never rounds up to a figure that has not been reached", () => {
+    // 329,600 users are not the 330K it takes to go public.
+    expect(count(329_600)).toBe("329K");
+    expect(count(329_999)).toBe("329K");
+    expect(count(330_000)).toBe("330K");
+    expect(count(12_449)).toBe("12.4K");
+    expect(count(12_499)).toBe("12.4K");
+    expect(count(99_999)).toBe("99.9K");
+    expect(count(999_999)).toBe("999K");
+    expect(count(1_159_999)).toBe("1.15M");
+    expect(count(-12_499)).toBe("-12.4K");
   });
 });
 
@@ -61,5 +74,18 @@ describe("percent, quarter, runway", () => {
     expect(runwayText(0.4)).toBe("0.4 turns");
     expect(runwayText(42.7)).toBe("40+ turns");
     expect(runwayText(-2)).toBe("0 turns");
+  });
+
+  it("never rounds runway up across the two turns the board looks at", () => {
+    expect(runwayText(1.96)).toBe("1.9 turns");
+    expect(runwayText(1.999)).toBe("1.9 turns");
+    expect(runwayText(2)).toBe("2.0 turns");
+    expect(runwayText(0.99)).toBe("0.9 turns");
+  });
+
+  it("says how long a funding climate still lasts, counting the quarter under way", () => {
+    expect(quartersLeft(1)).toBe("this quarter only");
+    expect(quartersLeft(2)).toBe("this quarter and the next");
+    expect(quartersLeft(3)).toBe("this quarter and 2 more");
   });
 });

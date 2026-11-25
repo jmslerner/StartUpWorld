@@ -3,7 +3,7 @@
 // cannot show what the player is not supposed to know.
 
 import { findCard } from "../engine/events";
-import { founderStake, hiringCapacity, poachChance, raiseAmount, round6, valuationOf, effectiveWork } from "../engine/formulas";
+import { effectiveWork, founderStake, hiringCapacity, marketingPull, poachChance, raiseAmount, round6, runwayOf, valuationOf } from "../engine/formulas";
 import { raiseBlocker, type RaiseBlocker } from "../engine/plan";
 import { projectTurn, type Projection } from "../engine/project";
 import { PRICE_TIERS } from "../engine/types";
@@ -33,9 +33,11 @@ import type { GameEndSound } from "./sound";
 
 const people = (n: number): string => (n === 1 ? "1 person" : `${n} people`);
 
-/** Change in a company's users since the start of last quarter, or null before its first quarter. */
-const usersChange = (users: number, last: QuarterStats | null): number | null =>
-  last === null ? null : users - (last.usersAtOpen - last.usersLostToEvent);
+/**
+ * How a company's users changed over its last quarter, close to close: what its report showed and
+ * what a board means by "users fell". null before its first quarter.
+ */
+const usersChange = (last: QuarterStats | null): number | null => (last === null ? null : last.usersWon - last.usersChurned - last.usersLostToEvent);
 
 // ── Resource bar ──
 
@@ -90,7 +92,7 @@ export const resourceView = (game: GameState, config: RulesConfig): ResourceView
     headcount: self.headcount,
     effectiveWork: effectiveWork(self.headcount, config.archetypes[self.archetype].workExponent),
     users: self.users,
-    usersChange: usersChange(self.users, self.lastQuarter),
+    usersChange: usersChange(self.lastQuarter),
     ipoUsers: config.ipo.users,
     hype: self.hype,
     quality: self.quality,
@@ -155,6 +157,8 @@ export interface PlanningView {
   /** People who can be put to work this quarter, and how many of them have no department yet. */
   readonly available: number;
   readonly unassigned: number;
+  /** What those people get done between them, after coordination drag. Someone off raising money adds nothing. */
+  readonly workDone: number;
   /** The quarter as the engine would resolve this plan, rivals estimated from public information. */
   readonly projection: Projection;
   readonly prices: readonly PriceOption[];
@@ -171,7 +175,15 @@ export interface PlanningView {
     readonly candidates: number;
   };
   readonly layoffs: { readonly count: number; readonly max: number; readonly severance: number; readonly hype: number };
-  readonly marketing: { readonly amount: number; readonly step: number; readonly max: number; readonly halved: boolean };
+  readonly marketing: {
+    readonly amount: number;
+    readonly step: number;
+    readonly max: number;
+    /** What this quarter's event does to marketing: 1 normally, 0.5 when it is half as effective. */
+    readonly effect: number;
+    /** What the spend adds to pull, as a share, event included. */
+    readonly pull: number;
+  };
   /** Most serious first. */
   readonly warnings: readonly Warning[];
 }
@@ -184,7 +196,11 @@ const raiseView = (self: Company, game: GameState, draft: Plan, config: RulesCon
   let blockedText: string | null = null;
   if (blocked === "users") blockedText = `Investors want to see ${config.raise.minUsers.toLocaleString("en-US")} users first.`;
   if (blocked === "cooldown" && self.lastRaise !== null) {
-    blockedText = `You raised in ${quarter(self.lastRaise.turn)}. You can raise again in ${quarter(self.lastRaise.turn + config.raise.cooldownTurns + 1)}.`;
+    const next = self.lastRaise.turn + config.raise.cooldownTurns + 1;
+    blockedText =
+      next > config.game.maxTurns
+        ? `You raised in ${quarter(self.lastRaise.turn)}. There is no time for another raise before the game ends.`
+        : `You raised in ${quarter(self.lastRaise.turn)}. You can raise again in ${quarter(next)}.`;
   }
   const investorSeatsAfter = self.investorSeats + 1;
   return {
@@ -202,10 +218,27 @@ const raiseView = (self: Company, game: GameState, draft: Plan, config: RulesCon
   };
 };
 
+/**
+ * The quarter if fewer new users arrive than expected. The expected figure runs a little high more
+ * often than not, so a threshold the plan only just clears is one it could miss.
+ */
+const cautiousCase = (self: Company, projection: Projection, config: RulesConfig) => {
+  const users = projection.users - Math.round(projection.usersWon * config.projection.cautiousShortfall);
+  const revenue = Math.round(users * config.priceTiers[projection.plan.price].price);
+  const runway = runwayOf(projection.cash - (projection.revenue - revenue), revenue, projection.costs.total);
+  return {
+    users,
+    profitable: revenue >= projection.costs.total,
+    usersFell: users < self.usersAtLastClose,
+    lowRunway: runway !== null && runway < config.board.runwayTurns,
+  };
+};
+
 export const planningView = (game: GameState, draft: Plan, config: RulesConfig): PlanningView => {
   const self = game.companies[PLAYER_ID];
   const view = viewFor(game, PLAYER_ID);
   const projection = projectTurn(view, draft, config);
+  const cautious = cautiousCase(self, projection, config);
   const idle = unassigned(self, draft);
   const raise = raiseView(self, game, draft, config);
 
@@ -221,16 +254,22 @@ export const planningView = (game: GameState, draft: Plan, config: RulesConfig):
   }
   if (projection.boardRisk > 0) {
     warn("caution", `Investors control your board and this quarter looks bad to them: a ${percent(projection.boardRisk)} chance they fire you.`);
+  } else if (projection.investorSeats > self.founderSeats && (cautious.usersFell || cautious.lowRunway)) {
+    const what = cautious.usersFell ? "your users would fall" : `runway would drop under ${config.board.runwayTurns} turns`;
+    warn("caution", `Close call: with ${percent(config.projection.cautiousShortfall)} fewer new users than expected, ${what}. That is a ${percent(config.board.fireChance)} chance your board fires you.`);
   }
   const chosenRaise = raise.options.find((option) => option.selected);
   if (chosenRaise?.handsOverBoard && projection.raise !== null) {
     warn("caution", `This raise gives investors the majority of your board, ${chosenRaise.investorSeatsAfter} seats to your ${self.founderSeats}. After a bad quarter they can fire you.`);
   }
   if (projection.users >= config.ipo.users) {
-    if (projection.profitable) {
+    const usersInHand = cautious.users >= config.ipo.users;
+    if (!projection.profitable) {
+      warn("caution", `${usersInHand ? "You have" : "You may reach"} the users to go public, but not the profit: revenue ${money(projection.revenue)} against costs ${money(projection.costs.total)}.`);
+    } else if (usersInHand && cautious.profitable) {
       warn("note", `On course to go public this quarter: ${count(config.ipo.users)} users and a profitable quarter.`);
     } else {
-      warn("caution", `You have the users to go public but not the profit: revenue ${money(projection.revenue)} against costs ${money(projection.costs.total)}.`);
+      warn("note", `You could go public this quarter: it takes ${count(config.ipo.users)} users and a profit, and this plan only gets there if you win the users you expect.`);
     }
   }
   if (!self.launched) {
@@ -249,6 +288,7 @@ export const planningView = (game: GameState, draft: Plan, config: RulesConfig):
   return {
     available: peopleAvailable(self, draft),
     unassigned: idle,
+    workDone: projection.work.product + projection.work.growth + projection.work.recruiting,
     projection,
     prices: PRICE_TIERS.map((tier) => ({ tier, ...config.priceTiers[tier], selected: draft.price === tier })),
     raise,
@@ -277,7 +317,13 @@ export const planningView = (game: GameState, draft: Plan, config: RulesConfig):
       candidates: config.hiring.candidatesPerTurn + game.modifiers.extraCandidates + game.freedPeople + projection.plan.layoffs,
     },
     layoffs: { count: draft.layoffs, max: Math.max(0, self.headcount - 1), severance: config.layoff.severance, hype: config.layoff.hype },
-    marketing: { amount: draft.marketing, step: config.pull.marketingStep, max: config.pull.maxMarketing, halved: game.modifiers.marketing < 1 },
+    marketing: {
+      amount: draft.marketing,
+      step: config.pull.marketingStep,
+      max: config.pull.maxMarketing,
+      effect: game.modifiers.marketing,
+      pull: marketingPull(projection.plan.marketing, game.modifiers.marketing, config),
+    },
     warnings: warnings.sort((a, b) => LEVEL_ORDER[a.level] - LEVEL_ORDER[b.level]),
   };
 };
@@ -313,7 +359,7 @@ export const rivalsView = (game: GameState, config: RulesConfig): RivalRow[] =>
       name: rival.name,
       pitch: rival.pitch,
       users: rival.users,
-      usersChange: rival.out === null ? usersChange(rival.users, rival.lastQuarter) : null,
+      usersChange: rival.out === null ? usersChange(rival.lastQuarter) : null,
       headcount: rival.headcount,
       quality: rival.quality,
       hype: rival.hype,
@@ -373,6 +419,7 @@ export interface ReportView {
   };
   readonly users: CompanyReport["users"];
   readonly people: {
+    /** At last quarter's close, before this quarter's event: start, less the losses, plus the arrivals, is the end. */
     readonly start: number;
     readonly lostToEvent: number;
     readonly laidOff: number;
@@ -441,7 +488,7 @@ export const reportView = (game: GameState, log: TurnLog, config: RulesConfig): 
     },
     users: report.users,
     people: {
-      start: report.headcount.start,
+      start: report.headcount.start + report.headcount.lostToEvent,
       lostToEvent: report.headcount.lostToEvent,
       laidOff: report.headcount.laidOff,
       hired: report.hiring.hired,

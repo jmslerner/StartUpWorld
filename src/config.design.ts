@@ -107,7 +107,7 @@ export const DESIGN: GameConfig = {
 
   // ── Projection (planning panel and CPU planner) ──
   // Not rules: assumptions the one-quarter projection uses about rivals it cannot see into.
-  projection: { rivalPullGuess: 1.6, rivalHireGuess: 1 },
+  projection: { rivalPullGuess: 1.6, rivalHireGuess: 1, cautiousShortfall: 0.25 },
 
   // ── Events ──
   events: {

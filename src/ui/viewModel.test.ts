@@ -41,10 +41,14 @@ describe("resource bar", () => {
     expect(view.turn).toBe(2);
   });
 
-  it("measures the change from the number shown a quarter ago, after that quarter's event", () => {
-    // Closed on 10,000; a breach took 1,000 before last quarter was planned, so the bar showed 9,000 then.
+  it("measures the change the way the report and the board do: close to close, an event's losses included", () => {
+    // Closed on 10,000; a breach took 1,000, 500 left and 3,500 came: 12,000 at the next close.
     const lastQuarter = { qualityAtOpen: 40, hypeAtOpen: 20, usersAtOpen: 10_000, usersLostToEvent: 1_000, usersChurned: 500, usersWon: 3_500, joined: 0, left: 0 };
-    expect(resourceView(going({ users: 12_000, lastQuarter }), DESIGN).usersChange).toBe(3_000);
+    expect(resourceView(going({ users: 12_000, lastQuarter }), DESIGN).usersChange).toBe(2_000);
+    // A breach revealed for the coming quarter has already taken 1,200: that belongs to the next report.
+    expect(resourceView(going({ users: 10_800, usersAtLastClose: 12_000, lastQuarter }), DESIGN).usersChange).toBe(2_000);
+    // A quarter in which users fell shows as a fall, whatever came in.
+    expect(resourceView(going({ users: 9_800, lastQuarter: { ...lastQuarter, usersWon: 1_300 } }), DESIGN).usersChange).toBe(-200);
   });
 
   it("applies the funding climate to the valuation it shows", () => {
@@ -63,6 +67,28 @@ describe("planning panel", () => {
     expect(view.unassigned).toBe(1);
     expect(view.hiring.capacity).toBeGreaterThanOrEqual(1);
     expect(view.warnings.some((w) => w.level === "note" && /1 person unassigned/.test(w.text))).toBe(true);
+  });
+
+  it("says what the people at work get done between them: less when one of them is off raising money", () => {
+    const game = going();
+    const everyone = planningView(game, draftOf(game), DESIGN);
+    expect(everyone.available).toBe(6);
+    expect(everyone.workDone).toBeCloseTo(6 ** 0.9, 5);
+    const raising = planningView(game, draftOf(game, { raisePercent: 20, allocation: { product: 5, growth: 0, recruiting: 0 } }), DESIGN);
+    expect(raising.available).toBe(5);
+    expect(raising.workDone).toBeCloseTo((6 ** 0.9 * 5) / 6, 5);
+  });
+
+  it("passes on what this quarter's event does to marketing, whatever the multiplier", () => {
+    const game = going();
+    const spend = { marketing: 100_000 };
+    // 0.5 × √(100K ÷ 25K) = +100% pull, before the event.
+    expect(planningView(game, draftOf(game, spend), DESIGN).marketing).toMatchObject({ effect: 1, pull: 1 });
+    const spike = withState(game, { modifiers: { ...game.modifiers, marketing: 0.5 } });
+    expect(planningView(spike, draftOf(spike, spend), DESIGN).marketing).toMatchObject({ effect: 0.5, pull: 0.5 });
+    const cheapAds = withState(game, { modifiers: { ...game.modifiers, marketing: 1.5 } });
+    expect(planningView(cheapAds, draftOf(cheapAds, spend), DESIGN).marketing).toMatchObject({ effect: 1.5, pull: 1.5 });
+    expect(planningView(game, draftOf(game), DESIGN).marketing.pull).toBe(0);
   });
 
   it("offers the three price tiers with their price per user", () => {
@@ -106,6 +132,17 @@ describe("planning panel", () => {
       const view = planningView(cooling, draftOf(cooling), DESIGN).raise;
       expect(view.blocked).toBe("cooldown");
       expect(view.blockedText).toMatch(/Q7/);
+    });
+
+    it("does not promise a raise in a quarter after the game's last", () => {
+      const late = withState(going({ lastRaise: { turn: 19, percent: 20, amount: 500_000 } }), { turn: 20 });
+      const text = planningView(late, draftOf(late), DESIGN).raise.blockedText;
+      expect(text).toMatch(/Q19/);
+      expect(text).not.toMatch(/Q2[1-9]/);
+      expect(text).toMatch(/no time/i);
+      // Raised in Q17: Q20 is still open for one.
+      const justInTime = withState(going({ lastRaise: { turn: 17, percent: 20, amount: 500_000 } }), { turn: 18 });
+      expect(planningView(justInTime, draftOf(justInTime), DESIGN).raise.blockedText).toMatch(/Q20/);
     });
 
     it("warns when the chosen raise gives investors the board", () => {
@@ -174,6 +211,37 @@ describe("planning panel", () => {
       const safe = going({ investorSeats: 3, cash: 9_000_000 });
       expect(planningView(safe, draftOf(safe), DESIGN).warnings.some((w) => /board/i.test(w.text))).toBe(false);
     });
+
+    it("calls it a close call when fewer new users than expected would leave runway too short for the board", () => {
+      const probe = planningView(going({ investorSeats: 3, cash: 9_000_000 }), draftOf(going()), DESIGN).projection;
+      const burn = probe.costs.total - probe.revenue;
+      expect(burn).toBeGreaterThan(0);
+      // Cash to end the quarter a shade over the board's two turns of runway, if all goes as expected.
+      const game = going({ investorSeats: 3, cash: burn + 2 * burn + 1_000 });
+      const view = planningView(game, draftOf(game), DESIGN);
+      expect(view.projection.boardRisk).toBe(0);
+      expect(view.projection.runway).toBeGreaterThanOrEqual(2);
+      const warning = view.warnings.find((w) => /board/i.test(w.text));
+      expect(warning).toMatchObject({ level: "caution" });
+      expect(warning!.text).toMatch(/close call/i);
+      expect(warning!.text).toMatch(/runway/);
+      expect(warning!.text).toMatch(/30%/);
+      // With founders in control there is nobody to fire them, close call or not.
+      const founderLed = going({ investorSeats: 2, cash: burn + 2 * burn + 1_000 });
+      expect(planningView(founderLed, draftOf(founderLed), DESIGN).warnings.some((w) => /board/i.test(w.text))).toBe(false);
+    });
+
+    it("calls it a close call when fewer new users than expected would mean users fell", () => {
+      const probe = planningView(going({ investorSeats: 3, cash: 9_000_000 }), draftOf(going()), DESIGN).projection;
+      // An event took users as the quarter opened: on the expected figure the company just gets back to its last close.
+      const game = going({ investorSeats: 3, cash: 9_000_000, usersAtLastClose: probe.users - 10 });
+      const view = planningView(game, draftOf(game), DESIGN);
+      expect(view.projection.boardRisk).toBe(0);
+      const warning = view.warnings.find((w) => /board/i.test(w.text));
+      expect(warning).toMatchObject({ level: "caution" });
+      expect(warning!.text).toMatch(/close call/i);
+      expect(warning!.text).toMatch(/users would fall/);
+    });
   });
 
   it("tells a company with no product what it needs to launch", () => {
@@ -189,6 +257,32 @@ describe("planning panel", () => {
     expect(planningView(ready, draftOf(ready), DESIGN).warnings.some((w) => /public/i.test(w.text) && w.level === "note")).toBe(true);
     const bloated = going({ users: 300_000, usersAtLastClose: 300_000, quality: 90, cash: 9_000_000, headcount: 30, headcountAtLastClose: 30 });
     expect(planningView(bloated, draftOf(bloated), DESIGN).warnings.some((w) => /profit/i.test(w.text) && w.level === "caution")).toBe(true);
+  });
+});
+
+describe("going public", () => {
+  const at = (users: number): GameState => going({ users, usersAtLastClose: users, quality: 90, cash: 2_000_000 });
+  const publicNote = (game: GameState) => planningView(game, draftOf(game), DESIGN).warnings.find((w) => /public/i.test(w.text));
+
+  it("is on course when the company clears the bar even with fewer new users than expected", () => {
+    expect(publicNote(at(300_000))).toMatchObject({ level: "note" });
+    expect(publicNote(at(300_000))!.text).toMatch(/on course/i);
+  });
+
+  it("could happen, not will, when it rests on the users the company expects to win", () => {
+    let users = 200_000;
+    while (planningView(at(users), draftOf(at(users)), DESIGN).projection.users < DESIGN.ipo.users) users += 500;
+    const { projection } = planningView(at(users), draftOf(at(users)), DESIGN);
+    // Just there on the expected figure; a quarter fewer new users and it falls short.
+    expect(projection.users - Math.round(projection.usersWon * DESIGN.projection.cautiousShortfall)).toBeLessThan(DESIGN.ipo.users);
+    const note = publicNote(at(users))!;
+    expect(note.level).toBe("note");
+    expect(note.text).toMatch(/could go public/i);
+    expect(note.text).not.toMatch(/on course/i);
+  });
+
+  it("says nothing while the bar is out of reach", () => {
+    expect(publicNote(at(100_000))).toBeUndefined();
   });
 });
 
@@ -228,6 +322,16 @@ describe("quarterly report", () => {
     expect(view.users).toMatchObject({ open: 20_000, churned: report.users.churned, won: report.users.won, end: report.users.end });
     expect(view.people).toMatchObject({ start: 6, hired: report.hiring.hired, end: report.headcount.end });
     expect(view.out).toBeNull();
+  });
+
+  it("starts the team line at last quarter's close, so a loss to an event shows and the line adds up", () => {
+    // Six at the close; burnout took one as the quarter opened, so five were at work.
+    const state = going({ headcount: 5, headcountAtLastClose: 6 });
+    const result = resolve(state, { [HUMAN]: { allocation: { product: 3, growth: 1, recruiting: 1 } } }, 1, NEVER);
+    const team = reportView(result.state, result.log, DESIGN).people;
+    expect(team).toMatchObject({ start: 6, lostToEvent: 1 });
+    expect(team.hired).toBeGreaterThan(0);
+    expect(team.start - team.lostToEvent - team.laidOff - team.poachedOut + team.hired + team.poachedIn).toBe(team.end);
   });
 
   it("reports rival moves in plain words: launches, raises, hires, layoffs and poaching", () => {

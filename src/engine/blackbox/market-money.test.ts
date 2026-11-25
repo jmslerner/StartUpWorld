@@ -126,7 +126,7 @@ const DESIGN: RulesConfig = {
   board: { fireChance: 0.3, runwayTurns: 2 },
   hype: { decay: 0.2, launch: 15, raise: 10, growth: 5, growthThreshold: 0.25 },
   // Not a rule: what the planning panel's projection assumes about rivals. Resolving a turn never reads it.
-  projection: { rivalPullGuess: 1.6, rivalHireGuess: 1 },
+  projection: { rivalPullGuess: 1.6, rivalHireGuess: 1, cautiousShortfall: 0.25 },
   events: { firstTurn: 3, chance: 0, deck: DECK },
 };
 

@@ -49,10 +49,14 @@ export interface PullInputs {
   readonly marketingModifier: number;
 }
 
+/** What a marketing spend adds to pull, as a share: each extra dollar does less, and this turn's event may scale it. */
+export const marketingPull = (marketing: number, modifier: number, config: RulesConfig): number =>
+  config.pull.marketingCoefficient * Math.sqrt(Math.max(0, marketing) / config.pull.marketingStep) * modifier;
+
 /** How strongly a launched company attracts users from the pool. */
 export const pullOf = (inputs: PullInputs, config: RulesConfig): number => {
   const growth = config.pull.growthCoefficient * inputs.growthWork;
-  const marketing = config.pull.marketingCoefficient * Math.sqrt(Math.max(0, inputs.marketing) / config.pull.marketingStep) * inputs.marketingModifier;
+  const marketing = marketingPull(inputs.marketing, inputs.marketingModifier, config);
   return inputs.quality * (1 + growth + marketing) * config.priceTiers[inputs.tier].pullFactor * (1 + inputs.hype / 100);
 };
 

@@ -58,7 +58,6 @@ export const PlanningPanel = ({ company, turn, draft, view, config, onChange }: 
       : hireLimit > capacity
         ? `Recruiting can only find ${capacity} this quarter. `
         : "";
-  const marketingPull = config.pull.marketingCoefficient * Math.sqrt(draft.marketing / config.pull.marketingStep) * (view.marketing.halved ? 0.5 : 1);
   const chosenRaise = view.raise.options.find((option) => option.selected);
   const selectedTier = view.prices.find((tier) => tier.selected);
 
@@ -88,7 +87,7 @@ export const PlanningPanel = ({ company, turn, draft, view, config, onChange }: 
         <div className={`${HINT} flex items-center justify-between gap-2`}>
           <span>
             {plural(view.available, "person", "people")} to assign
-            {view.unassigned > 0 && <span className={TONE.caution}>, {view.unassigned} unassigned</span>}. Together they do the work of {projection.work.effective.toFixed(1)}.
+            {view.unassigned > 0 && <span className={TONE.caution}>, {view.unassigned} unassigned</span>}. Together they do the work of {view.workDone.toFixed(1)}.
           </span>
           {view.unassigned > 0 && (
             <button type="button" onClick={() => onChange(assignEveryone(company, draft))} className={`${BUTTON} shrink-0 px-2 py-1 text-[0.7rem]`}>
@@ -119,8 +118,10 @@ export const PlanningPanel = ({ company, turn, draft, view, config, onChange }: 
           title="Marketing"
           hint={
             <>
-              {draft.marketing === 0 ? "No spend this quarter." : `+${percent(marketingPull)} pull. Each extra dollar does less.`}
-              {view.marketing.halved && <span className={TONE.caution}> Ad prices spiked: half as effective this quarter.</span>}
+              {draft.marketing === 0 ? "No spend this quarter." : `+${percent(view.marketing.pull)} pull. Each extra dollar does less.`}
+              {view.marketing.effect !== 1 && (
+                <span className={view.marketing.effect < 1 ? TONE.caution : TONE.good}> This quarter&apos;s event: marketing is {percent(view.marketing.effect)} as effective.</span>
+              )}
             </>
           }
         >
