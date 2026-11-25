@@ -28,6 +28,7 @@ import type {
 } from "../engine/types";
 import { companyRunway, publicCompany, publicReport, viewFor } from "../engine/view";
 import { PLAYER_ID } from "../state/player";
+import { careerWarnings } from "./careerPlan";
 import { peopleAvailable, unassigned } from "./draft";
 import { count, money, percent } from "./format";
 import type { GameEndSound } from "./sound";
@@ -322,6 +323,8 @@ export const planningView = (game: GameState, draft: Plan, config: RulesConfig):
   if (career === undefined && game.turn >= rules.game.maxTurns) {
     warn("note", "Final quarter. If nobody goes public, the largest founder's stake (equity × valuation) wins.");
   }
+  // A career's own warnings: going public, the rescue, the office move and the final year.
+  if (career !== undefined) warnings.push(...careerWarnings(game, draft, projection, config));
 
   // In a career nobody more can join a team that fills the last office.
   const staying = self.headcount - draft.layoffs;

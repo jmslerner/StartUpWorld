@@ -33,8 +33,13 @@ export const assignEveryone = (company: Company, plan: Plan): Plan =>
 export const setLayoffs = (company: Company, plan: Plan, layoffs: number): Plan =>
   fit(company, { ...plan, layoffs: Math.min(Math.max(0, Math.floor(layoffs)), Math.max(0, company.headcount - 1)) });
 
-/** 0 switches the raise off. */
-export const setRaise = (company: Company, plan: Plan, percent: number): Plan => fit(company, { ...plan, raisePercent: percent });
+/** 0 switches the raise off. A raise and going public do not go together: choosing a raise drops going public. */
+export const setRaise = (company: Company, plan: Plan, percent: number): Plan =>
+  fit(company, percent > 0 && plan.goPublic === true ? { ...plan, raisePercent: percent, goPublic: false } : { ...plan, raisePercent: percent });
+
+/** Choose or drop going public; choosing it drops a raise and gives the raiser back to the team. */
+export const setGoPublic = (company: Company, plan: Plan, on: boolean): Plan =>
+  fit(company, on ? { ...plan, goPublic: true, raisePercent: 0 } : { ...plan, goPublic: false });
 
 /** Marketing up or down by whole steps, between $0 and `max`: the most a plan may budget, the race's cap by default. */
 export const stepMarketing = (plan: Plan, steps: number, config: RulesConfig, max: number = config.pull.maxMarketing): Plan => ({
