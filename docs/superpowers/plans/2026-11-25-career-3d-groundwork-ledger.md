@@ -31,6 +31,10 @@ skill for this method is not installed on this machine; the method is followed b
   pixels back. Every other warning fails the check.
 - Task 11 restores a lost context through "Reload 3D view", as the plan says. Restoring in place and then unmounting
   logs driver warnings about objects of the old context; the picture is right, and the button's path is clean.
+- At about 08:00 UTC on 25 November the account's allowance for the session's own model ran out. Two agents were cut
+  off: the reviewer of Task 9 and the implementer of Task 10, whose files were left uncommitted. From then on every
+  agent is run on another model, named when it is dispatched. The cut-off work is treated as an unreviewed draft: a
+  fresh implementer verifies or redoes it, and the review of Task 9 starts again from nothing.
 - Someone back from being away takes the first team that is short, in the order Product, Growth, Recruiting, which
   need not be the team they left (ruling 4, as written). Kept: the plan's ruling is explicit.
 
@@ -47,6 +51,7 @@ skill for this method is not installed on this machine; the method is followed b
 | 7 | done | bb811ab, aab5a0c, 9ca7013 (fixes) | approved with two important points, fixed before Task 9 |
 | 8 | done | 3dbd554 | approved; three minor points, fixed with Task 9 |
 | 9 | done, in review | b47bf0c, 98e73bf | pending |
+| 10 | done, in review | 1847d99 | pending |
 
 ## Task notes
 
@@ -325,3 +330,28 @@ afterwards (5 of 5 caught).
 
 To look at in Task 11's screenshots: in the shared office at 900 by 600 the neighbours' half of the loft crops at
 the right edge. The camera frames the company's own floor.
+
+### Task 10
+
+Finished by a second implementer from the first one's uncommitted draft, read file by file. The draft's plan tests
+matched the plan. Fixed in it: a view that failed could show "opening" again; the count of frames in the last second
+could include frames from seconds earlier; typing the same value woke the view; two layout faults. Since the draft's
+tests were never seen failing, the pure modules were checked by 82 mutations; nine survived at first, seven of them
+now caught by new tests and two removed with the code they sat in. Two equivalent ones remain.
+
+Decisions the implementer took:
+
+- Address parameters beyond the plan's: `fit=1` (the office follows the head count even when one is given) and
+  `panel=0` (the controls start hidden, for clean screenshots). A forced office is kept whatever the head count.
+- `window.__officeLab` also has `scene()`, `mount()` and `unmount()`, and `stats()` adds the status and the frames
+  drawn in the last second. `ready` also resolves when the view fails to load, so a check never hangs.
+- When a year ends in the lab, people back from being away rejoin the teams along with the hires, each to the team
+  that is smallest at that moment.
+- The lab has its own stylesheet and its words in `labWords.ts`; it uses nothing of the game's.
+
+The build: the game's first load is now three files instead of one (the two pages share React), 349.49 kB in all
+against 350.53 kB before, and its stylesheet is byte for byte the same. The lab's own script is 12.66 kB. The one
+file that contains three (826.66 kB) loads lazily from the lab page only.
+
+In headless Chromium: the plan's example scene drew 22 people in 302 draw calls; after twenty mounts and unmounts
+the renderer held no geometry and no texture; without WebGL the note shows and the controls work.
