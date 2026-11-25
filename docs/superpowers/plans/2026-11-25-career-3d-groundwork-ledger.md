@@ -33,7 +33,7 @@ skill for this method is not installed on this machine; the method is followed b
 | 2 | done | a79793a, 2fb6113 | approved; one minor point, fixed with Task 5 |
 | 3 | done | 1fecaab (merge), 996c1a0 | approved; four minor points, fixed with Task 5 |
 | 4 | done | 0b2fc50 | approved; five minor points, four fixed with Task 6 |
-| 5 | done, in review | a103c6c, 5cd04ed | pending |
+| 5 | done | a103c6c, 5cd04ed | approved; minor points, two fixed with Task 7 |
 | 6 | done, in review | b5e5a27, 182fad9 | pending |
 
 ## Task notes
@@ -173,6 +173,20 @@ no station, door or wall writes a word, that the sign writes a plus and a number
 
 Noted: the built stylesheet grew by about 0.3 kB though `src/index.css` is untouched. To be explained by the
 whole-branch review.
+
+Review: approved. The reviewer checked all five plans with rectangle maths of its own (no overlap, 0.9 clear behind
+every seat, every seat, waiting spot and wander spot reachable from the door), read the plans' coordinates against
+the old ones (nothing moved beyond the plan's six points), and showed the office system always comes to rest and
+leaves nothing behind when disposed. The stylesheet's growth is the CSS framework finding the words "sticky" and
+"invert" in the new source files and emitting those two unused utilities: harmless. Minor points:
+
+- The arcade cabinet's screen, carried over from the old code, drew rows of blocky invaders, a cannon and a shot.
+  That reads as a nod to one existing game, so it is replaced by an abstract picture at the start of Task 7.
+- Comments in `pathfinding.ts` that still say "cushion" are reworded at the start of Task 7.
+- The ticker's symbols (SUW, CASH, BURN, HYPE) stay: they read as plain words of this game, not as companies.
+- With no seating plan the sign shows nothing even if the cast hides people. Left: Task 7 supplies the plan.
+- The garage has four waiting spots and up to six people may wait, so two of them have no spot there (Task 7's
+  ruling 4 covers it: they are not drawn).
 
 ### Task 6
 
