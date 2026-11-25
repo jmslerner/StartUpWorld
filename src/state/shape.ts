@@ -5,13 +5,19 @@
 // Each shape below lists every field of its type, and the compiler insists on it: add a field to
 // GameState, Plan or TurnLog and this file stops compiling until the field is checked here too.
 // (Also bump SAVE_VERSION in save.ts, so saves without the new field start a new game.)
+//
+// The career's own fields are the optional ones. A race game has none of them, so a race save has
+// the shape it always had and SAVE_VERSION stays as it is. Where one is present it is checked like
+// any other field, and a game checked against a career's config must have its career fields.
 
 import { PRICE_TIERS } from "../engine/types";
 import type {
   ActiveEvent,
   Allocation,
+  CareerReport,
   Climate,
   Company,
+  CompanyCareer,
   CompanyReport,
   Controller,
   CostBreakdown,
@@ -19,13 +25,16 @@ import type {
   Exit,
   GameState,
   LastRaise,
+  Listing,
   OutReason,
   Outcome,
   Plan,
   QuarterStats,
+  Rescue,
   RulesConfig,
   TurnLog,
   TurnModifiers,
+  Wave,
 } from "../engine/types";
 
 type Check = (value: unknown) => boolean;
@@ -49,6 +58,11 @@ const orNull =
   (check: Check): Check =>
   (value) =>
     value === null || check(value);
+/** A field that may be left out altogether, as the career's fields are in a race game. */
+const optional =
+  (check: Check): Check =>
+  (value) =>
+    value === undefined || check(value);
 const listOf =
   (check: Check): Check =>
   (value) =>
@@ -79,6 +93,7 @@ const plan = shape<Plan>({
   poachTarget: orNull(number),
   layoffs: number,
   hireLimit: orNull(number),
+  goPublic: optional(flag),
 });
 
 const lastRaise = shape<LastRaise>({ turn: count, percent: number, amount: number });
@@ -95,6 +110,23 @@ const quarterStats = shape<QuarterStats>({
 });
 
 const exit = shape<Exit>({ turn: count, reason: outReason, users: count, headcount: count });
+
+/** One of the career's fields: a game checked against a career's config must have it, any other game need not. */
+const careerField = (config: RulesConfig, check: Check): Check => (config.career === undefined ? optional(check) : check);
+
+const listing = shape<Listing>({ turn: count, valuation: number, amount: number });
+const rescue = shape<Rescue>({ turn: count, reason: outReason });
+
+/** A company's career facts. Against a career's config, its office has to be one that config has. */
+const companyCareer = (config: RulesConfig): Check =>
+  shape<CompanyCareer>({
+    founded: count,
+    office: (value) => count(value) && (config.career === undefined || (value as number) < config.career.offices.length),
+    listed: orNull(listing),
+    rescue: orNull(rescue),
+    qualityAtLastClose: between(0, 100),
+    qualified: flag,
+  });
 
 const company = (config: RulesConfig): Check =>
   shape<Company>({
@@ -123,9 +155,11 @@ const company = (config: RulesConfig): Check =>
     lastRevenue: orNull(number),
     lastCosts: orNull(number),
     lastPull: orNull(number),
+    career: careerField(config, companyCareer(config)),
   });
 
 const climate = shape<Climate>({ multiplier: number, turnsLeft: count });
+const wave = shape<Wave>({ multiplier: number, turnsLeft: count });
 const modifiers = shape<TurnModifiers>({ newUsers: number, marketing: number, extraCandidates: number });
 
 /** Checks that need to know how many companies are in the game. */
@@ -153,13 +187,22 @@ export const isGame = (value: unknown, config: RulesConfig): value is GameState 
     event: orNull(event),
     modifiers,
     outcome: orNull(outcome),
+    wave: careerField(config, wave),
   });
   if (!game(value)) return false;
   const checked = value as unknown as GameState;
   return checked.companies.every((each, index) => each.id === index) && checked.companies[0].controller === "human";
 };
 
-const costs = shape<CostBreakdown>({ salaries: number, marketing: number, hiring: number, poaching: number, severance: number, total: number });
+const costs = shape<CostBreakdown>({ salaries: number, marketing: number, hiring: number, poaching: number, severance: number, total: number, moving: optional(number) });
+
+const careerReport = shape<CareerReport>({
+  listing: orNull(shape<NonNullable<CareerReport["listing"]>>({ valuation: number, amount: number })),
+  rescue: orNull(shape<NonNullable<CareerReport["rescue"]>>({ reason: outReason, cashBefore: number, equityBefore: number })),
+  office: orNull(shape<NonNullable<CareerReport["office"]>>({ from: count, to: count, bill: number })),
+  hype: shape<CareerReport["hype"]>({ listing: number, rescue: number }),
+  qualityLostToEvent: number,
+});
 
 const report = (seats: number): Check => {
   const { seat } = seated(seats);
@@ -184,6 +227,7 @@ const report = (seats: number): Check => {
     valuation: number,
     equity: number,
     out: orNull(outReason),
+    career: optional(careerReport),
   });
 };
 
@@ -199,6 +243,7 @@ export const isTurnLog = (value: unknown, seats: number): value is TurnLog => {
     companies: listOf(orNull(report(seats))),
     nextEvent: orNull(event),
     outcome: orNull(outcome),
+    entrants: optional(listOf(seat)),
   });
   if (!log(value)) return false;
   const checked = value as unknown as TurnLog;

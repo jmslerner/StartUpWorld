@@ -418,6 +418,8 @@ export const resolveTurn = (state: GameState, plans: PlanSet, seed: number, conf
       modifiers: context.modifiers,
       outcome: null,
     };
+    // A career's wave of new users is carried over as it stands. A race state has none, and gains no such key.
+    if (state.wave !== undefined) next = { ...next, wave: state.wave };
   }
 
   const log: TurnLog = {

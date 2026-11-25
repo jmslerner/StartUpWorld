@@ -11,10 +11,14 @@ import type { RulesConfig } from "./engine/types";
 const K = 1_000;
 const M = 1_000_000;
 
-/** The rules' numbers, plus the numbers behind the computer players and the simulator. */
-export interface GameConfig extends RulesConfig {
+/** The rules' numbers, plus the numbers behind the computer players: all it takes to play a game. */
+export interface PlayConfig extends RulesConfig {
   readonly cpu: CpuConfig;
   readonly baseline: BaselineConfig;
+}
+
+/** A config that can be played, plus the numbers behind the simulator. */
+export interface GameConfig extends PlayConfig {
   readonly sim: SimConfig;
 }
 

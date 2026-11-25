@@ -4,24 +4,33 @@
 import { runwayOf } from "./formulas";
 import type { Company, CompanyId, CompanyReport, CompanyView, GameState, PublicCompany, PublicReport, RulesConfig } from "./types";
 
-/** A copy with the public fields only. Cash, plans and bookkeeping never leave the company. */
-export const publicCompany = (company: Company): PublicCompany => ({
-  id: company.id,
-  name: company.name,
-  pitch: company.pitch,
-  users: company.users,
-  headcount: company.headcount,
-  hype: company.hype,
-  quality: company.quality,
-  launched: company.launched,
-  price: company.price,
-  founderEquity: company.founderEquity,
-  founderSeats: company.founderSeats,
-  investorSeats: company.investorSeats,
-  lastRaise: company.lastRaise,
-  lastQuarter: company.lastQuarter,
-  out: company.out,
-});
+/**
+ * A copy with the public fields only. Cash, plans and bookkeeping never leave the company. A company with a
+ * career shows its public career facts and keeps the career's bookkeeping to itself; a race company has no
+ * career facts, and its copy has no such key.
+ */
+export const publicCompany = (company: Company): PublicCompany => {
+  const shown: PublicCompany = {
+    id: company.id,
+    name: company.name,
+    pitch: company.pitch,
+    users: company.users,
+    headcount: company.headcount,
+    hype: company.hype,
+    quality: company.quality,
+    launched: company.launched,
+    price: company.price,
+    founderEquity: company.founderEquity,
+    founderSeats: company.founderSeats,
+    investorSeats: company.investorSeats,
+    lastRaise: company.lastRaise,
+    lastQuarter: company.lastQuarter,
+    out: company.out,
+  };
+  if (company.career === undefined) return shown;
+  const { founded, office, listed, rescue } = company.career;
+  return { ...shown, career: { founded, office, listed, rescue } };
+};
 
 export const viewFor = (state: GameState, id: CompanyId): CompanyView => ({
   turn: state.turn,

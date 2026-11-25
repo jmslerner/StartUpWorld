@@ -11,5 +11,6 @@ export { companyRunway, publicCompany, publicReport, viewFor } from "./view";
 export { replayGame } from "./replay";
 export type { GameRecord, Replay } from "./replay";
 export { findCard } from "./events";
+export { officeFor } from "./career";
 export * from "./formulas";
 export * from "./types";
