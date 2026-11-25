@@ -16,9 +16,11 @@ import {
   newUsersForTurn,
   nextQuality,
   poachChance,
+  poachFloor,
   pullOf,
   qualityGain,
   raiseAmount,
+  revenueOf,
   round4,
   round6,
   runwayOf,
@@ -275,7 +277,7 @@ export const resolveTurn = (state: GameState, plans: PlanSet, seed: number, conf
     .sort(byHypeOrder);
   for (const { desk } of poachers) {
     const target = deskOf(desk.plan.poachTarget as CompanyId);
-    if (target === undefined || target.payroll - target.poachedOut < config.poach.minTargetHeadcount) {
+    if (target === undefined || target.payroll - target.poachedOut < poachFloor(config)) {
       desk.notes.push(`Poach dropped: ${target ? target.company.name : "that company"} is too small to lose anyone.`);
       desk.plan = { ...desk.plan, poachTarget: null };
       continue;
@@ -308,7 +310,7 @@ export const resolveTurn = (state: GameState, plans: PlanSet, seed: number, conf
     desk.hired = hiring.hired[company.id] ?? 0;
     desk.headcountEnd = desk.payroll + desk.hired + desk.poachedIn - desk.poachedOut;
 
-    desk.revenue = desk.users * config.priceTiers[plan.price].price;
+    desk.revenue = revenueOf(desk.users, plan.price, config);
     const salaries = desk.payroll * config.salary;
     const hiringFees = desk.hired * config.hiring.fee;
     const severance = plan.layoffs * config.layoff.severance;

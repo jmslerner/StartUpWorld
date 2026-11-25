@@ -196,4 +196,18 @@ describe("poaching", () => {
     expect(report.poach).toBeNull();
     expect(report.costs.poaching).toBe(0);
   });
+
+  it("never takes a company's last person, even if the config's floor is set to 1 or 0", () => {
+    for (const floor of [1, 0]) {
+      const loose = { ...DESIGN, poach: { ...DESIGN.poach, minTargetHeadcount: floor } };
+      const state = withCompany(newGame(), HUMAN, { headcount: 1, headcountAtLastClose: 1 });
+      const result = resolve(state, { [HUMAN]: { allocation: { product: 1, growth: 0, recruiting: 0 } }, [INCUMBENT]: { poachTarget: HUMAN } }, winning, loose);
+      expect(reportFor(result, INCUMBENT).poach, `floor ${floor}`).toBeNull();
+      expect(reportFor(result, INCUMBENT).costs.poaching, `floor ${floor}`).toBe(0);
+      expect(result.state.companies[HUMAN].headcount, `floor ${floor}`).toBe(1);
+      // A team of two can still lose one.
+      const pair = withCompany(newGame(), HUMAN, { headcount: 2, headcountAtLastClose: 2 });
+      expect(resolve(pair, { [INCUMBENT]: { poachTarget: HUMAN } }, winning, loose).state.companies[HUMAN].headcount, `floor ${floor}`).toBe(1);
+    }
+  });
 });

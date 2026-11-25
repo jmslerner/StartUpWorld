@@ -1,7 +1,7 @@
 // Plans: the default for a new turn, and the check that turns any plan into a legal one.
 // An illegal part is fixed up or dropped at no cost, with a note for the quarterly report.
 
-import { refitAllocation } from "./formulas";
+import { poachFloor, refitAllocation } from "./formulas";
 import { PRICE_TIERS } from "./types";
 import type { Allocation, Company, CompanyId, GameState, Plan, PublicCompany, RulesConfig } from "./types";
 
@@ -89,7 +89,7 @@ export const normalizePlanFor = (
     if (target === undefined || target.id === company.id || target.out !== null) {
       notes.push("Poach dropped: that company cannot be poached from.");
       poachTarget = null;
-    } else if (target.headcount < config.poach.minTargetHeadcount) {
+    } else if (target.headcount < poachFloor(config)) {
       notes.push(`Poach dropped: ${target.name} is too small to lose anyone.`);
       poachTarget = null;
     }

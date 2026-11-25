@@ -60,6 +60,9 @@ export const pullOf = (inputs: PullInputs, config: RulesConfig): number => {
   return inputs.quality * (1 + growth + marketing) * config.priceTiers[inputs.tier].pullFactor * (1 + inputs.hype / 100);
 };
 
+/** A quarter's revenue, in whole dollars whatever the price (ruling 24). */
+export const revenueOf = (users: number, tier: PriceTier, config: RulesConfig): number => Math.round(users * config.priceTiers[tier].price);
+
 /** In whole dollars. */
 export const valuationOf = (users: number, hype: number, climateMultiplier: number, config: RulesConfig): number =>
   Math.round(users * config.valuation.perUser * (1 + hype / 100) * climateMultiplier);
@@ -77,6 +80,12 @@ export const runwayOf = (cash: number, revenue: number, costs: number): number |
 
 export const hiringCapacity = (recruitingWork: number, config: RulesConfig): number =>
   Math.max(0, Math.round(config.hiring.capacityPerWork * recruitingWork));
+
+/**
+ * The smallest team that can lose someone to a poach: the configured floor, and never a team of
+ * one, because nobody loses their last person (ruling 11), whatever the config says.
+ */
+export const poachFloor = (config: RulesConfig): number => Math.max(2, config.poach.minTargetHeadcount);
 
 export const poachChance = (myHype: number, theirHype: number, config: RulesConfig): number =>
   clamp(config.poach.baseChance + (myHype - theirHype) * config.poach.chancePerHypePoint, config.poach.minChance, config.poach.maxChance);
@@ -112,7 +121,8 @@ export const splitByWeights = (total: number, weights: readonly number[]): numbe
 /** Fit a team split to the people available, keeping its proportions; with nothing to scale, everyone builds. */
 export const refitAllocation = (allocation: Allocation, available: number): Allocation => {
   const people = Math.max(0, Math.floor(available));
-  const clean = [allocation.product, allocation.growth, allocation.recruiting].map((n) => (Number.isFinite(n) && n > 0 ? Math.floor(n) : 0));
+  // Capped so that even absurd numbers keep their proportions instead of overflowing.
+  const clean = [allocation.product, allocation.growth, allocation.recruiting].map((n) => (Number.isFinite(n) && n > 0 ? Math.min(Math.floor(n), Number.MAX_SAFE_INTEGER) : 0));
   if (people === 0) return { product: 0, growth: 0, recruiting: 0 };
   if (clean.reduce((a, b) => a + b, 0) === 0) return { product: people, growth: 0, recruiting: 0 };
   const [product, growth, recruiting] = splitByWeights(people, clean);

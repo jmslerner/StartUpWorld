@@ -35,6 +35,18 @@ describe("a quarter's books", () => {
     expect(report.revenue).toBe(102_600);
   });
 
+  it("keeps revenue and cash in whole dollars when a price is not a whole number", () => {
+    const halfDollar = { ...DESIGN, events: { ...DESIGN.events, chance: 0 }, priceTiers: { ...DESIGN.priceTiers, standard: { ...DESIGN.priceTiers.standard, price: 2.5 } } };
+    // 10,001 users to begin with, so the count at the close is odd: 10,001 − 782 + 24,982 = 34,201.
+    const odd = withCompany(solo, HUMAN, { users: 10_001, usersAtLastClose: 10_001 });
+    const books = reportFor(resolve(odd, { [HUMAN]: { allocation: { product: 2, growth: 2, recruiting: 1 }, marketing: 50_000 } }, 1, halfDollar), HUMAN);
+    expect(books.users.end % 2).toBe(1);
+    // 34,201 × $2.50 = $85,502.50, rounded to the nearest dollar.
+    expect(books.revenue).toBe(Math.round(books.users.end * 2.5));
+    expect(Number.isInteger(books.revenue)).toBe(true);
+    expect(Number.isInteger(books.cash.end)).toBe(true);
+  });
+
   it("pays salaries, marketing and hiring fees", () => {
     expect(report.hiring.hired).toBe(2);
     expect(report.costs).toEqual({ salaries: 200_000, marketing: 50_000, hiring: 20_000, poaching: 0, severance: 0, total: 270_000 });

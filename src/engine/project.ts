@@ -18,6 +18,7 @@ import {
   pullOf,
   qualityGain,
   raiseAmount,
+  revenueOf,
   round4,
   round6,
   runwayOf,
@@ -179,7 +180,7 @@ export const projectTurn = (
   const hiresWanted = Math.min(hiringCapacity(work.recruiting, config), resolved.hireLimit ?? Number.MAX_SAFE_INTEGER);
   const hires = expectedHires(view, hiresWanted, resolved.layoffs, config);
 
-  const revenue = users * config.priceTiers[resolved.price].price;
+  const revenue = revenueOf(users, resolved.price, config);
   const salaries = payroll * config.salary;
   const hiring = hiresWanted * config.hiring.fee;
   const poaching = odds === null ? 0 : config.poach.cost;
@@ -223,7 +224,7 @@ export const projectTurn = (
     revenue,
     costs,
     cash,
-    cashFloor: self.cash + (raise?.amount ?? 0) + (self.users - usersChurned) * config.priceTiers[resolved.price].price - costs.total,
+    cashFloor: self.cash + (raise?.amount ?? 0) + revenueOf(self.users - usersChurned, resolved.price, config) - costs.total,
     profitable: revenue >= costs.total,
     runway,
     hype,

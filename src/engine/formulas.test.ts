@@ -224,6 +224,12 @@ describe("refitAllocation", () => {
   it("ignores negative and fractional entries", () => {
     expect(refitAllocation({ product: -3, growth: 1.9, recruiting: 1 }, 2)).toEqual({ product: 0, growth: 1, recruiting: 1 });
   });
+
+  it("keeps the proportions of absurdly large numbers without overflowing", () => {
+    expect(refitAllocation({ product: 1e308, growth: 0, recruiting: 0 }, 3)).toEqual({ product: 3, growth: 0, recruiting: 0 });
+    expect(refitAllocation({ product: 1e308, growth: 1e308, recruiting: 0 }, 3)).toEqual({ product: 2, growth: 1, recruiting: 0 });
+    expect(refitAllocation({ product: 1e300, growth: 1e308, recruiting: 5 }, 4)).toEqual({ product: 2, growth: 2, recruiting: 0 });
+  });
 });
 
 describe("clamp", () => {

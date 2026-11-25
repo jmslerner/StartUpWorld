@@ -68,6 +68,11 @@ describe("config", () => {
     expect(CONFIG.poach.minTargetHeadcount).toBeGreaterThanOrEqual(2);
   });
 
+  it("starts events on turn 2 at the earliest: turn 1 is dealt before anything is rolled", () => {
+    expect(CONFIG.events.firstTurn).toBeGreaterThanOrEqual(2);
+    expect(DESIGN.events.firstTurn).toBeGreaterThanOrEqual(2);
+  });
+
   describe("event deck", () => {
     const deck = CONFIG.events.deck;
 

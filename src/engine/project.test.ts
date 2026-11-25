@@ -104,6 +104,19 @@ describe("projectTurn", () => {
     expect(projection.cashFloor).toBe(projection.cash);
   });
 
+  it("keeps revenue, cash and the floor in whole dollars when a price is not a whole number, as the engine does", () => {
+    const halfDollar = { ...NEVER, priceTiers: { ...NEVER.priceTiers, standard: { ...NEVER.priceTiers.standard, price: 2.5 } } };
+    const state = withState(onlyActive(launchedCompany(newGame(), HUMAN, { users: 10_001, usersAtLastClose: 10_001, headcount: 5, headcountAtLastClose: 5, cash: 400_000 }), [HUMAN]), { turn: 3 });
+    const plan = planOf(state, HUMAN, { allocation: { product: 2, growth: 2, recruiting: 1 } });
+    const projection = projectTurn(viewFor(state, HUMAN), plan, halfDollar);
+    const report = reportFor(resolveTurn(state, [plan], 1, halfDollar), HUMAN);
+    expect(projection.users % 2).toBe(1);
+    expect(projection.revenue).toBe(report.revenue);
+    expect(projection.cash).toBe(report.cash.end);
+    expect(Number.isInteger(projection.revenue)).toBe(true);
+    expect(Number.isInteger(projection.cashFloor)).toBe(true);
+  });
+
   it("is conservative about hiring: it pays for every hire wanted", () => {
     const state = newGame();
     const projection = projectTurn(viewFor(state, HUMAN), planOf(state, HUMAN, { allocation: { product: 2, growth: 0, recruiting: 1 } }), DESIGN);

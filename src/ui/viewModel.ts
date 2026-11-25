@@ -3,7 +3,7 @@
 // cannot show what the player is not supposed to know.
 
 import { findCard } from "../engine/events";
-import { effectiveWork, founderStake, hiringCapacity, marketingPull, poachChance, raiseAmount, round6, runwayOf, valuationOf } from "../engine/formulas";
+import { effectiveWork, founderStake, hiringCapacity, marketingPull, poachChance, poachFloor, raiseAmount, revenueOf, round6, runwayOf, valuationOf } from "../engine/formulas";
 import { raiseBlocker, type RaiseBlocker } from "../engine/plan";
 import { projectTurn, type Projection } from "../engine/project";
 import { PRICE_TIERS } from "../engine/types";
@@ -224,7 +224,7 @@ const raiseView = (self: Company, game: GameState, draft: Plan, config: RulesCon
  */
 const cautiousCase = (self: Company, projection: Projection, config: RulesConfig) => {
   const users = projection.users - Math.round(projection.usersWon * config.projection.cautiousShortfall);
-  const revenue = Math.round(users * config.priceTiers[projection.plan.price].price);
+  const revenue = revenueOf(users, projection.plan.price, config);
   const runway = runwayOf(projection.cash - (projection.revenue - revenue), revenue, projection.costs.total);
   return {
     users,
@@ -297,14 +297,14 @@ export const planningView = (game: GameState, draft: Plan, config: RulesConfig):
       options: view.rivals
         .filter((rival) => rival.out === null)
         .map((rival) => {
-          const allowed = rival.headcount >= config.poach.minTargetHeadcount;
+          const allowed = rival.headcount >= poachFloor(config);
           return {
             id: rival.id,
             name: rival.name,
             headcount: rival.headcount,
             chance: poachChance(self.hype, rival.hype, config),
             allowed,
-            reason: allowed ? null : `Too small to poach from: a company needs ${people(config.poach.minTargetHeadcount)}.`,
+            reason: allowed ? null : `Too small to poach from: a company needs ${people(poachFloor(config))}.`,
             selected: draft.poachTarget === rival.id,
           };
         }),
