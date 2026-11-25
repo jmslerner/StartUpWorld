@@ -1,7 +1,9 @@
 # The 3D groundwork, checked in a real browser
 
 What `scripts/world-check.mjs` measured on the lab page (`/office-lab.html`) after the last task of the groundwork
-plan, on 25 November 2026, with the rules branch merged in.
+plan, on 25 November 2026, with the rules branch merged in, and measured again after the three fixes at the end of
+this page (walks that hurry on a large floor, reduced motion that stands still, and the lab's era and office list).
+Every number below is from that second run, which passed every check.
 
 **This machine renders WebGL in software.** Headless Chromium draws through its software renderer on four CPUs, at
 about four to fifteen frames a second. Its frame rates and its page-time durations say nothing about a phone. The
@@ -31,15 +33,17 @@ Read from the renderer once the office has come to rest. Draw calls include the 
 | Garage | 4 | 1280×800 | 82 | 31,458 | 4 | 0 |
 | Garage | 4 | 390×844 | 82 | 31,458 | 4 | 0 |
 | Shared office | 9 | 1280×800 | 160 | 71,160 | 9 | 0 |
-| Shared office | 9 | 390×844 | 159 | 71,080 | 9 | 0 |
-| Own office | 22 | 1280×800 | 301 | 122,880 | 22 | 0 |
-| Own office | 22 | 390×844 | 301 | 122,880 | 22 | 0 |
+| Shared office | 9 | 390×844 | 160 | 71,160 | 9 | 0 |
+| Own office | 22 | 1280×800 | 301 | 122,820 | 22 | 0 |
+| Own office | 22 | 390×844 | 300 | 122,800 | 22 | 0 |
 | Full floor | 40 | 1280×800 | 519 | 224,478 | 40 | 0 |
 | Full floor | 40 | 390×844 | 519 | 224,478 | 40 | 0 |
 | Campus | 150 | 1280×800 | 630 | 281,252 | 50 | 100 |
 | Campus | 150 | 390×844 | 629 | 280,880 | 50 | 100 |
 
-The design's phone budget is 300 draw calls. The own office, full with 22 people, is the first to cross it (301); the
+The counts move by a call or two and a few dozen triangles from one run to the next (a shadow that falls inside or
+outside a frustum); the first run had 159 and 301 where this one has 160 and 300. The design's phone budget is 300
+draw calls. The own office, full with 22 people, is the first to reach it (300 to 301); the
 shared office with 9 is well inside (160). One restored figure costs 8 draw calls, and 2 to 6 more in the shadow pass,
 so the people are most of the bill: 22 figures are about 176 calls before their shadows, 50 are 400. The campus stays
 at about 630 whatever the head count, because at most 50 staff are drawn and the rest are the "+100" on the sign.
@@ -60,42 +64,44 @@ machine took. The loop draws on for one second after the last movement and then 
 
 | Office | Size | End of year: rest, world s | End of year: page s | Before it, layoffs and hires to the door: rest, world s (page s) | Reduced motion: moving, world s | Reduced motion: rest, page s |
 |---|---|---|---|---|---|---|
-| Garage | 1280×800 | 2.5 | 2.8 | 7.5 (7.7) | 1.4 | 2.7 |
-| Garage | 390×844 | 2.5 | 2.6 | 7.6 (7.6) | 1.4 | 2.6 |
-| Shared office | 1280×800 | 2.5 | 2.8 | 9.3 (10.6) | 1.3 | 2.7 |
-| Shared office | 390×844 | 2.5 | 2.6 | 9.2 (9.4) | 1.4 | 2.6 |
-| Own office | 1280×800 | 2.5 | 3.3 | 12.3 (16.2) | 1.3 | 3.5 |
-| Own office | 390×844 | 2.6 | 2.9 | 12.2 (12.4) | 1.3 | 3.0 |
-| Full floor | 1280×800 | 2.5 | 4.1 | 15.0 (29.4) | 1.3 | 4.4 |
-| Full floor | 390×844 | 2.5 | 3.4 | 15.0 (22.7) | 1.3 | 3.7 |
-| Campus | 1280×800 | **18.0** | 41.6 | 15.2 (36.2) | 1.3 | 4.3 |
-| Campus | 390×844 | **18.1** | 33.3 | 15.2 (27.7) | 1.3 | 3.5 |
+| Garage | 1280×800 | 2.5 | 2.7 | 7.5 (7.6) | 0.8 | 2.2 |
+| Garage | 390×844 | 2.5 | 2.6 | 7.5 (7.6) | 0.9 | 2.1 |
+| Shared office | 1280×800 | 2.5 | 2.8 | 9.3 (11.1) | 0.9 | 2.2 |
+| Shared office | 390×844 | 2.5 | 2.6 | 9.2 (9.3) | 1.0 | 2.1 |
+| Own office | 1280×800 | 2.5 | 3.4 | 11.0 (14.7) | 0.8 | 2.4 |
+| Own office | 390×844 | 2.7 | 2.9 | 11.0 (11.2) | 0.8 | 2.2 |
+| Full floor | 1280×800 | 2.5 | 3.6 | 11.1 (21.3) | 0.9 | 2.8 |
+| Full floor | 390×844 | 2.5 | 3.4 | 11.1 (16.5) | 0.8 | 2.8 |
+| Campus | 1280×800 | 10.9 | 25.3 | 11.0 (26.4) | 0.8 | 3.3 |
+| Campus | 390×844 | 10.9 | 18.9 | 11.0 (21.0) | 0.8 | 2.8 |
+
+The limits: a year's end comes to rest within 15 world seconds (the loop's quiet second included), and under reduced
+motion nothing moves after 1 second. Both are met everywhere.
 
 What the numbers say:
 
 - In the first four offices a full office plus one person moves to the next office, so the end of the year is the
   old building sinking and the new one rising with everyone in place: 2.5 seconds, no walks. The walks of those
   years happen earlier, when the people let go and the people expected go to the door: 7.5 seconds in the garage,
-  rising to 15 at the full floor.
-- **The campus does not meet the 15-second limit.** It has no bigger office to move to, so the end of its year is
-  walks: the two let go leave through the door and the three hires cross the floor to their desks, at 1.6 units a
-  second over a much larger floor. It comes to rest after 18 world seconds (17 of movement and the one of grace), and
-  after 33 to 42 seconds of page time on this machine. Left as measured: making it shorter means faster walks or
-  shorter routes, which belongs with the year's beats in the next plan, not with this check.
-- **Under reduced motion nobody walks, but the year does not come to rest within one second.** Everyone is placed
-  at once; what still moves for 1.3 to 1.4 world seconds is the effects: the "+N" and "−N" over the door, which
-  live 1.4 seconds, and, when the office changes, the thinner dust of the rise (kept under reduced motion by an
-  earlier, tested decision). The loop then draws one more second before it rests. A rest within one second is not
-  possible by construction (the loop always draws a second after the last movement), so the script holds the
-  movement itself to one second, and that fails by 0.3 to 0.4 seconds. Meeting it would mean shorter labels at the
-  door under reduced motion, which is a choice for the owner. Left as measured.
+  rising to 11 from the own office on (15 at the full floor before the walks hurried).
+- **The campus's year comes to rest after 10.9 world seconds** (about 9.9 of movement and the one of grace), against
+  18.0 and 18.1 in the first run. It has no bigger office to move to, so the end of its year is walks: the two let
+  go leave through the door, and the hires take their desks, one of them crossing the whole floor from the door.
+  That walk is what kept it long, not the stagger: in the first run the leavers were out by about 7 seconds and the
+  last 8 seconds were that one person walking. A walk in, out or to a new desk now lasts at most 9 seconds (below).
+  On this machine the page took 19 to 25 seconds, as the world runs at about half speed here.
+- **Under reduced motion nothing moves after 0.8 to 1.0 world seconds** (1.3 to 1.4 in the first run). Everyone is
+  placed at once; no dust rises and the camera does not shake when the office changes; the "+N" and "−N" over the
+  door stand still and are gone after 0.9 seconds. The script reads 1.0 in one case because a frame on this machine
+  counts up to a tenth of a second; the effects themselves are tested to be at rest within a second at frames of
+  1/60 s and of 0.1 s. The loop then draws its one quiet second and rests: 2.1 to 3.3 page seconds in all.
 
 ## The rest of the checks
 
 | Check | Result |
 |---|---|
 | Console clean on every page (one message allowed: the software renderer's "GPU stall due to ReadPixels") | Passed on every page, at both sizes, with and without reduced motion and at device scale 2 |
-| No frame drawn in the second of two quiet seconds after opening | Passed in all ten, at scale 1 and scale 2 (after the fix below) |
+| No frame drawn in the second of two quiet seconds after opening | Passed in all ten, at scale 1 and scale 2 (after the first fix below) |
 | People drawn plus people counted equals the head count, before and after the year | Passed in all ten |
 | At most 56 figures drawn | Passed: 50 at the campus |
 | Lose the graphics context, restore it through "Reload 3D view" | Passed: status went context-lost, then running, with all 22 people drawn again and nothing in the console |
@@ -123,10 +129,14 @@ At device scale 2, one office per picture, controls hidden:
   behind; framed whole.
 - Campus, 390×844: the same, small; the sign is there but too small to read at this size.
 
-No z-fighting, no black or unlit surface, no missing piece in any of them. The crop of the shared office's
+No z-fighting, no black or unlit surface, no missing piece in any of them. Looked at again after the fixes: the same
+ten pictures, nothing changed or missing. The crop of the shared office's
 neighbours' half that an earlier run saw at 900×600 does not happen at either of these sizes.
 
 ## What failed and was fixed
+
+In the order they were found. The first three were fixed before the first full run; the two limits that run missed,
+and one fault of the lab page found in review, were fixed after it.
 
 - **The loop rested late on a slow page.** It drew for a second of world time after the last movement, and since a
   frame counts at most a tenth of a second, on this machine that second lasted up to 2.7 seconds of page time: the
@@ -142,8 +152,29 @@ neighbours' half that an earlier run saw at 900×600 does not happen at either o
   half speed. The script times the year in world seconds, read from the page's frame clock the way the world reads
   it, and prints the page seconds beside them.
 
-Not changed: the campus's 18-second year, and the 1.3 to 1.4 seconds of labels and dust under reduced motion, both
-above.
+- **Limit missed: the campus's year took 18.0 world seconds (18.1 at 390×844) against 15.** A walk across the largest
+  floor at the usual 1.6 units a second is long: the farthest desk is 31.5 units from the door, 19.7 seconds away.
+  A walk in through the door, out through it or to a new desk now goes at the usual pace raised just enough to last
+  at most nine seconds, corners included (`people/actor.ts`: speed = max(1.6, length / 8.5), the half second kept
+  for slowing at corners). A wander keeps the usual pace; the path follower is unchanged. Tested on the campus: the
+  longest walk from any desk to the door takes 8.7 seconds, every walk in takes at most nine, a short walk keeps the
+  usual pace, and the browser's year among 150 people is at rest after 9.4 seconds of movement (16.5 before), held
+  to 14 by a test. **Now 10.9.**
+- **Limit missed: under reduced motion things moved for 1.3 to 1.4 world seconds against 1.** Nobody walked, but the
+  "+N" and "−N" at the door lived 1.4 seconds and still rose a little, and thin dust rose when the office changed (an
+  earlier, tested decision, now reversed: that test now checks that none rises). Under reduced motion the effects
+  (`fx/FxSystem.ts`) raise no dust and no shake on a change of office, and the numbers at the door stand where they
+  appear, at their size, for 0.9 seconds. The float text layer had no way to be given a length or to stand still,
+  so it takes two optional settings that leave it as it was when they are left out. **Now 0.8 to 1.0.**
+- **The lab page went blank for an era cut through an emoji.** An era is cut to 40 letters; it was cut by UTF-16
+  units, which can leave half an emoji, and writing the address then threw before the page was drawn. It is now cut
+  by whole letters, and half a letter never reaches the address by any route (the address, an edit, or a whole scene
+  handed in through the checks' `setScene`). Found with it: a count of hundreds of digits read as nobody; any number
+  of digits now reads as at most the largest count. And the office list showed "Whichever fits the he…" at
+  1280×800, hiding the office the head count picked: it now reads "Fits all: Own office", under its label, and shows
+  whole at 1280 and at 390 wide.
+
+Not changed: the limits. Both are met by changing what is drawn.
 
 ## The rules branch
 
@@ -163,5 +194,5 @@ node scripts/world-check.mjs --no-build            # serves the dist that is the
 
 It takes about nine minutes on this machine, exits with 1 when any check fails, and lists each failure. It uses the
 machine's own Playwright and Chromium, is not part of `npm test`, and is not read by the linter or the test runner.
-As things stand it exits with 1, for the twelve failures above: the campus's year at both sizes, and the reduced
-motion year in all ten.
+As things stand it exits with 0: "all checks passed". The first run exited with 1, for twelve failures: the
+campus's year at both sizes, and the reduced motion year in all ten.
