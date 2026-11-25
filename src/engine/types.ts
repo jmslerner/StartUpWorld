@@ -341,8 +341,9 @@ export type EventEffect =
   | { readonly kind: "targetHeadcount"; readonly delta: number }
   | { readonly kind: "targetUsers"; readonly fraction: number }
   // A career's platform shift is these two on one card: no product keeps more quality than the ceiling, and
-  // new users are multiplied for that many turns.
-  | { readonly kind: "qualityCeiling"; readonly ceiling: number }
+  // new users are multiplied for that many turns. With `turns` 1 the ceiling holds through the card's year; with 0
+  // it is a cut made once, as the year opens.
+  | { readonly kind: "qualityCeiling"; readonly ceiling: number; readonly turns: number }
   | { readonly kind: "userWave"; readonly multiplier: number; readonly turns: number };
 
 export const EVENT_EFFECT_KINDS: readonly EventEffect["kind"][] = [
@@ -484,6 +485,7 @@ export interface DatedCard extends Omit<EventCard, "weight"> {
 export interface CareerRules {
   /** The calendar year of turn 1. Every turn is one year. */
   readonly firstYear: number;
+  /** Listed in order of `firstYear`, which `eraIndexOf` relies on. */
   readonly eras: readonly EraConfig[];
   readonly dated: readonly DatedCard[];
   /** How many years ahead a platform shift is announced. */
@@ -528,11 +530,11 @@ export interface PublicCareer {
   readonly office: number;
   readonly listed: Listing | null;
   readonly rescue: Rescue | null;
+  /** Quality when the last year closed, before the next year's card touched it. Public since it closed. */
+  readonly qualityAtLastClose: number;
 }
 
 export interface CompanyCareer extends PublicCareer {
-  /** Quality when the last year closed, before the next year's card touched it. */
-  readonly qualityAtLastClose: number;
   /** True once the company has closed a year at that year's bar with a profit. From then on it may go public. */
   readonly qualified: boolean;
 }

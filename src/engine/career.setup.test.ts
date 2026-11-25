@@ -31,7 +31,7 @@ describe("a career's opening state", () => {
   });
 
   it("what rivals see of a career leaves out the bookkeeping", () => {
-    expect(publicCompany(newCareer().companies[3]).career).toEqual({ founded: 1, office: 1, listed: null, rescue: null });
+    expect(publicCompany(newCareer().companies[3]).career).toEqual({ founded: 1, office: 1, listed: null, rescue: null, qualityAtLastClose: 30 });
     expect("career" in publicCompany(newGame().companies[3])).toBe(false);
   });
 

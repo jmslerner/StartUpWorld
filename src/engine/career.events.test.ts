@@ -96,6 +96,11 @@ describe("dated cards", () => {
     );
   });
 
+  it("a dated card is dealt when random cards are switched off, and before they start", () => {
+    const config = withCareer({ dated: [{ ...SLUMP, year: 1991 }] }, { ...CAREER_TEST, events: { ...DESIGN.events, firstTurn: 5, chance: 0 } });
+    for (let seed = 1; seed <= 20; seed++) expect(resolve(newCareer(config), {}, seed, config).log.nextEvent?.cardId).toBe("slump");
+  });
+
   it("a dated card can be looked up like any other", () => {
     expect(findCard("slump", withCareer({ dated: [SLUMP] }))?.name).toBe("Slump");
   });

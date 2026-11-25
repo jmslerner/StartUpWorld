@@ -2,10 +2,13 @@
 // An event is drawn at the end of one turn for the next, and its instant effects are applied
 // straight away, so the state a turn starts from already shows it.
 
-import { datedCardFor, rulesForTurn } from "./career";
+import { datedCardFor, findCard, rulesForTurn } from "./career";
 import { clamp, round4 } from "./formulas";
 import { STREAM, firstFloat, nextIntInclusive, pickWeightedIndex, streamSeed } from "./rng";
-import type { ActiveEvent, Climate, Company, CompanyId, EventCard, RulesConfig, TargetRule, TurnModifiers } from "./types";
+import type { ActiveEvent, Climate, Company, CompanyId, EventCard, RulesConfig, TargetRule, TurnModifiers, Wave } from "./types";
+
+// Looking a card up is the career's business too (a year's ceiling on quality), so it lives with the career's rules.
+export { findCard } from "./career";
 
 export const NEUTRAL_MODIFIERS: TurnModifiers = { newUsers: 1, marketing: 1, extraCandidates: 0 };
 
@@ -15,13 +18,9 @@ export interface EventContext {
   readonly climate: Climate;
   readonly modifiers: TurnModifiers;
   readonly carryOverUsers: number;
+  /** Career only: the wave of new users in force. */
+  readonly wave?: Wave;
 }
-
-/** A card by id: in the config's deck, in the deck of any of a career's eras, or among a career's dated cards. */
-export const findCard = (cardId: string, config: RulesConfig): Omit<EventCard, "weight"> | undefined =>
-  [config.events.deck, ...(config.career?.eras ?? []).map((era) => era.values.events?.deck ?? []), config.career?.dated ?? []]
-    .flat()
-    .find((card) => card.id === cardId);
 
 /** Companies a card may hit: still in the game and matching every condition of the rule. */
 export const eligibleTargets = (rule: TargetRule, companies: readonly Company[]): CompanyId[] =>
@@ -71,13 +70,16 @@ export const drawEvent = (companies: readonly Company[], turn: number, seed: num
   return { cardId: card.id, targetId: targetOf(card, companies, turn, seed) };
 };
 
-/** Apply a card's effects. Users a company loses join the pool, so users stay conserved. */
+/**
+ * Apply a card's effects. Users a company loses join the pool, so users stay conserved. A ceiling on quality cuts
+ * every company still in the game down to it, launched or not; a wave of new users replaces one still running.
+ */
 export const applyEvent = (context: EventContext, event: ActiveEvent, config: RulesConfig): EventContext => {
   const card = findCard(event.cardId, config);
   if (card === undefined) return context;
 
-  let { climate, modifiers, carryOverUsers } = context;
-  let target = event.targetId === null ? undefined : context.companies[event.targetId];
+  let { companies, climate, modifiers, carryOverUsers, wave } = context;
+  let target = event.targetId === null ? undefined : companies[event.targetId];
 
   for (const effect of card.effects) {
     switch (effect.kind) {
@@ -106,10 +108,21 @@ export const applyEvent = (context: EventContext, event: ActiveEvent, config: Ru
           carryOverUsers += lost;
         }
         break;
+      case "qualityCeiling": {
+        const cut = (company: Company): Company =>
+          company.out === null && company.quality > effect.ceiling ? { ...company, quality: effect.ceiling } : company;
+        companies = companies.map(cut);
+        if (target) target = cut(target);
+        break;
+      }
+      case "userWave":
+        wave = { multiplier: effect.multiplier, turnsLeft: effect.turns };
+        break;
     }
   }
 
   const changed = target;
-  const companies = changed === undefined ? context.companies : context.companies.map((company) => (company.id === changed.id ? changed : company));
-  return { companies, climate, modifiers, carryOverUsers };
+  if (changed !== undefined) companies = companies.map((company) => (company.id === changed.id ? changed : company));
+  // A race has no wave, and its context gains no such key.
+  return wave === undefined ? { companies, climate, modifiers, carryOverUsers } : { companies, climate, modifiers, carryOverUsers, wave };
 };

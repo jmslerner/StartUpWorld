@@ -11,6 +11,7 @@ export { companyRunway, publicCompany, publicReport, viewFor } from "./view";
 export { replayGame } from "./replay";
 export type { GameRecord, Replay } from "./replay";
 export { findCard } from "./events";
-export { datedCardFor, eraIndexOf, marketTurn, officeFor, rulesForTurn, turnOf, yearOf } from "./career";
+export { datedCardFor, eraIndexOf, heldCeiling, marketTurn, officeFor, rulesForTurn, turnOf, upcomingShift, yearOf } from "./career";
+export type { ShiftNotice } from "./career";
 export * from "./formulas";
 export * from "./types";

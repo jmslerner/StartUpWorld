@@ -6,7 +6,7 @@
 // from public information only.
 
 import { CONFIG } from "../config";
-import { marketTurn, rulesForTurn } from "./career";
+import { heldCeiling, marketTurn, rulesForTurn } from "./career";
 import {
   churnRate,
   clamp,
@@ -78,23 +78,34 @@ export interface Projection {
 
 const inPlay = (rival: PublicCompany): boolean => rival.out === null && rival.launched;
 
-/** Where a rival's quality is heading if it keeps building as it did last quarter. */
-const nextQualityGuess = (rival: PublicCompany, rules: RulesConfig): number => {
+/** The quality a rival closed last year with: in a career it is public, and a card may have cut it since. */
+const closedQuality = (rival: PublicCompany): number => rival.career?.qualityAtLastClose ?? rival.quality;
+
+/**
+ * Where a rival's quality is heading if it keeps building as it did last quarter, from the quality it has now. Its
+ * gain last quarter is read from the quality it closed with. In a year with a ceiling that holds, no higher than that.
+ */
+const nextQualityGuess = (rival: PublicCompany, ceiling: number | null, rules: RulesConfig): number => {
   const last = rival.lastQuarter;
-  if (last === null || last.qualityAtOpen >= 100) return rival.quality;
-  const lastGain = rival.quality - last.qualityAtOpen + rules.quality.decay;
-  const gain = Math.max(0, lastGain) * ((100 - rival.quality) / (100 - last.qualityAtOpen));
-  return clamp(rival.quality + gain - rules.quality.decay, 0, 100);
+  let heading = rival.quality;
+  if (last !== null && last.qualityAtOpen < 100) {
+    const lastGain = closedQuality(rival) - last.qualityAtOpen + rules.quality.decay;
+    const gain = Math.max(0, lastGain) * ((100 - rival.quality) / (100 - last.qualityAtOpen));
+    heading = clamp(rival.quality + gain - rules.quality.decay, 0, 100);
+  }
+  return ceiling === null ? heading : Math.min(heading, ceiling);
 };
 
 /**
  * Rivals' pull and churn this turn, from public information. Once this company has a quarter of
  * its own in the market, each rival's pull last quarter follows from the users it won (the pool is
  * split in proportion to pull), and is then carried forward along the rival's public quality and
- * hype trend. Before that, a rival's pull is a guess from its public stats.
+ * hype trend: from the quality it closed with to where its quality is heading. Before that, or for a rival that
+ * closed at 0, a rival's pull is a guess from its public stats.
  */
 export const estimateRivals = (view: CompanyView, config: RulesConfig = CONFIG): RivalEstimate => {
   const rules = rulesForTurn(config, view.turn);
+  const ceiling = heldCeiling(view.event, config);
   const { self } = view;
   const pullPerUserWon = self.lastPull !== null && self.lastQuarter !== null && self.lastQuarter.usersWon > 0 ? self.lastPull / self.lastQuarter.usersWon : null;
   let pull = 0;
@@ -105,15 +116,16 @@ export const estimateRivals = (view: CompanyView, config: RulesConfig = CONFIG):
       quality * rules.projection.rivalPullGuess * rules.priceTiers[rival.price].pullFactor * (1 + rival.hype / 100);
     if (!rival.launched) {
       // Not in the market yet, but it will be if its product keeps improving at this rate.
-      const heading = nextQualityGuess(rival, rules);
+      const heading = nextQualityGuess(rival, ceiling, rules);
       if (heading >= rules.quality.launchAt) pull += guessFrom(heading);
       continue;
     }
     churn += Math.min(rival.users, Math.round(rival.users * churnRate(rival.quality, rival.price, rules)));
     const last = rival.lastQuarter;
-    if (pullPerUserWon !== null && last !== null && rival.quality > 0) {
+    const closed = closedQuality(rival);
+    if (pullPerUserWon !== null && last !== null && closed > 0) {
       const lastPull = pullPerUserWon * last.usersWon;
-      const qualityTrend = nextQualityGuess(rival, rules) / rival.quality;
+      const qualityTrend = nextQualityGuess(rival, ceiling, rules) / closed;
       const hypeTrend = (1 + rival.hype / 100) / (1 + last.hypeAtOpen / 100);
       pull += lastPull * qualityTrend * hypeTrend;
     } else {
@@ -164,7 +176,10 @@ export const projectTurn = (
 
   const rivalQualities = view.rivals.filter(inPlay).map((rival) => rival.quality);
   const catchUp = archetype.catchUpMultiplier > 1 && rivalQualities.length > 0 && self.quality < Math.max(...rivalQualities);
-  const quality = nextQuality(self.quality, qualityGain(self.quality, work.product, catchUp ? archetype.catchUpMultiplier : 1, rules), rules);
+  const built = nextQuality(self.quality, qualityGain(self.quality, work.product, catchUp ? archetype.catchUpMultiplier : 1, rules), rules);
+  // In a career, a ceiling that holds through the year caps the quality Product work reaches, as in the turn.
+  const ceiling = heldCeiling(view.event, config);
+  const quality = ceiling === null ? built : Math.min(built, ceiling);
   const launchedNow = !self.launched && quality >= rules.quality.launchAt;
   const launched = self.launched || launchedNow;
 
@@ -172,7 +187,8 @@ export const projectTurn = (
     ? pullOf({ quality, growthWork: work.growth, marketing: resolved.marketing, tier: resolved.price, hype: self.hype, marketingModifier: view.modifiers.marketing }, rules)
     : 0;
   const usersChurned = launched ? Math.min(self.users, Math.round(self.users * churnRate(quality, resolved.price, rules))) : 0;
-  const pool = newUsersForTurn(marketTurn(config, view.turn), view.modifiers.newUsers, rules) + view.carryOverUsers + usersChurned + rivals.churn;
+  const newUsers = newUsersForTurn(marketTurn(config, view.turn), view.modifiers.newUsers * (view.wave?.multiplier ?? 1), rules);
+  const pool = newUsers + view.carryOverUsers + usersChurned + rivals.churn;
   const share = pull > 0 ? pull / (pull + rivals.pull) : 0;
   const usersWon = Math.round(pool * share);
   const users = self.users - usersChurned + usersWon;

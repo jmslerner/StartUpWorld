@@ -16,6 +16,10 @@ Before planning, already part of the state a year starts from:
 - The year's card is revealed and its instant effects are applied.
   - A card dated to the year is the year's card, whatever the dice say (ruling 8). The first year's card is dealt
     with the game, and hits no one company (ruling 9).
+  - A platform shift's ceiling cuts every company still in the game down to it, launched or not, and its wave of new
+    users replaces one still running; a shift in the first year sets its wave with the game (rulings 12 to 15). The
+    year's report says how much quality the card took from each company.
+  - A shift is announced in the `shiftNoticeYears` years before it, not in its own year (ruling 16).
 
 Resolution, in this order:
 
@@ -25,8 +29,13 @@ Resolution, in this order:
 3. The raise closes.
 4. Work is done.
 5. Product quality: gain, then decay, then the launch test.
+   - In a shift's year, when its ceiling has `turns` 1, no company's quality is above the ceiling after gain and
+     decay; the launch test reads the capped quality. The one-year projection caps it the same way, and expects no
+     rival's quality to head higher (ruling 14).
 6. Market: churn, then the pool is split by pull.
    - The year's new users follow its era's curve, counted from the era's first year (ruling 4).
+   - While a wave runs, the year's new users are multiplied by it as well as by the card's one-year change
+     (ruling 15).
 7. Poach attempts, in hype order.
 8. Hiring, one candidate at a time in hype order.
    - Candidates on the market are never fewer than none (ruling 11).
@@ -38,7 +47,10 @@ Resolution, in this order:
 13. Last company standing, then the ranking at the last turn.
     - One company left, or none, ends nothing. After the last year (turn 49, 2038) the largest founder's stake among
       the companies still in the game wins; with nobody left the outcome is `wipeout` (ruling 6).
+    - Closing the books, after the endings: each company's quality as the year closes is kept, public, before next
+      year's card can cut it (ruling 17).
 14. The funding climate ticks down and next year's card is drawn.
+    - A wave of new users ticks down with the funding climate, before next year's card can set a new one (ruling 15).
     - The card is drawn from next year's numbers, so a new era's deck is in play from its first year.
     - A card dated to next year replaces the draw, without a roll; its target is picked as for a random card, and when
       no company qualifies it is still in force and hits nobody (rulings 8 and 10).
@@ -59,6 +71,17 @@ Resolution, in this order:
 9. The first year's card is dealt with the game, so it cannot be a card that hits one company.
 10. A dated card whose target rule no company meets is still in force; the effects that need a target hit nobody.
 11. Candidates on the market are never fewer than none.
+12. A platform shift is two effects on one dated card: a ceiling on quality in its year, and a wave of new users for
+    the years the card says.
+13. The ceiling caps every company still in the game, launched or not; launch is permanent.
+14. A ceiling with `turns` 1 holds through its year: Product work that year lifts a product up to the ceiling and no
+    further, and rebuilding starts the year after. With `turns` 0 the cut is made once, as the year opens, and that
+    year's Product work builds on it.
+15. A new wave replaces one still running; it multiplies with a card's one-year change in new users, and it ticks
+    down with the funding climate.
+16. A shift is announced in the `shiftNoticeYears` years before it, not in its own year.
+17. The quality a company closed last year with is public, and a rival's pull is carried forward from it, not from
+    the quality a shift has just left it with.
 
 ## Starting numbers
 

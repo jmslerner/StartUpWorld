@@ -28,20 +28,24 @@ export const publicCompany = (company: Company): PublicCompany => {
     out: company.out,
   };
   if (company.career === undefined) return shown;
-  const { founded, office, listed, rescue } = company.career;
-  return { ...shown, career: { founded, office, listed, rescue } };
+  const { founded, office, listed, rescue, qualityAtLastClose } = company.career;
+  return { ...shown, career: { founded, office, listed, rescue, qualityAtLastClose } };
 };
 
-export const viewFor = (state: GameState, id: CompanyId): CompanyView => ({
-  turn: state.turn,
-  self: state.companies[id],
-  rivals: state.companies.filter((company) => company.id !== id).map(publicCompany),
-  climate: state.climate,
-  event: state.event,
-  modifiers: state.modifiers,
-  carryOverUsers: state.carryOverUsers,
-  freedPeople: state.freedPeople,
-});
+export const viewFor = (state: GameState, id: CompanyId): CompanyView => {
+  const view: CompanyView = {
+    turn: state.turn,
+    self: state.companies[id],
+    rivals: state.companies.filter((company) => company.id !== id).map(publicCompany),
+    climate: state.climate,
+    event: state.event,
+    modifiers: state.modifiers,
+    carryOverUsers: state.carryOverUsers,
+    freedPeople: state.freedPeople,
+  };
+  // A career's wave of new users is public; a race has none, and its view gains no such key.
+  return state.wave === undefined ? view : { ...view, wave: state.wave };
+};
 
 /** The part of a company's quarterly report its rivals can see: its moves, not its books or its plan. */
 export const publicReport = (report: CompanyReport): PublicReport => ({

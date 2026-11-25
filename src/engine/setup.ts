@@ -1,5 +1,5 @@
 // A new game: every company at its archetype's starting state, turn 1, no event.
-// With a career's config each company also gets its career facts, the state its wave of new users, and the first
+// With a career's config each company also gets its career facts, and the state its wave of new users. The first
 // year's dated card, if it has one, is dealt with the game.
 
 import { CONFIG } from "../config";
@@ -71,5 +71,13 @@ export const createGame = (setup: GameSetup, config: RulesConfig = CONFIG): Game
   // There is no seed to pick a target with yet, so the first year's card hits no one company.
   const event: ActiveEvent = { cardId: card.id, targetId: null };
   const dealt = applyEvent(started, event, config);
-  return { ...started, companies: dealt.companies, carryOverUsers: dealt.carryOverUsers, climate: dealt.climate, event, modifiers: dealt.modifiers };
+  return {
+    ...started,
+    companies: dealt.companies,
+    carryOverUsers: dealt.carryOverUsers,
+    climate: dealt.climate,
+    event,
+    modifiers: dealt.modifiers,
+    wave: dealt.wave,
+  };
 };
