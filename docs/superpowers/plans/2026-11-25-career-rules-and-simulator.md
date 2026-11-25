@@ -292,7 +292,8 @@ git add src/sim/raceGolden.test.ts eslint.config.js && git commit -m "sim: a gol
 **Files:**
 - Modify: `src/engine/types.ts` (the whole "Shared contract")
 - Modify: `src/config.ts:15-19` (`PlayConfig`; `GameConfig` extends it)
-- Modify: `src/engine/setup.ts` (each company's `career` when the config has one)
+- Modify: `src/engine/setup.ts` (each company's `career` and the state's `wave` when the config has a career)
+- Modify: `src/engine/resolveTurn.ts` (step 14: a career's next state keeps `wave`)
 - Modify: `src/engine/view.ts:8-24` (`publicCompany` copies the public career facts)
 - Modify: `src/state/shape.ts`
 - Create: `src/engine/career.ts`, `src/engine/careerKit.ts`, `docs/career-rules.md`
@@ -355,9 +356,11 @@ it("what rivals see of a career leaves out the bookkeeping", () => {
   expect(publicCompany(newCareer().companies[3]).career).toEqual({ founded: 1, office: 1, listed: null, rescue: null });
   expect("career" in publicCompany(newGame().companies[3])).toBe(false);
 });
-it("a year keeps every company's career facts", () => {
+it("a year keeps every company's career facts, and the wave", () => {
   const next = resolve(newCareer(), {}, 1, CAREER_TEST).state;
   expect(next.companies.map((company) => company.career?.founded)).toEqual([1, 1, 1, 1]);
+  expect(next.wave).toEqual({ multiplier: 1, turnsLeft: 0 });
+  expect("wave" in resolve(newGame(), {}, 1, DESIGN).state).toBe(false);
 });
 ```
 
@@ -401,7 +404,8 @@ Expected: FAIL (`./careerKit` does not exist).
 3. `createGame(setup, config)`: when `config.career` is set, each company gets
    `career: { founded: 1, office: officeFor(start.headcount, config.career), listed: null, rescue: null, qualityAtLastClose: start.quality, qualified: false }`
    and the state gets `wave: { multiplier: 1, turnsLeft: 0 }`. When it is not set, the state is built exactly as
-   today.
+   today. `resolveTurn` builds the next state field by field, so in a career it copies `wave` across unchanged
+   (Task 6 makes it tick); a race's next state gets no such key.
 4. `publicCompany`: adds `career` (without `qualityAtLastClose` and `qualified`) only when the company has one.
 5. `shape.ts`: add `const optional = (check: Check): Check => (value) => value === undefined || check(value)` and a
    check for every new optional member: `Plan.goPublic`, `Company.career`, `CostBreakdown.moving`,
