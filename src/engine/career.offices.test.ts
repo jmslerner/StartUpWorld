@@ -4,7 +4,7 @@ import { movingBill, peopleCap } from "./career";
 import { CAREER_RULES, CAREER_TEST, atTurn, careerOf, newCareer, withCareer, withCareerOf, withEras } from "./careerKit";
 import { runwayOf } from "./formulas";
 import { projectTurn } from "./project";
-import { BLITZ, HUMAN, newGame, reportFor, resolve, withCompany, withState } from "./testKit";
+import { BLITZ, HUMAN, newGame, reportFor, resolve, seedWhere, withCompany, withState } from "./testKit";
 import type { GameConfig } from "../config";
 import type { GameState, Plan } from "./types";
 import { companyRunway, publicReport, viewFor } from "./view";
@@ -200,7 +200,9 @@ describe("the last office is the largest a company grows", () => {
     for (const people of [148, 149]) {
       const state = teamOf(people, 4);
       const projection = projectTurn(viewFor(state, HUMAN), { ...state.companies[HUMAN].lastPlan, ...poaching(people) }, CAREER_TEST);
-      expect(projection.costs.hiring).toBe((150 - people) * DESIGN.hiring.fee);
+      // Room for the hires the payroll leaves, and one more for each of the three rivals that could poach one person
+      // away, within the capacity of four recruiters.
+      expect(projection.costs.hiring).toBe(Math.min(5, 150 - people + 3) * DESIGN.hiring.fee);
       expect(projection.costs.moving).toBe(0);
       const outcomes = new Set<boolean>();
       for (let seed = 1; seed <= 40; seed++) {
@@ -211,6 +213,18 @@ describe("the last office is the largest a company grows", () => {
       }
       expect([...outcomes].sort()).toEqual([false, true]);
     }
+  });
+
+  it("at the people cap a year cannot end under the projection's cash floor when a rival's poach frees room for a hire", () => {
+    // A full campus with recruiters and no hire limit wants nobody, but a rival that poaches one person away leaves
+    // room for a hire the year then makes. The projection cannot know the rival's plan, so its floor must allow for it.
+    const plans = { [HUMAN]: recruitFour(150), [BLITZ]: { poachTarget: HUMAN } };
+    const seed = seedWhere((s) => resolve(with150, plans, s, CAREER_TEST).log.companies[BLITZ]?.poach?.success === true);
+    const report = reportFor(resolve(with150, plans, seed, CAREER_TEST), HUMAN);
+    expect(report.headcount).toMatchObject({ poachedOut: 1, hired: 1, end: 150 });
+    const projection = projectTurn(viewFor(with150, HUMAN), { ...with150.companies[HUMAN].lastPlan, ...recruitFour(150) }, CAREER_TEST);
+    expect(report.costs.total).toBeLessThanOrEqual(projection.costs.total);
+    expect(report.cash.end).toBeGreaterThanOrEqual(projection.cashFloor);
   });
 });
 

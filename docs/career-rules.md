@@ -58,9 +58,11 @@ Resolution, in this order:
      it, however many sizes that skips, and pays one bill: `moving.salaryYears` of the year's salary for everyone on
      the team. The bill is the report's `costs.moving`, 0 without a move, and is counted in the year's total, so it
      counts against the profit and the cash and can bankrupt. The bill is a whole number of dollars. The one-year
-     projection costs every hire the year can make, whether the planned poach works or not, and works the move out
-     the same way on the largest team the year can end with: its payroll plus those hires plus the poach it plans,
-     never more than the last office holds (rulings 31 to 33 and 35).
+     projection costs every hire the year can make, whether the planned poach works or not, and at the last office
+     also the hires that rivals' poaches may make room for: one for each rival still in the game, while the team is
+     large enough to be poached from. It works the move out the same way on the largest team the year can end with:
+     its payroll plus the hires it wants plus the poach it plans, never more than the last office holds (rulings 31 to
+     33 and 35).
 10. Hype.
     - In the year it lists, a company gains `listing.hype`, added with the year's other hype before the cap at 100.
     - The valuation the year closes at carries the listing premium for a company that is public or listed this year,
@@ -161,7 +163,8 @@ Resolution, in this order:
 33. The bill is one of the year's costs.
 34. Hires are capped so that a team never exceeds the last office, and a poach that would overfill it is dropped.
 35. The projection costs every hire the year can make and the planned poach, and works the move out on the largest
-    team the year can end with, so its cash and its bill err on the careful side.
+    team the year can end with, so its cash and its bill err on the careful side. It cannot know a rival's plan, so at
+    the last office it costs a hire for each rival that could poach one person away and so make room for one.
 36. A seat is refilled only if its company was run by a computer style; the player's seat never is.
 37. Out in year Y means the newcomer plans from year Y + 2.
 38. A newcomer gets the startup numbers of the year it enters, whatever style it plays.

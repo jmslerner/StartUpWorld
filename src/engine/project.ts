@@ -29,6 +29,7 @@ import {
   newUsersForTurn,
   nextQuality,
   poachChance,
+  poachFloor,
   pullOf,
   qualityGain,
   raiseAmount,
@@ -72,7 +73,10 @@ export interface Projection {
   /** Hiring is costed for every hire the year can make, so cash errs on the low side. */
   readonly costs: CostBreakdown;
   readonly cash: number;
-  /** Cash if it wins no users at all this quarter and makes every hire it wants: it cannot end lower. */
+  /**
+   * Cash if it wins no users at all this year and pays for every hire the year can make (those a rival's poach may make
+   * room for at the last office included), the poach it plans and any move: it cannot end lower.
+   */
   readonly cashFloor: number;
   readonly profitable: boolean;
   readonly runway: number | null;
@@ -224,16 +228,18 @@ export const projectTurn = (
   // In a career the hires wanted are capped by the last office as in the turn, with room counted from the payroll
   // alone: the most hires the year can make, which it makes when the planned poach fails (ruling 35).
   const poachedIn = odds === null ? 0 : 1;
-  const hiresWanted = hiresWithinCap(
-    Math.min(hiringCapacity(work.recruiting, rules), resolved.hireLimit ?? Number.MAX_SAFE_INTEGER),
-    payroll,
-    rules,
-  );
+  const recruitable = Math.min(hiringCapacity(work.recruiting, rules), resolved.hireLimit ?? Number.MAX_SAFE_INTEGER);
+  const hiresWanted = hiresWithinCap(recruitable, payroll, rules);
   const hires = expectedHires(view, hiresWanted, resolved.layoffs, rules);
+  // At the last office's size the turn lets a team hire into the room a rival's poach leaves. The projection cannot
+  // know the rivals' plans, so it costs the most hires the year can make: room for one more for each rival still in
+  // the game, as each can take one person, while the team stays large enough to be poached from.
+  const poachable = rules.career === undefined ? 0 : Math.max(0, Math.min(view.rivals.filter((rival) => rival.out === null).length, payroll - poachFloor(rules) + 1));
+  const hiresAtMost = hiresWithinCap(recruitable, payroll - poachable, rules);
 
   const revenue = revenueOf(users, resolved.price, rules);
   const salaries = payroll * rules.salary;
-  const hiring = hiresWanted * rules.hiring.fee;
+  const hiring = hiresAtMost * rules.hiring.fee;
   const poaching = odds === null ? 0 : rules.poach.cost;
   const severance = resolved.layoffs * rules.layoff.severance;
   const yearCosts: CostBreakdown = { salaries, marketing: resolved.marketing, hiring, poaching, severance, total: salaries + resolved.marketing + hiring + poaching + severance };

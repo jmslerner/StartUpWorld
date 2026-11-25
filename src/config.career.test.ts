@@ -136,7 +136,9 @@ describe.each([["CAREER", CAREER], ["CAREER_DESIGN", CAREER_DESIGN]] as const)("
 
   it("gives every card, dated or in any era's deck, its own id, a name and a line of text", () => {
     const cards = allCards(config);
-    expect(new Set(cards.map((card) => card.id)).size).toBe(cards.length);
+    // findCard reads the base deck first, so no career card may share an id with it either.
+    const ids = [...config.events.deck, ...cards].map((card) => card.id);
+    expect(new Set(ids).size).toBe(ids.length);
     for (const card of cards) {
       expect(card.id.length, card.id).toBeGreaterThan(0);
       expect(card.name.length, card.id).toBeGreaterThan(0);

@@ -16,6 +16,7 @@ export {
   boardPaused,
   closingValuation,
   datedCardFor,
+  datedHeldCeiling,
   eraIndexOf,
   heldCeiling,
   hiresWithinCap,
