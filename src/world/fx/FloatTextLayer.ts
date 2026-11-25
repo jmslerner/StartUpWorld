@@ -7,6 +7,10 @@ export interface FloatTextOptions {
   reducedMotion: boolean;
   /** World units covered by one CSS pixel right now (sprites are sized from it). */
   unitsPerPixel(): number;
+  /** How long a text shows, in seconds. Left out, 1.4. */
+  lifeSeconds?: number;
+  /** A text stands where it appears, at its size: no rise and no pop, only the fade in and out. */
+  still?: boolean;
 }
 
 const TONE_COLORS: Record<FloatTone, string> = {
@@ -95,6 +99,7 @@ export class FloatTextLayer {
   readonly root = new THREE.Group();
 
   private readonly options: FloatTextOptions;
+  private readonly life: number;
   private readonly items: FloatItem[] = [];
   /** Insertion order doubles as recency: re-inserting on every hit keeps the oldest first. */
   private readonly cache = new Map<string, CachedText>();
@@ -104,6 +109,8 @@ export class FloatTextLayer {
 
   constructor(options: FloatTextOptions) {
     this.options = options;
+    const life = options.lifeSeconds;
+    this.life = life !== undefined && life > 0 && Number.isFinite(life) ? life : LIFE_SECONDS;
     this.root.name = "fx-float-text";
   }
 
@@ -147,7 +154,7 @@ export class FloatTextLayer {
     for (const item of this.items) {
       if (!item.active) continue;
       item.age += dt;
-      if (item.age >= LIFE_SECONDS) this.release(item);
+      if (item.age >= this.life) this.release(item);
       else this.place(item);
     }
   }
@@ -175,10 +182,11 @@ export class FloatTextLayer {
     const unitsPerPixel = this.options.unitsPerPixel();
     const fontPx = clamp(NOMINAL_FONT_UNITS / unitsPerPixel, MIN_FONT_PX, MAX_FONT_PX);
     const height = (fontPx * unitsPerPixel * TEXTURE_HEIGHT) / FONT_PX;
-    const t = item.age / LIFE_SECONDS;
-    const rise = (this.options.reducedMotion ? REDUCED_RISE_UNITS : RISE_UNITS) * easeOutCubic(t);
+    const t = item.age / this.life;
+    const still = this.options.still === true;
+    const rise = still ? 0 : (this.options.reducedMotion ? REDUCED_RISE_UNITS : RISE_UNITS) * easeOutCubic(t);
     const stack = (item.slot * height * STACK_PITCH) / VERTICAL_FORESHORTENING;
-    const pop = 0.6 + 0.4 * easeOutBack(item.age / POP_SECONDS);
+    const pop = still ? 1 : 0.6 + 0.4 * easeOutBack(item.age / POP_SECONDS);
 
     item.sprite.position.set(item.x, item.y + rise + stack, item.z);
     item.sprite.scale.set(height * cached.aspect * pop, height * pop, 1);

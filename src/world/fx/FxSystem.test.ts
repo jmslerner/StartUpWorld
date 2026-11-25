@@ -632,9 +632,45 @@ describe("FxSystem", () => {
     calm.fx.shake(0.4);
     calm.fx.applyFrame(frameOf(plain, {}, [moved]), still);
     expect(calm.shakes).toEqual([]);
-    // The dust still rises, thinner.
-    for (let t = 0; t < REBUILD_RISE_DELAY + 0.1; t += FRAME) calm.fx.update(FRAME, t);
-    expect(kindsAlive(calm.fx)).toEqual(["dust"]);
+    // No dust rises either: under reduced motion a new office comes up still.
+    expect(calm.fx.busy()).toBe(false);
+    for (let t = 0; t < REBUILD_RISE_DELAY + REBUILD_RISE_SECONDS + 0.1; t += FRAME) calm.fx.update(FRAME, t);
+    expect(kindsAlive(calm.fx)).toEqual([]);
+    expect(calm.fx.busy()).toBe(false);
+  });
+
+  it("under reduced motion the numbers at the door stand still, and are gone within a second", () => {
+    stubDocument();
+    for (const step of [FRAME, 0.1]) {
+      const { fx } = makeFx("high", true);
+      const floats = fx.root.children[2];
+      fx.applyFrame(frameOf({ ...plain, office: 2 }, { arrived: ["p6", "p7", "p8"], left: ["p2", "p3"] }, [moved]), still);
+      const sprites = floats.children.filter((child) => child.visible);
+      expect(sprites).toHaveLength(2);
+      const placed = sprites.map((sprite) => [sprite.position.clone(), sprite.scale.clone()] as const);
+      let t = 0;
+      while (fx.busy() && t < 5) {
+        fx.update(step, t);
+        t += step;
+        sprites.forEach((sprite, i) => {
+          if (!sprite.visible) return;
+          expect(sprite.position.equals(placed[i][0]), `moved at ${t}`).toBe(true);
+          expect(sprite.scale.equals(placed[i][1]), `grew at ${t}`).toBe(true);
+        });
+      }
+      expect(t, String(step)).toBeLessThan(1);
+      expect(t, String(step)).toBeGreaterThan(0.5);
+      expect(kindsAlive(fx)).toEqual([]);
+    }
+    // With full motion they still rise, and last as long as before.
+    const { fx } = makeFx();
+    const floats = fx.root.children[2];
+    fx.applyFrame(frameOf(plain, { arrived: ["p6"] }), still);
+    const sprite = floats.children.find((child) => child.visible)!;
+    const from = sprite.position.y;
+    fx.update(0.5, 0.5);
+    expect(sprite.position.y).toBeGreaterThan(from + 0.5);
+    expect(secondsToRest(fx)).toBeGreaterThan(0.8);
   });
 
   it("treats text and bubbles as no-ops where there is no document", () => {
@@ -779,10 +815,12 @@ describe("FxSystem at rest", () => {
     expect(secondsToRest(fx)).toBeLessThan(10);
   });
 
-  it("is busy while dust is still waiting to rise, with no particle alive yet and no shake to wait for", () => {
-    const { fx, shakes } = makeFx("high", true);
+  it("is busy while dust is still waiting to rise, with no particle alive yet", () => {
+    const { fx } = makeFx();
     fx.applyFrame(frameOf({ ...plain, office: 2 }, {}, [moved]), still);
-    expect(shakes).toEqual([]);
+    expect(fx.particles.activeCount).toBe(0);
+    expect(fx.busy()).toBe(true);
+    for (let t = 0; t < REBUILD_RISE_DELAY - FRAME; t += FRAME) fx.update(FRAME, t);
     expect(fx.particles.activeCount).toBe(0);
     expect(fx.busy()).toBe(true);
     const seconds = secondsToRest(fx);

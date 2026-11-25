@@ -7,6 +7,9 @@
  *   3. the company changes office: dust puffs across the floor while the new building comes up, and the camera
  *      gets the kick it always got at that moment.
  *
+ * Under reduced motion the new office raises no dust and the camera does not shake, and the numbers at the door
+ * stand still and are gone in under a second (REDUCED_TEXT_SECONDS): nothing the effects do moves after a second.
+ *
  * Where N comes from (see `doorCounts`): while everyone is drawn, from the cast's own lists, so the number is the
  * number of figures that appear and disappear. Somebody expected at the door counts when they appear there and not
  * again when they are hired; a hire that is called off counts as leaving the door. Once more people work here than
@@ -114,6 +117,9 @@ const RISE_SHAKE = 0.4;
  */
 export const SHAKE_SECONDS = 0.8;
 
+/** Under reduced motion a float text stands still and shows this long: gone within a second of its frame. */
+export const REDUCED_TEXT_SECONDS = 0.9;
+
 /** The longest a bubble may be asked to show. */
 const MAX_BUBBLE_SECONDS = 60;
 
@@ -167,7 +173,11 @@ export class FxSystem implements WorldSystem, FxApi {
     this.density = budget.density;
     this.particles = new ParticlePool(budget.capacity, deps.random);
     this.renderer = new ParticleRenderer(this.particles);
-    this.floats = new FloatTextLayer({ reducedMotion: deps.reducedMotion, unitsPerPixel: deps.unitsPerPixel });
+    this.floats = new FloatTextLayer({
+      reducedMotion: deps.reducedMotion,
+      unitsPerPixel: deps.unitsPerPixel,
+      ...(deps.reducedMotion ? { lifeSeconds: REDUCED_TEXT_SECONDS, still: true } : {}),
+    });
     this.bubbles = new BubbleLayer({
       scene: deps.scene,
       reducedMotion: deps.reducedMotion,
@@ -232,7 +242,8 @@ export class FxSystem implements WorldSystem, FxApi {
     const { arrived, left } = doorCounts(next, prev);
     if (arrived > 0) this.floatText(formatSignedCount(arrived), this.door(layout), "good");
     if (left > 0) this.floatText(formatSignedCount(-left), this.door(layout), "bad");
-    if (moved) {
+    // Under reduced motion the new office comes up without dust or a kick of the camera.
+    if (moved && !this.deps.reducedMotion) {
       this.raiseDust(layout);
       this.shake(RISE_SHAKE);
     }
