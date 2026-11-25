@@ -2,7 +2,7 @@
 // config has none. The rules are recorded in docs/career-rules.md.
 
 import { clamp, raiseAmount, round4, round6, valuationOf } from "./formulas";
-import type { ActiveEvent, CareerReport, CareerRules, Company, CostBreakdown, DatedCard, EventCard, EventEffect, RulesConfig } from "./types";
+import type { ActiveEvent, CareerReport, CareerRules, Company, Controller, CostBreakdown, CpuKind, DatedCard, EventCard, EventEffect, RulesConfig } from "./types";
 
 /** The calendar year a turn is played in: turn 1 is the career's first year. */
 export const yearOf = (turn: number, career: CareerRules): number => career.firstYear + turn - 1;
@@ -241,3 +241,7 @@ export const rescueEffects = (
  */
 export const closingValuation = (valuation: number, company: Company, listsNow: boolean, rules: RulesConfig): number =>
   listsNow || (company.career !== undefined && company.career.listed !== null) ? Math.round(valuation * listingRules(rules).premium) : valuation;
+
+/** True for a seat a computer style plays: a rival's seat, which a newcomer may take. False for the player's. */
+export const isCpuKind = (controller: Controller): controller is CpuKind =>
+  controller === "blitzscaler" || controller === "bootstrapper" || controller === "incumbent";

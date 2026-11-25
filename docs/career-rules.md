@@ -88,6 +88,11 @@ Resolution, in this order:
     - Closing the books also records a move: the company's office is the one it moved to. Offices are never given up
       (ruling 31).
 14. The funding climate ticks down and next year's card is drawn.
+    - First, newcomers take their seats: every seat whose company is out, was played by a computer style and went
+      out at least `replacement.afterYears` turns before the coming year gets a new startup, in seat order, with the
+      startup numbers of the coming year and `founded` set to it. Its style (one of `replacement.styles`), name and
+      pitch are drawn from the seat's own stream; no two companies share a name. The log's `entrants` lists the seats
+      taken, an empty list when nobody enters (rulings 36 to 39).
     - A wave of new users ticks down with the funding climate, before next year's card can set a new one (ruling 15).
     - The card is drawn from next year's numbers, so a new era's deck is in play from its first year.
     - A card dated to next year replaces the draw, without a roll; its target is picked as for a random card, and when
@@ -149,6 +154,10 @@ Resolution, in this order:
 33. The bill is one of the year's costs.
 34. Hires are capped so that a team never exceeds the last office, and a poach that would overfill it is dropped.
 35. The projection assumes every wanted hire and the planned poach arrive.
+36. A seat is refilled only if its company was run by a computer style; the player's seat never is.
+37. Out in year Y means the newcomer plans from year Y + 2.
+38. A newcomer gets the startup numbers of the year it enters, whatever style it plays.
+39. Newcomers enter before the coming year's card is drawn, so a card can hit them.
 
 ## Starting numbers
 

@@ -10,6 +10,7 @@ import {
   closingValuation,
   heldCeiling,
   hiresWithinCap,
+  isCpuKind,
   listingEffects,
   listingOf,
   marketTurn,
@@ -18,6 +19,7 @@ import {
   rulesForTurn,
   withMoving,
 } from "./career";
+import { drawEntrant } from "./cast";
 import { NEUTRAL_MODIFIERS, applyEvent, drawEvent, type EventContext } from "./events";
 import {
   churnRate,
@@ -43,6 +45,7 @@ import { byHypeOrder, handOutCandidates } from "./hiring";
 import { resolveMarket } from "./market";
 import { normalizePlan } from "./plan";
 import { STREAM, firstFloat } from "./rng";
+import { seatCompany } from "./setup";
 import type {
   CareerReport,
   Climate,
@@ -319,6 +322,32 @@ const closedLog = (state: GameState): TurnLog => ({
   outcome: state.outcome,
 });
 
+/**
+ * A career's newcomers for the coming turn: every seat whose company is out, was played by a computer style and went
+ * out at least `replacement.afterYears` turns before it gets a new startup, in seat order. Each newcomer's name joins
+ * the names taken before the next seat draws. Without a career nobody enters.
+ */
+const seatNewcomers = (
+  companies: readonly Company[],
+  coming: number,
+  seed: number,
+  config: RulesConfig,
+): { companies: readonly Company[]; entrants: CompanyId[] } => {
+  const career = config.career;
+  if (career === undefined) return { companies, entrants: [] };
+  const taken = new Set(companies.map((company) => company.name.toLowerCase()));
+  const entrants: CompanyId[] = [];
+  const seated = companies.map((company) => {
+    const due = company.out !== null && company.out.turn + career.replacement.afterYears <= coming;
+    if (!due || !isCpuKind(company.controller)) return company;
+    const newcomer = seatCompany(company.id, drawEntrant(seed, coming, company.id, taken, career), config, coming);
+    taken.add(newcomer.name.toLowerCase());
+    entrants.push(company.id);
+    return newcomer;
+  });
+  return { companies: seated, entrants };
+};
+
 export const resolveTurn = (state: GameState, plans: PlanSet, seed: number, config: RulesConfig = CONFIG): TurnResult => {
   if (state.outcome !== null) return { state, log: closedLog(state) };
 
@@ -521,11 +550,16 @@ export const resolveTurn = (state: GameState, plans: PlanSet, seed: number, conf
     };
   });
 
-  // 14. If the game goes on: the climate (and a career's wave) ticks down, and next turn's event is drawn and applied.
+  // 14. If the game goes on: in a career newcomers take the seats rivals left, the climate (and a career's wave)
+  // ticks down, and next turn's event is drawn and applied, so it can hit a newcomer.
   let next: GameState = { ...state, companies: closed, carryOverUsers, freedPeople, outcome };
+  let newcomerSeats: CompanyId[] = [];
   if (outcome === null) {
-    const event = drawEvent(closed, turn + 1, seed, config);
-    let context: EventContext = { companies: closed, climate: tickClimate(state.climate), modifiers: NEUTRAL_MODIFIERS, carryOverUsers };
+    const newcomers = seatNewcomers(closed, turn + 1, seed, config);
+    newcomerSeats = newcomers.entrants;
+    const seated = newcomers.companies;
+    const event = drawEvent(seated, turn + 1, seed, config);
+    let context: EventContext = { companies: seated, climate: tickClimate(state.climate), modifiers: NEUTRAL_MODIFIERS, carryOverUsers };
     if (state.wave !== undefined) context = { ...context, wave: tickClimate(state.wave) };
     if (event !== null) context = applyEvent(context, event, config);
     next = {
@@ -542,7 +576,7 @@ export const resolveTurn = (state: GameState, plans: PlanSet, seed: number, conf
     if (context.wave !== undefined) next = { ...next, wave: context.wave };
   }
 
-  const log: TurnLog = {
+  const raceLog: TurnLog = {
     turn,
     event: state.event,
     climateMultiplier: climate,
@@ -556,6 +590,9 @@ export const resolveTurn = (state: GameState, plans: PlanSet, seed: number, conf
     nextEvent: next.outcome === null ? next.event : null,
     outcome,
   };
+  // A career's log names the seats newcomers took, last and always, as an empty list when nobody entered. A race log
+  // gains no such key.
+  const log: TurnLog = rules.career === undefined ? raceLog : { ...raceLog, entrants: newcomerSeats };
 
   return { state: next, log };
 };

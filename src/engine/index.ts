@@ -1,6 +1,7 @@
 // The rules engine's public surface. Everything here is pure: no UI, no clock, no globals.
 
-export { createGame } from "./setup";
+export { createGame, seatCompany } from "./setup";
+export { ENTRANT_PITCHES, NAME_ENDS, NAME_STARTS, PITCHES, drawEntrant, drawName, picker } from "./cast";
 export { resolveTurn } from "./resolveTurn";
 export type { TurnResult } from "./resolveTurn";
 export { defaultPlan, normalizePlan, normalizePlanFor, raiseBlocker } from "./plan";
@@ -18,6 +19,7 @@ export {
   eraIndexOf,
   heldCeiling,
   hiresWithinCap,
+  isCpuKind,
   listingBlocker,
   listingEffects,
   listingOf,

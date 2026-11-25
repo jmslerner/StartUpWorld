@@ -50,6 +50,13 @@ export const newCareer = (config: GameConfig = CAREER_TEST): GameState => create
 /** The same state, dated to another turn. */
 export const atTurn = (state: GameState, turn: number): GameState => ({ ...state, turn });
 
+/**
+ * The company out of the game since that turn, gone bankrupt with no users and nobody left. Unlike testKit's
+ * onlyActive, which dates it to turn 0, it puts the newcomer for a rival's seat `replacement.afterYears` after it.
+ */
+export const outSince = (state: GameState, id: CompanyId, turn: number): GameState =>
+  withCompany(state, id, { users: 0, headcount: 0, out: { turn, reason: "bankrupt", users: 0, headcount: 0 } });
+
 /** A company's career facts; throws if it has none, as in a race game. */
 export const careerOf = (state: GameState, id: CompanyId): CompanyCareer => {
   const career = state.companies[id].career;
