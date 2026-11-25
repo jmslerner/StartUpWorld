@@ -774,6 +774,11 @@ it("cuts every product down to the ceiling and leaves lower ones alone", () => {
   expect(after.companies.map((c) => c.quality)).toEqual([30, 35, 20, 8]);
   expect(after.companies.map((c) => c.launched)).toEqual([true, true, true, false]);   // launch is permanent
 });
+it("is applied once, as the year opens: that year's Product work builds on it", () => {
+  // seat 0 opens 1995 cut to the ceiling, with ten people, all on Product
+  expect(reportFor(played1995, 0).quality.start).toBe(30);
+  expect(reportFor(played1995, 0).quality.end).toBeGreaterThan(30);
+});
 it("a leader and a newcomer restart level, and win the same share that year", () => {
   // 1994 is played on a market with no new users. Seats 0 and 1 are launched, have no users, the same team and the
   // same plan, and differ only in quality (90 and 35); seats 2 and 3 are out. 1995 then opens with 10,000 users
@@ -829,10 +834,21 @@ Expected: FAIL (qualities come back unchanged).
 
 As under Interfaces. Rulings: "A platform shift is two effects on one dated card: a ceiling on quality in its year,
 and a wave of new users for the years the card says." "The ceiling caps every company still in the game, launched or
-not; launch is permanent." "A new wave replaces one still running; it multiplies with a card's one-year change in new
-users, and it ticks down with the funding climate." "A shift is announced in the `shiftNoticeYears` years before it,
-not in its own year." "The quality a company closed last year with is public, and a rival's pull is carried forward
-from it, not from the quality a shift has just left it with."
+not; launch is permanent." "The ceiling is applied once, as the shift's year opens. That year's Product work builds
+on it, so a company with many people on Product is above the ceiling again when that year's users choose." "A new
+wave replaces one still running; it multiplies with a card's one-year change in new users, and it ticks down with
+the funding climate." "A shift is announced in the `shiftNoticeYears` years before it, not in its own year." "The
+quality a company closed last year with is public, and a rival's pull is carried forward from it, not from the
+quality a shift has just left it with."
+
+The design's sentence "in that year no product is worth more than the new platform allows" can also be read as a
+ceiling that holds for the whole year. This plan builds the reading above because the rest of the design's paragraph
+describes it: "preparing means having the cash and the people to put on Product when it lands". The plan's review
+tried both on throwaway numbers, 300 careers each. The leader of 2010 won 57% of careers with the shifts switched
+off, 50% with this reading at a ceiling of 30, 35% with it at a ceiling of 10, and 34% with the ceiling held all
+year. So the height of the ceiling is the first number Task 17 tunes, the simulator reports the lead figure with the
+shifts switched off beside the real one (Task 15), and the other reading is what goes to the owner if numbers are
+not enough (Task 17, Step 3).
 
 - [ ] **Step 4: Run the tests, then the checks.** Expected: PASS.
 
@@ -859,7 +875,8 @@ git add src scripts docs package.json README.md && git commit -m "engine: a plat
 ```ts
 export type ListingBlocker = "unavailable" | "listed" | "users" | "profit";
 // "unavailable": not a career. "listed": already public. null: `career.qualified` is true. Otherwise it says what
-// was missing last year: "users" when it closed under that year's bar, or no year has been played; else "profit".
+// the company still needs: "users" while it has fewer users than the bar of the year being planned (`turn`); else
+// "profit": it has the users, and has to close a year with revenue that covers its costs.
 export type RaiseBlocker = "users" | "cooldown" | "public";      // src/engine/plan.ts
 Projection.career?: { readonly listing: { readonly valuation: number; readonly amount: number } | null; readonly office: { readonly from: number; readonly to: number; readonly bill: number } | null }
 ```
@@ -885,9 +902,14 @@ it("and stays qualified: a bad year or a higher bar later does not take it back"
   expect(later.companies[0].career?.qualified).toBe(true);
   expect(listingBlocker(later.companies[0], later.turn, config)).toBeNull();
 });
+it("until then it is told what it still needs, against the bar of the year being planned", () => {
+  // two eras, the second with ipo: { users: 400_000 }; seat 0 closed the first era's last year with 300,000 users at a loss
+  expect(listingBlocker(company, lastTurnOfFirstEra, config)).toBe("profit");
+  expect(listingBlocker(company, lastTurnOfFirstEra + 1, config)).toBe("users");       // the new bar is out of reach this year
+});
 it("who else may not", () => {
   expect(listingBlocker(qualify(newCareer(), 0).companies[0], 2, CAREER_TEST)).toBeNull();
-  expect(listingBlocker(newCareer().companies[3], 1, CAREER_TEST)).toBe("users");      // nothing played yet
+  expect(listingBlocker(newCareer().companies[3], 1, CAREER_TEST)).toBe("users");      // 10,000 users, under the bar
   expect(listingBlocker(/* already listed */, 5, CAREER_TEST)).toBe("listed");
   expect(listingBlocker(newGame().companies[0], 2, DESIGN)).toBe("unavailable");
 });
@@ -921,8 +943,8 @@ it("a public company cannot raise privately", () => {
 });
 describe("plans that ask for the impossible (Review Focus 1)", () => {
   it.each([
-    ["before a year has closed at the bar", "Going public dropped: no year has yet closed with 250,000 users."],
-    ["when the year at the bar closed at a loss", "Going public dropped: last year closed at the bar, but not with a profit."],
+    ["with fewer users than the bar", "Going public dropped: it takes a year that closes with 250,000 users and a profit."],
+    ["with the users, before a year has closed with a profit", "Going public dropped: no year has yet closed at the bar with a profit."],
     ["a second time", "Going public dropped: the company is already public."],
   ])("asking to go public %s is dropped with the reason", (_case, note) => { /* report.notes contains note; report.career.listing is null */ });
   it("going public and raising in one year keeps the listing and drops the raise", () => {
@@ -966,7 +988,9 @@ Expected: FAIL (`listingBlocker` is not exported).
    other two).
 5. `src/ui/viewModel.ts` needs no change: its raise text ignores a blocker it does not know.
 6. Rulings: "A company qualifies when a year closes with that year's bar in users and with revenue that covered its
-   costs. Once qualified it stays qualified, whatever happens later, and may list in any later year, once." "A
+   costs. Once qualified it stays qualified, whatever happens later, and may list in any later year, once." "Until
+   it qualifies, what a company is told it still needs is measured against the bar of the year being planned: users
+   while it has fewer than that bar, a profitable year once it has them." "A
    listing closes with the raise step, at the opening valuation without the premium; the premium
    applies from the end of that year, rounded to whole dollars after it." "A plan that both raises and goes public
    loses the raise."
@@ -1057,7 +1081,8 @@ git add src scripts docs package.json README.md && git commit -m "engine: in a c
   board fires its founder) is rescued if `career.rescue` is null, and goes out as in the race otherwise. A rescue:
   equity times `rescue.equityKept`; investor seats become `max(seats + rescue.investorSeats, founderSeats + 1)`;
   `rescue.hype` is added to the year's hype after it is worked out, not below 0; cash below $0 becomes
-  `end-of-year headcount × rules.salary × rescue.salaryYears`; the valuation is worked out after all that.
+  `end-of-year headcount × rules.salary × rescue.salaryYears`, where `rules` are the numbers of the year that closes;
+  the valuation is worked out after all that.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -1111,6 +1136,20 @@ it("a second bankruptcy is final, the year after a rescue included (Review Focus
   expect(result6.state.companies[0].out).toEqual({ turn: 6, reason: "bankrupt", users: report6.users.end, headcount: report6.headcount.end });
   expect(result6.state.freedPeople).toBe(report6.headcount.end);
 });
+it("the reset is a year of salaries at the closing year's salary, also when the next year opens an era", () => {
+  // two eras, the second with salary: 100_000; the rescue falls in the first era's last year
+  expect(report.cash.end).toBe(report.headcount.end * DESIGN.salary);
+});
+it("a company that goes public and is rescued in the same year keeps its listing", () => {
+  // qualified, lists, and still ends the year below $0
+  expect(report.career?.listing).not.toBeNull();
+  expect(report.career?.rescue?.reason).toBe("bankrupt");
+  expect(report.career?.hype).toEqual({ listing: 20, rescue: -10 });
+  expect(report.equity).toBe(round6(company.founderEquity * 0.8 * 0.5));
+  expect(after.investorSeats).toBe(Math.max(company.investorSeats + 1 + 2, company.founderSeats + 1));
+  expect(report.valuation).toBe(Math.round(valuationOf(report.users.end, report.hype.end, 1, CAREER_TEST) * 1.25));
+  expect(after.career?.listed?.turn).toBe(state.turn);
+});
 it("everyone can see a rescue", () => { expect(publicReport(report).career?.rescued).toBe("bankrupt"); });
 it("the Incumbent is rescued like anyone else", () => { /* seat 3 */ });
 it("the race still has no rescue", () => {
@@ -1129,7 +1168,9 @@ As under Interfaces. In the pause year the board's report still says what it saw
 "Bankruptcy is checked first; a company rescued from it is not voted on that year." "'The year after a rescue' is the
 next turn only." "The rescue's hype is taken off after the year's hype is worked out, not below 0, and the valuation
 follows." "Investors end a rescue with two more seats, or one more than the founders if that is more." "Cash is reset
-only from below $0, to a year of salaries for the team as the year ends." "After a rescue the report's runway is
+only from below $0, to a year of salaries for the team as the year ends, at the salary of the year that closes." "A
+company that lists and is rescued in the same year keeps its listing: both changes to its equity, seats and hype
+apply." "After a rescue the report's runway is
 worked out again from the cash the rescue leaves."
 
 - [ ] **Step 4: Run the tests, then the checks.** Expected: PASS.
@@ -1382,6 +1423,8 @@ export interface CareerSimConfig {
   readonly loopholeMargin: number;              // 0.03
   readonly targets: CareerTargets;
 }
+// CpuConfig["recruiters"] gains `readonly shares?: readonly number[]`: recruiters weighed as shares of the people
+// free to assign (Task 13 reads it). The race's config does not set it.
 // src/config.ts
 export interface CareerGameConfig extends PlayConfig { readonly career: CareerRules; readonly sim: CareerSimConfig }
 export const CAREER: CareerGameConfig;
@@ -1406,9 +1449,12 @@ churn      base 0.30 · perQualityPoint 0.002 · min 0.05      raise   minUsers 
 board      fireChance 0.3 · runwayTurns 1                    hype    decay 0.4 · launch 15 · raise 10 · growth 5 · growthThreshold 0.25
 projection as CONFIG                                         events  firstTurn 2 · chance 0.5 · deck: none here,
                                                                      each era has its own (below)
-cpu        as CONFIG.cpu, except layoffRunway 0.5 · shortRunwayTurns 0.5 and, per personality:
+cpu        as CONFIG.cpu, except recruiters.shares 0.1, 0.2 · ipoPushLayoffs 0, 1, 2 ·
+           ipo win 2 / deficit 2 / nextDeficit 1 / usersShortfall 2 and, per personality:
            blitzscaler  hireRunway 1 · horizon 3        bootstrapper  raise.runway 1 · hireRunway 2 · horizon 4
            incumbent    raise.runway 1.5 · poachRunway 1.5 · hireRunway 1.5 · horizon 3
+           (layoffRunway and shortRunwayTurns stay 1: with a year as the turn, less than a year of cash is
+           bankruptcy this year, and layoffs have to be among the plans weighed)
 baseline   split 0.4 / 0.4 / 0.2 · standard · raisePercent 20 · raiseRunway 3 · hireRunway 3 · marketing 0
 sim        careers 1000 · firstSeed 1 · leaderYear 2010 · checkpointYears 1995, 2000, 2010, 2020, 2030, 2038
            overspendYear 1993 · loopholeMargin 0.03 · the five targets above
@@ -1422,19 +1468,27 @@ Each era's `values` (the base `salary`, `market`, `ipo`, `valuation`, `hiring.ca
 | id | name | firstYear | market.newUsersTurn1 | growthPerTurn | salary | valuation.perUser | hiring.candidatesPerTurn | ipo.users | archetypes.startup.cash | pull.maxMarketing | teamCap blitz / boot / incumbent | also sets |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
 | `dial-up` | Dial-up dawn | 1990 | 20K | 0.35 | 50K | 40 | 4 | 60K | 400K | 1M | 8 / 6 / 12 | `pull.marketingCoefficient` 0.2 |
-| `gold-rush` | Browser gold rush | 1995 | 100K | 0.40 | 70K | 200 | 5 | 300K | 600K | 5M | 15 / 9 / 20 | `poach.baseChance` 0.6 |
+| `gold-rush` | Browser gold rush | 1995 | 100K | 0.40 | 70K | 200 | 6 | 300K | 600K | 5M | 15 / 9 / 20 | `poach.baseChance` 0.6 |
 | `bust` | Bust and broadband | 2000 | 380K | 0.05 | 85K | 50 | 9 | 800K | 500K | 5M | 15 / 9 / 20 | `hiring.fee` 10K |
-| `phones` | Phones and cloud | 2007 | 700K | 0.10 | 100K | 80 | 6 | 1.5M | 600K | 10M | 25 / 14 / 35 | `quality.gainPerWork` 11 · `pull.growthCoefficient` 0.4 |
-| `cheap-money` | Cheap money years | 2014 | 1.3M | 0.03 | 130K | 130 | 6 | 3M | 1M | 30M | 50 / 25 / 70 | `churn.base` 0.35 |
-| `winter-ai` | Winter and AI | 2022 | 1.6M | 0.04 | 150K | 100 | 8 | 4M | 1M | 30M | 50 / 25 / 70 | `quality.gainPerWork` 12 · `quality.decay` 8 |
+| `phones` | Phones and cloud | 2007 | 700K | 0.10 | 100K | 80 | 8 | 1.5M | 600K | 10M | 25 / 14 / 35 | `quality.gainPerWork` 11 · `pull.growthCoefficient` 0.4 |
+| `cheap-money` | Cheap money years | 2014 | 1.3M | 0.03 | 130K | 130 | 16 | 3M | 1M | 30M | 50 / 25 / 70 | `churn.base` 0.35 |
+| `winter-ai` | Winter and AI | 2022 | 1.6M | 0.04 | 150K | 100 | 12 | 4M | 1M | 30M | 50 / 25 / 70 | `quality.gainPerWork` 12 · `quality.decay` 8 |
 | `agents` | Agent economy | 2027 | 2.0M | 0.06 | 220K | 60 | 4 | 5M | 1.5M | 40M | 30 / 15 / 40 | `quality.gainPerWork` 18 · `churn.perQualityPoint` 0.003 · `pull.marketingCoefficient` 0.15 |
-| `ambient` | Ambient age | 2033 | 3.5M | 0.10 | 280K | 80 | 5 | 8M | 2M | 60M | 60 / 30 / 90 | `pull.marketingCoefficient` 0.1 · `hype.launch` 25 |
+| `ambient` | Ambient age | 2033 | 3.5M | 0.10 | 280K | 80 | 16 | 8M | 2M | 60M | 60 / 30 / 90 | `pull.marketingCoefficient` 0.1 · `hype.launch` 25 |
 
 The last column is what makes an era play differently, as the spec's C2 asks: adverts that buy little in 1990;
 hiring as a fight in the gold rush; the cheapest hiring of the career after the bust; builders who ship more once
 servers are rented, and Growth work that counts for more in an app shop; users who move between rivals in the
 cheap-money years; faster building and faster ageing with AI; small teams that build fast, and users who follow
 quality, in the agent economy; trust worth more than reach in the ambient age.
+
+Three groups of these numbers come from the plan's review, which played 300 careers on a first draft of this table
+and saw every one go to the baseline bot. The computer players weighed two recruiters at most and were still 27 to
+47 people in 2038, so they now also weigh a tenth and a fifth of their people (`recruiters.shares`), and
+`hiring.candidatesPerTurn` is sized so that the four companies can come near their era's team caps within the era.
+The race's prize for going public (`ipo.win` 100, with layoffs of up to 30 people weighed to get there) suits a game
+that an IPO wins. In a career it made a rival lay off most of its team to list, so here the prize is small and the
+layoffs weighed for it are two at most. All of this is where tuning starts, not where it ends.
 
 Each era also has its own deck (`values.events.deck`): five to seven cards built from the race's seven cards that do
 not touch funding (viral moment, burnout, press feature, security breach, talent glut, market boom, ad prices
@@ -1617,9 +1671,16 @@ git add src scripts docs package.json README.md && git commit -m "config: the ca
   PlayConfig = CONFIG, human?)`. Each resolves `rules = rulesForTurn(config, view.turn)` first and reads every
   number, the personalities included, from `rules`. In a career:
   - every plan they return has `goPublic` set to `listingBlocker(self, turn, config) === null`;
-  - "cutting costs to list" (`ipoPush`) holds exactly while `listingBlocker` says `"profit"`;
+  - a plan that goes public asks for no raise, because the rules would drop it and the person set aside to raise
+    would sit idle: a computer player's raise options are then `[0]`, the baseline bot's `raisePercent` is 0, and
+    the cash a computer player sizes its marketing on counts `listingOf(self, view.climate.multiplier, rules).amount`
+    in the raise's place;
+  - "cutting costs to list" (`ipoPush`) holds exactly while `listingBlocker` says `"profit"`, and never in the final
+    year;
   - the prize `cpu.ipo.win` goes to a plan projected to end the year at the bar with a profit, for a company that
-    has not qualified yet;
+    has not qualified yet, and never in the final year: qualifying then buys nothing;
+  - when `cpu.recruiters.shares` is set, the recruiters a computer player weighs are the head counts of `few` or
+    `many` and, for each share, that share of the people free to assign, rounded to whole people;
   - nothing else changes. In the race nothing changes at all, and no plan has a `goPublic` key.
 
 - [ ] **Step 1: Write the failing tests**
@@ -1631,15 +1692,27 @@ it.each(KINDS)("a %s goes public in the first year it qualifies, and not before"
   expect(chooseCpuPlan(viewFor(qualified, 1), kind, 1, CAREER_TEST).goPublic).toBe(true);
   expect(chooseCpuPlan(viewFor(notYetQualified, 1), kind, 1, CAREER_TEST).goPublic).toBe(false);
 });
-it("the baseline bot does the same", () => {
-  expect(baselinePlan(viewFor(qualified, 0), CAREER_TEST).goPublic).toBe(true);
+it("the baseline bot does the same, and asks for no raise in the year it lists", () => {
+  // seat 0 of `qualified` opens the year with under three years of cash, so the bot would otherwise raise
+  expect(baselinePlan(viewFor(qualified, 0), CAREER_TEST)).toMatchObject({ goPublic: true, raisePercent: 0 });
   expect(baselinePlan(viewFor(notYetQualified, 0), CAREER_TEST).goPublic).toBe(false);
+});
+it("in the year it lists a computer player plans no raise, and sizes its marketing on what the listing brings", () => {
+  // seat 1 of `qualified`: a private Blitzscaler with $100,000 in hand and a listing worth millions
+  const view = viewFor(qualified, 1);
+  const plans = candidatePlans(view, "blitzscaler", CAREER_TEST);
+  expect(plans.every((plan) => plan.goPublic === true && plan.raisePercent === 0)).toBe(true);
+  expect(Math.max(...plans.map((plan) => plan.marketing))).toBeGreaterThan(view.self.cash);
+  for (const plan of plans) {
+    expect(normalizePlanFor(view.self, view.turn, view.rivals, plan, CAREER_TEST, view.climate.multiplier).notes).toEqual([]);
+  }
 });
 it("in the race no plan mentions going public", () => {
   expect("goPublic" in chooseCpuPlan(viewFor(newGame(), 1), "blitzscaler", 1, DESIGN)).toBe(false);
   expect("goPublic" in baselinePlan(viewFor(newGame(), 0), DESIGN)).toBe(false);
 });
 it("a Blitzscaler raises 30% whenever it may, until it is public", () => {
+  // privateBlitz has not qualified to list
   expect(chooseCpuPlan(viewFor(privateBlitz, 1), "blitzscaler", 1, CAREER_TEST).raisePercent).toBe(30);
   expect(chooseCpuPlan(viewFor(publicBlitz, 1), "blitzscaler", 1, CAREER_TEST).raisePercent).toBe(0);
 });
@@ -1654,6 +1727,19 @@ it("plays on its era's numbers (Review Focus 2)", () => {
   // $50M in cash, so that nothing but its era's cap decides whether it recruits
   expect(candidatePlans(viewFor(inFirstEra, 1), "blitzscaler", config).every((plan) => plan.hireLimit === 0)).toBe(true);
   expect(candidatePlans(viewFor(inSecondEra, 1), "blitzscaler", config).some((plan) => (plan.hireLimit ?? 0) > 0)).toBe(true);
+});
+it("weighs recruiters by share of its people once the config says so", () => {
+  // `config` is CAREER_TEST with cpu.recruiters.shares [0.1, 0.2] and a Blitzscaler team cap of 60; `withoutShares` has
+  // the cap alone. `big` has a Blitzscaler with 40 people, $50M in cash, fewer users than the bar and a raise last
+  // year, so nobody is set aside to raise.
+  const recruiters = (plans: readonly Plan[]): number[] => [...new Set(plans.map((plan) => plan.allocation.recruiting))].sort((a, b) => a - b);
+  expect(recruiters(candidatePlans(viewFor(big, 1), "blitzscaler", config))).toEqual([0, 1, 2, 4, 8]);
+  expect(recruiters(candidatePlans(viewFor(big, 1), "blitzscaler", withoutShares))).toEqual([0, 1, 2]);
+});
+it("in the final year it plays for its stake alone", () => {
+  // turn 49: a private, launched Blitzscaler at the bar, with cash, that would close with a profit only by spending nothing
+  expect(candidatePlans(viewFor(lastYearAtBar, 1), "blitzscaler", CAREER_TEST).some((plan) => plan.marketing > 0)).toBe(true);   // not cutting costs to list
+  expect(chooseCpuPlan(viewFor(lastYearAtBar, 1), "blitzscaler", 1, CAREER_TEST).marketing).toBeGreaterThan(0);                // no prize for qualifying too late
 });
 it("never plans more marketing than the cash in hand allows", () => {
   /* every candidate of every kind, for a company with cash and one raising: normalizePlanFor gives no "Marketing set" note */
@@ -1803,9 +1889,17 @@ export interface SimCareer {
 export const runCareer: (seed: number, config?: CareerGameConfig, pilot?: Pilot) => SimCareer;      // pilot plans seat 0; default baselinePlan
 export const runCareerBatch: (careers: number, firstSeed: number, config?: CareerGameConfig, pilot?: Pilot) => SimCareer[];
 
-// src/sim/pilots.ts
-export const neverListPilot: Pilot;                      // the baseline bot, except that it never goes public
-export const overspendPilot: (year: number) => Pilot;    // the baseline bot, except that in `year` it budgets all the marketing the rules allow
+// src/sim/pilots.ts: each pilot is the baseline bot with one change
+export const neverListPilot: Pilot;                         // never goes public
+export const listLastPilot: Pilot;                          // waits to go public until the final year, or until a year it opens
+                                                            // with less than `baseline.raiseRunway` years of cash
+export const overspendPilot: (fromYear: number) => Pilot;   // from `fromYear` until it has been rescued it spends all it can: the
+                                                            // largest marketing budget the rules allow, a third of its people
+                                                            // (at least one) recruiting with no hire limit, taken from Growth
+                                                            // first, and a poach of the rival with the most users among those
+                                                            // the rules let it poach from
+/** The same config with every platform shift switched off: ceilings at 100, waves at 1. The control for the lead target. */
+export const withoutShifts: (config: CareerGameConfig) => CareerGameConfig;
 
 // src/sim/careerReport.ts
 export interface CareerPosition { readonly companies: number; readonly listed: number; readonly users: number; readonly cash: number; readonly headcount: number; readonly quality: number }
@@ -1815,6 +1909,7 @@ export interface CareerSummary {
   readonly newcomerWinShare: number;                               // careers won by a company founded after 1990
   readonly baselineOutShare: number; readonly baselineRescuedShare: number; readonly baselineListedShare: number;
   readonly medianOutYear: number | null; readonly medianListingYear: number | null;
+  readonly playerMedianStake: number;                              // seat 0's founder's stake as the career closes; $0 when it is out
   readonly leaderHeldShare: number;                                // among careers where `leaderHeld` is not null
   readonly rivalsOutPerCareer: number;
   readonly cardHitShare: Readonly<Record<number, number>>;         // by year: how often a card that hits one company found one
@@ -1823,11 +1918,17 @@ export interface CareerSummary {
 }
 export type CareerCheckId = "cpu-cap" | "baseline" | "early-end" | "listed" | "lead";
 export interface CareerCheck { readonly id: CareerCheckId; readonly label: string; readonly pass: boolean; readonly detail: string }
-export interface LoopholeResult { readonly name: string; readonly winShare: number; readonly baselineWinShare: number; readonly flagged: boolean }
+export interface LoopholeResult {
+  readonly name: string; readonly winShare: number; readonly baselineWinShare: number; readonly flagged: boolean;
+  /** The pilot's median final stake over the baseline bot's; null when the baseline bot's is $0. Reported, never flagged on. */
+  readonly stakeRatio: number | null;
+  /** In what share of careers the pilot's company was rescued. */
+  readonly rescuedShare: number;
+}
 export const summarizeCareers: (careers: readonly SimCareer[]) => CareerSummary;
 export const checkCareerTargets: (summary: CareerSummary, targets: CareerTargets, leaderYear: number) => CareerCheck[];
 export const checkLoophole: (name: string, pilot: CareerSummary, baseline: CareerSummary, margin: number) => LoopholeResult;
-export const formatCareerReport: (summary: CareerSummary, checks: readonly CareerCheck[], loopholes: readonly LoopholeResult[], config: CareerGameConfig) => string;
+export const formatCareerReport: (summary: CareerSummary, checks: readonly CareerCheck[], loopholes: readonly LoopholeResult[], config: CareerGameConfig, withoutShifts?: CareerSummary) => string;
 
 // src/sim/args.ts: SimArgs gains `readonly mode?: "career"`, present only for mode=career
 ```
@@ -1836,7 +1937,10 @@ export const formatCareerReport: (summary: CareerSummary, checks: readonly Caree
   reported valuation)`; ties go to the higher valuation, then the lower seat. "Won" means the outcome's winner is the
   same company: same seat, same `founded`. A range target passes on its bounds; the lead target passes only under its
   figure. A pilot is flagged when its win share is above the baseline bot's by more than `loopholeMargin`. Flags are
-  reported, not counted as failed targets.
+  reported, not counted as failed targets. Given a summary of the same batch played without shifts, the report's
+  section on leads also says in what share of careers the leader of `leaderYear` wins there: the lead target can
+  pass for reasons that have nothing to do with C4, and the two figures side by side show how much is the shifts'
+  doing.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -1892,21 +1996,48 @@ describe("the five targets", () => {
   });
 });
 
-describe("the two pilots that look for loopholes", () => {
+describe("the three pilots that look for loopholes", () => {
   it("one is the baseline bot that never goes public", () => {
     expect(baselinePlan(qualifiedView, CAREER_TEST).goPublic).toBe(true);
     expect(neverListPilot(qualifiedView, CAREER_TEST)).toEqual({ ...baselinePlan(qualifiedView, CAREER_TEST), goPublic: false });
   });
-  it("the other spends all it may on marketing in its year, and is the baseline bot in every other", () => {
+  it("one waits to go public until the final year, unless it runs short of cash first", () => {
+    // three views of the same qualified company: in 2010 with cash for ten years, in 2010 with cash for two, and in 2038
+    expect(listLastPilot(qualifiedView, CAREER_TEST)).toEqual({ ...baselinePlan(qualifiedView, CAREER_TEST), goPublic: false });
+    expect(listLastPilot(qualifiedViewShortOfCash, CAREER_TEST)).toEqual(baselinePlan(qualifiedViewShortOfCash, CAREER_TEST));
+    expect(listLastPilot(qualifiedViewIn2038, CAREER_TEST)).toEqual(baselinePlan(qualifiedViewIn2038, CAREER_TEST));
+  });
+  it("one spends all it can from its year on, until it has been rescued", () => {
+    // viewIn1993: not raising, with less cash than the largest marketing budget, and a rival it may poach from
     const plan = overspendPilot(1993)(viewIn1993, CAREER_TEST);
     expect(plan.marketing).toBe(Math.floor(viewIn1993.self.cash / step) * step);
+    expect(plan.allocation.recruiting).toBe(Math.max(1, Math.round(viewIn1993.self.headcount / 3)));
+    expect(plan.hireLimit).toBeNull();
+    expect(plan.poachTarget).toBe(largestRivalIn1993.id);
     expect(normalizePlanFor(viewIn1993.self, 4, viewIn1993.rivals, plan, CAREER_TEST).notes).toEqual([]);
-    expect(overspendPilot(1993)(viewIn1994, CAREER_TEST)).toEqual(baselinePlan(viewIn1994, CAREER_TEST));
+    expect(overspendPilot(1993)(viewIn1992, CAREER_TEST)).toEqual(baselinePlan(viewIn1992, CAREER_TEST));                // not yet
+    expect(overspendPilot(1993)(viewIn1994, CAREER_TEST).hireLimit).toBeNull();                                           // still at it
+    expect(overspendPilot(1993)(viewIn1994Rescued, CAREER_TEST)).toEqual(baselinePlan(viewIn1994Rescued, CAREER_TEST));   // done
   });
   it("is flagged only when it beats the baseline bot by more than the margin", () => {
     expect(checkLoophole("x", { ...passing, winShare: { ...passing.winShare, baseline: 0.26 } }, { ...passing, winShare: { ...passing.winShare, baseline: 0.23 } }, 0.03).flagged).toBe(false);
     expect(checkLoophole("x", { ...passing, winShare: { ...passing.winShare, baseline: 0.27 } }, { ...passing, winShare: { ...passing.winShare, baseline: 0.23 } }, 0.03).flagged).toBe(true);
   });
+  it("says how the pilot's final stake compares, and how often it was rescued", () => {
+    const result = checkLoophole("x", { ...passing, playerMedianStake: 1_200, baselineRescuedShare: 0.9 }, { ...passing, playerMedianStake: 1_000 }, 0.03);
+    expect([result.stakeRatio, result.rescuedShare]).toEqual([1.2, 0.9]);
+    expect(checkLoophole("x", passing, { ...passing, playerMedianStake: 0 }, 0.03).stakeRatio).toBeNull();
+  });
+});
+
+it("the control has every platform shift switched off, and nothing else changed", () => {
+  const control = withoutShifts(CAREER_DESIGN);
+  const effects = control.career.dated.flatMap((card) => card.effects);
+  expect(effects.flatMap((effect) => (effect.kind === "qualityCeiling" ? [effect.ceiling] : []))).toEqual([100, 100, 100, 100]);
+  expect(effects.flatMap((effect) => (effect.kind === "userWave" ? [effect.multiplier] : []))).toEqual([1, 1, 1, 1]);
+  const outline = (config: CareerGameConfig) => config.career.dated.map((card) => [card.id, card.year, card.effects.map((effect) => effect.kind)]);
+  expect(outline(control)).toEqual(outline(CAREER_DESIGN));
+  expect({ ...control, career: { ...control.career, dated: [] } }).toEqual({ ...CAREER_DESIGN, career: { ...CAREER_DESIGN.career, dated: [] } });
 });
 
 it("an override can give an era a number it did not set", () => {
@@ -1918,11 +2049,13 @@ it("an override of a base number that every era sets is refused, with the way to
   expect(() => applyOverrides(CAREER_DESIGN, { salary: 90_000 })).toThrow(
     "salary has no effect: every era sets its own (use career.eras.<n>.values.salary)");
 });
-it("the report speaks in years and shows every target and both pilots", () => {
+it("the report speaks in years and shows every target, the three pilots and the control", () => {
   expect(text.split("\n")[0]).toBe("Career simulation: 20 careers, 1990 to 2038");
   for (const check of checks) expect(text).toContain(check.label);
   expect(text).toContain("Never goes public");
-  expect(text).toContain("Overspends in 1993");
+  expect(text).toContain("Goes public in the final year");
+  expect(text).toContain("Overspends from 1993 until rescued");
+  expect(text).toContain("with the platform shifts switched off");
   expect(text).not.toMatch(/\bturn \d/i);
 });
 ```
@@ -1953,23 +2086,30 @@ The three modules and the `mode` argument. `applyOverrides` learns two things ab
 changes nothing for one without: a path under `career.eras.<n>.values.` may name a number the era does not set yet,
 as long as the base config has it (the era gains it); and a path that names a base number every era sets is refused,
 because it would change nothing. `scripts/sim.ts` with `mode=career`: applies the overrides to `CAREER`,
-runs three batches on the same seeds (the baseline bot, `neverListPilot`, `overspendPilot(sim.overspendYear)`),
+runs five batches on the same seeds (the baseline bot; `neverListPilot`; `listLastPilot`;
+`overspendPilot(sim.overspendYear)`; and the baseline bot again on `withoutShifts` of the config),
 prints `formatCareerReport`, the seeds and the time taken, the overrides, then
 `formatChanges(changedNumbers(CAREER_DESIGN, CAREER))`. `games=` sets the number of careers. `strict=1` exits with 1
 when a target fails. Without `mode=career` the script does exactly what it does today. Update `USAGE`. The report's
-sections, in order: who wins (by style, and how many winners were newcomers); the baseline bot's career; leads;
-rivals; typical position at each checkpoint year; dated cards that hit one company, with how often each found one;
-loophole checks, where the overspending pilot's line also says in what share of careers it was rescued in its year
-(a pilot that is never rescued has not tried the loophole); targets.
+sections, in order: who wins (by style, and how many winners were newcomers); the baseline bot's career; leads,
+with the same figure for the batch without shifts; rivals; typical position at each checkpoint year; dated cards
+that hit one company, with how often each found one; loophole checks, one line a pilot (its win share beside the
+baseline bot's, its median final stake as a multiple of the baseline bot's, in what share of careers it was
+rescued, and whether it is flagged: an overspending pilot that is never rescued has not tried the loophole);
+targets.
 
 `docs/career-rules.md` gains a section "How the simulator measures the targets", with these as rulings: "A win is
 counted under the style the winning company plays, a newcomer's included." "The baseline bot's career 'ends early'
-when its company is out at the end, which takes two failures." "It 'goes public' if it lists in any year." "The
+when its company is out at the end, which takes two failures; a second failure in 2038 itself counts, because the
+company is out when the standings are drawn." "It 'goes public' if it lists in any year." "The
 leader of 2010 is the company not out with the largest founder's stake as 2010 closes; it 'wins' if the winner of
 2038 is that same company, same seat and same founding year; careers with no company in the game in 2010 are left
 out of the figure." "A loophole pilot is flagged when its win share beats the baseline bot's on the same seeds by more
 than `loopholeMargin`; a flag is reported, not counted as a failed target." "A range target passes on its bounds;
-the lead target passes only under its figure."
+the lead target passes only under its figure." "The control for the lead target is the same batch with every
+platform shift switched off (ceilings at 100, waves at 1): the difference between the two lead figures is what the
+shifts do." "Whether a pilot is flagged is decided on 5,000 careers (Task 17, Step 4): at 1,000 the difference
+between two win shares moves by one to two points from chance alone."
 
 - [ ] **Step 4: Run the tests, the checks, and the script both ways**
 
@@ -1983,7 +2123,7 @@ Expected: exit code 0; the first line is `Career simulation: 20 careers, 1990 to
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src scripts docs package.json README.md && git commit -m "sim: a career mode with the five targets and two loophole pilots"
+git add src scripts docs package.json README.md && git commit -m "sim: a career mode with the five targets, three loophole pilots and a control for the lead"
 ```
 
 ---
@@ -2030,7 +2170,8 @@ a second failure is rescued again; the board votes in the year after a rescue; a
 below $0; the ceiling multiplies quality instead of capping it; a dated card is subject to the chance roll; the
 marketing limit ignores the year's raise; candidates may go below none; a newcomer enters after one year; the
 player's seat is refilled; the moving bill is worked out on the head count at the start of the year; hires may pass
-150; a career ends when one company is left. For each break no test catches, add the test that does.
+150; a career ends when one company is left; what a company still needs to qualify is read against last year's
+bar; a rescue's cash is worked out at next year's salary. For each break no test catches, add the test that does.
 
 - [ ] **Step 5: Run the checks and commit**
 
@@ -2062,18 +2203,27 @@ Change numbers in `CAREER` only. Try a change first with `set=` on 300 careers
 (`npm run sim:career -- games=300 set=career.eras.2.values.salary=90000`), and keep it only if it moves a failing
 target without breaking a passing one. Work in this order, because each stage decides what the next can see:
 
-1. Careers work at all: a startup can launch and live through the first era, companies reach the later eras, and
-   the baseline bot's career ends early in 10% to 30%.
-2. Leads, which is the test of C4: with careers working, vary only the shifts' numbers (ceiling, wave), the eras'
-   markets and the quality numbers, until the leader of 2010 wins in under 60%. This stage has a budget of 30
-   trial settings. Nothing else is tuned until it holds or has gone to the owner (Step 3).
-3. Listing: bars and markets such that the baseline bot goes public in 40% to 80%.
+1. Careers work at all: a startup can launch and live through the first era; every style's typical team grows
+   with its era (in the report's positions no style sits for years at one or two people, or on cash worth twenty
+   years of its costs); companies fail, and the baseline bot's career ends early in 10% to 30%. The plan's review
+   played a first draft of the starting numbers: the baseline bot won every career and nobody ever failed. Expect
+   this stage to move many numbers.
+2. Leads, which is the test of C4: with careers working, vary only the shifts' numbers (the ceiling first, down to
+   the launch bar; then the wave), the eras' markets and the quality numbers, until the leader of 2010 wins in
+   under 60%. This stage has a budget of 30 trial settings. Nothing else is tuned until it holds or has gone to the
+   owner (Step 3). Record the figure without shifts beside it each time. If the target holds but the two figures are
+   within five points of each other, the shifts are not what overturns leads: say so in the Tuning log and in the
+   report to the owner.
+3. Listing: bars and markets such that the baseline bot goes public in 40% to 80%, and the computer players'
+   appetite for it (`cpu.ipo`, `cpu.ipoPushLayoffs`) such that none guts its team to list. Then `listing.hype`,
+   until the pilot that waits for the final year is not flagged: the review measured a final stake about 20% larger
+   for a company that lists in 2038, because the listing's hype lands in the valuation that decides the career.
 4. Who wins: the computer players' weights, caps and thresholds, until no style is over 40% and the baseline bot
    wins 15% to 35%. Then re-check stages 1 to 3.
 
-Two numbers are tuned for what they let the simulator see, not for a target: `sim.overspendYear`, until the
-overspending pilot is rescued in its year in a clear majority of careers, and the `qualityBelow` of a dated card that
-finds a target in under half of careers.
+Two numbers are tuned for what they let the simulator see, not for a target: `sim.overspendYear`, if the
+overspending pilot is rescued in fewer than nine careers in ten, and the `qualityBelow` of a dated card that finds a
+target in under half of careers.
 
 What may change: any number of `CAREER`, except those the tests of "what tuning may not change in a career" pin. A
 computer player's logic may change only when numbers cannot do it, with a failing test first and a ruling. A rule C1
@@ -2082,21 +2232,28 @@ to C11 may not change.
 - [ ] **Step 3: Stop and ask the owner if**
 
 - the leader of 2010 still wins in 60% or more of careers when stage 2's budget is spent: bring C4 back to the owner
-  with the measurements before tuning anything else, as the spec says; or
+  with the measurements before tuning anything else, as the spec says. Bring the figure with the shifts, the figure
+  without them, and the two ways out the review saw: the other reading of the rule (the ceiling holds through the
+  whole shift year, so that year's Product work cannot lift a product above it), and a ceiling that lifts over
+  several years; or
 - any target cannot be reached without changing a rule; or
-- a loophole pilot stays flagged whatever the numbers.
+- a loophole pilot stays flagged whatever the numbers. For the pilot that lists in the final year the ways out are
+  the owner's too: no listing in the final year, or hype from a listing that does not count in the year it is given.
 
 - [ ] **Step 4: Confirm on five batches**
 
 Run `npm run sim:career` with `seed=1`, `seed=100001`, `seed=110001`, `seed=120001` and `seed=130001`.
-Expected: all five targets PASS in all five batches and neither pilot is flagged in any. Run `npm run sim`.
+Expected: all five targets PASS in all five batches. Run `npm run sim:career -- games=5000 seed=200001`.
+Expected: no pilot is flagged. (Flags on the batches of 1,000 go into the log but do not decide: at that size
+chance alone moves the difference by one to two points.) Run `npm run sim`.
 Expected: the race's report as it was before this plan.
 
 - [ ] **Step 5: Write it down**
 
 `docs/career-rules.md`, "Tuning log": every number that differs from its starting value (old, new, why), in the
 order `npm run sim:career` lists them; the table of the five batches; "what the balance rests on" (which behaviours
-of the computer players each target leans on); what was tried and did not work. `README.md`, "Tuning the game": the
+of the computer players each target leans on, and how much of the lead target the platform shifts account for:
+the figure with them and without); what was tried and did not work. `README.md`, "Tuning the game": the
 career's commands (`npm run sim:career`, `games=`, `seed=`, `set=` with an era path, `strict=1`) and where its
 numbers live.
 
@@ -2121,7 +2278,8 @@ Left to that plan on purpose, from the spec's sections in scope here:
 
 - Ending the player's session after a second failure (spec sections 4 and 5.2, C7 and C8). The engine plays on, as
   it does in the race; the store ends the session.
-- The career's save: its own key and version, and the career's record of milestones by year (section 12). The
+- The career's save: its own key and version, a race load that refuses a state carrying career fields (today the
+  save check accepts them when they are well-formed), and the career's record of milestones by year (section 12). The
   record is collected by the store from each year's log, which carries what it needs: `quality.launchedNow`,
   `career.office`, `career.listing`, `career.rescue`, `out` and the log's `entrants`.
 - Every text a player reads about a year, a card or a note in the screens, and the timeline's mark where history
