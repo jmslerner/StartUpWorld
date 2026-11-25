@@ -7,6 +7,20 @@
 
 import { CONFIG } from "../config";
 import {
+  boardPaused,
+  closingValuation,
+  datedHeldCeiling,
+  heldCeiling,
+  hiresWithinCap,
+  listingEffects,
+  listingOf,
+  marketTurn,
+  officeMove,
+  peopleCap,
+  rulesForTurn,
+  withMoving,
+} from "./career";
+import {
   churnRate,
   clamp,
   departmentWork,
@@ -15,6 +29,7 @@ import {
   newUsersForTurn,
   nextQuality,
   poachChance,
+  poachFloor,
   pullOf,
   qualityGain,
   raiseAmount,
@@ -26,7 +41,7 @@ import {
 } from "./formulas";
 import { handOutCandidates } from "./hiring";
 import { normalizePlanFor } from "./plan";
-import type { CompanyReport, CompanyView, CostBreakdown, Plan, PublicCompany, RulesConfig } from "./types";
+import type { CareerReport, CompanyReport, CompanyView, CostBreakdown, Plan, PublicCompany, RulesConfig } from "./types";
 
 /** What the rivals are expected to do to this turn's market. */
 export interface RivalEstimate {
@@ -55,10 +70,13 @@ export interface Projection {
   readonly usersWon: number;
   readonly users: number;
   readonly revenue: number;
-  /** Hiring is costed for every hire wanted, so cash errs on the low side. */
+  /** Hiring is costed for every hire the year can make, so cash errs on the low side. */
   readonly costs: CostBreakdown;
   readonly cash: number;
-  /** Cash if it wins no users at all this quarter and makes every hire it wants: it cannot end lower. */
+  /**
+   * Cash if it wins no users at all this year and pays for every hire the year can make (those a rival's poach may make
+   * room for at the last office included), the poach it plans and any move: it cannot end lower.
+   */
   readonly cashFloor: number;
   readonly profitable: boolean;
   readonly runway: number | null;
@@ -73,26 +91,47 @@ export interface Projection {
   readonly poachChance: number | null;
   /** Chance the board fires the founder at the end of this turn. */
   readonly boardRisk: number;
+  /** Career only: the listing as the turn would close it, and the office move (set by the office rules). */
+  readonly career?: { readonly listing: CareerReport["listing"]; readonly office: CareerReport["office"] };
 }
 
 const inPlay = (rival: PublicCompany): boolean => rival.out === null && rival.launched;
 
-/** Where a rival's quality is heading if it keeps building as it did last quarter. */
-const nextQualityGuess = (rival: PublicCompany, config: RulesConfig): number => {
+/** The quality a rival closed last year with: in a career it is public, and a card may have cut it since. */
+const closedQuality = (rival: PublicCompany): number => rival.career?.qualityAtLastClose ?? rival.quality;
+
+/**
+ * Where a rival's quality is heading if it keeps building as it did last quarter, from the quality it has now. Its
+ * gain last quarter is read from the quality it closed with. In a career, a rival that closed last year at a ceiling
+ * that held through it showed no build rate: it is taken to put its whole team on Product (ruling 40). In a year with
+ * a ceiling that holds, no higher than that.
+ */
+const nextQualityGuess = (rival: PublicCompany, ceiling: number | null, lastCeiling: number | null, rules: RulesConfig): number => {
   const last = rival.lastQuarter;
-  if (last === null || last.qualityAtOpen >= 100) return rival.quality;
-  const lastGain = rival.quality - last.qualityAtOpen + config.quality.decay;
-  const gain = Math.max(0, lastGain) * ((100 - rival.quality) / (100 - last.qualityAtOpen));
-  return clamp(rival.quality + gain - config.quality.decay, 0, 100);
+  let heading = rival.quality;
+  if (lastCeiling !== null && closedQuality(rival) === lastCeiling) {
+    const product = effectiveWork(rival.headcount, rules.archetypes.startup.workExponent);
+    heading = nextQuality(rival.quality, qualityGain(rival.quality, product, 1, rules), rules);
+  } else if (last !== null && last.qualityAtOpen < 100) {
+    const lastGain = closedQuality(rival) - last.qualityAtOpen + rules.quality.decay;
+    const gain = Math.max(0, lastGain) * ((100 - rival.quality) / (100 - last.qualityAtOpen));
+    heading = clamp(rival.quality + gain - rules.quality.decay, 0, 100);
+  }
+  return ceiling === null ? heading : Math.min(heading, ceiling);
 };
 
 /**
  * Rivals' pull and churn this turn, from public information. Once this company has a quarter of
  * its own in the market, each rival's pull last quarter follows from the users it won (the pool is
  * split in proportion to pull), and is then carried forward along the rival's public quality and
- * hype trend. Before that, a rival's pull is a guess from its public stats.
+ * hype trend: from the quality it closed with to where its quality is heading. Before that, or for a rival that
+ * closed at 0, a rival's pull is a guess from its public stats.
  */
 export const estimateRivals = (view: CompanyView, config: RulesConfig = CONFIG): RivalEstimate => {
+  const rules = rulesForTurn(config, view.turn);
+  const ceiling = heldCeiling(view.event, config);
+  // In a career, the ceiling that held through last year by its dated card, if one did.
+  const lastCeiling = datedHeldCeiling(view.turn - 1, config);
   const { self } = view;
   const pullPerUserWon = self.lastPull !== null && self.lastQuarter !== null && self.lastQuarter.usersWon > 0 ? self.lastPull / self.lastQuarter.usersWon : null;
   let pull = 0;
@@ -100,18 +139,19 @@ export const estimateRivals = (view: CompanyView, config: RulesConfig = CONFIG):
   for (const rival of view.rivals) {
     if (rival.out !== null) continue;
     const guessFrom = (quality: number): number =>
-      quality * config.projection.rivalPullGuess * config.priceTiers[rival.price].pullFactor * (1 + rival.hype / 100);
+      quality * rules.projection.rivalPullGuess * rules.priceTiers[rival.price].pullFactor * (1 + rival.hype / 100);
     if (!rival.launched) {
       // Not in the market yet, but it will be if its product keeps improving at this rate.
-      const heading = nextQualityGuess(rival, config);
-      if (heading >= config.quality.launchAt) pull += guessFrom(heading);
+      const heading = nextQualityGuess(rival, ceiling, lastCeiling, rules);
+      if (heading >= rules.quality.launchAt) pull += guessFrom(heading);
       continue;
     }
-    churn += Math.min(rival.users, Math.round(rival.users * churnRate(rival.quality, rival.price, config)));
+    churn += Math.min(rival.users, Math.round(rival.users * churnRate(rival.quality, rival.price, rules)));
     const last = rival.lastQuarter;
-    if (pullPerUserWon !== null && last !== null && rival.quality > 0) {
+    const closed = closedQuality(rival);
+    if (pullPerUserWon !== null && last !== null && closed > 0) {
       const lastPull = pullPerUserWon * last.usersWon;
-      const qualityTrend = nextQualityGuess(rival, config) / rival.quality;
+      const qualityTrend = nextQualityGuess(rival, ceiling, lastCeiling, rules) / closed;
       const hypeTrend = (1 + rival.hype / 100) / (1 + last.hypeAtOpen / 100);
       pull += lastPull * qualityTrend * hypeTrend;
     } else {
@@ -122,11 +162,11 @@ export const estimateRivals = (view: CompanyView, config: RulesConfig = CONFIG):
 };
 
 /** Hires this company can expect: the real hand-out, with every rival assumed to want a few and to win ties. */
-const expectedHires = (view: CompanyView, wanted: number, layoffs: number, config: RulesConfig): number => {
-  const candidates = config.hiring.candidatesPerTurn + view.modifiers.extraCandidates + view.freedPeople + layoffs;
+const expectedHires = (view: CompanyView, wanted: number, layoffs: number, rules: RulesConfig): number => {
+  const candidates = rules.hiring.candidatesPerTurn + view.modifiers.extraCandidates + view.freedPeople + layoffs;
   const bids = [
     { id: view.self.id, hype: view.self.hype, tieKey: 1, wanted },
-    ...view.rivals.filter((rival) => rival.out === null).map((rival) => ({ id: rival.id, hype: rival.hype, tieKey: 0, wanted: config.projection.rivalHireGuess })),
+    ...view.rivals.filter((rival) => rival.out === null).map((rival) => ({ id: rival.id, hype: rival.hype, tieKey: 0, wanted: rules.projection.rivalHireGuess })),
   ];
   return handOutCandidates(candidates, bids).hired[view.self.id] ?? 0;
 };
@@ -137,19 +177,23 @@ export const projectTurn = (
   config: RulesConfig = CONFIG,
   rivals: RivalEstimate = estimateRivals(view, config),
 ): Projection => {
+  const rules = rulesForTurn(config, view.turn);
   const { self } = view;
-  const checked = normalizePlanFor(self, view.turn, view.rivals, plan, config);
+  const checked = normalizePlanFor(self, view.turn, view.rivals, plan, rules, view.climate.multiplier);
   const resolved = checked.plan;
-  const archetype = config.archetypes[self.archetype];
+  const archetype = rules.archetypes[self.archetype];
   const payroll = self.headcount - resolved.layoffs;
 
   let raise: Projection["raise"] = null;
   if (resolved.raisePercent > 0) {
-    const valuation = valuationOf(self.users, self.hype, view.climate.multiplier, config);
+    const valuation = valuationOf(self.users, self.hype, view.climate.multiplier, rules);
     raise = { percent: resolved.raisePercent, valuation, amount: raiseAmount(valuation, resolved.raisePercent) };
   }
-  const equity = raise ? round6(self.founderEquity * (1 - raise.percent / 100)) : self.founderEquity;
-  const investorSeats = self.investorSeats + (raise ? 1 : 0);
+  // In a career a listing closes with the raise step, as in the turn.
+  const listing = resolved.goPublic === true ? listingOf(self, view.climate.multiplier, rules) : null;
+  const listed = listing === null ? null : listingEffects(self, rules);
+  const equity = listed !== null ? listed.equity : raise ? round6(self.founderEquity * (1 - raise.percent / 100)) : self.founderEquity;
+  const investorSeats = listed !== null ? listed.investorSeats : self.investorSeats + (raise ? 1 : 0);
 
   const effective = effectiveWork(payroll, archetype.workExponent);
   const work = {
@@ -161,51 +205,74 @@ export const projectTurn = (
 
   const rivalQualities = view.rivals.filter(inPlay).map((rival) => rival.quality);
   const catchUp = archetype.catchUpMultiplier > 1 && rivalQualities.length > 0 && self.quality < Math.max(...rivalQualities);
-  const quality = nextQuality(self.quality, qualityGain(self.quality, work.product, catchUp ? archetype.catchUpMultiplier : 1, config), config);
-  const launchedNow = !self.launched && quality >= config.quality.launchAt;
+  const built = nextQuality(self.quality, qualityGain(self.quality, work.product, catchUp ? archetype.catchUpMultiplier : 1, rules), rules);
+  // In a career, a ceiling that holds through the year caps the quality Product work reaches, as in the turn.
+  const ceiling = heldCeiling(view.event, config);
+  const quality = ceiling === null ? built : Math.min(built, ceiling);
+  const launchedNow = !self.launched && quality >= rules.quality.launchAt;
   const launched = self.launched || launchedNow;
 
   const pull = launched
-    ? pullOf({ quality, growthWork: work.growth, marketing: resolved.marketing, tier: resolved.price, hype: self.hype, marketingModifier: view.modifiers.marketing }, config)
+    ? pullOf({ quality, growthWork: work.growth, marketing: resolved.marketing, tier: resolved.price, hype: self.hype, marketingModifier: view.modifiers.marketing }, rules)
     : 0;
-  const usersChurned = launched ? Math.min(self.users, Math.round(self.users * churnRate(quality, resolved.price, config))) : 0;
-  const pool = newUsersForTurn(view.turn, view.modifiers.newUsers, config) + view.carryOverUsers + usersChurned + rivals.churn;
+  const usersChurned = launched ? Math.min(self.users, Math.round(self.users * churnRate(quality, resolved.price, rules))) : 0;
+  const newUsers = newUsersForTurn(marketTurn(config, view.turn), view.modifiers.newUsers * (view.wave?.multiplier ?? 1), rules);
+  const pool = newUsers + view.carryOverUsers + usersChurned + rivals.churn;
   const share = pull > 0 ? pull / (pull + rivals.pull) : 0;
   const usersWon = Math.round(pool * share);
   const users = self.users - usersChurned + usersWon;
 
   const target = resolved.poachTarget === null ? undefined : view.rivals.find((rival) => rival.id === resolved.poachTarget);
-  const odds = target === undefined ? null : poachChance(self.hype, target.hype, config);
+  const odds = target === undefined ? null : poachChance(self.hype, target.hype, rules);
 
-  const hiresWanted = Math.min(hiringCapacity(work.recruiting, config), resolved.hireLimit ?? Number.MAX_SAFE_INTEGER);
-  const hires = expectedHires(view, hiresWanted, resolved.layoffs, config);
+  // In a career the hires wanted are capped by the last office as in the turn, with room counted from the payroll
+  // alone: the most hires the year can make, which it makes when the planned poach fails (ruling 35).
+  const poachedIn = odds === null ? 0 : 1;
+  const recruitable = Math.min(hiringCapacity(work.recruiting, rules), resolved.hireLimit ?? Number.MAX_SAFE_INTEGER);
+  const hiresWanted = hiresWithinCap(recruitable, payroll, rules);
+  const hires = expectedHires(view, hiresWanted, resolved.layoffs, rules);
+  // At the last office's size the turn lets a team hire into the room a rival's poach leaves. The projection cannot
+  // know the rivals' plans, so it costs the most hires the year can make: room for one more for each rival still in
+  // the game, as each can take one person, while the team stays large enough to be poached from.
+  const poachable = rules.career === undefined ? 0 : Math.max(0, Math.min(view.rivals.filter((rival) => rival.out === null).length, payroll - poachFloor(rules) + 1));
+  const hiresAtMost = hiresWithinCap(recruitable, payroll - poachable, rules);
 
-  const revenue = revenueOf(users, resolved.price, config);
-  const salaries = payroll * config.salary;
-  const hiring = hiresWanted * config.hiring.fee;
-  const poaching = odds === null ? 0 : config.poach.cost;
-  const severance = resolved.layoffs * config.layoff.severance;
-  const costs: CostBreakdown = { salaries, marketing: resolved.marketing, hiring, poaching, severance, total: salaries + resolved.marketing + hiring + poaching + severance };
-  const cash = self.cash + (raise?.amount ?? 0) + revenue - costs.total;
+  const revenue = revenueOf(users, resolved.price, rules);
+  const salaries = payroll * rules.salary;
+  const hiring = hiresAtMost * rules.hiring.fee;
+  const poaching = odds === null ? 0 : rules.poach.cost;
+  const severance = resolved.layoffs * rules.layoff.severance;
+  const yearCosts: CostBreakdown = { salaries, marketing: resolved.marketing, hiring, poaching, severance, total: salaries + resolved.marketing + hiring + poaching + severance };
+  // In a career the office move is worked out as in the turn, on the largest team the year can end with: every wanted
+  // hire and the planned poach, never more than the last office holds. Its bill errs high.
+  const career = rules.career === undefined ? undefined : self.career;
+  const office =
+    career === undefined || rules.career === undefined
+      ? null
+      : officeMove(career.office, Math.min(payroll + hiresWanted + poachedIn, peopleCap(rules.career)), rules);
+  const costs = career === undefined ? yearCosts : withMoving(yearCosts, office);
+  const cash = self.cash + (raise?.amount ?? 0) + (listing?.amount ?? 0) + revenue - costs.total;
   const runway = runwayOf(cash, revenue, costs.total);
 
-  const grew = self.usersAtLastClose > 0 && users >= self.usersAtLastClose * (1 + config.hype.growthThreshold);
+  const grew = self.usersAtLastClose > 0 && users >= self.usersAtLastClose * (1 + rules.hype.growthThreshold);
   const hype = round4(
     clamp(
-      self.hype * (1 - config.hype.decay) +
-        (launchedNow ? config.hype.launch : 0) +
-        (raise ? config.hype.raise : 0) +
-        (grew ? config.hype.growth : 0) +
-        (resolved.layoffs > 0 ? config.layoff.hype : 0),
+      self.hype * (1 - rules.hype.decay) +
+        (launchedNow ? rules.hype.launch : 0) +
+        (raise ? rules.hype.raise : 0) +
+        (grew ? rules.hype.growth : 0) +
+        (resolved.layoffs > 0 ? rules.layoff.hype : 0) +
+        (listed !== null ? listed.hype : 0),
       0,
       100,
     ),
   );
 
-  const badQuarter = users < self.usersAtLastClose || (runway !== null && runway < config.board.runwayTurns);
-  const boardRisk = investorSeats > self.founderSeats && badQuarter ? config.board.fireChance : 0;
+  const badQuarter = users < self.usersAtLastClose || (runway !== null && runway < rules.board.runwayTurns);
+  // In a career the board does not vote in the year after a rescue. The projection does not predict a rescue.
+  const boardRisk = investorSeats > self.founderSeats && badQuarter && !boardPaused(self, view.turn) ? rules.board.fireChance : 0;
 
-  return {
+  const projection: Projection = {
     plan: resolved,
     notes: checked.notes,
     work,
@@ -224,15 +291,17 @@ export const projectTurn = (
     revenue,
     costs,
     cash,
-    cashFloor: self.cash + (raise?.amount ?? 0) + revenueOf(self.users - usersChurned, resolved.price, config) - costs.total,
+    cashFloor: self.cash + (raise?.amount ?? 0) + (listing?.amount ?? 0) + revenueOf(self.users - usersChurned, resolved.price, rules) - costs.total,
     profitable: revenue >= costs.total,
     runway,
     hype,
-    valuation: valuationOf(users, hype, view.climate.multiplier, config),
+    valuation: closingValuation(valuationOf(users, hype, view.climate.multiplier, rules), self, listing !== null, rules),
     hiresWanted,
     hires,
     headcount: payroll + hires,
     poachChance: odds,
     boardRisk,
   };
+  // A career's projection says what the year would do to the company's career; a race projection has no such key.
+  return rules.career === undefined ? projection : { ...projection, career: { listing, office } };
 };

@@ -100,6 +100,7 @@ export const STREAM = {
   cpuNoise: 8,
   names: 9,
   poachTarget: 10,
+  entrant: 11,
 } as const;
 
 /**

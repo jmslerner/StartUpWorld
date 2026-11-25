@@ -1,5 +1,6 @@
 import { useId, useRef } from "react";
 import type { RulesConfig } from "../../engine/types";
+import { careerHelp } from "../careerHelp";
 import { count, money, percent } from "../format";
 import { PRIMARY } from "../styles";
 import { useDialog } from "../useDialog";
@@ -11,6 +12,18 @@ interface HowToPlayProps {
 
 /** The rules in a dozen lines. */
 export const HowToPlay = ({ config }: HowToPlayProps) => {
+  if (config.career !== undefined) {
+    return (
+      <dl className="space-y-2.5 text-xs leading-relaxed text-mist">
+        {careerHelp(config).map((section) => (
+          <div key={section.title}>
+            <dt className="font-semibold text-gray-100">{section.title}</dt>
+            <dd>{section.text}</dd>
+          </div>
+        ))}
+      </dl>
+    );
+  }
   const prices = config.priceTiers;
   const sizes = config.raise.options;
   const raiseSizes = sizes.length > 1 ? `${sizes.slice(0, -1).join(", ")} or ${sizes[sizes.length - 1]}` : String(sizes[0]);

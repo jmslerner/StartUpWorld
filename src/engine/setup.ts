@@ -1,48 +1,67 @@
 // A new game: every company at its archetype's starting state, turn 1, no event.
+// With a career's config each company also gets its career facts, and the state its wave of new users. The first
+// year's dated card, if it has one, is dealt with the game.
 
 import { CONFIG } from "../config";
-import type { Company, GameSetup, GameState, RulesConfig } from "./types";
+import { datedCardFor, officeFor, rulesForTurn } from "./career";
+import { applyEvent } from "./events";
+import type { ActiveEvent, Company, CompanyId, GameSetup, GameState, RulesConfig, SeatSetup } from "./types";
+
+/**
+ * A company as it takes its seat on a turn: its archetype's start in that turn's numbers. In a career it also gets
+ * its career facts, with `founded` that turn: 1 for the first four, the entry year for a newcomer.
+ */
+export const seatCompany = (id: CompanyId, seat: SeatSetup, config: RulesConfig, turn: number): Company => {
+  const rules = rulesForTurn(config, turn);
+  const start = rules.archetypes[seat.archetype];
+  const company: Company = {
+    id,
+    name: seat.name,
+    pitch: seat.pitch,
+    archetype: seat.archetype,
+    controller: seat.controller,
+    cash: start.cash,
+    headcount: start.headcount,
+    users: start.users,
+    quality: start.quality,
+    launched: start.quality >= rules.quality.launchAt,
+    hype: start.hype,
+    price: "standard",
+    founderEquity: start.founderEquity,
+    founderSeats: start.founderSeats,
+    investorSeats: start.investorSeats,
+    lastRaise: null,
+    lastQuarter: null,
+    out: null,
+    lastPlan: {
+      allocation: start.allocation,
+      marketing: 0,
+      price: "standard",
+      raisePercent: 0,
+      poachTarget: null,
+      layoffs: 0,
+      hireLimit: null,
+    },
+    usersAtLastClose: start.users,
+    headcountAtLastClose: start.headcount,
+    lastRevenue: null,
+    lastCosts: null,
+    lastPull: null,
+  };
+  // Career facts come last, and only in a career: a race company has no such key.
+  const { career } = rules;
+  if (career === undefined) return company;
+  return {
+    ...company,
+    career: { founded: turn, office: officeFor(start.headcount, career), listed: null, rescue: null, qualityAtLastClose: start.quality, qualified: false },
+  };
+};
 
 export const createGame = (setup: GameSetup, config: RulesConfig = CONFIG): GameState => {
   if (setup.seats.length < 2) throw new Error("A game needs at least two companies.");
-  const companies: Company[] = setup.seats.map((seat, id) => {
-    const start = config.archetypes[seat.archetype];
-    return {
-      id,
-      name: seat.name,
-      pitch: seat.pitch,
-      archetype: seat.archetype,
-      controller: seat.controller,
-      cash: start.cash,
-      headcount: start.headcount,
-      users: start.users,
-      quality: start.quality,
-      launched: start.quality >= config.quality.launchAt,
-      hype: start.hype,
-      price: "standard",
-      founderEquity: start.founderEquity,
-      founderSeats: start.founderSeats,
-      investorSeats: start.investorSeats,
-      lastRaise: null,
-      lastQuarter: null,
-      out: null,
-      lastPlan: {
-        allocation: start.allocation,
-        marketing: 0,
-        price: "standard",
-        raisePercent: 0,
-        poachTarget: null,
-        layoffs: 0,
-        hireLimit: null,
-      },
-      usersAtLastClose: start.users,
-      headcountAtLastClose: start.headcount,
-      lastRevenue: null,
-      lastCosts: null,
-      lastPull: null,
-    };
-  });
-  return {
+  const { career } = config;
+  const companies = setup.seats.map((seat, id) => seatCompany(id, seat, config, 1));
+  const state: GameState = {
     turn: 1,
     companies,
     carryOverUsers: 0,
@@ -51,5 +70,22 @@ export const createGame = (setup: GameSetup, config: RulesConfig = CONFIG): Game
     event: null,
     modifiers: { newUsers: 1, marketing: 1, extraCandidates: 0 },
     outcome: null,
+  };
+  if (career === undefined) return state;
+  // The same for the state's wave of new users: at rest until a platform shift sets one off.
+  const started: GameState = { ...state, wave: { multiplier: 1, turnsLeft: 0 } };
+  const card = datedCardFor(1, config);
+  if (card === null) return started;
+  // There is no seed to pick a target with yet, so the first year's card hits no one company.
+  const event: ActiveEvent = { cardId: card.id, targetId: null };
+  const dealt = applyEvent(started, event, config);
+  return {
+    ...started,
+    companies: dealt.companies,
+    carryOverUsers: dealt.carryOverUsers,
+    climate: dealt.climate,
+    event,
+    modifiers: dealt.modifiers,
+    wave: dealt.wave ?? started.wave,
   };
 };

@@ -31,7 +31,7 @@ export const serializeSave = (save: SavedGame): string => JSON.stringify({ versi
  * The saved draft as the planning panel may hold it: every number legal, and people left without a
  * department still without one. Only a split holding more people than there are is refitted.
  */
-const loadedDraft = (game: GameState, draft: Plan, config: RulesConfig): Plan => {
+export const loadedDraft = (game: GameState, draft: Plan, config: RulesConfig): Plan => {
   const checked = normalizePlan(game, PLAYER_ID, draft, config).plan;
   const saved = [draft.allocation.product, draft.allocation.growth, draft.allocation.recruiting];
   const available = checked.allocation.product + checked.allocation.growth + checked.allocation.recruiting;

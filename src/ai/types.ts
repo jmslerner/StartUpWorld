@@ -64,8 +64,16 @@ export interface CpuConfig {
   readonly ipoPushLayoffs: readonly number[];
   /** Layoffs it weighs when short of cash: these head counts, then these shares of the team (1 = everyone but one). */
   readonly troubleLayoffs: { readonly counts: readonly number[]; readonly shares: readonly number[] };
-  /** Recruiters it weighs: `few`, or `many` once at least `manyFrom` people are free to assign. */
-  readonly recruiters: { readonly few: readonly number[]; readonly many: readonly number[]; readonly manyFrom: number };
+  /**
+   * Recruiters it weighs: `few`, or `many` once at least `manyFrom` people are free to assign; and, when `shares` is
+   * set, these shares of the people free to assign as well. The race's config does not set it.
+   */
+  readonly recruiters: {
+    readonly few: readonly number[];
+    readonly many: readonly number[];
+    readonly manyFrom: number;
+    readonly shares?: readonly number[];
+  };
   /** How much of the value it gives product quality over its horizon it also gives a bigger team. */
   readonly teamGrowthShare: number;
   /** Score of a plan projected to end below $0, less a point per $1M of shortfall: under every plan that survives. */
@@ -100,4 +108,29 @@ export interface SimConfig {
   readonly games: number;
   readonly firstSeed: number;
   readonly targets: BalanceTargets;
+}
+
+/** What the career's simulator checks. Shares are 0–1. */
+export interface CareerTargets {
+  readonly maxCpuWinShare: number;
+  readonly baselineWinShare: readonly [number, number];
+  /** Careers in which the baseline bot ends early, by failing twice. */
+  readonly baselineOutShare: readonly [number, number];
+  readonly baselineListedShare: readonly [number, number];
+  /** The leader of `leaderYear` wins in less than this share of careers. */
+  readonly leaderHoldsBelow: number;
+}
+
+export interface CareerSimConfig {
+  readonly careers: number;
+  readonly firstSeed: number;
+  /** The year whose leader is checked against `leaderHoldsBelow`. */
+  readonly leaderYear: number;
+  /** The years the simulator reports on. */
+  readonly checkpointYears: readonly number[];
+  /** The year a pilot starts spending past its means, to see whether a deliberate rescue pays. */
+  readonly overspendYear: number;
+  /** How far a pilot may beat the baseline bot before it is reported as a loophole. */
+  readonly loopholeMargin: number;
+  readonly targets: CareerTargets;
 }

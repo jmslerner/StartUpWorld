@@ -3,9 +3,19 @@
 
 const sign = (value: number): string => (value < 0 ? "-" : "");
 
-/** $950, $420K, $1.23M, $37.5M, $250M; a minus goes before the dollar sign. */
+/**
+ * Career only: a 49-year career can pass $1B, which then reads "$1.07B" and not "$1069M". The race never turns this
+ * on, so every figure it shows stays exactly as it was. The app sets it from the mode in play (App.tsx).
+ */
+let billions = false;
+export const moneyInBillions = (on: boolean): void => {
+  billions = on;
+};
+
+/** $950, $420K, $1.23M, $37.5M, $250M (and, in a career, $1.07B); a minus goes before the dollar sign. */
 export const money = (value: number): string => {
   const abs = Math.abs(value);
+  if (billions && abs >= 999_500_000) return `${sign(value)}$${(Math.round(abs / 10_000_000) / 100).toFixed(2)}B`;
   if (abs < 1_000) return `${sign(value)}$${Math.round(abs)}`;
   if (abs < 999_500) return `${sign(value)}$${Math.round(abs / 1_000)}K`;
   if (abs < 9_995_000) return `${sign(value)}$${(Math.round(abs / 10_000) / 100).toFixed(2)}M`;
@@ -45,3 +55,16 @@ export const runwayText = (runway: number | null): string => {
 /** How long something that counts the quarter under way still lasts: a funding climate with 2 turns left ends after the next quarter. */
 export const quartersLeft = (turnsLeft: number): string =>
   turnsLeft <= 1 ? "this quarter only" : turnsLeft === 2 ? "this quarter and the next" : `this quarter and ${turnsLeft - 1} more`;
+
+/** Runway in years, cut to one decimal like runwayText; null means the last year was profitable. */
+export const yearRunwayText = (runway: number | null): string => {
+  if (runway === null) return "profitable";
+  if (runway <= 0) return "0 years";
+  if (runway > 40) return "40+ years";
+  const text = (Math.floor(runway * 10) / 10).toFixed(1);
+  return `${text} ${text === "1.0" ? "year" : "years"}`;
+};
+
+/** How long something that counts the year under way still lasts: a climate with 2 years left ends after the next year. */
+export const yearsLeft = (turnsLeft: number): string =>
+  turnsLeft <= 1 ? "this year only" : turnsLeft === 2 ? "this year and the next" : `this year and ${turnsLeft - 1} more`;

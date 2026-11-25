@@ -4,7 +4,8 @@
 
 import { findCard } from "../engine/events";
 import { effectiveWork, founderStake, hiringCapacity, marketingPull, poachChance, poachFloor, raiseAmount, revenueOf, round6, runwayOf, valuationOf } from "../engine/formulas";
-import { raiseBlocker, type RaiseBlocker } from "../engine/plan";
+import { boardPaused, closingValuation, hiresWithinCap, peopleCap, rulesForTurn } from "../engine/career";
+import { marketingRoom, raiseBlocker, type RaiseBlocker } from "../engine/plan";
 import { projectTurn, type Projection } from "../engine/project";
 import { PRICE_TIERS } from "../engine/types";
 import type {
@@ -27,9 +28,11 @@ import type {
 } from "../engine/types";
 import { companyRunway, publicCompany, publicReport, viewFor } from "../engine/view";
 import { PLAYER_ID } from "../state/player";
+import { careerWarnings } from "./careerPlan";
 import { peopleAvailable, unassigned } from "./draft";
-import { count, money, percent, quarter } from "./format";
+import { count, money, percent } from "./format";
 import type { GameEndSound } from "./sound";
+import { wordsFor } from "./words";
 
 const people = (n: number): string => (n === 1 ? "1 person" : `${n} people`);
 
@@ -38,6 +41,15 @@ const people = (n: number): string => (n === 1 ? "1 person" : `${n} people`);
  * what a board means by "users fell". null before its first quarter.
  */
 const usersChange = (last: QuarterStats | null): number | null => (last === null ? null : last.usersWon - last.usersChurned - last.usersLostToEvent);
+
+/**
+ * A company's valuation as shown, by the year's rules: in a career a public company carries the listing premium, as
+ * it does when its year closes. In the race it is the plain valuation.
+ */
+const shownValuation = (company: Company, climateMultiplier: number, rules: RulesConfig): number => {
+  const valuation = valuationOf(company.users, company.hype, climateMultiplier, rules);
+  return rules.career === undefined ? valuation : closingValuation(valuation, company, false, rules);
+};
 
 // ── Resource bar ──
 
@@ -82,22 +94,23 @@ const boardOf = (company: Pick<Company, "founderSeats" | "investorSeats">): Boar
 
 export const resourceView = (game: GameState, config: RulesConfig): ResourceView => {
   const self = game.companies[PLAYER_ID];
-  const valuation = valuationOf(self.users, self.hype, game.climate.multiplier, config);
+  const rules = rulesForTurn(config, game.turn);
+  const valuation = shownValuation(self, game.climate.multiplier, rules);
   return {
     companyName: self.name,
     turn: game.turn,
-    maxTurns: config.game.maxTurns,
+    maxTurns: rules.game.maxTurns,
     cash: self.cash,
-    runway: companyRunway(self, config),
+    runway: companyRunway(self, rules),
     headcount: self.headcount,
-    effectiveWork: effectiveWork(self.headcount, config.archetypes[self.archetype].workExponent),
+    effectiveWork: effectiveWork(self.headcount, rules.archetypes[self.archetype].workExponent),
     users: self.users,
     usersChange: usersChange(self.lastQuarter),
-    ipoUsers: config.ipo.users,
+    ipoUsers: rules.ipo.users,
     hype: self.hype,
     quality: self.quality,
     launched: self.launched,
-    launchAt: config.quality.launchAt,
+    launchAt: rules.quality.launchAt,
     valuation,
     equity: self.founderEquity,
     stake: founderStake(self.founderEquity, valuation),
@@ -190,26 +203,30 @@ export interface PlanningView {
 
 const LEVEL_ORDER: Record<WarningLevel, number> = { danger: 0, caution: 1, note: 2 };
 
-const raiseView = (self: Company, game: GameState, draft: Plan, config: RulesConfig): RaiseView => {
-  const valuation = valuationOf(self.users, self.hype, game.climate.multiplier, config);
-  const blocked = raiseBlocker(self, game.turn, config);
+/** `rules` are the year's. */
+const raiseView = (self: Company, game: GameState, draft: Plan, rules: RulesConfig): RaiseView => {
+  const w = wordsFor(rules);
+  // A raise is paid at the plain valuation; only a public company carries the premium, and it cannot raise.
+  const opening = valuationOf(self.users, self.hype, game.climate.multiplier, rules);
+  const blocked = raiseBlocker(self, game.turn, rules);
   let blockedText: string | null = null;
-  if (blocked === "users") blockedText = `Investors want to see ${config.raise.minUsers.toLocaleString("en-US")} users first.`;
+  if (blocked === "users") blockedText = `Investors want to see ${rules.raise.minUsers.toLocaleString("en-US")} users first.`;
+  if (blocked === "public") blockedText = "A public company cannot raise privately.";
   if (blocked === "cooldown" && self.lastRaise !== null) {
-    const next = self.lastRaise.turn + config.raise.cooldownTurns + 1;
+    const next = self.lastRaise.turn + rules.raise.cooldownTurns + 1;
     blockedText =
-      next > config.game.maxTurns
-        ? `You raised in ${quarter(self.lastRaise.turn)}. There is no time for another raise before the game ends.`
-        : `You raised in ${quarter(self.lastRaise.turn)}. You can raise again in ${quarter(next)}.`;
+      next > rules.game.maxTurns
+        ? `You raised in ${w.when(self.lastRaise.turn)}. There is no time for another raise before ${w.career ? `your career ends in ${w.when(rules.game.maxTurns)}` : "the game ends"}.`
+        : `You raised in ${w.when(self.lastRaise.turn)}. You can raise again in ${w.when(next)}.`;
   }
   const investorSeatsAfter = self.investorSeats + 1;
   return {
     blocked,
     blockedText,
-    valuation,
-    options: config.raise.options.map((option) => ({
+    valuation: shownValuation(self, game.climate.multiplier, rules),
+    options: rules.raise.options.map((option) => ({
       percent: option,
-      amount: raiseAmount(valuation, option),
+      amount: raiseAmount(opening, option),
       equityAfter: round6(self.founderEquity * (1 - option / 100)),
       investorSeatsAfter,
       handsOverBoard: investorSeatsAfter > self.founderSeats && self.investorSeats <= self.founderSeats,
@@ -222,25 +239,37 @@ const raiseView = (self: Company, game: GameState, draft: Plan, config: RulesCon
  * The quarter if fewer new users arrive than expected. The expected figure runs a little high more
  * often than not, so a threshold the plan only just clears is one it could miss.
  */
-const cautiousCase = (self: Company, projection: Projection, config: RulesConfig) => {
-  const users = projection.users - Math.round(projection.usersWon * config.projection.cautiousShortfall);
-  const revenue = revenueOf(users, projection.plan.price, config);
+const cautiousCase = (self: Company, projection: Projection, rules: RulesConfig) => {
+  const users = projection.users - Math.round(projection.usersWon * rules.projection.cautiousShortfall);
+  const revenue = revenueOf(users, projection.plan.price, rules);
   const runway = runwayOf(projection.cash - (projection.revenue - revenue), revenue, projection.costs.total);
   return {
     users,
     profitable: revenue >= projection.costs.total,
     usersFell: users < self.usersAtLastClose,
-    lowRunway: runway !== null && runway < config.board.runwayTurns,
+    lowRunway: runway !== null && runway < rules.board.runwayTurns,
   };
+};
+
+const CASH_CUT = "it cannot exceed the cash in hand.";
+
+/** The engine's marketing note, worded for where the room came from in a career. */
+export const marketingNote = (note: string, proceeds: "raise" | "listing" | null): string => {
+  if (proceeds === null || !note.endsWith(CASH_CUT)) return note;
+  const extra = proceeds === "raise" ? "what the raise brings" : "what going public brings";
+  return `${note.slice(0, -CASH_CUT.length)}it cannot exceed the cash in hand plus ${extra}.`;
 };
 
 export const planningView = (game: GameState, draft: Plan, config: RulesConfig): PlanningView => {
   const self = game.companies[PLAYER_ID];
+  const rules = rulesForTurn(config, game.turn);
+  const career = rules.career;
+  const w = wordsFor(config);
   const view = viewFor(game, PLAYER_ID);
   const projection = projectTurn(view, draft, config);
-  const cautious = cautiousCase(self, projection, config);
+  const cautious = cautiousCase(self, projection, rules);
   const idle = unassigned(self, draft);
-  const raise = raiseView(self, game, draft, config);
+  const raise = raiseView(self, game, draft, rules);
 
   const warnings: Warning[] = [];
   const warn = (level: WarningLevel, text: string): void => {
@@ -248,86 +277,100 @@ export const planningView = (game: GameState, draft: Plan, config: RulesConfig):
   };
 
   if (projection.cash < 0) {
-    warn("danger", `This plan is expected to end the quarter at ${money(projection.cash)}. Below $0 you go bankrupt.`);
+    // A career's own warning for this case comes with its screens.
+    if (career === undefined) warn("danger", `This plan is expected to end the ${w.period} at ${money(projection.cash)}. Below $0 you go bankrupt.`);
   } else if (projection.cashFloor < 0) {
-    warn("caution", `Cash only stays above $0 if you win new users. With none, the quarter would end at ${money(projection.cashFloor)}.`);
+    warn("caution", `Cash only stays above $0 if you win new users. With none, the ${w.period} would end at ${money(projection.cashFloor)}.`);
   }
   // Clears the bar and turns a profit even in the cautious case: the company lists, and a listing ends the game
-  // before any board gets to vote.
-  const listing = projection.users >= config.ipo.users && projection.profitable && cautious.users >= config.ipo.users && cautious.profitable;
+  // before any board gets to vote. Only in the race: a career never lists by itself.
+  const listing =
+    career === undefined && projection.users >= rules.ipo.users && projection.profitable && cautious.users >= rules.ipo.users && cautious.profitable;
+  // In a career the board does not vote in the year after a rescue.
+  const boardSitsOut = career !== undefined && boardPaused(self, game.turn);
   if (listing) {
     // Nothing to say about the board.
   } else if (projection.boardRisk > 0) {
-    warn("caution", `Investors control your board and this quarter looks bad to them: a ${percent(projection.boardRisk)} chance they fire you.`);
-  } else if (projection.investorSeats > self.founderSeats && (cautious.usersFell || cautious.lowRunway)) {
-    const what = cautious.usersFell ? "your users would fall" : `runway would drop under ${config.board.runwayTurns} turns`;
-    warn("caution", `Close call: with ${percent(config.projection.cautiousShortfall)} fewer new users than expected, ${what}. That is a ${percent(config.board.fireChance)} chance your board fires you.`);
+    warn("caution", `Investors control your board and this ${w.period} looks bad to them: a ${percent(projection.boardRisk)} chance they fire you.`);
+  } else if (!boardSitsOut && projection.investorSeats > self.founderSeats && (cautious.usersFell || cautious.lowRunway)) {
+    const what = cautious.usersFell ? "your users would fall" : `runway would drop under ${w.units(rules.board.runwayTurns)}`;
+    warn("caution", `Close call: with ${percent(rules.projection.cautiousShortfall)} fewer new users than expected, ${what}. That is a ${percent(rules.board.fireChance)} chance your board fires you.`);
   }
   const chosenRaise = raise.options.find((option) => option.selected);
   if (chosenRaise?.handsOverBoard && projection.raise !== null) {
-    warn("caution", `This raise gives investors the majority of your board, ${chosenRaise.investorSeatsAfter} seats to your ${self.founderSeats}. After a bad quarter they can fire you.`);
+    warn("caution", `This raise gives investors the majority of your board, ${chosenRaise.investorSeatsAfter} seats to your ${self.founderSeats}. After a bad ${w.period} they can fire you.`);
   }
-  if (projection.users >= config.ipo.users) {
-    const usersInHand = cautious.users >= config.ipo.users;
+  if (career === undefined && projection.users >= rules.ipo.users) {
+    const usersInHand = cautious.users >= rules.ipo.users;
     if (!projection.profitable) {
       warn("caution", `${usersInHand ? "You have" : "You may reach"} the users to go public, but not the profit: revenue ${money(projection.revenue)} against costs ${money(projection.costs.total)}.`);
     } else if (listing) {
-      warn("note", `On course to go public this quarter: ${count(config.ipo.users)} users and a profitable quarter.`);
+      warn("note", `On course to go public this quarter: ${count(rules.ipo.users)} users and a profitable quarter.`);
     } else {
-      warn("note", `You could go public this quarter: it takes ${count(config.ipo.users)} users and a profit, and this plan only gets there if you win the users you expect.`);
+      warn("note", `You could go public this quarter: it takes ${count(rules.ipo.users)} users and a profit, and this plan only gets there if you win the users you expect.`);
     }
   }
   if (!self.launched) {
-    if (projection.launchedNow) warn("note", "Your product launches this quarter and starts winning users.");
-    else warn("note", `Your product launches at quality ${config.quality.launchAt}. This plan takes it to ${Math.floor(projection.quality)}.`);
+    if (projection.launchedNow) warn("note", `Your product launches this ${w.period} and starts winning users.`);
+    else warn("note", `Your product launches at quality ${rules.quality.launchAt}. This plan takes it to ${Math.floor(projection.quality)}.`);
   }
   if (idle > 0) warn("note", `${people(idle)} unassigned: they will be put to work for you, following your split.`);
+  const proceeds = projection.plan.goPublic === true ? "listing" : projection.plan.raisePercent > 0 ? "raise" : null;
   for (const note of projection.notes) {
     // The split being refitted is what the line above already says.
-    if (!note.startsWith("Team split refitted")) warn("note", note);
+    if (!note.startsWith("Team split refitted")) warn("note", marketingNote(note, proceeds));
   }
-  if (game.turn >= config.game.maxTurns) {
+  if (career === undefined && game.turn >= rules.game.maxTurns) {
     warn("note", "Final quarter. If nobody goes public, the largest founder's stake (equity × valuation) wins.");
   }
+  // A career's own warnings: going public, the rescue, the office move and the final year.
+  if (career !== undefined) warnings.push(...careerWarnings(game, draft, projection, config));
+
+  // In a career nobody more can join a team that fills the last office.
+  const staying = self.headcount - draft.layoffs;
+  const full = career !== undefined && staying >= peopleCap(career);
+  const fullReason = career === undefined ? null : `Your ${career.offices[career.offices.length - 1].name.toLowerCase()} is full: nobody more can join.`;
+  const room = marketingRoom(self, projection.plan, game.climate.multiplier, rules);
 
   return {
     available: peopleAvailable(self, draft),
     unassigned: idle,
     workDone: projection.work.product + projection.work.growth + projection.work.recruiting,
     projection,
-    prices: PRICE_TIERS.map((tier) => ({ tier, ...config.priceTiers[tier], selected: draft.price === tier })),
+    prices: PRICE_TIERS.map((tier) => ({ tier, ...rules.priceTiers[tier], selected: draft.price === tier })),
     raise,
     poach: {
-      cost: config.poach.cost,
+      cost: rules.poach.cost,
       options: view.rivals
         .filter((rival) => rival.out === null)
         .map((rival) => {
-          const allowed = rival.headcount >= poachFloor(config);
+          const bigEnough = rival.headcount >= poachFloor(rules);
+          const allowed = !full && bigEnough;
           return {
             id: rival.id,
             name: rival.name,
             headcount: rival.headcount,
-            chance: poachChance(self.hype, rival.hype, config),
+            chance: poachChance(self.hype, rival.hype, rules),
             allowed,
-            reason: allowed ? null : `Too small to poach from: a company needs ${people(poachFloor(config))}.`,
+            reason: allowed ? null : full ? fullReason : `Too small to poach from: a company needs ${people(poachFloor(rules))}.`,
             selected: draft.poachTarget === rival.id,
           };
         }),
     },
     hiring: {
-      capacity: hiringCapacity(projection.work.recruiting, config),
+      capacity: hiresWithinCap(hiringCapacity(projection.work.recruiting, rules), staying, rules),
       wanted: projection.hiresWanted,
       expected: projection.hires,
-      fee: config.hiring.fee,
-      candidates: config.hiring.candidatesPerTurn + game.modifiers.extraCandidates + game.freedPeople + projection.plan.layoffs,
+      fee: rules.hiring.fee,
+      candidates: rules.hiring.candidatesPerTurn + game.modifiers.extraCandidates + game.freedPeople + projection.plan.layoffs,
     },
-    layoffs: { count: draft.layoffs, max: Math.max(0, self.headcount - 1), severance: config.layoff.severance, hype: config.layoff.hype },
+    layoffs: { count: draft.layoffs, max: Math.max(0, self.headcount - 1), severance: rules.layoff.severance, hype: rules.layoff.hype },
     marketing: {
       amount: draft.marketing,
-      step: config.pull.marketingStep,
-      max: config.pull.maxMarketing,
+      step: rules.pull.marketingStep,
+      max: room === null ? rules.pull.maxMarketing : Math.min(rules.pull.maxMarketing, room),
       effect: game.modifiers.marketing,
-      pull: marketingPull(projection.plan.marketing, game.modifiers.marketing, config),
+      pull: marketingPull(projection.plan.marketing, game.modifiers.marketing, rules),
     },
     warnings: warnings.sort((a, b) => LEVEL_ORDER[a.level] - LEVEL_ORDER[b.level]),
   };
@@ -355,11 +398,13 @@ export interface RivalRow {
   readonly out: Exit | null;
 }
 
-export const rivalsView = (game: GameState, config: RulesConfig): RivalRow[] =>
-  game.companies
+export const rivalsView = (game: GameState, config: RulesConfig): RivalRow[] => {
+  const rules = rulesForTurn(config, game.turn);
+  return game.companies
     .filter((company) => company.id !== PLAYER_ID)
-    .map(publicCompany)
-    .map((rival) => ({
+    .map((company) => ({ rival: publicCompany(company), company }))
+    // A listing is public: the premium reads nothing else of the company.
+    .map(({ rival, company }) => ({
       id: rival.id,
       name: rival.name,
       pitch: rival.pitch,
@@ -370,7 +415,7 @@ export const rivalsView = (game: GameState, config: RulesConfig): RivalRow[] =>
       hype: rival.hype,
       price: rival.price,
       launched: rival.launched,
-      valuation: valuationOf(rival.users, rival.hype, game.climate.multiplier, config),
+      valuation: shownValuation(company, game.climate.multiplier, rules),
       equity: rival.founderEquity,
       board: boardOf(rival),
       investorControlled: rival.investorSeats > rival.founderSeats,
@@ -378,6 +423,7 @@ export const rivalsView = (game: GameState, config: RulesConfig): RivalRow[] =>
       lastQuarter: rival.lastQuarter,
       out: rival.out,
     }));
+};
 
 // ── Event banner ──
 
@@ -549,7 +595,7 @@ export interface EndView {
   readonly standings: readonly Standing[];
 }
 
-const TYPE_LABEL: Record<Controller, string> = {
+export const TYPE_LABEL: Record<Controller, string> = {
   human: "You",
   baseline: "Baseline bot",
   blitzscaler: "Blitzscaler",
@@ -572,10 +618,11 @@ export const endView = (game: GameState, config: RulesConfig): EndView | null =>
   const self = game.companies[PLAYER_ID];
   const outcome = game.outcome;
   if (self.out === null && outcome === null) return null;
+  const rules = rulesForTurn(config, game.turn);
 
   const standings: Standing[] = game.companies
     .map((company) => {
-      const valuation = company.out === null ? valuationOf(company.users, company.hype, game.climate.multiplier, config) : 0;
+      const valuation = company.out === null ? valuationOf(company.users, company.hype, game.climate.multiplier, rules) : 0;
       return {
         id: company.id,
         name: company.name,
@@ -601,7 +648,7 @@ export const endView = (game: GameState, config: RulesConfig): EndView | null =>
   const you = standings.find((standing) => standing.you);
   const winner = standings.find((standing) => standing.winner);
   const turn = self.out?.turn ?? outcome?.turn ?? game.turn;
-  const when = quarter(turn);
+  const when = wordsFor(config).when(turn);
 
   let kind: EndKind;
   if (self.out !== null) kind = self.out.reason;

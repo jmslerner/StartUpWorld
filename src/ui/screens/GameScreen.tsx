@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useRef, useState } from "react";
-import { CONFIG } from "../../config";
+import { rulesForTurn } from "../../engine/career";
 import type { Plan } from "../../engine/types";
 import { PLAYER_ID } from "../../state/player";
 import { gameStore, useGame } from "../../state/useGame";
@@ -9,17 +9,25 @@ import { PlanningPanel } from "../components/PlanningPanel";
 import { ProjectionCard } from "../components/ProjectionCard";
 import { QuarterReport } from "../components/QuarterReport";
 import { ResourceBar } from "../components/ResourceBar";
+import { careerEndView } from "../careerEnd";
+import { listingView, officeMoveView } from "../careerPlan";
+import { careerReportView, rivalCareerRows } from "../careerReport";
+import { careerStatusView, datedYear, timelineView } from "../careerTimeline";
+import { CareerStatus } from "../components/CareerStatus";
 import { RivalsPanel } from "../components/RivalsPanel";
 import { SoundMenu } from "../components/SoundMenu";
-import { money, quarter } from "../format";
+import { Timeline } from "../components/Timeline";
+import { YearSummary } from "../components/YearSummary";
+import { money } from "../format";
 import { SFX } from "../sound";
 import { BUTTON, BUTTON_ON, LABEL, PRIMARY, TONE } from "../styles";
 import { SETTLE_MS } from "../useDialog";
 import { endView, eventView, planningView, reportView, resourceView, rivalsView } from "../viewModel";
+import { wordsFor } from "../words";
 
 type Tab = "plan" | "rivals";
 
-/** The game itself: resources on top, the plan and the rivals side by side, the report over everything after each quarter. */
+/** The game itself: resources on top, the plan and the rivals side by side, the report over everything after each year or quarter. */
 export const GameScreen = () => {
   const game = useGame((state) => state.game);
   const draft = useGame((state) => state.draft);
@@ -31,16 +39,39 @@ export const GameScreen = () => {
   const closeReport = useGame((state) => state.closeReport);
   const openReport = useGame((state) => state.openReport);
   const abandon = useGame((state) => state.abandon);
+  const leave = useGame((state) => state.leave);
+  const config = useGame((state) => state.config);
+  const record = useGame((state) => state.record);
+  const words = useMemo(() => wordsFor(config), [config]);
 
   const [tab, setTab] = useState<Tab>("plan");
   const [helpOpen, setHelpOpen] = useState(false);
   const [confirmingQuit, setConfirmingQuit] = useState(false);
+  // A career's report opens on the year in brief; the full report is one button away. Reset as the report closes,
+  // so every opening starts on the summary.
+  const [fullReport, setFullReport] = useState(false);
 
-  const resource = useMemo(() => (game === null ? null : resourceView(game, CONFIG)), [game]);
-  const planning = useMemo(() => (game === null || draft === null ? null : planningView(game, draft, CONFIG)), [game, draft]);
-  const rivals = useMemo(() => (game === null ? [] : rivalsView(game, CONFIG)), [game]);
-  const event = useMemo(() => (game === null ? null : eventView(game.event, game, CONFIG)), [game]);
-  const report = useMemo(() => (game === null || lastLog === null || !reportOpen ? null : reportView(game, lastLog, CONFIG)), [game, lastLog, reportOpen]);
+  const resource = useMemo(() => (game === null ? null : resourceView(game, config)), [game, config]);
+  const planning = useMemo(() => (game === null || draft === null ? null : planningView(game, draft, config)), [game, draft, config]);
+  const rivals = useMemo(() => (game === null ? [] : rivalsView(game, config)), [game, config]);
+  const rivalCareers = useMemo(() => (game === null ? [] : rivalCareerRows(game, config)), [game, config]);
+  const event = useMemo(() => (game === null ? null : eventView(game.event, game, config)), [game, config]);
+  const report = useMemo(
+    () => (game === null || lastLog === null || !reportOpen ? null : reportView(game, lastLog, config)),
+    [game, lastLog, reportOpen, config],
+  );
+  // The report's career lines and the coming card's date; null in a race.
+  const careerReport = useMemo(
+    () => (game === null || lastLog === null || !reportOpen ? null : careerReportView(game, lastLog, record, config)),
+    [game, lastLog, reportOpen, record, config],
+  );
+  const datedNext = useMemo(() => (lastLog === null ? null : datedYear(lastLog.nextEvent, lastLog.turn + 1, config)), [lastLog, config]);
+  // A career's timeline and the year's status; null in a race.
+  const timeline = useMemo(() => (game === null ? null : timelineView(game, record, config)), [game, record, config]);
+  const status = useMemo(() => (game === null ? null : careerStatusView(game, config)), [game, config]);
+  // Going public and the coming office move, as the plan offers them; null in a race.
+  const listing = useMemo(() => (game === null || draft === null ? null : listingView(game, draft, config)), [game, draft, config]);
+  const move = useMemo(() => (planning === null ? null : officeMoveView(planning.projection, config)), [planning, config]);
 
   const onChange = useCallback((plan: Plan) => setDraft(plan), [setDraft]);
 
@@ -49,7 +80,7 @@ export const GameScreen = () => {
 
   const onEndQuarter = useCallback(() => {
     // The report's button can sit right over this one: the second tap of a double tap on it lands here
-    // as the report closes, and must not play a quarter nobody has planned.
+    // as the report closes, and must not play a year or quarter nobody has planned.
     if (performance.now() - reportClosedAt.current < SETTLE_MS) return;
     SFX.tick();
     // Focus leaves the button before the report opens over it: when the report closes, focus comes back to
@@ -63,11 +94,21 @@ export const GameScreen = () => {
   const onCloseReport = useCallback(() => {
     // The ending's sound belongs to the click that reveals it.
     const state = gameStore.getState();
-    const ending = state.over && state.game !== null ? endView(state.game, CONFIG) : null;
+    const ending =
+      !state.over || state.game === null
+        ? null
+        : state.config.career !== undefined
+          ? careerEndView(state.game, state.record, state.config)
+          : endView(state.game, state.config);
     if (ending !== null) SFX.gameOver(ending.sound);
     reportClosedAt.current = performance.now();
+    // The full report opened from the summary, whose button is gone: focus goes back to the top of the page.
+    if (fullReport) titleRef.current?.focus({ preventScroll: true });
+    setFullReport(false);
     closeReport();
-  }, [closeReport]);
+  }, [closeReport, fullReport]);
+
+  const showFullReport = useCallback(() => setFullReport(true), []);
 
   const closeHelp = useCallback(() => setHelpOpen(false), []);
 
@@ -75,7 +116,7 @@ export const GameScreen = () => {
   const company = game.companies[PLAYER_ID];
   const { projection } = planning;
   const cashTone = projection.cash < 0 ? TONE.danger : projection.cashFloor < 0 ? TONE.caution : "text-gray-100";
-  // The most serious thing to know before ending the quarter, if there is one.
+  // The most serious thing to know before ending the year or quarter, if there is one.
   const headline = planning.warnings.find((warning) => warning.level !== "note");
 
   return (
@@ -85,7 +126,8 @@ export const GameScreen = () => {
           <header className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
             <p className={LABEL}>StartUpWorld</p>
             <h1 ref={titleRef} tabIndex={-1} className="order-last w-full min-w-0 truncate text-sm font-semibold text-gray-100 outline-none sm:order-none sm:w-auto sm:flex-1">
-              {resource.companyName} <span className="font-normal text-mist/70">· {quarter(game.turn)} of {resource.maxTurns}</span>
+              {resource.companyName}{" "}
+              <span className="font-normal text-mist/70">· {status !== null ? status.heading : `${words.when(game.turn)} of ${resource.maxTurns}`}</span>
             </h1>
             <div className="flex items-center gap-1.5">
               {lastLog !== null && (
@@ -99,6 +141,11 @@ export const GameScreen = () => {
               <SoundMenu />
               {confirmingQuit ? (
                 <>
+                  {words.career && (
+                    <button type="button" onClick={leave} className={`${BUTTON} px-2 py-1 text-[0.65rem]`}>
+                      Save and leave
+                    </button>
+                  )}
                   <button type="button" onClick={abandon} className="rounded-lg bg-red-500/20 px-2 py-1 text-[0.65rem] font-semibold text-red-400 hover:bg-red-500/30">
                     Abandon game
                   </button>
@@ -114,8 +161,12 @@ export const GameScreen = () => {
             </div>
           </header>
 
-          <ResourceBar view={resource} boardRunwayTurns={CONFIG.board.runwayTurns} />
-          {event !== null && <EventBanner event={event} />}
+          {timeline !== null && <Timeline view={timeline} />}
+          {status !== null && <CareerStatus view={status} />}
+          <ResourceBar view={resource} boardRunwayTurns={rulesForTurn(config, game.turn).board.runwayTurns} words={words} rescueUsed={status !== null && status.rescueYear !== null} />
+          {event !== null && (
+            <EventBanner event={event} words={words} datedYear={datedYear(game.event, game.turn, config)} historyEnds={timeline?.historyEnds ?? null} />
+          )}
 
           <div className="flex gap-1.5 lg:hidden" role="group" aria-label="Show">
             <button type="button" aria-pressed={tab === "plan"} onClick={() => setTab("plan")} className={`${tab === "plan" ? BUTTON_ON : BUTTON} flex-1 py-2 text-xs`}>
@@ -132,26 +183,26 @@ export const GameScreen = () => {
           {/* Wide screens: the plan on the left; its projection and the rivals on the right. Phones: one tab at a time. */}
           <div className="grid items-start gap-3 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
             <div className={tab === "plan" ? "" : "hidden lg:block"}>
-              <PlanningPanel company={company} turn={game.turn} draft={draft} view={planning} config={CONFIG} onChange={onChange} />
+              <PlanningPanel company={company} turn={game.turn} draft={draft} view={planning} config={rulesForTurn(config, game.turn)} words={words} listing={listing} onChange={onChange} />
             </div>
             <div className="space-y-3">
               <div className={tab === "plan" ? "" : "hidden lg:block"}>
-                <ProjectionCard company={company} view={planning} />
+                <ProjectionCard company={company} view={planning} words={words} move={move} />
               </div>
               <div className={tab === "rivals" ? "" : "hidden lg:block"}>
-                <RivalsPanel you={resource} rivals={rivals} />
+                <RivalsPanel you={resource} rivals={rivals} words={words} careers={rivalCareers} />
               </div>
             </div>
           </div>
         </main>
 
-        {/* Always in reach: what the plan does to cash, the most serious warning, and the button that ends the quarter. */}
+        {/* Always in reach: what the plan does to cash, the most serious warning, and the button that ends the year or quarter. */}
         <div className="panel-surface fixed inset-x-0 bottom-0 z-30 rounded-t-xl border-b-0" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
           {/* Narrow screens have no room beside the button: the warning gets lines of its own above it. */}
           {headline !== undefined && <p className={`mx-auto line-clamp-3 w-full max-w-6xl px-3 pt-2 text-[0.7rem] leading-snug md:hidden ${TONE[headline.level]}`}>{headline.text}</p>}
           <div className="mx-auto flex w-full max-w-6xl items-center gap-3 px-3 py-2.5">
             <div className="min-w-0 shrink-0 text-xs">
-              <div className="text-[0.6rem] uppercase tracking-[0.16em] text-mist/60">Cash after {quarter(game.turn)}</div>
+              <div className="text-[0.6rem] uppercase tracking-[0.16em] text-mist/60">Cash after {words.when(game.turn)}</div>
               <div className={`font-semibold tabular-nums ${cashTone}`}>
                 <span className="sm:hidden">≥ </span>
                 <span className="hidden sm:inline">at least </span>
@@ -162,14 +213,19 @@ export const GameScreen = () => {
               {headline?.text}
             </p>
             <button type="button" onClick={onEndQuarter} className={`${PRIMARY} ml-auto shrink-0 md:ml-0`}>
-              End {quarter(game.turn)}
+              End {words.when(game.turn)}
             </button>
           </div>
         </div>
       </div>
 
-      {report !== null && <QuarterReport companyName={resource.companyName} view={report} over={over} onClose={onCloseReport} />}
-      {helpOpen && <HowToPlayDialog config={CONFIG} onClose={closeHelp} />}
+      {report !== null &&
+        (careerReport !== null && !fullReport ? (
+          <YearSummary career={careerReport} view={report} over={over} words={words} onFull={showFullReport} onClose={onCloseReport} />
+        ) : (
+          <QuarterReport companyName={resource.companyName} view={report} over={over} words={words} career={careerReport} datedNext={datedNext} historyEnds={timeline?.historyEnds ?? null} onClose={onCloseReport} />
+        ))}
+      {helpOpen && <HowToPlayDialog config={config} onClose={closeHelp} />}
     </>
   );
 };
