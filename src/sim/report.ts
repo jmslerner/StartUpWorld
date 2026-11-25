@@ -15,7 +15,9 @@ const endingLabel = (kind: EndingKind, maxTurns: number): string =>
   ({ ipo: "IPO", turnLimit: `Turn ${maxTurns}`, lastStanding: "Last one standing", wipeout: "Nobody left" })[kind];
 
 export interface Position {
-  /** Share of games in which this seat was still in the game at the checkpoint. */
+  /** Games that got as far as the checkpoint: one that has already ended has no position to count. */
+  readonly reached: number;
+  /** Of those games, the share in which this seat was still in the game. */
   readonly alive: number;
   /** Medians among those still in the game. */
   readonly users: number;
@@ -83,7 +85,8 @@ export const summarize = (games: readonly SimGame[]): SimSummary => {
       const reached = games.map((game) => game.checkpoints[turn]?.find((s) => s.controller === seat)).filter((s) => s !== undefined);
       const alive = reached.filter((s) => s.inGame);
       return {
-        alive: share(alive.length),
+        reached: reached.length,
+        alive: reached.length === 0 ? 0 : alive.length / reached.length,
         users: median(alive.map((s) => s.users)),
         cash: median(alive.map((s) => s.cash)),
         headcount: median(alive.map((s) => s.headcount)),
@@ -202,6 +205,10 @@ export const formatReport = (summary: SimSummary, checks: readonly Check[], maxT
   for (const turn of CHECKPOINT_TURNS) {
     const positions = summary.positions[turn];
     if (positions === undefined) continue;
+    // "In game" is a share of the games still going at that turn, so say so when some were already over.
+    const reached = positions[SEATS[0]].reached;
+    if (reached === 0) continue;
+    if (reached < summary.games) lines.push(`  T${turn}: ${reached.toLocaleString("en-US")} of ${summary.games.toLocaleString("en-US")} games got this far`);
     for (const seat of SEATS) {
       const p = positions[seat];
       lines.push(row(`T${turn} ${SEAT_LABEL[seat]}`, percent(p.alive), count(p.users), money(p.cash), String(p.headcount), p.quality.toFixed(0)));

@@ -69,6 +69,22 @@ describe("summarize", () => {
       expect(summary.firedShare[controller]).toBeCloseTo(seats.filter((seat) => seat.out === "fired").length / 24, 9);
     }
   });
+
+  it("counts who is still in the game among the games that got to that turn, not among all games", () => {
+    // On the design's numbers most games are over before turn 15: a company that is in every game
+    // still going must read 100%, not the share of games that lasted that long.
+    const turn = 15;
+    const reached = batch.filter((game) => game.checkpoints[turn] !== undefined);
+    expect(reached.length).toBeGreaterThan(0);
+    expect(reached.length).toBeLessThan(batch.length);
+    for (const controller of ["baseline", "blitzscaler", "bootstrapper", "incumbent"] as const) {
+      const inGame = reached.filter((game) => game.checkpoints[turn].find((seat) => seat.controller === controller)!.inGame).length;
+      expect(summary.positions[turn][controller].reached, controller).toBe(reached.length);
+      expect(summary.positions[turn][controller].alive, controller).toBeCloseTo(inGame / reached.length, 9);
+    }
+    expect(summary.positions[turn].incumbent.alive).toBe(1);
+    expect(summary.positions[5].incumbent).toMatchObject({ reached: 24, alive: 1 });
+  });
 });
 
 describe("targets and the printed report", () => {
@@ -120,6 +136,20 @@ describe("targets and the printed report", () => {
     expect(text).toContain("Turn 12");
     expect(text).toContain("at turn 12");
     expect(text).not.toMatch(/turn 20/i);
+  });
+
+  it("says how many games got to a checkpoint when not all of them did", () => {
+    const text = formatReport(healthy, checkTargets(healthy, DESIGN.sim.targets), 20);
+    expect(text).toContain("T15: 6 of 24 games got this far");
+    expect(text).not.toMatch(/T5: \d+ of 24 games/);
+    expect(text).toMatch(/T15 Incumbent\s+100\.0%/);
+  });
+
+  it("leaves out a checkpoint no game got to", () => {
+    const short = applyOverrides(DESIGN, { "game.maxTurns": 12 });
+    const text = formatReport(summarize(runBatch(6, 1, short)), [], 12);
+    expect(text).toContain("T10 Incumbent");
+    expect(text).not.toContain("T15");
   });
 });
 
