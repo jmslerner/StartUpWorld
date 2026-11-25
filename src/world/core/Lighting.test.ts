@@ -81,6 +81,22 @@ describe("Lighting at rest", () => {
     }
   });
 
+  it("keeps the sun on the viewer's left by day and brings it round to the open side at dusk", () => {
+    const { lighting, sun } = makeLighting();
+    lighting.showLook("morning");
+    const morning = sunDirection(sun);
+    // From −X/+Z and high: shadows fall toward +X/−Z, the viewer's right.
+    expect(morning.x).toBeLessThan(0);
+    expect(morning.z).toBeGreaterThan(0);
+    expect(morning.y).toBeGreaterThan(0.75);
+
+    lighting.showLook("dusk");
+    const dusk = sunDirection(sun);
+    expect(dusk.y).toBeLessThan(morning.y);
+    // Mostly from +Z, the side with no wall, so it lights the room instead of shading it.
+    expect(dusk.z).toBeGreaterThan(Math.abs(dusk.x) * 2);
+  });
+
   it("lighting has no clock: two frames a year apart give the same light", () => {
     // Shown on their own, two years of the same office look the same.
     const first = makeLighting();
@@ -155,6 +171,43 @@ describe("Lighting at rest", () => {
     still.lighting.applyFrame(base, null);
     still.lighting.update(FRAME, 0);
     expect(lightOf(moved)).toEqual(lightOf(still));
+  });
+});
+
+describe("Lighting and odd frame lengths", () => {
+  const ODD = [Number.NaN, 0, -1, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY];
+
+  it("a frame whose length is not a positive finite number changes nothing, in a glide", () => {
+    const rig = makeLighting();
+    rig.lighting.showLook("night");
+    rig.lighting.applyFrame(base, base);
+    run(rig.lighting, 0.2);
+    const before = lightOf(rig);
+    for (const dt of ODD) {
+      rig.lighting.update(dt, 0);
+      expect(lightOf(rig)).toEqual(before);
+      expect(rig.lighting.busy()).toBe(true);
+    }
+    // And the light still comes to rest afterwards, on the resting look.
+    run(rig.lighting, 6);
+    expect(rig.lighting.busy()).toBe(false);
+    expect(getLightingState(rig.scene)).toEqual({ duskAmount: 0, daylight: 1 });
+  });
+
+  it("nor in a year's sweep, which still ends on time", () => {
+    const rig = makeLighting();
+    rig.lighting.applyFrame(base, null);
+    rig.lighting.applyFrame(frameOf({ year: baseScene.year + 1 }, base), base);
+    run(rig.lighting, 0.5);
+    const before = lightOf(rig);
+    for (const dt of ODD) {
+      rig.lighting.update(dt, 0);
+      expect(lightOf(rig)).toEqual(before);
+      expect(rig.lighting.busy()).toBe(true);
+    }
+    run(rig.lighting, 1.1);
+    expect(rig.lighting.busy()).toBe(false);
+    expect(getLightingState(rig.scene)).toEqual({ duskAmount: 0, daylight: 1 });
   });
 });
 
@@ -252,6 +305,44 @@ describe("Lighting endings", () => {
     shown.lighting.applyFrame(frameOf({ ending: "lost" }), null);
     shown.lighting.update(FRAME, 0);
     expect(state).toEqual(getLightingState(shown.scene));
+  });
+
+  it("a frame with no events, arriving during the fade, does not hurry it", () => {
+    const hurried = makeLighting();
+    const alone = makeLighting();
+    const lost = frameOf({ ending: "lost" }, base);
+    for (const rig of [hurried, alone]) {
+      rig.lighting.applyFrame(base, null);
+      rig.lighting.applyFrame(lost, base);
+      run(rig.lighting, 0.25);
+    }
+    // The same scene again, as a resize or a re-render sends it.
+    const again = frameOf({ ending: "lost" }, lost);
+    expect(again.events).toEqual([]);
+    hurried.lighting.applyFrame(again, lost);
+    expect(hurried.lighting.busy()).toBe(true);
+    for (let t = 0; t < 3; t += FRAME) {
+      hurried.lighting.update(FRAME, t);
+      alone.lighting.update(FRAME, t);
+      expect(lightOf(hurried)).toEqual(lightOf(alone));
+    }
+    // Still the slow fade three seconds on, not one the normal rate has finished.
+    expect(hurried.lighting.busy()).toBe(true);
+  });
+
+  it("a new goal during the fade is glided to at the normal rate", () => {
+    const { scene, lighting } = makeLighting();
+    const state = getLightingState(scene);
+    const lost = frameOf({ ending: "lost" }, base);
+    lighting.applyFrame(base, null);
+    lighting.applyFrame(lost, base);
+    run(lighting, 2);
+    // Not a case the game produces (a run that has ended stays ended), but the light must not crawl back.
+    const back: WorldFrame = { scene: base.scene, cast: lost.cast, events: [] };
+    lighting.applyFrame(back, lost);
+    run(lighting, 4);
+    expect(lighting.busy()).toBe(false);
+    expect(state).toEqual({ duskAmount: 0, daylight: 1 });
   });
 
   it("the year that ends the run fades to the ending instead of sweeping to a morning", () => {

@@ -231,6 +231,8 @@ export class Lighting implements WorldSystem {
   private readonly shown = copyKey(MORNING, key(0, 0, [0, 1, 0], 0, 0, 0, 0, 0));
   /** Where `shown` is heading. */
   private readonly goal = copyKey(MORNING, key(0, 0, [0, 1, 0], 0, 0, 0, 0, 0));
+  /** The goal before the latest frame, to tell a glide that carries on from one that turns. */
+  private readonly lastGoal = copyKey(MORNING, key(0, 0, [0, 1, 0], 0, 0, 0, 0, 0));
   private readonly sweepFrom = copyKey(MORNING, key(0, 0, [0, 1, 0], 0, 0, 0, 0, 0));
   private readonly shadowCenter = new THREE.Vector3();
   private shadowRadius = 12;
@@ -330,8 +332,8 @@ export class Lighting implements WorldSystem {
   }
 
   applyFrame(next: WorldFrame, prev: WorldFrame | null): void {
+    copyKey(this.goal, this.lastGoal);
     goalKey(next.scene, this.goal);
-    this.rate = NORMAL_RATE;
 
     let snap = prev === null;
     let sweep = false;
@@ -369,12 +371,19 @@ export class Lighting implements WorldSystem {
       this.gliding = false;
     } else if (this.sweepTime < 0) {
       // Anything else leaves a sweep in progress alone (it ends on the goal), and otherwise glides if there is anywhere to go.
+      // A glide already under way to this same goal keeps its rate, so a frame with no news does not hurry an ending's
+      // slow fade. A glide that starts here, or turns to another goal, runs at the normal rate.
+      const sameGlide = this.gliding && keyGap(this.lastGoal, this.goal) === 0;
       this.gliding = keyGap(this.shown, this.goal) > 0;
+      if (this.gliding && !sameGlide) this.rate = NORMAL_RATE;
     }
   }
 
   update(dt: number, elapsed: number): void {
     void elapsed;
+    // A frame of no length, or of a length that is not a number, moves nothing. A NaN let in here would spread to
+    // every light and never leave, and the lighting would report itself busy for good.
+    if (!(dt > 0) || !Number.isFinite(dt)) return;
     if (this.sweepTime >= 0) {
       this.advanceSweep(dt);
     } else if (this.gliding) {

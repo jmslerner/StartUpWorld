@@ -94,7 +94,7 @@ export const C = {
 
 /**
  * Shirt colour per team, and the accent of that team's desks. Three colours far apart in hue, so a team reads as
- * a block of colour from across the office: the old engineering blue, marketing orange and sales green.
+ * a block of colour from across the office.
  */
 export const ROLE_COLORS: Record<Team, number> = {
   product: 0x7dd3fc,
