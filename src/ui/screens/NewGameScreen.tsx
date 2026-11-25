@@ -12,7 +12,7 @@ import { BUTTON, HINT, LABEL, PRIMARY } from "../styles";
 const MAX_SEED = 2_000_000_000;
 
 const MODES: readonly SegmentedOption<Mode>[] = [
-  { key: "race", label: "Quick race", sub: "20 quarters" },
+  { key: "race", label: "Quick race", sub: "5 years" },
   { key: "career", label: "Career", sub: "1990 to 2038" },
 ];
 
