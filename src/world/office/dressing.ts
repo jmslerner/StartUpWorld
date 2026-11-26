@@ -11,6 +11,7 @@
  * Nothing here is interactive, and nothing here changes after the office is
  * built. The signs say plain words: the world is told no company's name.
  */
+import { CAMERA_AZIMUTH } from "../core/CameraRig";
 import { C, NEON, phaseTier, themeFor } from "../core/palette";
 import type { LookId, OfficeIndex } from "../types";
 import { decorSize, getLayoutDecor, groundRect, LOFT_ANNEX_WIDTH, WALL_GAP } from "./layouts";
@@ -124,6 +125,13 @@ export const createDecorProp = (office: OfficeIndex, spot: DecorSpot, look: Look
 
 /** Décor a signature prop may stand in for. Never reception, meeting pods, partitions, couches, tables or games. */
 export const REPLACEABLE_DECOR: readonly DecorKind[] = ["plant", "plant-large", "boxes", "filing-cabinet", "water-cooler", "vending", "bookshelf"];
+
+/**
+ * A spot facing `facing` (front +Z turned by it) shows its front to the camera, which looks from (+X, +Z): a
+ * signature prop stands only on spots like this, so it is never seen from behind.
+ */
+export const facesCamera = (facing: number): boolean =>
+  Math.sin(facing) * Math.sin(CAMERA_AZIMUTH) + Math.cos(facing) * Math.cos(CAMERA_AZIMUTH) > 0;
 
 const NO_SIGNATURES: ReadonlyMap<number, SignatureKind> = new Map();
 

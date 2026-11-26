@@ -26,6 +26,7 @@ import {
   createFloor,
   createOverflowSign,
   createProductWall,
+  createSignatureProp,
   createStation,
   createWall,
   DESK_STYLE_FOR_PHASE,
@@ -35,10 +36,11 @@ import {
   PROP_CATALOG,
   PROP_SETS,
   SCREEN_FOR_TEAM,
+  SIGNATURE_SIZES,
   STATION_FOOTPRINTS,
   wallStyleFor,
 } from "./props";
-import type { CatalogEntry, PropHandle } from "./props";
+import type { CatalogEntry, PropHandle, SignatureKind } from "./props";
 
 const MESH_BUDGET = { hero: 25, decor: 10 } as const;
 
@@ -380,6 +382,18 @@ describe("prop catalog", () => {
       handle.update?.(0.016, 1);
       expect(meshesOf(handle.group).length).toBeGreaterThan(0);
       handle.dispose();
+    }
+  });
+
+  it("builds every signature prop in the spot it needs, within one mesh", () => {
+    for (const kind of Object.keys(SIGNATURE_SIZES) as SignatureKind[]) {
+      const prop = createSignatureProp(kind, SIGNATURE_SIZES[kind], 0);
+      const meshes: THREE.Mesh[] = [];
+      prop.group.traverse((o) => {
+        if ((o as THREE.Mesh).isMesh) meshes.push(o as THREE.Mesh);
+      });
+      expect(meshes.length, kind).toBe(1);
+      prop.dispose();
     }
   });
 });

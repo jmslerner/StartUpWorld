@@ -22,38 +22,49 @@ export type SignatureKind =
   | "foosball"
   | "plant-wall"
   | "ring-light"
-  | "scooter";
+  | "scooter"
+  | "dot-printer"
+  | "pinball"
+  | "box-stack"
+  | "charging-kiosk"
+  | "drinks-fridge"
+  | "compute-cabinet";
 
-const NINETIES: readonly SignatureKind[] = ["fax-machine", "software-shelf", "tube-tv"];
-const NOUGHTIES: readonly SignatureKind[] = ["flat-tv", "beanbag", "foosball"];
-const TWENTIES: readonly SignatureKind[] = ["plant-wall", "ring-light", "scooter"];
+/** The row the two eras still to come borrow until their own props are built. */
+const STAND_IN: readonly SignatureKind[] = ["plant-wall", "ring-light", "scooter"];
 
 /**
- * Each era's three props, in the order they claim a spot. For now each era borrows its decade's row; the eras get
- * rows of their own when their props are built.
+ * Each era's three props, in the order they claim a spot; the first is the one that names the era, and no two eras
+ * share a first.
  */
 export const SIGNATURE_PROPS: Readonly<Record<Exclude<LookId, "classic">, readonly SignatureKind[]>> = {
-  "dial-up": NINETIES,
-  "gold-rush": NINETIES,
-  bust: NOUGHTIES,
-  phones: NOUGHTIES,
-  "cheap-money": NOUGHTIES,
-  "winter-ai": TWENTIES,
-  agents: TWENTIES,
-  ambient: TWENTIES,
+  "dial-up": ["fax-machine", "dot-printer", "tube-tv"],
+  "gold-rush": ["software-shelf", "pinball", "tube-tv"],
+  bust: ["box-stack", "fax-machine", "flat-tv"],
+  phones: ["charging-kiosk", "flat-tv", "beanbag"],
+  "cheap-money": ["foosball", "drinks-fridge", "scooter"],
+  "winter-ai": ["compute-cabinet", "plant-wall", "ring-light"],
+  agents: STAND_IN,
+  ambient: STAND_IN,
 };
 
 /** The least footprint each prop needs (width across its facing, depth). */
 export const SIGNATURE_SIZES: Readonly<Record<SignatureKind, FootprintSize>> = {
   "fax-machine": { width: 0.4, depth: 0.4 },
-  "software-shelf": { width: 0.9, depth: 0.3 },
+  "software-shelf": { width: 0.8, depth: 0.3 },
   "tube-tv": { width: 0.6, depth: 0.5 },
   "flat-tv": { width: 0.7, depth: 0.3 },
   beanbag: { width: 0.45, depth: 0.45 },
-  foosball: { width: 0.9, depth: 0.55 },
+  foosball: { width: 0.8, depth: 0.5 },
   "plant-wall": { width: 0.9, depth: 0.3 },
   "ring-light": { width: 0.4, depth: 0.4 },
   scooter: { width: 0.7, depth: 0.3 },
+  "dot-printer": { width: 0.5, depth: 0.4 },
+  pinball: { width: 0.45, depth: 0.45 },
+  "box-stack": { width: 0.5, depth: 0.4 },
+  "charging-kiosk": { width: 0.4, depth: 0.4 },
+  "drinks-fridge": { width: 0.45, depth: 0.45 },
+  "compute-cabinet": { width: 0.6, depth: 0.5 },
 };
 
 type Draw = (b: ModelBuilder, w: number, d: number, variant: number) => void;
@@ -238,6 +249,152 @@ const drawScooter: Draw = (b, w, d, variant) => {
   for (const sz of [-1, 1]) b.tube([stemX - 0.08, 0.86, sz * (bar - 0.06)], [stemX - 0.08, 0.86, sz * (bar - 0.005)], 0.02, C.black, { seg: 6 });
 };
 
+/** A dot-matrix printer on a little wheeled trolley, a fold of perforated paper feeding in below and out on top. */
+const drawDotPrinter: Draw = (b, w, d) => {
+  const tw = Math.min(w, 0.6) - 0.04;
+  const td = Math.min(d, 0.5) - 0.04;
+  // The trolley: four posts on castors, a shelf low down with the paper box, a top for the printer.
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+    b.box(0.025, 0.6, 0.025, C.greyDark, sx * (tw / 2 - 0.02), 0.05, sz * (td / 2 - 0.02), { r: 0 });
+    b.ball(0.025, C.black, sx * (tw / 2 - 0.02), 0, sz * (td / 2 - 0.02), { seg: 6 });
+  }
+  b.box(tw, 0.025, td, C.greyDark, 0, 0.14, 0, { r: 0.004 });
+  b.box(tw, 0.025, td, C.greyDark, 0, 0.62, 0, { r: 0.004 });
+  b.box(tw * 0.8, 0.1, td * 0.8, C.cardboard, 0, 0.165, 0, { r: 0.004 });
+  b.box(tw * 0.74, 0.012, td * 0.7, C.paper, 0, 0.265, 0, { r: 0 });
+  // The printer: a wide, low body, a darker lid over the platen, a knob on the side.
+  const pw = tw - 0.04;
+  const pd = Math.min(td - 0.06, 0.3);
+  b.box(pw, 0.12, pd, C.bone, 0, 0.645, 0.02, { r: 0.015 });
+  b.box(pw * 0.8, 0.03, pd * 0.45, C.greyLight, 0, 0.765, 0.02 - pd * 0.1, { r: 0.008 });
+  b.box(pw * 0.9, 0.012, 0.01, C.charcoal, 0, 0.72, 0.02 + pd / 2, { r: 0 });
+  b.box(0.04, 0.012, 0.02, C.good, pw / 2 - 0.05, 0.765, 0.02 + pd / 2 - 0.03, { r: 0 });
+  b.cyl(0.03, 0.02, C.charcoal, pw / 2 + 0.005, 0.7, 0.02, { axis: "x", seg: 10 });
+  // Paper: a few printed sheets fanned up out of the back, the fold hanging down from the trolley top.
+  for (let i = 0; i < 3; i += 1) b.box(pw * 0.72, 0.004, 0.09, C.paper, 0, 0.8 + i * 0.02, 0.02 - pd / 2 - 0.02 + i * 0.01, { r: 0, rx: -0.9 + i * 0.12 });
+  b.box(pw * 0.72, 0.34, 0.006, C.paper, 0, 0.29, td / 2 - 0.01, { r: 0 });
+  for (let i = 0; i < 5; i += 1) b.box(pw * 0.72, 0.004, 0.008, C.greyLight, 0, 0.32 + i * 0.06, td / 2 - 0.006, { r: 0 });
+};
+
+/** An upright pinball cabinet: a sloping glass playfield of coloured bumpers on legs, a tall backbox behind. */
+const drawPinball: Draw = (b, w, d, variant) => {
+  const cw = Math.min(w, 0.6) - 0.04;
+  const cd = Math.min(d, 0.6) - 0.04;
+  const body = [C.purple, C.red, C.navy][variant % 3];
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) b.box(0.035, 0.62, 0.035, C.chrome, sx * (cw / 2 - 0.025), 0, sz * (cd / 2 - 0.025), { r: 0 });
+  // The table: a box whose top slopes up toward the back.
+  b.box(cw, 0.22, cd, body, 0, 0.6, 0, { r: 0.01 });
+  b.place(0, 0.84, 0, { rx: 0.12 }, () => {
+    b.box(cw - 0.03, 0.01, cd - 0.03, C.charcoal, 0, -0.005, 0, { r: 0 });
+    // Bumpers and lanes in loud colours, all plain boxes.
+    const bumpers: Array<[number, number, number]> = [
+      [-cw * 0.2, -cd * 0.2, C.yellow],
+      [cw * 0.2, -cd * 0.2, C.teal],
+      [0, -cd * 0.05, C.pink],
+      [-cw * 0.25, cd * 0.15, C.orange],
+      [cw * 0.25, cd * 0.15, C.green],
+    ];
+    for (const [x, z, colour] of bumpers) b.box(0.05, 0.03, 0.05, colour, x, 0.005, z, { r: 0.006 });
+    b.box(0.07, 0.012, 0.016, C.white, -0.05, 0.005, cd / 2 - 0.07, { r: 0, ry: 0.4 });
+    b.box(0.07, 0.012, 0.016, C.white, 0.05, 0.005, cd / 2 - 0.07, { r: 0, ry: -0.4 });
+  });
+  // Side rails, the coin door at the front and the tall backbox.
+  b.box(cw * 0.4, 0.12, 0.01, darken(body, 0.25), 0, 0.64, cd / 2 - 0.004, { r: 0 });
+  b.box(0.05, 0.03, 0.01, C.brass, 0, 0.7, cd / 2 + 0.002, { r: 0 });
+  const bd = 0.1;
+  b.box(cw, 0.6, bd, body, 0, 0.84, -cd / 2 + bd / 2, { r: 0.012 });
+  b.box(cw - 0.06, 0.4, 0.008, lighten(body, 0.25), 0, 0.96, -cd / 2 + bd + 0.004, { r: 0 });
+  for (let i = 0; i < 4; i += 1) b.box(0.05, 0.05, 0.008, [C.yellow, C.pink, C.teal, C.orange][i], -cw * 0.3 + i * cw * 0.2, 1.24, -cd / 2 + bd + 0.008, { r: 0 });
+};
+
+/** Moving boxes stacked and taped shut, ready to go. */
+const drawBoxStack: Draw = (b, w, d, variant) => {
+  const bw = Math.min(w, 0.6) - 0.04;
+  const bd = Math.min(d, 0.5) - 0.04;
+  const layers: Array<[number, number, number, number]> = [
+    // width, depth, height, offset across
+    [bw, bd, 0.34, 0],
+    [bw * 0.86, bd * 0.9, 0.3, (variant % 2 === 0 ? 1 : -1) * bw * 0.04],
+    [bw * 0.62, bd * 0.75, 0.24, (variant % 2 === 0 ? -1 : 1) * bw * 0.08],
+  ];
+  let y = 0;
+  layers.forEach(([lw, ld, lh, x], i) => {
+    const colour = i % 2 === 0 ? C.cardboard : C.cardboardDark;
+    b.box(lw, lh, ld, colour, x, y, 0, { r: 0.006, ry: (i - 1) * 0.05 });
+    // Tape over the top seam and down the front.
+    b.box(0.06, 0.004, ld + 0.002, C.tape, x, y + lh, 0, { r: 0, ry: (i - 1) * 0.05 });
+    b.box(0.06, lh * 0.5, 0.004, C.tape, x, y + lh * 0.5, ld / 2, { r: 0 });
+    y += lh;
+  });
+};
+
+/** A free-standing kiosk of charging slots, a phone or two docked in it, cables looping out. */
+const drawChargingKiosk: Draw = (b, w, d) => {
+  const kw = Math.min(w, 0.5) - 0.06;
+  const kd = Math.min(d, 0.5) - 0.06;
+  b.box(kw + 0.02, 0.04, kd + 0.02, C.charcoal, 0, 0, 0, { r: 0.01 });
+  b.box(kw * 0.5, 0.7, kd * 0.5, C.greyLight, 0, 0.04, 0, { r: 0.02 });
+  // The head: a block with rows of slots on the front.
+  b.box(kw, 0.5, kd, C.white, 0, 0.74, 0, { r: 0.03 });
+  b.box(kw - 0.04, 0.06, 0.01, C.teal, 0, 1.18, kd / 2 - 0.003, { r: 0 });
+  const cols = 3;
+  for (let row = 0; row < 3; row += 1) for (let col = 0; col < cols; col += 1) {
+    const x = -kw / 2 + 0.05 + (col * (kw - 0.1)) / (cols - 1);
+    const y = 0.8 + row * 0.12;
+    b.box(0.06, 0.09, 0.012, C.greyDark, x, y, kd / 2 - 0.004, { r: 0 });
+    if ((row + col) % 3 === 0) b.box(0.045, 0.08, 0.012, C.black, x, y + 0.02, kd / 2 + 0.002, { r: 0.006 });
+    b.box(0.012, 0.012, 0.012, (row + col) % 2 === 0 ? C.good : C.yellow, x + 0.022, y + 0.005, kd / 2 + 0.001, { r: 0 });
+  }
+  // Two cables looping down the front from the head.
+  b.tube([-kw * 0.3, 0.76, kd / 2 - 0.01], [-kw * 0.2, 0.5, kd / 2 - 0.02], 0.006, C.black, { seg: 5 });
+  b.tube([kw * 0.3, 0.76, kd / 2 - 0.01], [kw * 0.15, 0.45, kd / 2 - 0.02], 0.006, C.black, { seg: 5 });
+};
+
+/** A tall glass-fronted fridge of drinks, bottles and cans on bright shelves. */
+const drawDrinksFridge: Draw = (b, w, d, variant) => {
+  const fw = Math.min(w, 0.6) - 0.04;
+  const fd = Math.min(d, 0.6) - 0.04;
+  const h = 1.7;
+  const shell = [C.white, C.greyDark, C.red][variant % 3];
+  b.box(fw, h, fd, shell, 0, 0, 0, { r: 0.015 });
+  b.box(fw - 0.06, h - 0.3, 0.01, C.charcoal, 0, 0.18, fd / 2 - 0.004, { r: 0 });
+  const drinks = [C.red, C.orange, C.green, C.blue, C.yellow, C.purple, C.teal];
+  const shelves = 4;
+  for (let s = 0; s < shelves; s += 1) {
+    const y = 0.22 + s * 0.33;
+    b.box(fw - 0.08, 0.012, 0.012, C.chrome, 0, y, fd / 2 - 0.006, { r: 0 });
+    for (let i = 0; i < 5; i += 1) {
+      const colour = drinks[(i + s * 2 + variant) % drinks.length];
+      const tall = s % 2 === 0 ? 0.2 : 0.12;
+      b.box(0.045, tall, 0.012, colour, -fw / 2 + 0.08 + (i * (fw - 0.16)) / 4, y + 0.015, fd / 2 - 0.004, { r: 0.004 });
+    }
+  }
+  // Glass over it all, a handle, and a lit band at the top.
+  b.box(fw - 0.04, h - 0.26, 0.008, C.glass, 0, 0.16, fd / 2 + 0.006, { r: 0 });
+  b.box(0.02, 0.4, 0.02, C.chrome, fw / 2 - 0.05, 0.7, fd / 2 + 0.006, { r: 0 });
+  b.box(fw - 0.04, 0.08, 0.01, C.lampWarm, 0, h - 0.11, fd / 2 + 0.006, { r: 0 });
+  b.box(fw - 0.02, 0.12, 0.02, darken(shell, 0.3), 0, 0.02, fd / 2 - 0.004, { r: 0 });
+};
+
+/** A cabinet of compute boards behind a mesh door, a row of status lights painted along each board. */
+const drawComputeCabinet: Draw = (b, w, d) => {
+  const cw = Math.min(w, 0.7) - 0.04;
+  const cd = Math.min(d, 0.6) - 0.04;
+  const h = 1.75;
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) b.box(0.04, 0.02, 0.04, C.black, sx * (cw / 2 - 0.04), 0, sz * (cd / 2 - 0.04), { r: 0 });
+  b.box(cw, h - 0.02, cd, C.charcoal, 0, 0.02, 0, { r: 0.012 });
+  b.box(cw - 0.04, h - 0.1, 0.01, C.black, 0, 0.06, cd / 2 - 0.004, { r: 0 });
+  const boards = 9;
+  for (let i = 0; i < boards; i += 1) {
+    const y = 0.12 + i * 0.17;
+    b.box(cw - 0.1, 0.12, 0.014, C.greyDark, 0, y, cd / 2 + 0.002, { r: 0.004 });
+    b.box(cw - 0.22, 0.03, 0.006, C.green, -0.04, y + 0.06, cd / 2 + 0.01, { r: 0 });
+    for (let l = 0; l < 4; l += 1) b.box(0.016, 0.016, 0.006, l === 3 && i % 4 === 1 ? C.alarm : C.good, cw / 2 - 0.12 + l * 0.024, y + 0.05, cd / 2 + 0.01, { r: 0 });
+  }
+  // A vented top.
+  for (let i = 0; i < 4; i += 1) b.box(cw - 0.08, 0.008, 0.03, C.greyDark, 0, h, -cd / 2 + 0.08 + i * ((cd - 0.16) / 3), { r: 0 });
+};
+
 const DRAW: Record<SignatureKind, Draw> = {
   "fax-machine": drawFax,
   "software-shelf": drawSoftwareShelf,
@@ -248,6 +405,12 @@ const DRAW: Record<SignatureKind, Draw> = {
   "plant-wall": drawPlantWall,
   "ring-light": drawRingLight,
   scooter: drawScooter,
+  "dot-printer": drawDotPrinter,
+  pinball: drawPinball,
+  "box-stack": drawBoxStack,
+  "charging-kiosk": drawChargingKiosk,
+  "drinks-fridge": drawDrinksFridge,
+  "compute-cabinet": drawComputeCabinet,
 };
 
 const key = (value: number): string => (Math.round(value * 1000) / 1000).toFixed(3);

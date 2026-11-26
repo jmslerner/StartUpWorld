@@ -54,7 +54,8 @@ import {
   TREE_VARIANTS,
 } from "./decor";
 import { createOverflowSign } from "./markers";
-import { createSignatureProp, SIGNATURE_PROPS, SIGNATURE_SIZES } from "./signature";
+import { createSignatureProp, SIGNATURE_SIZES } from "./signature";
+import type { SignatureKind } from "./signature";
 import type { PropHandle } from "./shared";
 import { SCREEN_KINDS } from "./shared";
 import {
@@ -325,8 +326,8 @@ const decor: CatalogEntry[] = [
   ...Array.from({ length: BACKGROUND_BUILDING_VARIANTS }, (_, variant) =>
     entry({ id: `skyline-${variant}`, set: "decor", label: `background building · ${variant}`, create: () => createBackgroundBuilding(variant, { scale: 0.6 }) })
   ),
-  // Each era's signature props, each once (eras share some), at the least size they are ever given.
-  ...[...new Set(Object.values(SIGNATURE_PROPS).flat())]
+  // Every signature prop, each once (eras share some), at the least size it is ever given.
+  ...(Object.keys(SIGNATURE_SIZES) as SignatureKind[])
     .map((kind) =>
       entry({ id: `signature-${kind}`, set: "decor", label: `signature · ${kind.replace("-", " ")}`, create: () => createSignatureProp(kind, SIGNATURE_SIZES[kind], 0) })
     ),

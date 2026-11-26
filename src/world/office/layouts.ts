@@ -212,10 +212,10 @@ const garagePlan = (): FloorPlan => {
       at(3.5, 0.95, TO_POS_X),
       at(0.0, 1.4, TO_POS_Z),
     ],
-    // What was in the garage before the company was: boxes by the door, a cabinet nobody has opened.
+    // What was in the garage before the company was: boxes along the side wall, a cabinet nobody has opened.
     decor: [
       decor("filing-cabinet", onBackWall(floor, DECOR_SIZES["filing-cabinet"], 2.45)),
-      decor("boxes", at(3.66, -1.5, TO_NEG_X), 2),
+      decor("boxes", onSideWall(floor, DECOR_SIZES.boxes, 2.5), 2),
     ],
   };
 };
