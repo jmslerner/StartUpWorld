@@ -788,6 +788,23 @@ export interface CalendarHandle extends StationHandle {
 const YEAR_DIGITS = 4;
 const SEGMENTS_PER_DIGIT = 7;
 
+/** How wide four digits of the calendar's year are at digit height `digitHeight` (digit 0.55 × h, pitch 0.8 × h). */
+export const yearDisplayWidth = (digitHeight: number): number => digitHeight * (0.55 + (YEAR_DIGITS - 1) * 0.8);
+
+/**
+ * The calendar's page for a calendar `width` wide: it fills the footprint (leaving the day-dots their room beside it
+ * from 1.0 wide), and the year's digits are as tall as fits across the page with 0.02 to spare on either side.
+ */
+export const calendarPage = (width: number): { readonly pageW: number; readonly pageH: number; readonly digitH: number } => {
+  const pageW = width >= 1.0 ? Math.min(1.0, width - 0.36) : width - 0.12;
+  const pageH = pageW * 1.2;
+  const digitH = Math.min((pageW - 0.04) / yearDisplayWidth(1), pageH * 0.3);
+  return { pageW, pageH, digitH };
+};
+
+/** Where the top edge of every calendar's page hangs, so a bigger page grows downwards (clear of the campus ticker). */
+const CALENDAR_PAGE_TOP = 1.892;
+
 /**
  * The year on the calendar's header: 28 bars laid out once, as four seven-segment digits. Each bar is an object named
  * "calendar-segment" whose `visible` says whether it is lit; the lit ones are drawn together by one instanced mesh,
@@ -865,9 +882,11 @@ export const createWallCalendar = (office: OfficeIndex = 2, look: LookId = "clas
   const kit = new PropKit("station:calendar");
   const digital = tier >= 3;
   const wall = wallFaceZ(size.depth);
-  const pageW = Math.min(0.66, size.width - 0.2);
-  const pageH = pageW * 1.2;
-  const pageY = 1.1;
+  const { pageW, pageH, digitH } = calendarPage(size.width);
+  const pageY = CALENDAR_PAGE_TOP - pageH;
+  // The year sits just under the binder rings; the header band reaches down far enough to hold it.
+  const yearY = pageY + pageH - 0.065 - digitH / 2;
+  const headerBottom = Math.min(pageY + pageH * 0.7, yearY - digitH / 2 - 0.02);
   const pageZ = wall + 0.075;
   const header = tier === 0 ? C.red : theme.accents[0];
   const backing = [C.cardboard, theme.accents[1], C.white, C.white, C.brass][tier];
@@ -880,7 +899,7 @@ export const createWallCalendar = (office: OfficeIndex = 2, look: LookId = "clas
     } else {
       // A fat pad of pages, the top one drawn by the texture (or this fallback).
       b.box(pageW, pageH, 0.04, C.bone, 0, pageY, wall + 0.05, { r: 0.004 });
-      b.box(pageW, pageH * 0.3, 0.006, header, 0, pageY + pageH * 0.7, pageZ - 0.004, { r: 0 });
+      b.box(pageW, pageY + pageH - headerBottom, 0.006, header, 0, headerBottom, pageZ - 0.004, { r: 0 });
       b.box(pageW * 0.3, pageH * 0.28, 0.006, C.charcoal, 0, pageY + pageH * 0.18, pageZ - 0.004, { r: 0 });
       // Binder rings.
       for (let i = 0; i < 5; i += 1) b.torus(0.022, 0.007, C.charcoal, -pageW / 2 + 0.07 + (i * (pageW - 0.14)) / 4, pageY + pageH - 0.035, pageZ - 0.01, { axis: "x", seg: 8 });
@@ -914,7 +933,7 @@ export const createWallCalendar = (office: OfficeIndex = 2, look: LookId = "clas
   }
 
   // The year, in the header band at the top of the page, under the binder rings.
-  const setYear = addYearDisplay(kit, 0, pageY + pageH * 0.84, pageZ + 0.006, pageH * 0.16, digital ? NEON : C.white, digital);
+  const setYear = addYearDisplay(kit, 0, yearY, pageZ + 0.006, digitH, digital ? NEON : C.white, digital);
 
   return kit.finish(stationFootprint("calendar", office), { kind: "calendar" as const, office, setYear });
 };

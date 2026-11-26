@@ -8,6 +8,8 @@
  */
 import * as THREE from "three";
 import type { LookId, OfficeIndex, OfficeLayout } from "../types";
+import { mergeStaticChildren } from "./mergeStatic";
+import type { MergedStatic } from "./mergeStatic";
 import type { PropHandle } from "./props";
 import { PropSet } from "./PropSet";
 
@@ -31,9 +33,16 @@ export class StageKit {
   readonly structure = new THREE.Group();
   /** Furniture, scenery, markers: everything that pops in piece by piece. */
   readonly contents = new THREE.Group();
+  /**
+   * The still things of the contents (no animation, no glow, never pointed at), which `mergeStatics` draws as one
+   * mesh per material. It pops in as one piece, at the place of the first still thing.
+   */
+  readonly statics = new THREE.Group();
   readonly props = new PropSet();
   /** Top-level content objects in build order. */
   readonly entrances: THREE.Object3D[] = [];
+  private merged: MergedStatic | null = null;
+  private mergedOnce = false;
 
   constructor(layout: OfficeLayout, look: LookId = "classic") {
     this.office = layout.office;
@@ -42,6 +51,7 @@ export class StageKit {
     this.root.name = `office:${layout.office}`;
     this.structure.name = "structure";
     this.contents.name = "contents";
+    this.statics.name = "statics";
     this.root.add(this.structure, this.contents);
   }
 
@@ -57,6 +67,27 @@ export class StageKit {
     this.props.add(handle, this.contents);
     this.entrances.push(handle.group);
     return handle;
+  }
+
+  /**
+   * Put a prop that never moves, glows or is pointed at into the office. It stays owned by the kit's props (so it is
+   * disposed as before) but hangs under `statics`, to be merged with the other still things by `mergeStatics`.
+   */
+  placeStatic<T extends PropHandle>(handle: T, spot: Spot): T {
+    this.position(handle.group, spot);
+    this.props.add(handle, this.statics);
+    if (this.statics.parent === null) {
+      this.contents.add(this.statics);
+      this.entrances.push(this.statics);
+    }
+    return handle;
+  }
+
+  /** Draw every still thing placed so far as one mesh per material. Call once, after dressing; later calls do nothing. */
+  mergeStatics(): void {
+    if (this.mergedOnce) return;
+    this.mergedOnce = true;
+    this.merged = mergeStaticChildren(this.statics, new Set());
   }
 
   /** Add a ready-made group (e.g. a desk with its chair) to the contents. */
@@ -79,6 +110,8 @@ export class StageKit {
   }
 
   dispose(): void {
+    this.merged?.dispose();
+    this.merged = null;
     this.props.dispose();
     this.entrances.length = 0;
     this.root.removeFromParent();

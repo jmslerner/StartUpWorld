@@ -21,6 +21,7 @@ import {
 } from "../core/palette";
 import { CHAIR_SIZE, DESK_SIZE, STATION_KINDS, STATION_SIZES, WALL_GAP } from "./footprints";
 import {
+  calendarPage,
   createChair,
   createDesk,
   createDoor,
@@ -41,6 +42,7 @@ import {
   SIGNATURE_SIZES,
   STATION_FOOTPRINTS,
   wallStyleFor,
+  yearDisplayWidth,
 } from "./props";
 import type { CatalogEntry, PropHandle, SignatureKind } from "./props";
 
@@ -593,4 +595,15 @@ describe("building kit", () => {
       }
     }
   });
+});
+
+it("draws the calendar's year at least 0.18 tall, and fits it across the page, in every office", () => {
+  for (const width of [0.8, 0.9, 1.0, 1.2, 1.2]) {
+    const { pageW, digitH } = calendarPage(width);
+    expect(digitH).toBeGreaterThanOrEqual(0.18);
+    expect(yearDisplayWidth(digitH)).toBeLessThanOrEqual(pageW - 0.04 + 1e-9);
+    // A calendar of 1.0 or more keeps room for its day-dots beside the page (right edge pageW/2 + 0.17).
+    expect(pageW).toBeLessThanOrEqual((width >= 1.0 ? width - 0.36 : width - 0.12) + 1e-9);
+  }
+  expect(yearDisplayWidth(0.2)).toBeCloseTo(0.59);
 });

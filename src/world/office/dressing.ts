@@ -194,6 +194,13 @@ const createExtensionLead = (): PropHandle => {
 // The scene of each office
 // ─────────────────────────────────────────────────────────────────────────────
 
+/**
+ * Place a piece of contents: a prop that never animates or glows goes with the still things, to be merged into a
+ * few meshes; the rest stand on their own.
+ */
+const placeProp = <T extends PropHandle>(kit: StageKit, prop: T, spot: Spot): T =>
+  prop.update === undefined && prop.setGlow === undefined ? kit.placeStatic(prop, spot) : kit.place(prop, spot);
+
 /** Placement vocabulary for a scene, in floor-plan coordinates. */
 class Dresser {
   readonly kit: StageKit;
@@ -208,7 +215,12 @@ class Dresser {
 
   /** Stand a prop on the floor or the ground outside. */
   put<T extends PropHandle>(prop: T, x: number, z: number, facing = 0): T {
-    return this.kit.place(prop, { x, z, facing });
+    return this.stand(prop, { x, z, facing });
+  }
+
+  /** Put a prop into the office at `spot` (merged with the still things when it neither animates nor glows). */
+  stand<T extends PropHandle>(prop: T, spot: Spot): T {
+    return placeProp(this.kit, prop, spot);
   }
 
   /** Lay something flat on the office floor (a rug, a cable): part of the building, it rises with the shell. */
@@ -227,22 +239,22 @@ class Dresser {
 
   /** Hang a sign / poster / neon on the −Z wall: centred on `x`, bottom edge at height `y`. */
   hangBack<T extends PropHandle>(prop: T, x: number, y: number): T {
-    return this.kit.place(prop, this.backWallSpot(x, y));
+    return this.stand(prop, this.backWallSpot(x, y));
   }
 
   /** Hang a sign / poster / neon on the −X wall: centred on `z`, bottom edge at height `y`. */
   hangSide<T extends PropHandle>(prop: T, z: number, y: number): T {
-    return this.kit.place(prop, this.sideWallSpot(z, y));
+    return this.stand(prop, this.sideWallSpot(z, y));
   }
 
   /** Stand a wall-hugging prop (origin at its footprint centre) against the −Z wall. */
   againstBack<T extends PropHandle>(prop: T, x: number): T {
-    return this.kit.place(prop, { x, z: this.floor.minZ + WALL_GAP + prop.footprint.d / 2 });
+    return this.stand(prop, { x, z: this.floor.minZ + WALL_GAP + prop.footprint.d / 2 });
   }
 
   /** Stand a wall-hugging prop against the −X wall. */
   againstSide<T extends PropHandle>(prop: T, z: number): T {
-    return this.kit.place(prop, { x: this.floor.minX + WALL_GAP + prop.footprint.d / 2, z, facing: Math.PI / 2 });
+    return this.stand(prop, { x: this.floor.minX + WALL_GAP + prop.footprint.d / 2, z, facing: Math.PI / 2 });
   }
 
   backWallSpot(x: number, y: number): Spot {
@@ -294,7 +306,7 @@ const sharedScene: Scene = (d) => {
 
   d.lay(createRug(6.2, 3.6, { color: theme.accents[0], pattern: "border" }), 0.05, 0);
   // Above the coffee corner, clear of everything that hangs lower on that wall.
-  d.kit.place(createNeonSign("hello", { color: NEON, height: 0.42 }), d.backWallSpot(4.35, 1.98));
+  d.stand(createNeonSign("hello", { color: NEON, height: 0.42 }), d.backWallSpot(4.35, 1.98));
   d.hangSide(createWallArt(0), 4.5, 1.15);
   d.put(createPendantLamp({ shade: theme.accents[1] }), -1.05, 0.15);
   d.put(createPendantLamp({ shade: theme.accents[2] }), 1.75, 0.15);
@@ -321,7 +333,7 @@ const sharedScene: Scene = (d) => {
 const ownScene: Scene = (d) => {
   const { floor } = d;
 
-  d.kit.place(createSign("welcome", { height: 0.46, lit: true }), d.backWallSpot(6.0, 1.85));
+  d.stand(createSign("welcome", { height: 0.46, lit: true }), d.backWallSpot(6.0, 1.85));
   d.hangSide(createWallArt(2), -5.6, 1.2);
 
   d.put(createTree(0), floor.minX - 0.2, floor.maxZ + 1.3);
@@ -337,7 +349,7 @@ const floorScene: Scene = (d) => {
   const { floor } = d;
   const theme = themeFor(3, d.kit.look);
 
-  d.kit.place(createNeonSign("onwards", { color: theme.accents[2], height: 0.5 }), d.sideWallSpot(-1.35, 1.75));
+  d.stand(createNeonSign("onwards", { color: theme.accents[2], height: 0.5 }), d.sideWallSpot(-1.35, 1.75));
   d.lay(createRug(4.4, 3.4, { color: theme.accents[0], pattern: "stripes" }), 8.35, 4.05);
   d.lay(createRug(3.4, 2.6, { color: theme.accents[1], pattern: "border" }), -1.2, 6.4);
   d.lay(createRug(2.2, 1.5, { color: theme.accents[2], pattern: "plain" }), 4.3, 6.0);
@@ -357,7 +369,7 @@ const floorScene: Scene = (d) => {
 const campusScene: Scene = (d) => {
   const { floor } = d;
 
-  d.kit.place(createSign("HQ", { height: 0.5, background: C.marble, color: C.brass, lit: true }), d.backWallSpot(11.6, 1.55));
+  d.stand(createSign("HQ", { height: 0.5, background: C.marble, color: C.brass, lit: true }), d.backWallSpot(11.6, 1.55));
   // A ticker above the calendar: set dressing, the same made-up prices whatever the company does.
   d.put(createStockTicker(), 0.2, floor.minZ + 0.32);
   d.lay(createRug(2.2, 2.4, { color: C.burgundy, accent: C.brass, pattern: "border" }), 10.5, 7.9);
@@ -387,7 +399,8 @@ export const dressOffice = (kit: StageKit): void => {
   const signatures = signaturePlan(decor, kit.look);
   decor.forEach((spot, index) => {
     const signature = signatures.get(index);
-    kit.place(signature === undefined ? createDecorProp(kit.office, spot, kit.look) : createSignatureProp(signature, decorSize(spot), spot.variant), spot);
+    placeProp(kit, signature === undefined ? createDecorProp(kit.office, spot, kit.look) : createSignatureProp(signature, decorSize(spot), spot.variant), spot);
   });
   SCENES[phaseTier(kit.office)](new Dresser(kit));
+  kit.mergeStatics();
 };
