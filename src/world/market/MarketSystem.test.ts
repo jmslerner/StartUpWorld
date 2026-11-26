@@ -3,7 +3,10 @@ import { describe, expect, it } from "vitest";
 import { targetKey } from "../targets";
 import type { InteractableOptions, InteractableRegistry, InteractableTarget, MarketCompany, MarketScene, MarketSeatState } from "../types";
 import { MARKET_DRAW_CEILING } from "./marketLayout";
-import { MarketSystem } from "./MarketSystem";
+import * as THREE_ from "three";
+import { C, PHASE_THEMES } from "../core/palette";
+import type { LookId } from "../types";
+import { colourOf, MarketSystem } from "./MarketSystem";
 
 interface Entry {
   object: THREE.Object3D;
@@ -92,5 +95,27 @@ describe("the market system", () => {
     expect(market.meshCount()).toBeLessThanOrEqual(MARKET_DRAW_CEILING / 2); // halved: each may also be drawn in the shadow pass
     market.dispose();
     expect(market.root.children).toEqual([]);
+  });
+
+  it("gives every rival a colour well away from the player's in every look, so yours is never mistaken for a rival's", () => {
+    const hueOf = (colour: number): number => new THREE_.Color(colour).getHSL({ h: 0, s: 0, l: 0 }).h * 360;
+    const apart = (a: number, b: number): number => {
+      const d = Math.abs(hueOf(a) - hueOf(b)) % 360;
+      return Math.min(d, 360 - d);
+    };
+    const looks = Object.keys(PHASE_THEMES) as LookId[];
+    for (const look of looks) {
+      const player = PHASE_THEMES[look][0].accents[0];
+      expect(colourOf(company(0, 0.2, 0), player)).toBe(player);
+      const rivals = [1, 2, 3].map((seat) => colourOf(company(seat, 0.2, 0), player));
+      expect(new Set(rivals).size, look).toBe(3);
+      const saturated = new THREE_.Color(player).getHSL({ h: 0, s: 0, l: 0 }).s > 0.25;
+      for (const rival of rivals) {
+        expect(rival, look).not.toBe(player);
+        if (saturated) expect(apart(rival, player), `${look} ${rival.toString(16)}`).toBeGreaterThanOrEqual(30);
+      }
+    }
+    // The case that was wrong: the gold-rush red against coral.
+    expect([1, 2, 3].map((seat) => colourOf(company(seat, 0.2, 0), PHASE_THEMES["gold-rush"][0].accents[0]))).not.toContain(C.coral);
   });
 });

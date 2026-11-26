@@ -43,9 +43,21 @@ const restPoint = (lot: MarketLot, index: number, out: THREE.Vector3): THREE.Vec
   return out.set(lot.x - (lot.width - 0.6) / 2 + col * step, PLAZA_HEIGHT + DOT_RADIUS, lot.z + lot.width / 2 - 0.25 - row * 0.3);
 };
 
-const colourOf = (company: MarketCompany, player: number): number => {
+/** Rivals' colours must sit at least this far round the colour wheel from the player's, in degrees. */
+const RIVAL_HUE_APART = 30;
+const scratchHsl = { h: 0, s: 0, l: 0 };
+const hueOf = (colour: number): number => new THREE.Color(colour).getHSL(scratchHsl).h * 360;
+const hueApart = (a: number, b: number): number => {
+  const d = Math.abs(hueOf(a) - hueOf(b)) % 360;
+  return Math.min(d, 360 - d);
+};
+
+/** A company's colour: the player's is the era's first accent; each rival's is one well away from it. */
+export const colourOf = (company: MarketCompany, player: number): number => {
   if (company.state === "player" || company.seat === 0) return player;
-  const rivals = RIVAL_COLORS.filter((colour) => colour !== player);
+  const grey = new THREE.Color(player).getHSL(scratchHsl).s <= 0.25;
+  const apart = RIVAL_COLORS.filter((colour) => colour !== player && (grey || hueApart(colour, player) >= RIVAL_HUE_APART));
+  const rivals = apart.length >= 3 ? apart : RIVAL_COLORS.filter((colour) => colour !== player);
   return rivals[(Math.max(1, company.seat) - 1) % rivals.length];
 };
 

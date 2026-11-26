@@ -87,7 +87,7 @@ export const careerHelp = (config: RulesConfig): readonly HelpSection[] => {
     },
     {
       title: "The market",
-      text: `"${OFFICE_WORDS.market}" shows the four companies as buildings: the more users, the taller. The bar of users for going public is marked across them, and a public company flies a flag. Each year ends there, showing where its new users went. Click a building, or a rival's "${MARKET_WORDS.show}", to see its public numbers; "${OFFICE_WORDS.office}" goes back to your office.`,
+      text: `"${OFFICE_WORDS.market}" shows the four companies as buildings: the more users, the taller. Yours is the first, on the left. The bar of users for going public is marked across them, and a public company flies a flag. Each year ends there, showing where its new users went. Click a building, or a rival's "${MARKET_WORDS.show}", to see its public numbers; "${OFFICE_WORDS.office}" goes back to your office.`,
     },
     {
       title: "Sound",

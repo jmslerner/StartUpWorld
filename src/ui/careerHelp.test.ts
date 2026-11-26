@@ -18,7 +18,7 @@ describe("how to play a career", () => {
 
   it("explains the market: buildings by users, the bar, the year's new users, selecting a company", () => {
     const text = help.find((s) => s.title === "The market")!.text;
-    for (const words of ["Market", "users", "bar", "public", "Show in market"]) expect(text).toContain(words);
+    for (const words of ["Market", "users", "bar", "public", "Show in market", "Yours is the first, on the left"]) expect(text).toContain(words);
   });
 
   it("says what makes a sound and where to turn it off", () => {
