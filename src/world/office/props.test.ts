@@ -63,6 +63,17 @@ const solidBoundsOf = (root: THREE.Object3D): THREE.Box3 => {
   return bounds;
 };
 
+const countVisibleSegmentMeshes = (root: THREE.Object3D): number => {
+  let n = 0;
+  root.traverse((o) => { if (o.name === "calendar-segment" && o.visible) n += 1; });
+  return n;
+};
+const countGeometries = (root: THREE.Object3D): number => {
+  const seen = new Set<THREE.BufferGeometry>();
+  root.traverse((o) => { if (o instanceof THREE.Mesh) seen.add(o.geometry); });
+  return seen.size;
+};
+
 const phasesFor = (entry: CatalogEntry): readonly OfficeIndex[] => (entry.styled ? PHASES : [2]);
 
 /** Share of triangles whose winding disagrees with their vertex normals — i.e. faces that would render inside-out. */
@@ -498,6 +509,22 @@ describe("stations", () => {
     for (const text of written) expect(text).toMatch(/^\+\d+$/);
     expect(written).toContain("+100");
     expect(written).toContain("+7");
+  });
+
+  it("the wall calendar shows the year on its segments, and changes it without new geometry", () => {
+    const calendar = createStation("calendar", 2, "classic");
+    const lit = () => countVisibleSegmentMeshes(calendar.group);
+    calendar.setYear(1990); expect(lit()).toBe(2 + 6 + 6 + 6);
+    const geometries = countGeometries(calendar.group);
+    calendar.setYear(2038); expect(lit()).toBe(5 + 6 + 5 + 7);
+    expect(countGeometries(calendar.group)).toBe(geometries);
+    calendar.setYear(123456); expect(lit()).toBe(0);
+    // The bars drawn are exactly the segments lit.
+    const drawn = calendar.group.getObjectByName("calendar-year-bars") as THREE.InstancedMesh;
+    calendar.setYear(1999);
+    expect(drawn.count).toBe(lit());
+    expect(drawn.count).toBe(2 + 6 + 6 + 6);
+    calendar.dispose();
   });
 
   it("reveals sticky notes with a draw range", () => {

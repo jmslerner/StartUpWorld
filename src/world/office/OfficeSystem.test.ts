@@ -656,6 +656,23 @@ describe("OfficeSystem when the office changes", () => {
     expect(world.freeDesks()).toEqual(world.seating!.freeDeskSlots());
   });
 
+  it("the calendar shows the scene's year, and the next one after the year has advanced", () => {
+    const lit = (root: THREE.Object3D): number => {
+      let n = 0;
+      root.traverse((o) => {
+        if (o.name === "calendar-segment" && o.visible) n += 1;
+      });
+      return n;
+    };
+    const world = new Harness();
+    world.apply({ office: 2, capacity: 22, era: "dial-up", year: 1990 });
+    const stage = world.system.currentStage!;
+    expect(lit(stage.stations.calendar.group)).toBe(2 + 6 + 6 + 6);
+    world.apply({ year: 1991 });
+    expect(world.system.currentStage).toBe(stage);
+    expect(lit(stage.stations.calendar.group)).toBe(2 + 6 + 6 + 2);
+  });
+
   it("a sign that arrives with a new office is part of what pops in", () => {
     const world = new Harness();
     world.apply({ office: 3 });

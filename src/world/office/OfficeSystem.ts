@@ -85,6 +85,7 @@ export class OfficeSystem implements WorldSystem {
 
     // A stage that was just built has nothing to animate *from*: it must simply be right.
     stage.sync(!instant && !rebuilt);
+    stage.setYear(next.scene.year);
     // After the sync, so that the sign is part of the reveal.
     if (rebuilt && !instant) this.reveal(stage);
   }

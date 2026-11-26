@@ -24,9 +24,9 @@ import type {
 import { DeskSlots } from "./DeskSlots";
 import type { Registrar } from "./DeskSlots";
 import { dressOffice } from "./dressing";
-import { doorExterior, STATION_KINDS, WALL_HEIGHT } from "./layouts";
+import { doorExterior, WALL_HEIGHT } from "./layouts";
 import { createOverflowSign, createStation } from "./props";
-import type { OverflowSignHandle, StationHandle } from "./props";
+import type { OverflowSignHandle, StationHandles } from "./props";
 import { buildShell, ROLL_UP_WIDTH } from "./shell";
 import type { Shell } from "./shell";
 import { StageKit } from "./StageKit";
@@ -81,7 +81,7 @@ export interface StageOptions {
 
 export class OfficeStage implements Registrar {
   readonly kit: StageKit;
-  readonly stations: Readonly<Record<StationKind, StationHandle>>;
+  readonly stations: Readonly<StationHandles>;
   readonly desks: DeskSlots;
 
   private readonly interactables: InteractableRegistry;
@@ -209,9 +209,8 @@ export class OfficeStage implements Registrar {
 
   // ── Stations ──────────────────────────────────────────────────────────────
 
-  private buildStations(): Record<StationKind, StationHandle> {
-    const stations = {} as Record<StationKind, StationHandle>;
-    for (const kind of STATION_KINDS) {
+  private buildStations(): StationHandles {
+    const build = <K extends StationKind>(kind: K): StationHandles[K] => {
       const handle = createStation(kind, this.kit.office, this.kit.look);
       this.kit.place(handle, this.kit.layout.stations[kind]);
       this.register(
@@ -222,9 +221,24 @@ export class OfficeStage implements Registrar {
       // Some stations are slight things (a phone on a stool, a board seen nearly edge-on):
       // every one of them gets a click area the size of the prop, and never a tiny one.
       addHitProxy(handle.group, STATION_CLICK_AREA);
-      stations[kind] = handle;
-    }
-    return stations;
+      return handle;
+    };
+    // In the order of STATION_KINDS.
+    return {
+      ship: build("ship"),
+      launch: build("launch"),
+      investors: build("investors"),
+      boardroom: build("boardroom"),
+      calendar: build("calendar"),
+      coffee: build("coffee"),
+      servers: build("servers"),
+      pricing: build("pricing"),
+    };
+  }
+
+  /** Show the year on the wall calendar. */
+  setYear(year: number): void {
+    this.stations.calendar.setYear(year);
   }
 
   /**

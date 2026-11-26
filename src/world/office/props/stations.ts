@@ -29,12 +29,14 @@ import {
   phaseTier,
   STEEL,
   themeFor,
+  unitBox,
   unitPlane,
   unitSphere,
   vertexMat,
 } from "../../core/palette";
 import type { CanvasDraw } from "../../core/palette";
 import { STATION_SIZES, WALL_GAP } from "../footprints";
+import { digitSegments } from "./digits";
 import { drawChair, drawMonitor, drawMug, drawPaperCup, drawPlant, SEAT_Y } from "./parts";
 import type { ChairStyle } from "./parts";
 import { createScreenSurface, hash01, PropKit, Pulse, screenQuads } from "./shared";
@@ -777,7 +779,86 @@ const drawMonthPage =
     }
   };
 
-export const createWallCalendar = (office: OfficeIndex = 2, look: LookId = "classic"): StationHandle => {
+/** The wall calendar, which shows the year in four digits of seven bars each. */
+export interface CalendarHandle extends StationHandle {
+  /** Show `year` (a whole number from 1000 to 9999; anything else shows no year). Builds nothing new. */
+  setYear(year: number): void;
+}
+
+const YEAR_DIGITS = 4;
+const SEGMENTS_PER_DIGIT = 7;
+
+/**
+ * The year on the calendar's header: 28 bars laid out once, as four seven-segment digits. Each bar is an object named
+ * "calendar-segment" whose `visible` says whether it is lit; the lit ones are drawn together by one instanced mesh,
+ * so a year costs one draw call and changing it builds nothing.
+ */
+const addYearDisplay = (kit: PropKit, centreX: number, centreY: number, z: number, height: number, color: number, glow: boolean): ((year: number) => void) => {
+  const width = height * 0.55;
+  const bar = Math.max(0.006, height * 0.13);
+  const pitch = width + height * 0.25;
+  const group = kit.add(new THREE.Group());
+  group.name = "calendar-year";
+  const material = glow ? mat(color, { emissive: color, emissiveIntensity: 0.6 }) : mat(color);
+  const drawn = new THREE.InstancedMesh(unitBox(), material, YEAR_DIGITS * SEGMENTS_PER_DIGIT);
+  drawn.name = "calendar-year-bars";
+  drawn.count = 0;
+  drawn.castShadow = false;
+  drawn.receiveShadow = false;
+  kit.own(drawn);
+  group.add(drawn);
+
+  // Where each of a digit's seven bars sits (a, b, c, d, e, f, g), and whether it lies flat.
+  const across = width * 0.82;
+  const upright = height / 2 - bar * 0.4;
+  const layout: ReadonlyArray<readonly [number, number, boolean]> = [
+    [0, height / 2 - bar / 2, true],
+    [width / 2 - bar / 2, height / 4, false],
+    [width / 2 - bar / 2, -height / 4, false],
+    [0, -height / 2 + bar / 2, true],
+    [-width / 2 + bar / 2, -height / 4, false],
+    [-width / 2 + bar / 2, height / 4, false],
+    [0, 0, true],
+  ];
+  const segments: THREE.Object3D[] = [];
+  for (let digit = 0; digit < YEAR_DIGITS; digit += 1) {
+    const x = centreX + (digit - (YEAR_DIGITS - 1) / 2) * pitch;
+    for (const [dx, dy, flat] of layout) {
+      const segment = new THREE.Object3D();
+      segment.name = "calendar-segment";
+      segment.position.set(x + dx, centreY + dy, z);
+      segment.scale.set(flat ? across : bar, flat ? bar : upright, 0.006);
+      segment.visible = false;
+      segment.updateMatrix();
+      group.add(segment);
+      segments.push(segment);
+    }
+  }
+
+  let shown: number | null = null;
+  return (year: number) => {
+    const valid = Number.isInteger(year) && year >= 1000 && year <= 9999;
+    const wanted = valid ? year : null;
+    if (wanted === shown) return;
+    shown = wanted;
+    const digits = wanted === null ? [] : String(wanted).split("").map(Number);
+    let count = 0;
+    segments.forEach((segment, i) => {
+      const lit = digitSegments(digits[Math.floor(i / SEGMENTS_PER_DIGIT)] ?? -1)[i % SEGMENTS_PER_DIGIT] ?? false;
+      segment.visible = lit;
+      if (lit) {
+        drawn.setMatrixAt(count, segment.matrix);
+        count += 1;
+      }
+    });
+    drawn.count = count;
+    drawn.instanceMatrix.needsUpdate = true;
+    drawn.boundingBox = null;
+    drawn.boundingSphere = null;
+  };
+};
+
+export const createWallCalendar = (office: OfficeIndex = 2, look: LookId = "classic"): CalendarHandle => {
   const size = STATION_SIZES[phaseTier(office)].calendar;
   const tier = phaseTier(office);
   const theme = themeFor(office, look);
@@ -832,7 +913,10 @@ export const createWallCalendar = (office: OfficeIndex = 2, look: LookId = "clas
     }
   }
 
-  return kit.finish(stationFootprint("calendar", office), { kind: "calendar" as const, office });
+  // The year, in the header band at the top of the page, under the binder rings.
+  const setYear = addYearDisplay(kit, 0, pageY + pageH * 0.84, pageZ + 0.006, pageH * 0.16, digital ? NEON : C.white, digital);
+
+  return kit.finish(stationFootprint("calendar", office), { kind: "calendar" as const, office, setYear });
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1200,7 +1284,7 @@ export interface StationHandles {
   launch: GrowthCornerHandle;
   investors: InvestorLineHandle;
   boardroom: StationHandle;
-  calendar: StationHandle;
+  calendar: CalendarHandle;
   coffee: StationHandle;
   servers: StationHandle;
   pricing: StationHandle;
