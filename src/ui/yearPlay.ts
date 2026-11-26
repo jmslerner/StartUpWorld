@@ -1,0 +1,59 @@
+/**
+ * A year playing out in the office after "End year": which beat is on screen at each moment, when it is over, and
+ * when End is refused or a year must not play at all. Pure: the screen keeps the clock and passes the time in.
+ */
+
+import type { PlaybackBeat, YearPlayback } from "../scene/yearPlayback";
+import type { OfficeAvailability } from "./officeView";
+
+export type YearPlay =
+  | { readonly phase: "idle" }
+  | {
+      readonly phase: "playing";
+      readonly year: number;
+      readonly playback: YearPlayback;
+      readonly startedMs: number;
+      readonly endsMs: number;
+    };
+
+export const IDLE: YearPlay = { phase: "idle" };
+
+/** Starts `year` playing at `nowMs` for the playback's length. A playback with no beats, or a year already playing,
+ *  changes nothing. */
+export const startYearPlay = (play: YearPlay, playback: YearPlayback, year: number, nowMs: number): YearPlay => {
+  if (play.phase === "playing" || playback.beats.length === 0) return play;
+  return { phase: "playing", year, playback, startedMs: nowMs, endsMs: nowMs + playback.seconds * 1000 };
+};
+
+/** The index of the beat on screen at `nowMs`; null when idle or done. The last beat runs to the end. */
+export const beatIndexNow = (play: YearPlay, nowMs: number): number | null => {
+  if (play.phase !== "playing" || nowMs >= play.endsMs) return null;
+  const { beats } = play.playback;
+  const elapsed = nowMs - play.startedMs;
+  let ends = 0;
+  for (let i = 0; i < beats.length - 1; i++) {
+    ends += beats[i].seconds * 1000;
+    if (elapsed < ends) return i;
+  }
+  return beats.length - 1;
+};
+
+/** The beat on screen at `nowMs`; null when idle or done. */
+export const beatNow = (play: YearPlay, nowMs: number): PlaybackBeat | null => {
+  const index = beatIndexNow(play, nowMs);
+  return index === null || play.phase !== "playing" ? null : (play.playback.beats[index] ?? null);
+};
+
+/** Nothing is playing at `nowMs`. */
+export const yearPlayDone = (play: YearPlay, nowMs: number): boolean => play.phase !== "playing" || nowMs >= play.endsMs;
+
+/** The office stopped drawing (or is not known to draw): the year ends at once. */
+export const yearPlayAfterLoss = (play: YearPlay, availability: OfficeAvailability): YearPlay =>
+  availability === "running" ? play : IDLE;
+
+/** End is refused while a year plays out or a report is open: checked before endQuarter runs. */
+export const endRefused = (play: YearPlay, reportOpen: boolean): boolean => play.phase === "playing" || reportOpen;
+
+/** The year really ended: the turn moved on by exactly one and the store reports no failure. */
+export const yearEnded = (turnBefore: number, after: { readonly turn: number | null; readonly failure: Error | null }): boolean =>
+  after.failure === null && after.turn === turnBefore + 1;

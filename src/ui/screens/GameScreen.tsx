@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { rulesForTurn } from "../../engine/career";
+import { rulesForTurn, yearOf } from "../../engine/career";
 import type { Plan } from "../../engine/types";
 import { PLAYER_ID } from "../../state/player";
 import { browserStorage, gameStore, useGame } from "../../state/useGame";
+import { NO_PLAYBACK, yearPlayback } from "../../scene/yearPlayback";
 import type { WorldViewState } from "../../world/mountWorld";
 import { EventBanner } from "../components/EventBanner";
 import { OfficeSlot } from "../components/OfficeSlot";
@@ -28,7 +29,9 @@ import { endView, eventView, planningView, reportView, resourceView, rivalsView 
 import { createOfficeProbe, PROBE_GLOBAL, type CareerOfficeProbe, type OfficeProbeLink } from "../officeProbe";
 import { createOfficeSource } from "../officeSource";
 import {
+  beatLine,
   canDrawOffice,
+  canPlayOut,
   canSwitch,
   DESKTOP_QUERY,
   firstAvailability,
@@ -36,12 +39,14 @@ import {
   officeCellHeight,
   officeLayoutFor,
   OFFICE_WORDS,
+  playingLine,
   readOfficePreference,
   reloadOffered,
   writeOfficePreference,
   type OfficeAvailability,
 } from "../officeView";
 import { wordsFor } from "../words";
+import { beatIndexNow, beatNow, endRefused, IDLE, startYearPlay, yearEnded, yearPlayAfterLoss, yearPlayDone, type YearPlay } from "../yearPlay";
 
 type Tab = "plan" | "rivals";
 
@@ -58,6 +63,13 @@ const officeProbe = (): CareerOfficeProbe & OfficeProbeLink => {
 const NO_VIEW: WorldViewState = { status: "starting", handle: null };
 
 /** A desktop browser window, now. */
+/** How often the screen looks at the clock while a year plays out. */
+const PLAY_TICK_MS = 250;
+
+/** The player asked for less motion, now. */
+const reducedMotionNow = (): boolean =>
+  typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
 const desktopWindow = (): boolean => typeof window !== "undefined" && typeof window.matchMedia === "function" && window.matchMedia(DESKTOP_QUERY).matches;
 
 /** The game itself: resources on top, the plan and the rivals side by side, the report over everything after each year or quarter. */
@@ -91,6 +103,13 @@ export const GameScreen = () => {
   const cellRef = useRef<HTMLDivElement | null>(null);
   const barRef = useRef<HTMLDivElement | null>(null);
 
+  // A year playing out after End: the ref is what the handlers read, the state what the page shows.
+  const playRef = useRef<YearPlay>(IDLE);
+  const [play, setPlay] = useState<YearPlay>(IDLE);
+  const [playNow, setPlayNow] = useState(0);
+  const beatShown = useRef<number | null>(null);
+  const skipRef = useRef<HTMLButtonElement | null>(null);
+
   const [tab, setTab] = useState<Tab>("plan");
   const [helpOpen, setHelpOpen] = useState(false);
   const [confirmingQuit, setConfirmingQuit] = useState(false);
@@ -122,6 +141,17 @@ export const GameScreen = () => {
 
   const onChange = useCallback((plan: Plan) => setDraft(plan), [setDraft]);
 
+  /** The year stops playing: the world finishes what is moving, the new year shows, and the summary opens. */
+  const finishPlay = useCallback(() => {
+    const current = playRef.current;
+    if (current.phase !== "playing") return;
+    viewRef.current.handle?.settle();
+    officeSource.showBeat(current.playback, null);
+    playRef.current = IDLE;
+    beatShown.current = null;
+    setPlay(IDLE);
+  }, [officeSource]);
+
   useEffect(() => {
     availabilityRef.current = availability;
   }, [availability]);
@@ -131,9 +161,14 @@ export const GameScreen = () => {
     const query = window.matchMedia(DESKTOP_QUERY);
     const changed = (): void => setWide(query.matches);
     changed();
-    query.addEventListener("change", changed);
-    return () => query.removeEventListener("change", changed);
-  }, [career]);
+    // A window made narrow leaves the 3D layout: a year playing out ends at once.
+    const moved = (): void => {
+      if (!query.matches) finishPlay();
+      changed();
+    };
+    query.addEventListener("change", moved);
+    return () => query.removeEventListener("change", moved);
+  }, [career, finishPlay]);
 
   useEffect(() => {
     if (!career) return;
@@ -164,9 +199,14 @@ export const GameScreen = () => {
     const old = viewRef.current.handle;
     if (old !== null && old !== state.handle) officeProbe().retire(old);
     viewRef.current = state;
+    // An office that stops drawing, or goes away, ends a year playing out at once.
+    if (yearPlayAfterLoss(playRef.current, nextAvailability(availabilityRef.current, state.status)) === IDLE) finishPlay();
     setAvailability((prev) => nextAvailability(prev, state.status));
-  }, []);
-  const onOfficeFailed = useCallback(() => setAvailability("failed"), []);
+  }, [finishPlay]);
+  const onOfficeFailed = useCallback(() => {
+    finishPlay();
+    setAvailability("failed");
+  }, [finishPlay]);
   const onMove = useCallback(
     (patch: Pick<Plan, "allocation">) => {
       const current = gameStore.getState().draft;
@@ -176,16 +216,19 @@ export const GameScreen = () => {
   );
   const toggleOffice = useCallback(() => {
     const on = layout !== "3d";
+    if (!on) finishPlay();
     writeOfficePreference(browserStorage(), on);
     setPreference(on);
     if (on) setAvailability((prev) => (prev === "context-lost" ? "unknown" : prev));
-  }, [layout]);
+  }, [layout, finishPlay]);
   const reloadOffice = useCallback(() => setAvailability("unknown"), []);
 
   const titleRef = useRef<HTMLHeadingElement | null>(null);
   const reportClosedAt = useRef(Number.NEGATIVE_INFINITY);
 
   const onEndQuarter = useCallback(() => {
+    // Nothing ends a year while one plays out or a report is open: no second year, and last year never replays.
+    if (endRefused(playRef.current, gameStore.getState().reportOpen)) return;
     // The report's button can sit right over this one: the second tap of a double tap on it lands here
     // as the report closes, and must not play a year or quarter nobody has planned.
     if (performance.now() - reportClosedAt.current < SETTLE_MS) return;
@@ -193,10 +236,59 @@ export const GameScreen = () => {
     // Focus leaves the button before the report opens over it: when the report closes, focus comes back to
     // the top of the page, not to a button that a key held down would press again and again.
     titleRef.current?.focus({ preventScroll: true });
-    endQuarter();
+    const before = gameStore.getState();
+    const playOut =
+      before.game !== null && before.config.career !== undefined && canPlayOut({ layout, availability: availabilityRef.current, reducedMotion: reducedMotionNow() });
+    if (playOut && before.game !== null && before.config.career !== undefined) {
+      const turnBefore = before.game.turn;
+      const year = yearOf(turnBefore, before.config.career);
+      officeSource.startPlay();
+      endQuarter();
+      const after = gameStore.getState();
+      if (yearEnded(turnBefore, { turn: after.game?.turn ?? null, failure: after.failure })) {
+        const now = performance.now();
+        playRef.current = startYearPlay(playRef.current, yearPlayback(after.lastLog?.companies[PLAYER_ID] ?? null, false), year, now);
+        setPlayNow(now);
+      }
+      const started = playRef.current;
+      if (started.phase === "playing") {
+        beatShown.current = 0;
+        officeSource.showBeat(started.playback, 0);
+      } else {
+        officeSource.showBeat(NO_PLAYBACK, null);
+      }
+      setPlay(started);
+    } else {
+      endQuarter();
+    }
     setTab("plan");
     window.scrollTo({ top: 0 });
-  }, [endQuarter]);
+  }, [endQuarter, layout, officeSource]);
+
+  // While a year plays out: the clock moves the caption and the beats on, and the year ends when its time is up.
+  useEffect(() => {
+    if (play.phase !== "playing") return;
+    const timer = window.setInterval(() => {
+      const now = performance.now();
+      // Time is up, or (should a change of view have slipped past its handler) the office stopped drawing.
+      if (yearPlayDone(playRef.current, now) || yearPlayAfterLoss(playRef.current, availabilityRef.current) === IDLE) {
+        finishPlay();
+        return;
+      }
+      const index = beatIndexNow(playRef.current, now);
+      if (index !== null && index !== beatShown.current) {
+        beatShown.current = index;
+        officeSource.showBeat(play.playback, index);
+      }
+      setPlayNow(now);
+    }, PLAY_TICK_MS);
+    return () => window.clearInterval(timer);
+  }, [play, finishPlay, officeSource]);
+
+  // Skip has the focus while a year plays out.
+  useEffect(() => {
+    if (play.phase === "playing") skipRef.current?.focus({ preventScroll: true });
+  }, [play]);
 
   const onCloseReport = useCallback(() => {
     // The ending's sound belongs to the click that reveals it.
@@ -225,10 +317,13 @@ export const GameScreen = () => {
   const cashTone = projection.cash < 0 ? TONE.danger : projection.cashFloor < 0 ? TONE.caution : "text-gray-100";
   // The most serious thing to know before ending the year or quarter, if there is one.
   const headline = planning.warnings.find((warning) => warning.level !== "note");
+  const playing = play.phase === "playing";
+  const beat = beatNow(play, playNow);
+  const officeNames = rulesForTurn(config, game.turn).career?.offices.map((office) => office.name) ?? [];
 
   return (
     <>
-      <div inert={report !== null || helpOpen}>
+      <div inert={report !== null || helpOpen || playing}>
         <main className="mx-auto w-full max-w-6xl space-y-3 px-3 pb-44 pt-3 md:pb-28">
           <header className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
             <p className={LABEL}>StartUpWorld</p>
@@ -367,7 +462,21 @@ export const GameScreen = () => {
         </div>
       </div>
 
+      {play.phase === "playing" && (
+        <div className="panel-surface fixed inset-x-0 bottom-0 z-40 rounded-t-xl border-b-0" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
+          <div className="mx-auto flex w-full max-w-6xl items-center gap-3 px-3 py-2.5" role="status">
+            <div className="min-w-0 flex-1 text-xs">
+              <div className="text-[0.6rem] uppercase tracking-[0.16em] text-mist/60">{playingLine(play.year)}</div>
+              <div className="truncate font-semibold text-gray-100">{beat === null ? "\u00a0" : beatLine(beat, officeNames)}</div>
+            </div>
+            <button ref={skipRef} type="button" onClick={finishPlay} className={`${PRIMARY} shrink-0`}>
+              {OFFICE_WORDS.skip}
+            </button>
+          </div>
+        </div>
+      )}
       {report !== null &&
+        !playing &&
         (careerReport !== null && !fullReport ? (
           <YearSummary career={careerReport} view={report} over={over} words={words} onFull={showFullReport} onClose={onCloseReport} />
         ) : (
