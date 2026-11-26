@@ -76,6 +76,8 @@ export const mountWorld = (canvas: HTMLCanvasElement, viewport: HTMLElement, sta
           if (!mounted) return;
           store.setState({ selected: hit?.target ?? null });
           anchor.set(hit?.screen ?? null);
+          // Every tap is told, the same target again included: the store alone cannot say so.
+          stage.taps.tell(hit?.target ?? null);
         },
         onSelectedAnchorMove: (screen) => {
           if (mounted) anchor.set(screen);

@@ -26,6 +26,10 @@ const fakes = vi.hoisted(() => {
     stats: vi.fn(() => ({ drawCalls: 0, triangles: 0, geometries: 0, textures: 0, figures: 0, hidden: 0, framesDrawn: 0 })),
     loseContext: vi.fn(),
     restoreContext: vi.fn(),
+    teamOf: vi.fn(() => null),
+    personAt: vi.fn(() => null),
+    releaseFirst: vi.fn(),
+    settle: vi.fn(),
     dispose: vi.fn(),
   });
   const handle = makeHandle();
@@ -401,6 +405,30 @@ describe("mountWorld", () => {
     created().callbacks.onSelect(hit);
     expect(stage.store.getState().selected).toEqual({ kind: "door" });
     touch();
+  });
+
+  it("each tap the world reports is told on the stage, the same person twice included", () => {
+    const person: InteractableHit = { target: { kind: "person", personId: "p1" }, label: "Someone", screen: { x: 5, y: 6 } };
+    const cleanup = mount();
+    const { callbacks } = created();
+    const heard: unknown[] = [];
+    const selectedWhenHeard: unknown[] = [];
+    stage.taps.subscribe((target) => {
+      heard.push(target);
+      selectedWhenHeard.push(stage.store.getState().selected);
+    });
+    callbacks.onSelect(person);
+    expect(stage.store.getState().selected).toEqual({ kind: "person", personId: "p1" });
+    callbacks.onSelect(person);
+    callbacks.onSelect(null);
+    expect(stage.store.getState().selected).toBeNull();
+    expect(heard).toEqual([{ kind: "person", personId: "p1" }, { kind: "person", personId: "p1" }, null]);
+    // The store is up to date by the time the tap is told.
+    expect(selectedWhenHeard).toEqual(heard);
+    cleanup();
+    // Once the mount is gone, what its world still reports is not told.
+    callbacks.onSelect(person);
+    expect(heard).toHaveLength(3);
   });
 
   it("another run clears what was selected: it belonged to the other company", () => {

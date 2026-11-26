@@ -23,6 +23,9 @@
  * 5. `min(scene.arriving, MAX_WAITING_DRAWN)` people wait at the door: those already waiting stay, longest-waiting
  *    first; any others have left; new ones get new ids.
  * 6. `people` is in id order. `look` is `hashText32(scene.seed, id)`.
+ * 7. A hint may name one person to release first. When that person's group must give people up, they are released
+ *    before the most recent joiner. A hint naming nobody in the cast, or someone whose group does not shrink, changes
+ *    nothing.
  *
  * Where the rulings are silent:
  *
@@ -31,6 +34,8 @@
  * - Someone who goes away without having had a team (from leaving, from the door, or a new face) gets the team
  *   Product, as in a fresh cast.
  * - New staff are numbered before new people at the door, group by group.
+ * - A person released on a hint is also the first released person a short group takes, so the person picked is the
+ *   one who walks to the group that grew.
  */
 import { hashText32 } from "./hash";
 import { TEAMS } from "./types/scene";
@@ -108,7 +113,12 @@ const into = (group: Group, person: Person): Person => {
   return { id: person.id, standing: "working", team: group };
 };
 
-export const nextCast = (prev: Cast | null, scene: OfficeScene): Cast => {
+/** Who to release first, if their group must give people up (ruling 7). */
+export interface CastHint {
+  readonly releaseFirst?: string;
+}
+
+export const nextCast = (prev: Cast | null, scene: OfficeScene, hint: CastHint = {}): Cast => {
   const counts = [...TEAMS.map((team) => whole(scene.teams[team])), whole(scene.away), whole(scene.leaving)];
   const total = counts.reduce((sum, count) => sum + count, 0);
   const shares = sharesOf(counts, MAX_STAFF_DRAWN);
@@ -130,14 +140,29 @@ export const nextCast = (prev: Cast | null, scene: OfficeScene): Cast => {
   const members: Person[][] = [];
   const fromWork: Person[] = [];
   const fromLeaving: Person[] = [];
+  /** The person picked, once released from work or from being away: at most one. */
+  const picks: Person[] = [];
   GROUPS.forEach((group, index) => {
     const had = stayed.filter((person) => groupOf(person) === group);
+    const picked = had.find((person) => person.id === hint.releaseFirst);
+    if (picked !== undefined && had.length > shares[index]) {
+      // The group shrinks and the person picked is in it: they go first, and the rest as the ruling says.
+      const others = had.filter((person) => person !== picked);
+      members.push(others.slice(0, shares[index]));
+      // People released from leaving still come after those released from work or from being away (ruling 3).
+      if (group === "leaving") fromLeaving.push(picked, ...others.slice(shares[index]));
+      else {
+        fromWork.push(...others.slice(shares[index]));
+        picks.push(picked);
+      }
+      return;
+    }
     members.push(had.slice(0, shares[index]));
     (group === "leaving" ? fromLeaving : fromWork).push(...had.slice(shares[index]));
   });
 
-  // Groups that are short take the released, then the people at the door, then new people.
-  const released = [...fromWork.sort(bySerial), ...fromLeaving];
+  // Groups that are short take the released (the person picked first), then the people at the door, then new people.
+  const released = [...picks, ...fromWork.sort(bySerial), ...fromLeaving];
   const door = stayed.filter((person) => person.standing === "waiting");
   const fill = (take: () => Person | undefined): void => {
     GROUPS.forEach((group, index) => {

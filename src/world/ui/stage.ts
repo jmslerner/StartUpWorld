@@ -40,9 +40,21 @@ export interface AnchorChannel {
   subscribe(listener: (point: ScreenPoint | null) => void): () => void;
 }
 
+/**
+ * Every tap on the view, the same target twice included, and a tap on nothing (null). The store's `selected` cannot
+ * tell this: a target tapped again leaves it as it was.
+ */
+export interface TapChannel {
+  tell(target: InteractableTarget | null): void;
+  /** Returns the unsubscribe function. */
+  subscribe(listener: (target: InteractableTarget | null) => void): () => void;
+}
+
 export interface WorldStage {
   store: StoreApi<StageState>;
   anchor: AnchorChannel;
+  /** Told of every tap the world reports, after the store has been updated. A reset keeps its listeners. */
+  taps: TapChannel;
   /**
    * Select a target (or clear the selection with null) from the React side:
    * updates the store, the world's highlight and the anchor in one step.
@@ -73,6 +85,28 @@ const createAnchorChannel = (): AnchorChannel => {
   };
 };
 
+const createTapChannel = (): TapChannel => {
+  const listeners = new Set<(target: InteractableTarget | null) => void>();
+  return {
+    tell: (target) => {
+      for (const listener of [...listeners]) {
+        try {
+          listener(target);
+        } catch (error) {
+          // One listener's failure must not keep the tap from the others, nor reach the world's pointer handling.
+          console.error("[world] A tap listener failed.", error);
+        }
+      }
+    },
+    subscribe: (listener) => {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
+    },
+  };
+};
+
 export const INITIAL_STAGE_STATE: StageState = Object.freeze({
   status: "starting",
   handle: null,
@@ -84,9 +118,11 @@ export const INITIAL_STAGE_STATE: StageState = Object.freeze({
 export const createStage = (): WorldStage => {
   const store = createStore<StageState>(() => INITIAL_STAGE_STATE);
   const anchor = createAnchorChannel();
+  const taps = createTapChannel();
   return {
     store,
     anchor,
+    taps,
     select: (target) => {
       const { handle } = store.getState();
       handle?.setSelected(target);

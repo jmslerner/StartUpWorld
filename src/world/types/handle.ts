@@ -1,7 +1,7 @@
 /** The React-facing WorldHandle and its callbacks. Re-exported by ../types. */
 
 import type { InteractableTarget } from "./interaction";
-import type { OfficeScene } from "./scene";
+import type { OfficeScene, Team } from "./scene";
 
 /** CSS pixels relative to the canvas's top-left corner. */
 export interface ScreenPoint {
@@ -111,5 +111,16 @@ export interface WorldHandle {
    */
   loseContext(): void;
   restoreContext(): void;
+  /**
+   * The team a target belongs to: a person working has their team, a desk the team whose area it is in, a team
+   * area itself. Someone away, leaving or at the door, anything else, and a world that is gone: null.
+   */
+  teamOf(target: InteractableTarget): Team | null;
+  /** Who sits at this desk (an index into the layout's desks), or null. */
+  personAt(desk: number): string | null;
+  /** The next scene, if it is of this year and takes someone from this person's team, moves this person. Used once. */
+  releaseFirst(personId: string | null): void;
+  /** Finish at once whatever is moving (walks, an office rising, the lights), then draw it. */
+  settle(): void;
   dispose(): void;
 }

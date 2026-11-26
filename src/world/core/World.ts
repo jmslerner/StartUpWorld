@@ -4,6 +4,7 @@ import { Interaction } from "../interaction/Interaction";
 import { computeBuildingFrame, type LayoutFrame } from "../office/framing";
 import { OfficeSystem } from "../office/OfficeSystem";
 import { EmployeeSystem } from "../people/EmployeeSystem";
+import { teamOfTarget } from "../targets";
 import type {
   InteractableTarget,
   OfficeLayout,
@@ -24,13 +25,14 @@ import type {
 import { detectQuality, prefersReducedMotion } from "../ui/environment";
 import { AdaptiveQualityGovernor } from "./adaptiveQuality";
 import { CameraRig } from "./CameraRig";
-import { FrameLoop, MIN_FRAME_SECONDS } from "./FrameLoop";
+import { FrameLoop, MAX_FRAME_SECONDS, MIN_FRAME_SECONDS } from "./FrameLoop";
 import { layoutBounds } from "./layoutBounds";
 import { clamp } from "./math";
 import { disposeSharedResources } from "./palette";
 import { getLightingState, Lighting } from "./Lighting";
 import { configureRenderer } from "./rendererLook";
 import { SceneFrames, type StagedFrame } from "./sceneFrames";
+import { settle } from "./settle";
 import { SystemRunner } from "./SystemRunner";
 
 /** Thrown by createWorld when the browser cannot give us a usable WebGL 2 context. */
@@ -327,6 +329,12 @@ class World {
       stats: () => this.stats(),
       loseContext: () => this.loseContext(),
       restoreContext: () => this.restoreContext(),
+      teamOf: (target) => (this.disposed ? null : teamOfTarget(target, this.frames.last?.cast ?? null, this.frames.seating)),
+      personAt: (desk) => (this.disposed ? null : this.frames.seating.deskOccupant(desk)),
+      releaseFirst: (personId) => {
+        if (!this.disposed) this.frames.releaseFirst(personId);
+      },
+      settle: () => this.settle(),
       dispose: () => this.dispose(),
     };
     debugByHandle.set(this.handle, { ctx, rig: this.rig, renderer });
@@ -455,6 +463,25 @@ class World {
     // Only a context taken away through the extension can be given back through it.
     if (this.disposed || !this.gl.isContextLost()) return;
     this.contextSwitch?.restoreContext();
+  }
+
+  private settle(): void {
+    if (this.disposed) return;
+    try {
+      // Runs the systems on in whole frames of the longest length the loop ever hands them; the next frame drawn
+      // (woken below) shows where everything ended up.
+      settle(
+        () => this.runner.busy(),
+        (dt) => {
+          this.elapsed += dt;
+          this.runner.update(dt, this.elapsed);
+        },
+        MAX_FRAME_SECONDS
+      );
+    } catch (error) {
+      this.runner.reportFailure("settle", error);
+    }
+    this.loop.wake();
   }
 
   private dispose(): void {

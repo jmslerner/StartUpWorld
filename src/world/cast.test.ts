@@ -227,3 +227,21 @@ describe("the cast, where the plan's cases stop", () => {
     });
   });
 });
+
+describe("the cast, with a hint of who moves", () => {
+  it("a hint moves the person picked, not the most recent joiner", () => {
+    const before = play(scene([3, 0, 0]));
+    expect(who(nextCast(before, scene([2, 1, 0]), { releaseFirst: "p0" }))).toEqual([
+      "p0:working:growth",
+      "p1:working:product",
+      "p2:working:product",
+    ]);
+  });
+
+  it("a hint for someone whose team keeps its size, or for nobody here, changes nothing", () => {
+    const before = play(scene([2, 1, 0]));
+    for (const hint of [{ releaseFirst: "p2" }, { releaseFirst: "p9" }, {}]) {
+      expect(who(nextCast(before, scene([1, 2, 0]), hint))).toEqual(who(nextCast(before, scene([1, 2, 0]))));
+    }
+  });
+});
