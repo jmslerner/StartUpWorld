@@ -18,3 +18,4 @@ export * from "./types/interaction";
 export * from "./types/fx";
 export * from "./types/system";
 export * from "./types/handle";
+export * from "./types/market";
