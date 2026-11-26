@@ -40,7 +40,7 @@ export const SELECTED_RING: RingStyle = {
   glow: 0.16,
   pulse: true,
   // A selection must stay findable even in the middle of a block of desks.
-  occluded: 0.45,
+  occluded: 0.8,
 };
 
 /** Line half-width limits in world units: never a hairline when zoomed out, never a slab when zoomed in. */
