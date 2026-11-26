@@ -18,7 +18,7 @@ import { ProjectionCard } from "../components/ProjectionCard";
 import { QuarterReport } from "../components/QuarterReport";
 import { ResourceBar } from "../components/ResourceBar";
 import { careerEndView } from "../careerEnd";
-import { beatSoundFor, playCareerSound, soundOnce, yearSoundFor } from "../careerSound";
+import { beatSoundFor, playCareerSound, resetSoundOnce, soundOnce, yearSoundFor } from "../careerSound";
 import { listingView, officeMoveView } from "../careerPlan";
 import { careerReportView, rivalCareerRows } from "../careerReport";
 import { careerStatusView, datedYear, timelineView } from "../careerTimeline";
@@ -77,7 +77,7 @@ const PLAY_TICK_MS = 250;
 const reducedMotionNow = (): boolean =>
   typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-/** The sound a year earns, and the key that lets it play once: the office scene's runId and the year played. */
+/** The sound a year earns, and the key that lets it play once: the career (seed, seat, founding year) and the year played. */
 interface YearCue {
   readonly key: string;
   readonly sound: SoundName | null;
@@ -202,6 +202,11 @@ export const GameScreen = () => {
     yearCueRef.current = null;
     if (cue !== null) soundOnce(cue.key, cue.sound);
   }, [officeSource]);
+
+  // A new career screen: the last career's year keys are forgotten, so the same seed's first year is heard again.
+  useEffect(() => {
+    resetSoundOnce();
+  }, []);
 
   useEffect(() => {
     availabilityRef.current = availability;

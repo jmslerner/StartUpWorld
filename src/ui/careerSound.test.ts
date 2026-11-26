@@ -5,7 +5,7 @@ import { CAREER } from "../config";
 import { DESIGN } from "../config.design";
 import { eraIndexOf, upcomingShift } from "../engine/career";
 import type { CareerRecord, Milestone } from "../state/careerRecord";
-import { beatSoundFor, careerWorldSound, soundOnce, soundsHeard, YEAR_SOUNDS, yearSoundFor } from "./careerSound";
+import { beatSoundFor, careerWorldSound, resetSoundOnce, soundOnce, soundsHeard, YEAR_SOUNDS, yearSoundFor } from "./careerSound";
 
 const at = (turn: number, record: CareerRecord = [], over = false) => ({ turn, record, over });
 const m = (milestone: Milestone): CareerRecord => [milestone];
@@ -110,6 +110,15 @@ describe("through the audio engine", () => {
     // A null call stores its key too: the same key with a sound afterwards plays nothing.
     soundOnce("c:5", null);
     soundOnce("c:5", "crowd-cheer");
+    expect(heard() - was).toBe(2);
+  });
+
+  it("forgets the last key when a new career screen opens, so the same seed's first year is heard again", () => {
+    const heard = () => soundsHeard().filter((name) => name === "launch-ok").length;
+    const was = heard();
+    soundOnce("7:0:1990:0", "launch-ok");
+    resetSoundOnce();
+    soundOnce("7:0:1990:0", "launch-ok");
     expect(heard() - was).toBe(2);
   });
 

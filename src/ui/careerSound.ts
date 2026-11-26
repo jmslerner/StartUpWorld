@@ -72,13 +72,18 @@ export const soundsHeard = (): readonly SoundName[] => [...heard];
 let lastKey: string | null = null;
 
 /**
- * Plays `name` once for `key` (`${runId}:${turn}`, the office scene's runId): a second call with the same key plays
- * nothing. Every call stores its key, a null one included.
+ * Plays `name` once for `key` (the career and the year played: `${seed}:${playerId}:${founded}:${turn}`, built by the
+ * game screen): a second call with the same key plays nothing. Every call stores its key, a null one included.
  */
 export const soundOnce = (key: string, name: SoundName | null): void => {
   if (key === lastKey) return;
   lastKey = key;
   if (name !== null) playCareerSound(name);
+};
+
+/** Forgets the last key: a new career screen calls it, so another career on the same seed hears its first year. */
+export const resetSoundOnce = (): void => {
+  lastKey = null;
 };
 
 /** Footsteps and chairs on the world bus, panned where the world says they happen. */
