@@ -1,6 +1,6 @@
 /**
  * Signature props: the few things that say which era an office is in at a glance. Each look other than classic
- * has three; the office's dressing (../dressing.ts) stands them in for some of its plain décor.
+ * has three (the two invented eras props of their own, nothing borrowed); the office's dressing (../dressing.ts) stands them in for some of its plain décor.
  *
  * Every prop is built to fill the floor area it is given (`size`: width across its facing, depth along it), front
  * +Z, standing on y = 0, and never reaches past that area. None writes a word, and none is shaped after any real
@@ -28,10 +28,12 @@ export type SignatureKind =
   | "box-stack"
   | "charging-kiosk"
   | "drinks-fridge"
-  | "compute-cabinet";
-
-/** The row the two eras still to come borrow until their own props are built. */
-const STAND_IN: readonly SignatureKind[] = ["plant-wall", "ring-light", "scooter"];
+  | "compute-cabinet"
+  | "robot-dock"
+  | "holo-table"
+  | "home-robot"
+  | "glasses-stand"
+  | "light-column";
 
 /**
  * Each era's three props, in the order they claim a spot; the first is the one that names the era, and no two eras
@@ -44,8 +46,8 @@ export const SIGNATURE_PROPS: Readonly<Record<Exclude<LookId, "classic">, readon
   phones: ["charging-kiosk", "flat-tv", "beanbag"],
   "cheap-money": ["foosball", "drinks-fridge", "scooter"],
   "winter-ai": ["compute-cabinet", "plant-wall", "ring-light"],
-  agents: STAND_IN,
-  ambient: STAND_IN,
+  agents: ["robot-dock", "holo-table", "plant-wall"],
+  ambient: ["home-robot", "glasses-stand", "light-column"],
 };
 
 /** The least footprint each prop needs (width across its facing, depth). */
@@ -65,6 +67,11 @@ export const SIGNATURE_SIZES: Readonly<Record<SignatureKind, FootprintSize>> = {
   "charging-kiosk": { width: 0.4, depth: 0.4 },
   "drinks-fridge": { width: 0.45, depth: 0.45 },
   "compute-cabinet": { width: 0.6, depth: 0.5 },
+  "robot-dock": { width: 0.45, depth: 0.45 },
+  "holo-table": { width: 0.8, depth: 0.5 },
+  "home-robot": { width: 0.45, depth: 0.45 },
+  "glasses-stand": { width: 0.4, depth: 0.4 },
+  "light-column": { width: 0.4, depth: 0.4 },
 };
 
 type Draw = (b: ModelBuilder, w: number, d: number, variant: number) => void;
@@ -395,6 +402,133 @@ const drawComputeCabinet: Draw = (b, w, d) => {
   for (let i = 0; i < 4; i += 1) b.box(cw - 0.08, 0.008, 0.03, C.greyDark, 0, h, -cd / 2 + 0.08 + i * ((cd - 0.16) / 3), { r: 0 });
 };
 
+/** A low charging dock with two small wheeled robots parked on its pads, one plugged in, one about to be. */
+const drawRobotDock: Draw = (b, w, d, variant) => {
+  const dw = Math.min(w, 0.6) - 0.04;
+  const dd = Math.min(d, 0.6) - 0.04;
+  const body = [C.white, C.greyLight, C.bone][variant % 3];
+  // The dock: a slab with a raised back that carries the charging lights.
+  b.box(dw, 0.04, dd, C.charcoal, 0, 0, 0, { r: 0.012 });
+  b.box(dw, 0.22, 0.06, body, 0, 0.04, -dd / 2 + 0.03, { r: 0.02 });
+  for (const sx of [-1, 1]) {
+    b.box(dw * 0.36, 0.006, dd * 0.6, C.mint, sx * dw * 0.24, 0.04, 0.03, { r: 0 });
+    b.box(0.04, 0.02, 0.008, C.good, sx * dw * 0.24, 0.18, -dd / 2 + 0.064, { r: 0 });
+  }
+  // Two robots: a squat rounded body on wheels, a dark visor with two painted eyes.
+  const r = Math.min(dw * 0.16, dd * 0.22);
+  for (const sx of [-1, 1]) {
+    const x = sx * dw * 0.24;
+    const z = sx > 0 ? 0.0 : 0.04;
+    for (const wz of [-1, 1]) b.cyl(0.022, 0.016, C.black, x - r * 0.7, 0.062, z + wz * r * 0.5, { axis: "x", seg: 8 });
+    for (const wz of [-1, 1]) b.cyl(0.022, 0.016, C.black, x + r * 0.7, 0.062, z + wz * r * 0.5, { axis: "x", seg: 8 });
+    b.ball(r, body, x, 0.06 + r * 0.9, z, { sy: 0.8, seg: 12 });
+    b.box(r * 1.1, r * 0.4, 0.01, C.screenOff, x, 0.06 + r * 0.95, z + r * 0.92, { r: 0.006 });
+    for (const ex of [-1, 1]) b.box(0.014, 0.014, 0.004, C.mint, x + ex * r * 0.25, 0.06 + r * 1.1, z + r * 0.92 + 0.006, { r: 0 });
+  }
+};
+
+/** A round table with a softly lit top, two thin panels of light hanging over it on fine posts. */
+const drawHoloTable: Draw = (b, w, d) => {
+  const radius = Math.min(w, d) / 2 - 0.02;
+  const top = 0.74;
+  // A single pedestal on a disc foot.
+  b.cyl(radius * 0.55, 0.03, C.charcoal, 0, 0, 0, { seg: 20 });
+  b.cyl(0.05, top - 0.07, C.white, 0, 0.03, 0, { seg: 10 });
+  // The top: an ellipse as wide as the spot, a pale ring of light set into its edge.
+  const sx = (w / 2 - 0.02) / radius;
+  b.cyl(radius, 0.04, C.white, 0, top - 0.04, 0, { seg: 24, sx });
+  b.cyl(radius * 0.95, 0.004, C.mint, 0, top, 0, { seg: 24, sx });
+  b.cyl(radius * 0.88, 0.007, C.glass, 0, top, 0, { seg: 24, sx });
+  // Two floating panels, painted bright, held by posts as fine as wire.
+  const panels: Array<[number, number]> = [
+    [-radius * sx * 0.4, -0.25],
+    [radius * sx * 0.4, 0.25],
+  ];
+  for (const [x, yaw] of panels) {
+    b.cyl(0.004, 0.18, C.chrome, x, top, 0, { seg: 4 });
+    b.place(x, top + 0.18, 0, { ry: yaw }, () => {
+      b.box(radius * 0.7, radius * 0.45, 0.006, C.glass, 0, 0, 0, { r: 0 });
+      b.box(radius * 0.5, 0.012, 0.008, C.mint, 0, radius * 0.3, 0, { r: 0 });
+      b.box(radius * 0.36, 0.012, 0.008, C.lavender, -radius * 0.07, radius * 0.18, 0, { r: 0 });
+    });
+  }
+};
+
+/** A short, rounded home robot: a soft body on a wheeled base, a round head with a face of two painted eyes. */
+const drawHomeRobot: Draw = (b, w, d, variant) => {
+  const radius = Math.min(w, d) / 2 - 0.03;
+  const body = [C.cream, C.white, C.sand][variant % 3];
+  b.cyl(radius, 0.06, C.charcoal, 0, 0, 0, { seg: 16 });
+  b.lathe(
+    [
+      [radius * 0.85, 0.06],
+      [radius * 0.95, 0.2],
+      [radius * 0.85, 0.4],
+      [radius * 0.6, 0.5],
+      [0.001, 0.52],
+    ],
+    body,
+    0,
+    0,
+    0,
+    { seg: 16 }
+  );
+  b.box(radius * 0.8, 0.02, 0.01, C.lavender, 0, 0.3, radius * 0.92, { r: 0 });
+  // The head, set a little forward, its face a dark band with two soft eyes.
+  const head = radius * 0.62;
+  b.ball(head, body, 0, 0.52 + head * 0.8, radius * 0.06, { seg: 14 });
+  b.box(head * 1.3, head * 0.55, 0.012, C.screenOff, 0, 0.52 + head * 0.55, radius * 0.06 + head * 0.9, { r: 0.01 });
+  for (const ex of [-1, 1]) b.ball(0.016, C.lavender, ex * head * 0.3, 0.52 + head * 0.82, radius * 0.06 + head * 0.96, { seg: 6 });
+  // Two small arms folded at its sides.
+  for (const sx of [-1, 1]) b.box(0.03, 0.14, 0.05, darken(body, 0.08), sx * radius * 0.92, 0.2, 0, { r: 0.012, rz: sx * 0.15 });
+};
+
+/** A slim stand of hooks, pairs of glasses hanging on it in soft colours. */
+const drawGlassesStand: Draw = (b, w, d, variant) => {
+  const spread = Math.min(w, d) / 2 - 0.04;
+  const h = 1.45;
+  b.cyl(spread, 0.03, C.charcoal, 0, 0, 0, { seg: 16 });
+  b.cyl(0.018, h - 0.03, C.white, 0, 0.03, 0, { seg: 8 });
+  b.ball(0.03, C.white, 0, h, 0, { seg: 8 });
+  const frames = [C.violet, C.black, C.lavender, C.pink, C.teal, C.charcoal];
+  // Four arms round the post, a pair of glasses hanging on each, their lenses faintly tinted.
+  for (let i = 0; i < 4; i += 1) {
+    const yaw = (i * Math.PI) / 2 + Math.PI / 4;
+    const y = 0.75 + (i % 2) * 0.32;
+    const reach = spread - 0.04;
+    const ax = Math.sin(yaw) * reach;
+    const az = Math.cos(yaw) * reach;
+    b.tube([0, y + 0.04, 0], [ax, y, az], 0.006, C.chrome, { seg: 4 });
+    b.place(ax, y - 0.05, az, { ry: yaw }, () => {
+      const frame = frames[(i + variant) % frames.length];
+      for (const lx of [-1, 1]) {
+        b.box(0.05, 0.035, 0.006, frame, lx * 0.032, 0, 0, { r: 0.006 });
+        b.box(0.04, 0.026, 0.008, lighten(C.lavender, 0.4), lx * 0.032, 0.0045, 0, { r: 0 });
+      }
+      b.box(0.016, 0.006, 0.006, frame, 0, 0.028, 0, { r: 0 });
+    });
+  }
+};
+
+/** A column of soft rings of light stacked up a slim pole: painted bright, not lit. */
+const drawLightColumn: Draw = (b, w, d, variant) => {
+  const base = Math.min(w, d) / 2 - 0.03;
+  const tints = [
+    [C.lavender, C.violet],
+    [C.glass, C.mint],
+    [C.pink, C.lavender],
+  ][variant % 3];
+  b.cyl(base, 0.04, C.bone, 0, 0, 0, { seg: 18 });
+  b.cyl(0.014, 1.6, C.white, 0, 0.04, 0, { seg: 8 });
+  const rings = 6;
+  for (let i = 0; i < rings; i += 1) {
+    const t = i / (rings - 1);
+    const radius = base * (0.55 + 0.35 * Math.sin(t * Math.PI));
+    b.torus(radius, 0.018, i % 2 === 0 ? tints[0] : tints[1], 0, 0.3 + t * 1.2, 0, { seg: 20 });
+  }
+  b.ball(0.05, lighten(tints[0], 0.4), 0, 1.66, 0, { seg: 10 });
+};
+
 const DRAW: Record<SignatureKind, Draw> = {
   "fax-machine": drawFax,
   "software-shelf": drawSoftwareShelf,
@@ -411,6 +545,11 @@ const DRAW: Record<SignatureKind, Draw> = {
   "charging-kiosk": drawChargingKiosk,
   "drinks-fridge": drawDrinksFridge,
   "compute-cabinet": drawComputeCabinet,
+  "robot-dock": drawRobotDock,
+  "holo-table": drawHoloTable,
+  "home-robot": drawHomeRobot,
+  "glasses-stand": drawGlassesStand,
+  "light-column": drawLightColumn,
 };
 
 const key = (value: number): string => (Math.round(value * 1000) / 1000).toFixed(3);

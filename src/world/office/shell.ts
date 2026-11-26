@@ -140,6 +140,8 @@ const SHELL_SPECS: Record<FurnitureSet, readonly ShellSpec[]> = {
   nineties: CLASSIC_SHELLS,
   noughties: CLASSIC_SHELLS,
   twenties: CLASSIC_SHELLS,
+  // The invented future stands in the same buildings as the twenties; its floor and furniture say which years these are.
+  future: CLASSIC_SHELLS,
 };
 
 /** Width of the garage's roll-up opening, and of the gap a framed door needs in the kerb. */

@@ -13,10 +13,10 @@ describe("looks", () => {
   it("an era nobody has heard of keeps the classic look", () => {
     expect(["flat", "", "constructor", "__proto__", "classic", "nineties"].map(lookFor)).toEqual(Array(6).fill("classic"));
   });
-  it("eight looks sit on four furniture sets, the decade's", () => {
-    expect(ERAS.map(furnitureOf)).toEqual(["nineties", "nineties", "noughties", "noughties", "noughties", "twenties", "twenties", "twenties"]);
+  it("eight looks sit on four furniture sets, the decade's, the invented future on its own", () => {
+    expect(ERAS.map(furnitureOf)).toEqual(["nineties", "nineties", "noughties", "noughties", "noughties", "twenties", "future", "future"]);
     expect(furnitureOf("classic")).toBe("classic");
-    expect(FURNITURE_SETS).toEqual(["classic", "nineties", "noughties", "twenties"]);
+    expect(FURNITURE_SETS).toEqual(["classic", "nineties", "noughties", "twenties", "future"]);
   });
   it("every look has five themes, and no two looks dress the same office alike", () => {
     for (const office of PHASES) {

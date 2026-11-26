@@ -4,6 +4,7 @@ import type { OfficeIndex } from "../types";
 import {
   bakeModel,
   canDrawTextures,
+  FURNITURE_SETS,
   canvasTexture,
   createDynamicTexture,
   disposeSharedResources,
@@ -31,6 +32,7 @@ import {
   createWall,
   DESK_STYLE_FOR_PHASE,
   DESK_STYLES,
+  deskHardware,
   deskStyleFor,
   monitorFor,
   PROP_CATALOG,
@@ -349,7 +351,22 @@ describe("prop catalog", () => {
     expect(DESK_STYLES.map((style) => monitorFor(style, "twenties"))).toEqual(Array(5).fill("laptop"));
   });
 
-  it("gives every office of every look a desk style, a floor and walls", () => {
+  it("the future puts a glass screen on every desk", () => {
+    expect(DESK_STYLES.map((style) => monitorFor(style, "future"))).toEqual(Array(5).fill("glass"));
+  });
+
+  it("the hardware on a desk belongs to the computer on it", () => {
+    for (const set of FURNITURE_SETS) for (const style of DESK_STYLES) {
+      const monitor = monitorFor(style, set);
+      const kit = deskHardware(style, set);
+      expect(kit.tower, `${style} ${set}`).toBe(monitor === "crt");
+      expect(kit.laptopStand, `${style} ${set}`).toBe(monitor === "laptop" && style === "hotdesk");
+      expect(kit.keyboard, `${style} ${set}`).toBe(
+        monitor === "crt" ? "beige" : monitor === "glass" ? "pad" : monitor === "laptop" ? "none" : "dark");
+    }
+  });
+
+  it("gives every office of every furniture set a desk style, a floor and walls", () => {
     for (const look of LOOKS) for (const office of PHASES) {
       expect(DESK_STYLES).toContain(deskStyleFor(office, look));
       expect(["drywall", "brick", "plaster", "glass", "panel"]).toContain(wallStyleFor(office, look));

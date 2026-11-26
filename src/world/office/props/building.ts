@@ -59,7 +59,12 @@ interface FloorStyle {
   groove: number;
   side: number;
   tones: readonly number[];
+  /** Strips of light inlaid in the floor, in this colour, if the finish has them. */
+  lines?: number;
 }
+
+/** Spacing of the light strips inlaid in a floor that has them. */
+const LINE_PITCH = 1.6;
 
 /** The floor finish, by furniture set and then by office (0 the garage … 4 the campus). */
 const FLOOR_STYLES: Record<FurnitureSet, readonly FloorStyle[]> = {
@@ -94,6 +99,14 @@ const FLOOR_STYLES: Record<FurnitureSet, readonly FloorStyle[]> = {
     { groove: 0xbfc0bf, side: 0xb4b5b4, tones: [0xe0e0de, 0xdbdbd9, 0xe5e5e3] },
     { groove: 0xb3b5b6, side: 0x2c3038, tones: [0xd2d4d5, 0xcdcfd0, 0xd7d9da] },
   ],
+  // The invented future: pale poured resin, seamless to the eye, with strips of light inlaid in it.
+  future: [
+    { groove: 0xd3d6d8, side: 0xbfc3c6, tones: [0xeceeed, 0xe8eae9, 0xeff1f0], lines: 0xc9f1fb },
+    { groove: 0xd6d4cf, side: 0xc2c0bb, tones: [0xefece6, 0xebe8e2, 0xf2efe9, 0xe8e5df], lines: 0xc9f1fb },
+    { groove: 0xd1d5d8, side: 0xbcc1c5, tones: [0xe9ecee, 0xe5e8ea, 0xedf0f2], lines: 0xd6ccf6 },
+    { groove: 0xd5d7d8, side: 0xc0c2c4, tones: [0xf0f1f1, 0xecedee, 0xf3f4f4], lines: 0xc9f1fb },
+    { groove: 0xcfd2d4, side: 0x2c3038, tones: [0xe4e7e9, 0xe0e3e5, 0xe8ebed], lines: 0xd6ccf6 },
+  ],
 };
 
 const drawFloor = (b: ModelBuilder, w: number, d: number, office: OfficeIndex, look: LookId): void => {
@@ -107,6 +120,14 @@ const drawFloor = (b: ModelBuilder, w: number, d: number, office: OfficeIndex, l
   const tile = (x: number, z: number, tw: number, td: number, color: number): void => {
     b.box(tw, 0.03, td, color, x, -0.03, z, { r: 0 });
   };
+
+  if (style.lines !== undefined) {
+    // Painted bright rather than lit: part of the one floor mesh, nothing that glows or animates.
+    const across = Math.max(1, Math.round(w / LINE_PITCH));
+    const along = Math.max(1, Math.round(d / LINE_PITCH));
+    for (let i = 1; i < across; i += 1) b.box(0.03, 0.003, d - 0.1, style.lines, -w / 2 + (w / across) * i, 0, 0, { r: 0 });
+    for (let i = 1; i < along; i += 1) b.box(w - 0.1, 0.003, 0.03, style.lines, 0, 0, -d / 2 + (d / along) * i, { r: 0 });
+  }
 
   if (tier === 1) {
     // Planks running along X, staggered row to row.
@@ -277,6 +298,8 @@ export const WALL_STYLE_FOR_PHASE: Record<FurnitureSet, readonly WallStyle[]> = 
   nineties: ["drywall", "brick", "plaster", "glass", "panel"],
   noughties: ["drywall", "brick", "plaster", "glass", "panel"],
   twenties: ["drywall", "brick", "plaster", "glass", "panel"],
+  // The future stands in the twenties' buildings (see SHELL_SPECS in ../shell.ts), so it has their walls.
+  future: ["drywall", "brick", "plaster", "glass", "panel"],
 };
 
 /** The wall finish of an office in a look: its furniture set's. */

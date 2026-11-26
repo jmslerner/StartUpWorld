@@ -8,8 +8,6 @@ import { createSignatureProp, SIGNATURE_PROPS, SIGNATURE_SIZES } from "./props/s
 
 const kinds = (office: OfficeIndex) => getLayoutDecor(getOfficeLayout(office));
 const ERA_LOOKS_ALL = ["dial-up", "gold-rush", "bust", "phones", "cheap-money", "winter-ai", "agents", "ambient"] as const;
-/** The eras whose rows are final (the last two still borrow a stand-in row). */
-const OWN_ROWS = ["dial-up", "gold-rush", "bust", "phones", "cheap-money", "winter-ai"] as const;
 
 afterEach(() => {
   disposeSharedResources();
@@ -23,22 +21,30 @@ describe("signature props", () => {
     expect(SIGNATURE_PROPS.phones).toEqual(["charging-kiosk", "flat-tv", "beanbag"]);
     expect(SIGNATURE_PROPS["cheap-money"]).toEqual(["foosball", "drinks-fridge", "scooter"]);
     expect(SIGNATURE_PROPS["winter-ai"]).toEqual(["compute-cabinet", "plant-wall", "ring-light"]);
-    const firsts = OWN_ROWS.map((look) => SIGNATURE_PROPS[look][0]);
+    const firsts = ERA_LOOKS_ALL.map((look) => SIGNATURE_PROPS[look][0]);
     expect(new Set(firsts).size).toBe(firsts.length);
+  });
+
+  it("the two invented eras stand props of their own", () => {
+    expect(SIGNATURE_PROPS.agents).toEqual(["robot-dock", "holo-table", "plant-wall"]);
+    expect(SIGNATURE_PROPS.ambient).toEqual(["home-robot", "glasses-stand", "light-column"]);
+    expect(SIGNATURE_PROPS.ambient.filter((kind) => SIGNATURE_PROPS.agents.includes(kind))).toEqual([]);
   });
 
   it("the two tightest offices stand the props this table says (index into the office's décor, then kind)", () => {
     // garage: 0 filing cabinet 0.46 × 0.6, 1 boxes 1.0 × 0.6. shared office: 0 large plant 0.8 × 0.8,
     // 1 water cooler 0.45 × 0.4, 3 plant 0.55 × 0.55. Measured with signaturePlan over the real layouts and these sizes.
-    const plans: Record<(typeof OWN_ROWS)[number], [unknown, unknown]> = {
+    const plans: Record<(typeof ERA_LOOKS_ALL)[number], [unknown, unknown]> = {
       "dial-up": [[[0, "fax-machine"], [1, "dot-printer"]], [[1, "fax-machine"], [3, "dot-printer"], [0, "tube-tv"]]],
       "gold-rush": [[[1, "software-shelf"], [0, "pinball"]], [[0, "software-shelf"], [3, "pinball"]]],
       bust: [[[1, "box-stack"], [0, "fax-machine"]], [[3, "box-stack"], [1, "fax-machine"], [0, "flat-tv"]]],
       phones: [[[0, "charging-kiosk"], [1, "flat-tv"]], [[1, "charging-kiosk"], [0, "flat-tv"], [3, "beanbag"]]],
       "cheap-money": [[[1, "foosball"], [0, "drinks-fridge"]], [[0, "foosball"], [3, "drinks-fridge"]]],
       "winter-ai": [[[1, "compute-cabinet"], [0, "ring-light"]], [[0, "compute-cabinet"], [1, "ring-light"]]],
+      agents: [[[0, "robot-dock"], [1, "holo-table"]], [[3, "robot-dock"], [0, "holo-table"]]],
+      ambient: [[[0, "home-robot"], [1, "glasses-stand"]], [[3, "home-robot"], [1, "glasses-stand"], [0, "light-column"]]],
     };
-    for (const look of OWN_ROWS) {
+    for (const look of ERA_LOOKS_ALL) {
       expect([...signaturePlan(kinds(0), look)], `garage ${look}`).toEqual(plans[look][0]);
       expect([...signaturePlan(kinds(1), look)], `shared ${look}`).toEqual(plans[look][1]);
     }
@@ -50,7 +56,7 @@ describe("signature props", () => {
   });
 
   it("every era's first prop shows in every office", () => {
-    for (const office of PHASES) for (const look of OWN_ROWS)
+    for (const office of PHASES) for (const look of ERA_LOOKS_ALL)
       expect([...signaturePlan(kinds(office), look).values()], `office ${office} ${look}`).toContain(SIGNATURE_PROPS[look][0]);
   });
 

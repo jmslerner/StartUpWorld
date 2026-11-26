@@ -20,7 +20,7 @@ export type LookId = "classic" | "dial-up" | "gold-rush" | "bust" | "phones" | "
  * The furniture a look stands on: the desks, the computer on them, floors, walls and shells. Eight looks share the
  * decades' three sets; the classic set is what the classic look keeps.
  */
-export type FurnitureSet = "classic" | "nineties" | "noughties" | "twenties";
+export type FurnitureSet = "classic" | "nineties" | "noughties" | "twenties" | "future";
 
 export interface OfficeScene {
   /** Changes when another company or another game is shown: everything is rebuilt. */

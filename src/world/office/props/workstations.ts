@@ -7,7 +7,7 @@
  * (+Z) side of the top with its screen facing back toward −Z.
  */
 import * as THREE from "three";
-import { bakeModel, C, darken, furnitureOf, modelMesh, phaseTier, SCALE } from "../../core/palette";
+import { bakeModel, C, darken, furnitureOf, lighten, modelMesh, phaseTier, SCALE } from "../../core/palette";
 import type { ColorFilter, ModelBuilder } from "../../core/palette";
 import type { FurnitureSet, LookId, OfficeIndex, Team } from "../../types";
 import { CHAIR_SIZE, DESK_SIZE } from "../footprints";
@@ -41,6 +41,7 @@ export const DESK_STYLE_FOR_PHASE: Record<FurnitureSet, readonly DeskStyle[]> = 
   nineties: ["garage", "hotdesk", "standard", "premium", "executive"],
   noughties: ["garage", "hotdesk", "standard", "premium", "executive"],
   twenties: ["garage", "hotdesk", "standard", "premium", "executive"],
+  future: ["garage", "hotdesk", "standard", "premium", "executive"],
 };
 
 /** The desk and chair style of an office in a look: its furniture set's. */
@@ -89,7 +90,8 @@ const CLASSIC_MONITORS: Record<DeskStyle, MonitorKind> = {
 
 /**
  * The computer on a desk of a style in a furniture set: a tube monitor on every desk of the nineties, flat screens
- * (wide on the two best desks) in the noughties, a laptop on every desk of the twenties.
+ * (wide on the two best desks) in the noughties, a laptop on every desk of the twenties, a pane of glass on every
+ * desk of the invented future.
  */
 export const monitorFor = (style: DeskStyle, set: FurnitureSet): MonitorKind => {
   switch (set) {
@@ -101,7 +103,32 @@ export const monitorFor = (style: DeskStyle, set: FurnitureSet): MonitorKind => 
       return style === "premium" || style === "executive" ? "wide" : "flat";
     case "twenties":
       return "laptop";
+    case "future":
+      return "glass";
   }
+};
+
+/** What else a desk carries besides its screen. */
+export interface DeskHardware {
+  /** A computer case under the desk. */
+  readonly tower: boolean;
+  readonly keyboard: "beige" | "dark" | "pad" | "none";
+  /** The wedge that lifts a laptop to eye level. */
+  readonly laptopStand: boolean;
+}
+
+/**
+ * The hardware that belongs to the computer on a desk: a tube monitor has a beige tower under the desk and a beige
+ * keyboard; a flat screen a modern keyboard in the desk's finish; a laptop its own keys (and, on the hot desk, a
+ * stand); the future's glass a touch pad.
+ */
+export const deskHardware = (style: DeskStyle, set: FurnitureSet): DeskHardware => {
+  const monitor = monitorFor(style, set);
+  return {
+    tower: monitor === "crt",
+    keyboard: monitor === "crt" ? "beige" : monitor === "glass" ? "pad" : monitor === "laptop" ? "none" : "dark",
+    laptopStand: monitor === "laptop" && style === "hotdesk",
+  };
 };
 
 /** The casing of each style's computer, whatever kind it is: it matches the desk. */
@@ -128,10 +155,34 @@ const deskMonitors = (style: DeskStyle, look: LookId): MonitorSpec[] => {
       return [withShell({ kind, x: 0, y: TOP, z: style === "executive" ? 0.17 : 0.15 })];
     case "wide":
       return [withShell({ kind, x: 0, y: TOP, z: style === "executive" ? 0.17 : 0.15 })];
+    case "glass":
+      return [withShell({ kind, x: 0, y: TOP, z: 0.15 })];
   }
 };
 
-const drawBody = (b: ModelBuilder, style: DeskStyle, accent: number): void => {
+const BEIGE = 0xdcd3bb;
+
+/** Where the tower stands under each desk: clear of its legs, pedestals and panels, and of the sitter's knees. */
+const TOWER_AT: Record<DeskStyle, { x: number; z: number; d: number }> = {
+  garage: { x: 0.27, z: 0.16, d: 0.34 },
+  hotdesk: { x: 0.27, z: 0.18, d: 0.3 },
+  standard: { x: -0.3, z: 0.08, d: 0.3 },
+  premium: { x: 0.27, z: 0.02, d: 0.3 },
+  executive: { x: 0.17, z: 0.08, d: 0.3 },
+};
+
+/** A beige tower PC parked under the desk. */
+const drawTower = (b: ModelBuilder, style: DeskStyle): void => {
+  const { x, z, d } = TOWER_AT[style];
+  const front = z - d / 2 - 0.004;
+  b.box(0.19, 0.42, d, BEIGE, x, 0, z, { r: 0.014 });
+  b.box(0.15, 0.03, 0.01, C.charcoal, x, 0.33, front, { r: 0 });
+  b.box(0.15, 0.03, 0.01, C.charcoal, x, 0.27, front, { r: 0 });
+  b.box(0.03, 0.03, 0.01, C.good, x - 0.05, 0.2, front, { r: 0 });
+};
+
+const drawBody = (b: ModelBuilder, style: DeskStyle, accent: number, set: FurnitureSet): void => {
+  if (deskHardware(style, set).tower) drawTower(b, style);
   switch (style) {
     case "garage": {
       // A sheet of plywood across two sawhorses.
@@ -146,12 +197,6 @@ const drawBody = (b: ModelBuilder, style: DeskStyle, accent: number): void => {
         }
         b.box(0.03, 0.035, 0.5, darken(C.pallet, 0.12), x, 0.26, 0, { r: 0 });
       }
-      // Beige tower PC parked underneath, clear of the sitter's legs.
-      const beige = 0xdcd3bb;
-      b.box(0.19, 0.42, 0.34, beige, 0.27, 0, 0.16, { r: 0.014 });
-      b.box(0.15, 0.03, 0.01, C.charcoal, 0.27, 0.33, -0.014, { r: 0 });
-      b.box(0.15, 0.03, 0.01, C.charcoal, 0.27, 0.27, -0.014, { r: 0 });
-      b.box(0.03, 0.03, 0.01, C.good, 0.22, 0.2, -0.014, { r: 0 });
       return;
     }
     case "hotdesk": {
@@ -215,41 +260,57 @@ const drawBody = (b: ModelBuilder, style: DeskStyle, accent: number): void => {
   }
 };
 
+/** Each style's keyboard and mouse finish, used when its keyboard is a modern one. */
+const KEYS_FINISH: Record<DeskStyle, { body: number; keys: number; w: number }> = {
+  garage: { body: C.charcoal, keys: C.greyDark, w: 0.36 },
+  hotdesk: { body: C.white, keys: C.greyLight, w: 0.3 },
+  standard: { body: C.charcoal, keys: C.greyDark, w: 0.36 },
+  premium: { body: C.white, keys: C.greyLight, w: 0.3 },
+  executive: { body: C.black, keys: C.charcoal, w: 0.34 },
+};
+
+/** Where each style's mat, keyboard and mouse lie: the mat's size and centre, the keyboard's x, the mouse's x. */
+const MAT_AT: Record<DeskStyle, { w: number; d: number; x: number; z: number; t: number; keys: number; mouse: number }> = {
+  garage: { w: 0.24, d: 0.2, x: 0.38, z: -0.19, t: 0.004, keys: 0.08, mouse: 0.38 },
+  hotdesk: { w: 0.2, d: 0.18, x: 0.26, z: -0.19, t: 0.004, keys: 0, mouse: 0.26 },
+  standard: { w: 0.72, d: 0.24, x: 0.1, z: -0.19, t: 0.004, keys: -0.02, mouse: 0.34 },
+  premium: { w: 0.82, d: 0.3, x: 0, z: -0.15, t: 0.006, keys: -0.04, mouse: 0.26 },
+  executive: { w: 0.62, d: 0.34, x: 0, z: -0.13, t: 0.008, keys: 0, mouse: 0.26 },
+};
+
 /**
  * Keyboard + mouse: stays on the desk when it is vacant. So does the mat under them, which is in the desk's accent
- * colour in every style: seen from above, it is what says whose desk this is.
+ * colour in every style: seen from above, it is what says whose desk this is. Which keyboard it is belongs to the
+ * computer on the desk (`deskHardware`): a beige one with a tube, the desk's own with a flat screen, none beside a
+ * laptop (it has its own keys), a pane of touch glass with the future's screen.
  */
-const drawHardware = (b: ModelBuilder, style: DeskStyle, accent: number): void => {
-  switch (style) {
-    case "garage":
-      b.box(0.24, 0.004, 0.2, accent, 0.38, TOP, -0.19, { r: 0 });
-      drawKeyboard(b, 0.08, TOP, -0.2, 0xdcd3bb, 0xbfb59c, 0.4);
-      drawMouse(b, 0.38, TOP + 0.004, -0.19, 0xdcd3bb);
-      return;
-    case "hotdesk":
-      // Wedge stand that lifts the laptop to eye level.
-      b.box(0.3, 0.07, 0.2, C.white, 0, TOP, 0.05, { r: 0.012, taperZ: 0.9 });
-      b.box(0.2, 0.004, 0.18, accent, 0.26, TOP, -0.19, { r: 0 });
-      drawKeyboard(b, 0, TOP, -0.2, C.white, C.greyLight, 0.3);
-      drawMouse(b, 0.26, TOP + 0.004, -0.19, C.white);
-      return;
-    case "standard":
-      b.box(0.72, 0.004, 0.24, accent, 0.1, TOP, -0.19, { r: 0 });
-      drawKeyboard(b, -0.02, TOP + 0.004, -0.2);
-      drawMouse(b, 0.34, TOP + 0.004, -0.19);
-      return;
-    case "premium":
-      b.box(0.82, 0.006, 0.3, accent, 0, TOP, -0.15, { r: 0 });
-      drawKeyboard(b, -0.04, TOP + 0.006, -0.2, C.white, C.greyLight, 0.3);
-      drawMouse(b, 0.26, TOP + 0.006, -0.19, C.white);
-      return;
-    case "executive":
-      b.box(0.62, 0.008, 0.34, accent, 0, TOP, -0.13, { r: 0 });
-      b.box(0.64, 0.004, 0.36, C.brass, 0, TOP, -0.13, { r: 0 });
-      drawKeyboard(b, 0, TOP + 0.008, -0.2, C.black, C.charcoal, 0.34);
-      drawMouse(b, 0.26, TOP + 0.008, -0.19, C.black);
-      return;
+const drawHardware = (b: ModelBuilder, style: DeskStyle, accent: number, set: FurnitureSet): void => {
+  const kit = deskHardware(style, set);
+  const mat = MAT_AT[style];
+  const finish = KEYS_FINISH[style];
+  const top = TOP + mat.t;
+  // The garage's and the hot desk's mats lie under the mouse only; the keyboard stands on the bare top.
+  const keysY = style === "garage" || style === "hotdesk" ? TOP : top;
+  if (kit.laptopStand) b.box(0.3, 0.07, 0.2, C.white, 0, TOP, 0.05, { r: 0.012, taperZ: 0.9 });
+  if (style === "executive") b.box(0.64, 0.004, 0.36, C.brass, mat.x, TOP, mat.z, { r: 0 });
+  b.box(mat.w, mat.t, mat.d, accent, mat.x, TOP, mat.z, { r: 0 });
+  const mouse = kit.keyboard === "beige" ? BEIGE : finish.body;
+  switch (kit.keyboard) {
+    case "beige":
+      drawKeyboard(b, mat.keys, keysY, -0.2, BEIGE, 0xbfb59c, 0.4);
+      break;
+    case "dark":
+      drawKeyboard(b, mat.keys, keysY, -0.2, finish.body, finish.keys, finish.w);
+      break;
+    case "pad":
+      // A thin pane of touch glass, its keys a faint grid of light.
+      b.box(0.34, 0.006, 0.12, C.glass, mat.keys, keysY, -0.2, { r: 0.004 });
+      for (let row = 0; row < 3; row += 1) b.box(0.3, 0.002, 0.004, lighten(C.glass, 0.5), mat.keys, keysY + 0.006, -0.235 + row * 0.035, { r: 0 });
+      break;
+    case "none":
+      break;
   }
+  drawMouse(b, mat.mouse, top, -0.19, mouse);
 };
 
 /** Personal mess — only on occupied desks. `variant` shuffles it so rows of desks do not look cloned. */
@@ -346,9 +407,10 @@ const vacantFilter: ColorFilter = (color) => {
 
 const drawDesk = (b: ModelBuilder, style: DeskStyle, look: LookId, accent: number, occupied: boolean, variant: number): void => {
   if (!occupied) b.setColorFilter(vacantFilter);
-  drawBody(b, style, accent);
+  const set = furnitureOf(look);
+  drawBody(b, style, accent, set);
   for (const monitor of deskMonitors(style, look)) drawMonitor(b, monitor);
-  drawHardware(b, style, accent);
+  drawHardware(b, style, accent, set);
   if (occupied) drawClutter(b, style, accent, variant);
   b.setColorFilter(null);
 };

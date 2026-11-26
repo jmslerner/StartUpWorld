@@ -163,10 +163,13 @@ export const ERA_LOOKS: Readonly<Record<string, LookId>> = Object.freeze({
 /** The look of an era. Any string has one: an era not listed (or a name an object inherits) keeps the classic look. */
 export const lookFor = (era: string): LookId => (Object.hasOwn(ERA_LOOKS, era) ? ERA_LOOKS[era] : "classic");
 
-/** Every furniture set there is: the classic one, then the three decades'. */
-export const FURNITURE_SETS: readonly FurnitureSet[] = ["classic", "nineties", "noughties", "twenties"];
+/** Every furniture set there is: the classic one, the three decades', then the invented future's. */
+export const FURNITURE_SETS: readonly FurnitureSet[] = ["classic", "nineties", "noughties", "twenties", "future"];
 
-/** The furniture each look stands on: its decade's set; the classic look keeps the classic set. */
+/**
+ * The furniture each look stands on: its decade's set; the two invented eras share the future's; the classic look
+ * keeps the classic set.
+ */
 const FURNITURE_OF: Readonly<Record<LookId, FurnitureSet>> = {
   classic: "classic",
   "dial-up": "nineties",
@@ -175,8 +178,8 @@ const FURNITURE_OF: Readonly<Record<LookId, FurnitureSet>> = {
   phones: "noughties",
   "cheap-money": "noughties",
   "winter-ai": "twenties",
-  agents: "twenties",
-  ambient: "twenties",
+  agents: "future",
+  ambient: "future",
 };
 
 /** The furniture set of a look. */
