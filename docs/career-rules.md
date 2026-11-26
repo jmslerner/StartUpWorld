@@ -1,9 +1,10 @@
 # StartUpWorld: career rules
 
 The career is StartUpWorld's second game: one company from 1990 to 2038, one turn a year. Its design is in
-`docs/superpowers/specs/2026-11-25-career-3d-design.md`. This file is the record kept while the career is built. It
+`docs/superpowers/specs/2026-11-25-career-3d-design.md`. This file is the record kept as the career was built. It
 says in what order a year is played, how each point the design left open was settled, and which numbers tuning
-changed and why. Each section fills in as the build goes on.
+changed and why. Everything here is built: the rules and the simulator, the career's 2D screens, and its 3D office and
+market on desktop (the plans are in `docs/superpowers/plans/`).
 
 ## Order of a year
 
@@ -117,7 +118,8 @@ Resolution, in this order:
    among the companies still in the game; ties go to the higher valuation, then the lower seat; with nobody left the
    outcome is `wipeout`.
 7. As in the race, the engine plays on when the player's company is out. Ending the player's session after a second
-   failure is the app's job (the screens plan); the simulator plays every career to 2038.
+   failure is the app's job (built by the plan "The career in the 2D screens",
+   `docs/superpowers/plans/2026-11-25-career-2d-screens.md`); the simulator plays every career to 2038.
 8. A dated card replaces the random draw of its year. `events.firstTurn` and `events.chance` govern random draws only.
 9. The first year's card is dealt with the game, so it cannot be a card that hits one company.
 10. A dated card whose target rule no company meets is still in force; the effects that need a target hit nobody.
