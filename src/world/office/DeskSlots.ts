@@ -231,6 +231,7 @@ export class DeskSlots {
       variant: index,
       screen: team === null ? SCREEN_FOR_NOBODY : SCREEN_FOR_TEAM[team],
       occupied,
+      look: this.kit.look,
     });
   }
 

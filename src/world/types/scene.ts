@@ -10,8 +10,11 @@ export const TEAMS: readonly Team[] = ["product", "growth", "recruiting"];
 /** Which of the five offices: 0 is the garage, 4 the campus. */
 export type OfficeIndex = 0 | 1 | 2 | 3 | 4;
 
-/** How an office of a given size is dressed. One look for now. */
-export type LookId = "classic";
+/**
+ * How an office of a given size is dressed: one look per decade's furniture (the nineties, the noughties, the
+ * twenties), and the classic look for any era the world does not know.
+ */
+export type LookId = "classic" | "nineties" | "noughties" | "twenties";
 
 export interface OfficeScene {
   /** Changes when another company or another game is shown: everything is rebuilt. */

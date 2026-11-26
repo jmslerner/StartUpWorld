@@ -113,10 +113,14 @@ export const LIGHTING_LOOKS: readonly LightingLook[] = ["morning", "afternoon", 
 /**
  * The daytime look each office rests in, by the office's look and then by office (0 the garage … 4 the campus).
  * A year has no clock, so an office has one light for as long as nothing happens. The classic look is the old
- * full-energy morning everywhere; this is where an era gets its own mood later.
+ * full-energy morning everywhere; each decade's look rests in a light of its own, the same in all five offices.
  */
 const RESTING_LOOKS: Record<LookId, readonly [LightingLook, LightingLook, LightingLook, LightingLook, LightingLook]> = {
   classic: ["morning", "morning", "morning", "morning", "morning"],
+  // The warm low sun of the nineties, the fresh morning of the noughties, the clean early light of the twenties.
+  nineties: ["afternoon", "afternoon", "afternoon", "afternoon", "afternoon"],
+  noughties: ["morning", "morning", "morning", "morning", "morning"],
+  twenties: ["sunrise", "sunrise", "sunrise", "sunrise", "sunrise"],
 };
 
 /** The look an office rests in. An office out of range rests as the garage does. */

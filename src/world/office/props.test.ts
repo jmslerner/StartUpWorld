@@ -10,6 +10,7 @@ import {
   mat,
   mixColor,
   ModelBuilder,
+  LOOKS,
   PHASES,
   ROLE_COLORS,
   roundedRect,
@@ -22,6 +23,7 @@ import {
   createChair,
   createDesk,
   createDoor,
+  createFloor,
   createOverflowSign,
   createProductWall,
   createStation,
@@ -29,6 +31,7 @@ import {
   DESK_STYLE_FOR_PHASE,
   DESK_STYLES,
   deskStyleFor,
+  monitorFor,
   PROP_CATALOG,
   PROP_SETS,
   SCREEN_FOR_TEAM,
@@ -208,6 +211,13 @@ describe("palette", () => {
   });
 });
 
+/** What a built prop is made of: its meshes' vertex and index counts and its bounds. */
+const signature = (handle: PropHandle): string => {
+  const bounds = boundsOf(handle.group);
+  const meshes = meshesOf(handle.group).map((mesh) => `${mesh.geometry.getAttribute("position").count}/${mesh.geometry.getIndex()?.count ?? 0}`);
+  return `${meshes.join(",")} @ ${[...bounds.min.toArray(), ...bounds.max.toArray()].map((value) => value.toFixed(3)).join(" ")}`;
+};
+
 describe("prop catalog", () => {
   it("covers every set and has unique ids", () => {
     const ids = PROP_CATALOG.map((entry) => entry.id);
@@ -283,11 +293,6 @@ describe("prop catalog", () => {
   });
 
   it("builds each prop the same whatever was built before it (no cache-key collisions)", () => {
-    const signature = (handle: PropHandle): string => {
-      const bounds = boundsOf(handle.group);
-      const meshes = meshesOf(handle.group).map((mesh) => `${mesh.geometry.getAttribute("position").count}/${mesh.geometry.getIndex()?.count ?? 0}`);
-      return `${meshes.join(",")} @ ${[...bounds.min.toArray(), ...bounds.max.toArray()].map((value) => value.toFixed(3)).join(" ")}`;
-    };
     // First with one cache shared by everything, in catalog order…
     const shared = new Map<string, string>();
     for (const entry of PROP_CATALOG) {
@@ -305,6 +310,37 @@ describe("prop catalog", () => {
         expect(signature(handle), `${entry.id} (${phase})`).toBe(shared.get(`${entry.id}/${phase}`));
         handle.dispose();
       }
+    }
+  });
+
+  // The catalog test above builds desks with no look (desk entries are not `styled`), so it cannot see a collision
+  // between looks. This one can: every style in every look, busy and vacant, with one shared cache and then each from
+  // empty caches.
+  it("builds a desk of every style in every look the same whatever was built before it (no cache-key collisions)", () => {
+    const cases = DESK_STYLES.flatMap((style, i) => LOOKS.flatMap((look) => [true, false].map((occupied) => ({ style, look, occupied, variant: i }))));
+    const build = (c: (typeof cases)[number]) => createDesk({ style: c.style, look: c.look, occupied: c.occupied, variant: c.variant });
+    const shared = cases.map((c) => { const desk = build(c); const s = signature(desk); desk.dispose(); return s; });
+    cases.forEach((c, i) => {
+      disposeSharedResources();
+      const desk = build(c);
+      expect(signature(desk), `${c.style} ${c.look} ${c.occupied ? "busy" : "vacant"}`).toBe(shared[i]);
+      desk.dispose();
+    });
+    expect(new Set(LOOKS.map((look) => signature(createDesk({ style: "standard", look })))).size).toBeGreaterThan(1);
+  });
+
+  it("each look puts its decade's computer on every desk", () => {
+    expect(DESK_STYLES.map((style) => monitorFor(style, "classic"))).toEqual(["crt", "laptop", "flat", "wide", "flat"]);
+    expect(DESK_STYLES.map((style) => monitorFor(style, "nineties"))).toEqual(Array(5).fill("crt"));
+    expect(DESK_STYLES.map((style) => monitorFor(style, "noughties"))).toEqual(["flat", "flat", "flat", "wide", "wide"]);
+    expect(DESK_STYLES.map((style) => monitorFor(style, "twenties"))).toEqual(Array(5).fill("laptop"));
+  });
+
+  it("gives every office of every look a desk style, a floor and walls", () => {
+    for (const look of LOOKS) for (const office of PHASES) {
+      expect(DESK_STYLES).toContain(deskStyleFor(office, look));
+      expect(["drywall", "brick", "plaster", "glass", "panel"]).toContain(wallStyleFor(office, look));
+      expect(() => createFloor(4, 4, office, look).dispose()).not.toThrow();
     }
   });
 

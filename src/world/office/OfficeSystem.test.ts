@@ -627,6 +627,35 @@ describe("OfficeSystem when the office changes", () => {
     }
   });
 
+  it("a year that crosses into another decade rebuilds the office in place; a year within it does not", () => {
+    const world = new Harness();
+    world.apply({ office: 2, capacity: 22, era: "bust", year: 2006 }, (seating) => seating.seat("product", 3));
+    world.settle();
+    const bust = world.system.currentStage!;
+    expect(bust.look).toBe("noughties");
+    world.apply({ era: "phones", year: 2007 });
+    expect(world.system.currentStage).toBe(bust);
+    expect(bust.look).toBe("noughties");
+    world.settle();
+
+    world.apply({ era: "cheap-money", year: 2021 });
+    expect(world.system.currentStage).toBe(bust);
+    world.settle();
+    world.apply({ era: "winter-ai", year: 2022 });
+    const twenties = world.system.currentStage!;
+    expect(twenties).not.toBe(bust);
+    expect(twenties.look).toBe("twenties");
+    expect(twenties.office).toBe(2);
+    // The old office sinks away while the new one rises in the same place.
+    const root = world.scene.children[0];
+    expect(root.children).toEqual([bust.root, twenties.root]);
+    world.run(0.2);
+    expect(bust.root.position.y).toBeLessThan(0);
+    world.settle();
+    expect(root.children).toEqual([twenties.root]);
+    expect(world.freeDesks()).toEqual(world.seating!.freeDeskSlots());
+  });
+
   it("a sign that arrives with a new office is part of what pops in", () => {
     const world = new Harness();
     world.apply({ office: 3 });

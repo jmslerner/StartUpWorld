@@ -123,17 +123,26 @@ export const HAIR_COLORS: readonly number[] = [
 export const PANTS_COLORS: readonly number[] = [0x34405a, 0x3a4049, 0xb79c6f, 0x2f4b7c, 0x5a4a42];
 export const SHOE_COLORS: readonly number[] = [0x20242a, 0xf0ede4, 0x7a4a2e, 0xe4574a];
 
-/** Every look there is. A look is how an office of a given size is dressed; this version ships one. */
-export const LOOKS: readonly LookId[] = ["classic"];
+/** Every look there is. A look is how an office of a given size is dressed: the classic one, then one per decade. */
+export const LOOKS: readonly LookId[] = ["classic", "nineties", "noughties", "twenties"];
 
 /**
- * The look of an era. Era ids are free text (the rules name the eras, and the world knows none of them), so
- * any string has a look: every era gives the classic one for now. This is where an era gets its own look later.
+ * The look of each era the career has, by its decade's furniture. Era ids are free text to the world (the rules
+ * name the eras); these are the ids the shipped career uses.
  */
-export const lookFor = (era: string): LookId => {
-  void era;
-  return "classic";
-};
+export const ERA_LOOKS: Readonly<Record<string, LookId>> = Object.freeze({
+  "dial-up": "nineties",
+  "gold-rush": "nineties",
+  bust: "noughties",
+  phones: "noughties",
+  "cheap-money": "noughties",
+  "winter-ai": "twenties",
+  agents: "twenties",
+  ambient: "twenties",
+});
+
+/** The look of an era. Any string has one: an era not listed (or a name an object inherits) keeps the classic look. */
+export const lookFor = (era: string): LookId => (Object.hasOwn(ERA_LOOKS, era) ? ERA_LOOKS[era] : "classic");
 
 /** Furniture finish for one office in one look: the garage scrappy → the campus polished. */
 export interface PhaseTheme {
@@ -161,6 +170,30 @@ export const PHASE_THEMES: Record<LookId, OfficeThemes> = {
     { wood: C.oak, woodDark: C.walnut, frame: C.steel, panel: C.greyLight, accents: [C.blue, C.teal, C.orange], glow: NEON },
     { wood: C.birch, woodDark: C.oak, frame: C.white, panel: C.white, accents: [C.purple, C.leaf, C.pink], glow: NEON },
     { wood: C.walnut, woodDark: C.walnutDark, frame: C.brass, panel: C.marble, accents: [C.burgundy, C.navy, C.brass], glow: EMBER },
+  ],
+  // Beige casework and grey metal: the office furniture of the dial-up years.
+  nineties: [
+    { wood: C.pallet, woodDark: C.cardboardDark, frame: C.grey, panel: C.bone, accents: [C.teal, C.purple, C.yellow], glow: EMBER },
+    { wood: C.oak, woodDark: C.pallet, frame: C.grey, panel: C.cream, accents: [C.navy, C.teal, C.coral], glow: EMBER },
+    { wood: C.oak, woodDark: C.walnut, frame: C.greyDark, panel: C.bone, accents: [C.burgundy, C.teal, C.yellow], glow: NEON },
+    { wood: C.birch, woodDark: C.oak, frame: C.grey, panel: C.cream, accents: [C.navy, C.burgundy, C.teal], glow: NEON },
+    { wood: C.walnut, woodDark: C.walnutDark, frame: C.brass, panel: C.bone, accents: [C.navy, C.burgundy, C.green], glow: EMBER },
+  ],
+  // Light woods on steel frames.
+  noughties: [
+    { wood: C.birch, woodDark: C.plywood, frame: C.steel, panel: C.greyLight, accents: [C.orange, C.blue, C.leaf], glow: NEON },
+    { wood: C.plywood, woodDark: C.oak, frame: C.steel, panel: C.white, accents: [C.orange, C.leafLight, C.blue], glow: NEON },
+    { wood: C.birch, woodDark: C.oak, frame: C.steel, panel: C.white, accents: [C.blue, C.orange, C.leafLight], glow: NEON },
+    { wood: C.oak, woodDark: C.walnut, frame: C.chrome, panel: C.greyLight, accents: [C.blue, C.pink, C.orange], glow: NEON },
+    { wood: C.oak, woodDark: C.walnut, frame: C.steel, panel: C.charcoal, accents: [C.orange, C.blue, C.chrome], glow: NEON },
+  ],
+  // Birch and white with green and teal.
+  twenties: [
+    { wood: C.birch, woodDark: C.plywood, frame: C.white, panel: C.bone, accents: [C.leaf, C.teal, C.yellow], glow: NEON },
+    { wood: C.birch, woodDark: C.oak, frame: C.charcoal, panel: C.white, accents: [C.leaf, C.teal, C.coral], glow: NEON },
+    { wood: C.birch, woodDark: C.oak, frame: C.white, panel: C.greyLight, accents: [C.teal, C.leaf, C.pink], glow: NEON },
+    { wood: C.plywood, woodDark: C.oak, frame: C.white, panel: C.white, accents: [C.leafDark, C.teal, C.yellow], glow: NEON },
+    { wood: C.oak, woodDark: C.walnut, frame: C.black, panel: C.white, accents: [C.leaf, C.teal, C.brass], glow: EMBER },
   ],
 };
 

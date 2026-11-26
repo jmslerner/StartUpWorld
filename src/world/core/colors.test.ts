@@ -1,16 +1,30 @@
 import { describe, expect, it } from "vitest";
 import { TEAMS } from "../types";
 import type { OfficeIndex } from "../types";
-import { C, LOOKS, lookFor, PHASE_THEMES, PHASES, phaseTier, ROLE_COLORS, themeFor } from "./colors";
+import { C, EMBER, LOOKS, lookFor, NEON, PHASE_THEMES, PHASES, phaseTier, ROLE_COLORS, themeFor } from "./colors";
 
 describe("looks", () => {
-  it("every era has a look", () => {
-    expect(["dial-up", "ambient", "anything"].map(lookFor)).toEqual(["classic", "classic", "classic"]);
+  it("each era of the career has the look of its decade's furniture", () => {
+    expect(["dial-up", "gold-rush", "bust", "phones", "cheap-money", "winter-ai", "agents", "ambient"].map(lookFor)).toEqual(
+      ["nineties", "nineties", "noughties", "noughties", "noughties", "twenties", "twenties", "twenties"]);
   });
-
-  it("an era nobody has heard of, or none at all, still has one", () => {
-    expect(["flat", "", "constructor", "__proto__", "classic"].map(lookFor)).toEqual(Array(5).fill("classic"));
-    for (const era of ["flat", ""]) expect(LOOKS).toContain(lookFor(era));
+  it("an era nobody has heard of, or none at all, keeps the classic look", () => {
+    expect(["flat", "", "constructor", "__proto__", "classic", "nineties"].map(lookFor)).toEqual(Array(6).fill("classic"));
+  });
+  it("every look has five themes, and no two looks dress the same office alike", () => {
+    for (const office of PHASES) {
+      const keys = LOOKS.map((look) => { const t = themeFor(office, look); return `${t.wood}:${t.panel}:${t.accents.join(",")}`; });
+      expect(new Set(keys).size).toBe(LOOKS.length);
+    }
+  });
+  it("the classic themes are as they were", () => {
+    expect(PHASE_THEMES.classic).toEqual([
+      { wood: C.plywood, woodDark: C.pallet, frame: C.galvanised, panel: C.cardboard, accents: [C.red, C.yellow, C.blue], glow: EMBER },
+      { wood: C.birch, woodDark: C.oak, frame: C.white, panel: C.cream, accents: [C.teal, C.yellow, C.coral], glow: NEON },
+      { wood: C.oak, woodDark: C.walnut, frame: C.steel, panel: C.greyLight, accents: [C.blue, C.teal, C.orange], glow: NEON },
+      { wood: C.birch, woodDark: C.oak, frame: C.white, panel: C.white, accents: [C.purple, C.leaf, C.pink], glow: NEON },
+      { wood: C.walnut, woodDark: C.walnutDark, frame: C.brass, panel: C.marble, accents: [C.burgundy, C.navy, C.brass], glow: EMBER },
+    ]);
   });
 });
 
