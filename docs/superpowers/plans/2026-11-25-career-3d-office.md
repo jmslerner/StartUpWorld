@@ -122,8 +122,8 @@ in the task named.
 
 1. **End pressed again while a year plays out, or Skip pressed as it ends; or End when the year cannot end:** nothing
    plays a second year, nothing replays last year, and the summary opens exactly once. (Task 9: `endRefused` refuses
-   End while playing or while a report is open, before `endQuarter` runs; `yearEnded` starts a playback only when the
-   turn moved on by one with no failure; `startYearPlay` ignores a start while playing; Task 11: a double click.)
+   End while playing or while a report is open, before `endQuarter` runs; `yearPlaysOut` starts a playback only when a
+   new report came in with no failure and the player's company is not out; `startYearPlay` ignores a start while playing; Task 11: a double click.)
 2. **The 3D view fails at any moment** (chunk fails to load, no WebGL, context lost mid-playback): the year finishes at
    once, the summary opens, the 2D panels are all there, and the layout does not swing back to 3D by itself. (Task 7:
    `officeLayoutFor`, `nextAvailability` and `canPlayOut` tables; Task 9: `yearPlayAfterLoss`; Tasks 10 and 11:
@@ -1164,26 +1164,38 @@ git commit -m "ui: the career's office stands beside the plan in 3D, with a swit
   export const yearPlayAfterLoss: (play: YearPlay, availability: OfficeAvailability) => YearPlay;   // IDLE unless still "running"
   /** End is refused while a year plays out or a report is open: checked before endQuarter runs. */
   export const endRefused: (play: YearPlay, reportOpen: boolean) => boolean;
-  /** The year really ended: the turn moved on by exactly one and the store reports no failure. */
-  export const yearEnded: (turnBefore: number, after: { readonly turn: number | null; readonly failure: Error | null }) => boolean;
+  /** The year End just closed plays out: a new report came in, the store reports no failure, and the player's company
+   *  is not out (a year it goes out opens its summary at once). The career's last year plays out too. */
+  export const yearPlaysOut: (
+    before: { readonly log: object | null },
+    after: { readonly log: object | null; readonly failure: Error | null; readonly playerOut: boolean },
+  ) => boolean;
+  export type YearPlayStep = { readonly kind: "none" } | { readonly kind: "beat"; readonly index: number } | { readonly kind: "finish" };
+  /** What the office does for the moment the caption shows, given the beat it shows: nothing, the caption's beat, or finish. */
+  export const yearPlayStep: (play: YearPlay, shown: number | null, nowMs: number) => YearPlayStep;
   ```
 
 The flow, in `GameScreen`'s End handler, with the play state kept in a ref (`playRef`, mirrored into state for
 rendering): first, `if (endRefused(playRef.current, gameStore.getState().reportOpen)) return;`. Then today's guard.
 In a career when `canPlayOut` (reduced motion read from `matchMedia("(prefers-reduced-motion: reduce)")` at the click):
-note `turnBefore = game.turn` and `year = yearOf(game.turn, config.career!)` (a career's config always has `career`),
+note `year = yearOf(game.turn, config.career!)` (a career's config always has `career`),
 call `source.startPlay()`, then `endQuarter()`. Read `after = gameStore.getState()`; if
-`yearEnded(turnBefore, { turn: after.game?.turn ?? null, failure: after.failure })`, set
+`yearPlaysOut({ log: before.lastLog }, { log: after.lastLog, failure: after.failure, playerOut })` (`playerOut`: no game
+after, or the player's company `out`), set
 `playRef.current = startYearPlay(playRef.current, yearPlayback(after.lastLog?.companies[PLAYER_ID] ?? null, false), year, performance.now())`;
 otherwise leave it `IDLE`. If it is `IDLE`, `source.showBeat(NO_PLAYBACK, null)` at once (the summary or the error
 shows as today); else `source.showBeat(playback, 0)`. While playing: the page's main `div` is `inert`, the report
-dialogs are not rendered, a timer runs every 250 ms: it re-renders for the caption and, when `beatIndexNow` moves to
-another index, calls `source.showBeat(playback, index)`, so the world draws each beat's scene in turn. A fixed bar at
+dialogs are not rendered, a timer runs every 250 ms and only moves the caption's moment on (`setPlayNow`); a layout
+effect on that moment takes `yearPlayStep(play, shown, playNow)` and, for a `beat`, calls
+`source.showBeat(playback, index)`, so the world draws each beat's scene in turn, and the scene changes in the same
+commit as the caption, before anything is drawn. (Calling `showBeat` from the timer, ahead of React's render, let a
+frame or two draw the next beat, the hires walking in or the new office, under the last beat's caption.) When the step
+is `finish` the timer ends the year inside `flushSync`, so the new year and the caption's removal also land together. A fixed bar at
 the bottom (outside the inert `div`, `z-40`) shows `playingLine(year)`, the caption, and a `Skip` button that has
 focus. The caption is `beatLine(beat, officeNames)` when `beatNow` gives a beat and nothing when it gives `null`
 (the last moment before the end); `officeNames` are `rulesForTurn(config, game.turn).career?.offices.map((o) => o.name) ?? []`
 (and `beatLine` says "The company moves to a bigger place" with no name when the index has none). Finishing, by the
-timer reaching `endsMs`, by Skip, by `yearPlayAfterLoss` giving `IDLE`, or by the layout leaving "3d" (the switch
+timer reaching `endsMs` (`yearPlayStep` gives `finish`), by Skip, by `yearPlayAfterLoss` giving `IDLE`, or by the layout leaving "3d" (the switch
 turned off, the window made narrow): `handle?.settle()`,
 `source.showBeat(playback, null)`, `IDLE`; the summary then opens as today. Every other path (race, 2D, reduced
 motion) is today's.
@@ -1223,12 +1235,15 @@ it("End is refused while a year plays out or a report is open, before the year i
   const play = startYearPlay(IDLE, playback(4, [leave, arrive]), 1994, 1000);
   expect([endRefused(IDLE, false), endRefused(play, false), endRefused(IDLE, true), endRefused(play, true)]).toEqual([false, true, true, true]);
 });
-it("plays a year only when it really ended: one turn on, and no failure (Review Focus 1)", () => {
-  expect(yearEnded(5, { turn: 6, failure: null })).toBe(true);
-  expect(yearEnded(5, { turn: 5, failure: null })).toBe(false);          // over, or nothing happened: last year must not replay
-  expect(yearEnded(5, { turn: 5, failure: new Error("x") })).toBe(false);
-  expect(yearEnded(5, { turn: 7, failure: null })).toBe(false);
-  expect(yearEnded(5, { turn: null, failure: null })).toBe(false);
+it("plays a year only when it really ended: a new report and no failure (Review Focus 1)", () => {
+  const log = { turn: 5 }; const next = { turn: 6 };
+  expect(yearPlaysOut({ log }, { log: next, failure: null, playerOut: false })).toBe(true);
+  expect(yearPlaysOut({ log }, { log, failure: null, playerOut: false })).toBe(false); // nothing happened: last year must not replay
+  expect(yearPlaysOut({ log }, { log, failure: new Error("x"), playerOut: false })).toBe(false);
+  expect(yearPlaysOut({ log: null }, { log: null, failure: null, playerOut: false })).toBe(false);
+});
+it("a year in which the player's company went out does not play out: the summary opens at once", () => {
+  expect(yearPlaysOut({ log: { turn: 12 } }, { log: { turn: 13 }, failure: null, playerOut: true })).toBe(false);
 });
 it("a beat list held to six seconds ends at six seconds, whatever its beats add up to", () => {
   const play = startYearPlay(IDLE, playback(6, [leave, { kind: "move", seconds: 2.5, count: 0, office: 1 }, arrive]), 2001, 0);
