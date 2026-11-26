@@ -109,6 +109,9 @@ export const OFFICE_WORDS = {
   reload: "Reload 3D view",
   opening: "Opening the office…",
   skip: "Skip",
+  office: "Office",
+  market: "Market",
+  views: "Show the office or the market",
 } as const;
 
 /** The caption while a year plays out. */

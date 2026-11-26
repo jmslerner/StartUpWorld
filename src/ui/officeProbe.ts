@@ -9,6 +9,7 @@
 import type { SceneSource, WorldViewState } from "../world/mountWorld";
 import type { ScreenPoint, ScreenRect, WorldHandle, WorldStats } from "../world/types/handle";
 import type { InteractableTarget } from "../world/types/interaction";
+import type { MarketScene, WorldViewKind } from "../world/types/market";
 import type { OfficeScene, Team } from "../world/types/scene";
 import type { StageStatus } from "../world/ui/stage";
 import type { OfficeAvailability } from "./officeView";
@@ -32,11 +33,20 @@ export interface CareerOfficeProbe {
   /** Where a target is drawn on the canvas (a person's anchor is above their head; this box is their body). */
   screenBounds(target: InteractableTarget): ScreenRect | null;
   loseContext(): void;
+  /** The view the live world shows, or null while there is none. */
+  view(): WorldViewKind | null;
+  /** The market the career screen gives the world, or null. */
+  market(): MarketScene | null;
 }
 
 export interface OfficeProbeLink {
-  /** A career screen shows its office through this; the function returned detaches it. */
-  attach(view: () => WorldViewState, source: SceneSource, availability: () => OfficeAvailability): () => void;
+  /** A career screen shows its office through this; the function returned detaches it. `market` reads as null when absent. */
+  attach(
+    view: () => WorldViewState,
+    source: SceneSource,
+    availability: () => OfficeAvailability,
+    market?: () => MarketScene | null,
+  ): () => void;
   /** A world was taken down: its figures stay readable through retiredStats(). */
   retire(handle: WorldHandle): void;
 }
@@ -52,6 +62,7 @@ interface Link {
   readonly view: () => WorldViewState;
   readonly source: SceneSource;
   readonly availability: () => OfficeAvailability;
+  readonly market: () => MarketScene | null;
 }
 
 export const createOfficeProbe = (): CareerOfficeProbe & OfficeProbeLink => {
@@ -84,8 +95,10 @@ export const createOfficeProbe = (): CareerOfficeProbe & OfficeProbeLink => {
     project: (target) => handle()?.project(target) ?? null,
     screenBounds: (target) => handle()?.screenBounds(target) ?? null,
     loseContext: () => handle()?.loseContext(),
-    attach: (view, source, availability) => {
-      const mine: Link = { view, source, availability };
+    view: () => handle()?.view() ?? null,
+    market: () => link?.market() ?? null,
+    attach: (view, source, availability, market = () => null) => {
+      const mine: Link = { view, source, availability, market };
       link = mine;
       return () => {
         if (link === mine) link = null;

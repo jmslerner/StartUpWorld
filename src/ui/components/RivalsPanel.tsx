@@ -1,7 +1,8 @@
 import type { PriceTier } from "../../engine/types";
 import type { RivalCareerRow } from "../careerReport";
 import { count, money, percent, signed } from "../format";
-import { HINT, LABEL, TONE } from "../styles";
+import { MARKET_WORDS } from "../marketView";
+import { BUTTON, HINT, LABEL, TONE } from "../styles";
 import type { ResourceView, RivalRow } from "../viewModel";
 import type { Words } from "../words";
 
@@ -32,6 +33,8 @@ interface RivalsPanelProps {
   words: Words;
   /** Each rival's career, by seat; [] in a race. */
   careers: readonly RivalCareerRow[];
+  /** Given only by the career's 3D layout: each rival still in the market gets a button that shows it there. */
+  onShow?: (seat: number) => void;
 }
 
 /** A rival's career in one line: founded, office, public or private, rescued. */
@@ -44,7 +47,7 @@ const careerLine = (row: RivalCareerRow): string =>
   ].join(" · ");
 
 /** Everything the player may know about the three rivals: their public numbers, never their cash or plans. */
-export const RivalsPanel = ({ you, rivals, words, careers }: RivalsPanelProps) => (
+export const RivalsPanel = ({ you, rivals, words, careers, onShow }: RivalsPanelProps) => (
   <section aria-label="Rivals" className="panel-surface rounded-xl p-3">
     <h2 className={LABEL}>{words.career ? `This year's bar to go public: ${count(you.ipoUsers)} users` : `Race to ${count(you.ipoUsers)} users`}</h2>
     <div className="mt-2 space-y-1.5">
@@ -106,6 +109,11 @@ export const RivalsPanel = ({ you, rivals, words, careers }: RivalsPanelProps) =
                   Worth {money(rival.valuation)}; founders own {percent(rival.equity)}, board {rival.board.founderSeats}–{rival.board.investorSeats}
                   {rival.investorControlled ? " (investors in control)" : ""}.{rival.lastRaise !== null && ` Raised ${money(rival.lastRaise.amount)} in ${words.when(rival.lastRaise.turn)}.`}
                 </p>
+                {onShow !== undefined && (
+                  <button type="button" onClick={() => onShow(rival.id)} className={`${BUTTON} mt-1.5 px-2 py-1 text-[0.65rem]`}>
+                    {MARKET_WORDS.show}
+                  </button>
+                )}
               </>
             )}
           </li>

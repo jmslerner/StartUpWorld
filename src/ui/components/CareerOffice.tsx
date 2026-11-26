@@ -3,12 +3,16 @@ import type { Plan } from "../../engine/types";
 import type { WorldViewState } from "../../world/mountWorld";
 import type { InteractableTarget } from "../../world/types/interaction";
 import type { WorldHandle } from "../../world/types/handle";
+import type { MarketScene, WorldViewKind } from "../../world/types/market";
 import type { Team } from "../../world/types/scene";
 import WorldView from "../../world/WorldView";
 import { WorldBoundary, WorldUnavailableNote } from "../../world/ui/WorldShell";
+import { marketCard, MARKET_WORDS } from "../marketView";
 import { asDrawn, CARRY_WORDS, carryLine, carryStep, highlightFor, TEAM_NAMES, type Carry, type Picked } from "../officeMoves";
 import type { OfficeSource } from "../officeSource";
-import { BUTTON } from "../styles";
+import { OFFICE_WORDS } from "../officeView";
+import { BUTTON, BUTTON_ON } from "../styles";
+import type { RivalRow } from "../viewModel";
 
 export interface CareerOfficeProps {
   /** The career's office, from the store. The same object for the life of the screen. */
@@ -21,21 +25,39 @@ export interface CareerOfficeProps {
   readonly onView: (state: WorldViewState) => void;
   /** The view could not be shown: the screen goes back to its 2D panels. */
   readonly onFailed: () => void;
+  /** The market as the world draws it; null before any year was played. */
+  readonly market: MarketScene | null;
+  /** The view on screen. */
+  readonly view: WorldViewKind;
+  /** The company selected in the market, by seat. */
+  readonly selectedSeat: number | null;
+  /** A year plays out: the switch is disabled. */
+  readonly playing: boolean;
+  /** The rivals' public rows, for the card over a selected company. */
+  readonly rivals: readonly RivalRow[];
+  readonly onSelectCompany: (seat: number | null) => void;
+  readonly onChooseView: (view: WorldViewKind) => void;
 }
 
 type Select = (target: InteractableTarget | null) => void;
 
 const TEAMS: readonly Team[] = ["product", "growth", "recruiting"];
+const VIEWS: readonly WorldViewKind[] = ["office", "market"];
 
 /**
  * The career's office in 3D. The one place under src/ui that brings in the world by value, so it is only ever
  * loaded lazily (through OfficeSlot), and three.js with it. It fills the cell the screen gives it.
  *
  * A person is moved by pointing: a tap picks them up (highlighted), a tap on someone of another team, or one of the
- * strip's team buttons, sets them down there as one change to the plan. Every tap goes through `carryStep`.
+ * strip's team buttons, sets them down there as one change to the plan. Every tap in the office goes through
+ * `carryStep`. In the market a tap on a company selects it and shows its card; a tap on nothing clears both.
  */
-const CareerOffice = ({ source, draft, onMove, onView, onFailed }: CareerOfficeProps) => {
+const CareerOffice = ({ source, draft, onMove, onView, onFailed, market, view, selectedSeat, playing, rivals, onSelectCompany, onChooseView }: CareerOfficeProps) => {
   const [carry, setCarry] = useState<Carry>(null);
+  const [handle, setHandle] = useState<WorldHandle | null>(null);
+  // Without a market there is nothing to show but the office.
+  const shown: WorldViewKind = market === null ? "office" : view;
+  const shownRef = useRef(shown);
   const carryRef = useRef<Carry>(null);
   const draftRef = useRef(draft);
   const handleRef = useRef<WorldHandle | null>(null);
@@ -44,6 +66,9 @@ const CareerOffice = ({ source, draft, onMove, onView, onFailed }: CareerOfficeP
   useEffect(() => {
     draftRef.current = draft;
   }, [draft]);
+  useEffect(() => {
+    shownRef.current = shown;
+  }, [shown]);
 
   const setCarried = useCallback((next: Carry) => {
     carryRef.current = next;
@@ -89,6 +114,16 @@ const CareerOffice = ({ source, draft, onMove, onView, onFailed }: CareerOfficeP
   const onTap = useCallback(
     (target: InteractableTarget | null, select: Select) => {
       selectRef.current = select;
+      if (shownRef.current === "market") {
+        // Taps in the market select a company; they never carry anyone.
+        if (target?.kind === "company") onSelectCompany(target.seat);
+        else {
+          select(null);
+          onSelectCompany(null);
+        }
+        return;
+      }
+      if (target?.kind === "company") return;
       const handle = handleRef.current;
       step(
         target === null
@@ -96,20 +131,62 @@ const CareerOffice = ({ source, draft, onMove, onView, onFailed }: CareerOfficeP
           : { team: handle?.teamOf(target) ?? null, personId: target.kind === "person" ? target.personId : null },
       );
     },
-    [step],
+    [step, onSelectCompany],
   );
 
-  const view = useCallback(
+  const viewState = useCallback(
     (state: WorldViewState) => {
       // Another world (or none): what was carried there is put back.
       if (state.handle !== handleRef.current) {
         drop();
         handleRef.current = state.handle;
+        setHandle(state.handle);
       }
       onView(state);
     },
     [onView, drop],
   );
+
+  // The world draws the market it is given, and the view on screen.
+  useEffect(() => {
+    if (handle !== null && market !== null) handle.setMarket(market);
+  }, [handle, market]);
+  useEffect(() => {
+    handle?.setView(shown);
+  }, [handle, shown]);
+
+  // Nobody stays held unseen: the market shown puts back whatever was carried, as "Keep them" or Escape does (the
+  // highlight goes with it, as the market sets its own).
+  const [shownBefore, setShownBefore] = useState(shown);
+  if (shown !== shownBefore) {
+    setShownBefore(shown);
+    if (shown === "market") setCarry(null);
+  }
+  useEffect(() => {
+    if (shown === "market") carryRef.current = null;
+  }, [shown]);
+
+  // The company selected is highlighted while the market shows; leaving the market clears it.
+  const companyLit = useRef(false);
+  useEffect(() => {
+    if (handle === null) {
+      companyLit.current = false;
+      return;
+    }
+    if (shown === "market") {
+      handle.setSelected(selectedSeat === null ? null : { kind: "company", seat: selectedSeat });
+      companyLit.current = selectedSeat !== null;
+    } else if (companyLit.current) {
+      handle.setSelected(null);
+      companyLit.current = false;
+    }
+  }, [handle, shown, selectedSeat]);
+
+  const company = shown === "market" && selectedSeat !== null ? (market?.companies.find((c) => c.seat === selectedSeat && c.state !== "out") ?? null) : null;
+  const card =
+    company === null || market === null
+      ? null
+      : marketCard(company, company.state === "player" ? null : (rivals.find((row) => row.id === company.seat) ?? null), market.barUsers);
 
   // A new year in the office, or a year starting to play out, puts back whatever is carried.
   useEffect(() => {
@@ -136,12 +213,55 @@ const CareerOffice = ({ source, draft, onMove, onView, onFailed }: CareerOfficeP
     return () => window.removeEventListener("keydown", onKey);
   }, [carry, drop]);
 
+  // Escape closes the company's card.
+  const cardShown = card !== null;
+  useEffect(() => {
+    if (!cardShown) return;
+    const onKey = (event: KeyboardEvent): void => {
+      if (event.key === "Escape") onSelectCompany(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [cardShown, onSelectCompany]);
+
   return (
     <div className="relative h-full w-full">
       <WorldBoundary fallback={<WorldUnavailableNote />} onError={onFailed}>
-        <WorldView source={source} onState={view} onTap={onTap} />
+        <WorldView source={source} onState={viewState} onTap={onTap} />
       </WorldBoundary>
-      {carry !== null && (
+      <div role="group" aria-label={OFFICE_WORDS.views} className="panel-surface absolute left-2 top-2 z-10 flex gap-1 rounded-lg p-1 text-xs">
+        {VIEWS.map((kind) => (
+          <button
+            key={kind}
+            type="button"
+            aria-pressed={shown === kind}
+            disabled={playing || (kind === "market" && market === null)}
+            onClick={() => onChooseView(kind)}
+            className={`${shown === kind ? BUTTON_ON : BUTTON} px-2 py-1 text-[0.7rem] disabled:opacity-50`}
+          >
+            {kind === "office" ? OFFICE_WORDS.office : OFFICE_WORDS.market}
+          </button>
+        ))}
+      </div>
+      {card !== null && (
+        <section
+          aria-label={MARKET_WORDS.card}
+          className="panel-surface absolute bottom-2 right-2 z-10 w-64 max-w-[calc(100%-1rem)] rounded-lg px-3 py-2 text-xs"
+        >
+          <div className="flex items-baseline justify-between gap-2">
+            <h3 className="truncate text-sm font-semibold text-gray-100">{card.title}</h3>
+            <button type="button" aria-label="Close" onClick={() => onSelectCompany(null)} className={`${BUTTON} shrink-0 px-2 py-0.5 text-[0.7rem]`}>
+              ×
+            </button>
+          </div>
+          <ul className="mt-1 space-y-0.5 text-mist/90">
+            {card.lines.map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+          </ul>
+        </section>
+      )}
+      {carry !== null && shown === "office" && (
         <div
           role="group"
           aria-label={CARRY_WORDS.label}
