@@ -1,0 +1,1201 @@
+#!/usr/bin/env node
+/**
+ * The browser check of the career's 3D office: builds the app, serves `dist` with `vite preview`, and plays the
+ * career in headless Chromium at 1280x800 with WebGL 2 (through the software renderer), reading the office through
+ * `window.__careerOffice` (src/ui/officeProbe.ts).
+ *
+ *   node scripts/office-check.mjs [--no-build] [--shots <dir>] [--only <n,n,...>]
+ *
+ * In order: (1) the race is unchanged and never loads the office; (2) the office opens as the career's main view,
+ * beside the plan, above the bottom bar, in 1990 and on the nineties, noughties and twenties fixtures; (3) a year
+ * plays out beat by beat, End is refused while it plays or a report is open, Skip ends it; (4) a person moved by
+ * pointing; (5) an office move and the three looks, and a full campus; (6) the world taken down cleanly on every way
+ * out; (7) a hidden tab and resizes; (8) reduced motion; (9) the "3D office" switch; (10) the fallbacks: no WebGL, the
+ * office's chunk blocked, a context lost during a year; (11) a reload while a year plays out; (12) a whole career
+ * through the 3D screen; (13) a narrow touch window. Every page fails on any console error or page error, but the
+ * software renderer's "GPU stall due to ReadPixels".
+ *
+ * Exits 1 on the first failed assertion, naming it. `--shots <dir>` saves screenshots into <dir>. `--no-build` serves
+ * the `dist` that is there. `--only` runs only the steps named (for working on one). Not part of `npm test`: it
+ * needs a browser and takes minutes. The fixtures come from `npx tsx scripts/career-fixtures.ts`.
+ */
+import { spawn, spawnSync } from "node:child_process";
+import { mkdirSync, readFileSync } from "node:fs";
+import { createRequire } from "node:module";
+import { connect } from "node:net";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { raceText, stubAnalytics } from "./race-text.mjs";
+
+const require = createRequire(import.meta.url);
+const { chromium } = require("playwright");
+
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const PORT = 4181;
+const BASE = `http://localhost:${PORT}`;
+const CAREER_KEY = "startupworld:career:save";
+const OFFICE_KEY = "startupworld:office:v1";
+const DESKTOP = { width: 1280, height: 800 };
+const PHONE = { width: 390, height: 844 };
+const FIRST_YEAR = 1990;
+const LAST_YEAR = 2038;
+const YEARS = LAST_YEAR - FIRST_YEAR + 1;
+/** A dialog ignores a click this soon after it opens, and "End" one this soon after a dialog closes, with a margin. */
+const SETTLE_MS = 600;
+const FORBIDDEN = /\b(quarters?|quarterly|turns?)\b|\bQ\d{1,2}\b/i;
+/** The one console message allowed: the software renderer logs it whenever the world draws. */
+const ALLOWED_CONSOLE = /GPU stall due to ReadPixels/;
+/** The world's caps on figures drawn (src/world/cast.ts). */
+const MAX_STAFF_DRAWN = 50;
+const MAX_WAITING_DRAWN = 6;
+/** The world's second of grace before it rests (core/rest.ts); no frame for this long means it rests. */
+const REST_AFTER_MS = 1000;
+const QUIET_MS = 1500;
+/** The look of each era id (src/world/core/colors.ts, ERA_LOOKS), copied: any other id is "classic". */
+const ERA_LOOKS = {
+  "dial-up": "nineties",
+  "gold-rush": "nineties",
+  bust: "noughties",
+  phones: "noughties",
+  "cheap-money": "noughties",
+  "winter-ai": "twenties",
+  agents: "twenties",
+  ambient: "twenties",
+};
+const lookFor = (era) => (Object.hasOwn(ERA_LOOKS, era) ? ERA_LOOKS[era] : "classic");
+/** The eras by first year, as the design fixes them. */
+const ERAS = [
+  [1990, "Dial-up dawn"],
+  [1995, "Browser gold rush"],
+  [2000, "Bust and broadband"],
+  [2007, "Phones and cloud"],
+  [2014, "Cheap money years"],
+  [2022, "Winter and AI"],
+  [2027, "Agent economy"],
+  [2033, "Ambient age"],
+];
+const eraOf = (year) => ERAS.filter(([first]) => first <= year).pop()[1];
+/** The words of the office's screen (src/ui/officeView.ts, src/ui/officeMoves.ts). */
+const WORDS = {
+  toggle: "3D office",
+  unavailable: "The 3D office cannot be shown on this device. The game is complete without it.",
+  narrow: "The 3D office needs a desktop browser window at least 1024 pixels wide.",
+  reload: "Reload 3D view",
+  skip: "Skip",
+  keep: "Keep them",
+  carry: "Move a person between teams",
+};
+
+// ---------------------------------------------------------------------------------------------------------------
+// Arguments
+
+const argValue = (name) => {
+  const at = process.argv.indexOf(name);
+  if (at === -1) return null;
+  const value = process.argv[at + 1];
+  if (value === undefined || value.startsWith("--")) {
+    console.error(`${name} needs a value`);
+    process.exit(2);
+  }
+  return value;
+};
+const shotsArg = argValue("--shots");
+const shotsDir = shotsArg === null ? null : resolve(shotsArg);
+const onlyArg = argValue("--only");
+const only = onlyArg === null ? null : new Set(onlyArg.split(",").map(Number));
+const build = !process.argv.includes("--no-build");
+const runs = (step) => only === null || only.has(step);
+
+// ---------------------------------------------------------------------------------------------------------------
+// The server, killed on every way out
+
+let server = null;
+const browsers = [];
+const stopServer = () => {
+  if (!server || server.exitCode !== null || server.signalCode !== null) return;
+  try {
+    process.kill(-server.pid, "SIGTERM");
+  } catch {
+    try {
+      server.kill("SIGTERM");
+    } catch {
+      // Already gone.
+    }
+  }
+};
+process.on("exit", stopServer);
+for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"]) {
+  process.on(signal, () => {
+    stopServer();
+    process.exit(130);
+  });
+}
+
+const answers = (host, port) =>
+  new Promise((done) => {
+    const socket = connect({ host, port });
+    socket.setTimeout(1000);
+    socket.once("connect", () => {
+      socket.destroy();
+      done(true);
+    });
+    socket.once("timeout", () => {
+      socket.destroy();
+      done(false);
+    });
+    socket.once("error", () => done(false));
+  });
+
+const startServer = async () => {
+  for (const host of ["127.0.0.1", "::1"]) {
+    if (await answers(host, PORT)) throw new Error(`port ${PORT} is already in use (on ${host}): stop whatever holds it and run again`);
+  }
+  server = spawn("npx", ["vite", "preview", "--port", String(PORT), "--strictPort"], { cwd: ROOT, detached: true, stdio: ["ignore", "pipe", "pipe"] });
+  let output = "";
+  server.stdout.on("data", (chunk) => (output += chunk));
+  server.stderr.on("data", (chunk) => (output += chunk));
+  const until = Date.now() + 30000;
+  while (Date.now() < until) {
+    if (server.exitCode !== null) throw new Error(`vite preview exited:\n${output}`);
+    if (output.includes("Local:")) {
+      try {
+        if ((await fetch(`${BASE}/`)).ok) return;
+      } catch {
+        // Not listening yet.
+      }
+    }
+    await new Promise((done) => setTimeout(done, 200));
+  }
+  throw new Error(`vite preview did not answer on port ${PORT}:\n${output}`);
+};
+
+// ---------------------------------------------------------------------------------------------------------------
+// Assertions: the first that fails ends the run, naming it
+
+class Failed extends Error {}
+
+let current = "";
+const assert = (ok, what) => {
+  if (!ok) throw new Failed(`${current}: ${what}`);
+};
+const passed = (what) => console.log(`  ok  ${what}`);
+const sleep = (ms) => new Promise((done) => setTimeout(done, ms));
+
+/** Every console error and page error on a page (but the software renderer's warning); checked after every step. */
+const pages = [];
+const watch = (page, allowed = null) => {
+  const bad = [];
+  page.on("console", (message) => {
+    if (message.type() !== "error") return;
+    const text = message.text();
+    if (ALLOWED_CONSOLE.test(text) || (allowed !== null && allowed.test(text))) return;
+    bad.push(`console error: ${text}`);
+  });
+  page.on("pageerror", (error) => bad.push(`page error: ${error.message}`));
+  pages.push(bad);
+  return bad;
+};
+const noErrors = () => {
+  for (const bad of pages) assert(bad.length === 0, bad.join(" | "));
+};
+
+/** The tab's count of `[data-office]` and `[data-world]` elements ever added, kept in sessionStorage across reloads. */
+const OFFICE_ADDS = "officeCheck:officeAdds";
+const countOfficeAdds = (key) => {
+  const seen = (node) => {
+    if (node.nodeType !== Node.ELEMENT_NODE) return 0;
+    const self = node.matches("[data-office]") ? 1 : 0;
+    return self + node.querySelectorAll("[data-office]").length;
+  };
+  const worlds = (node) => {
+    if (node.nodeType !== Node.ELEMENT_NODE) return 0;
+    const self = node.matches("[data-world]") ? 1 : 0;
+    return self + node.querySelectorAll("[data-world]").length;
+  };
+  new MutationObserver((records) => {
+    let offices = 0;
+    let world = 0;
+    for (const record of records)
+      for (const node of record.addedNodes) {
+        offices += seen(node);
+        world += worlds(node);
+      }
+    const add = (name, count) => {
+      if (count > 0) sessionStorage.setItem(`${key}:${name}`, String(Number(sessionStorage.getItem(`${key}:${name}`) ?? "0") + count));
+    };
+    add("office", offices);
+    add("world", world);
+  }).observe(document, { childList: true, subtree: true });
+};
+const officeAdds = (page) =>
+  page.evaluate((key) => ({ office: Number(sessionStorage.getItem(`${key}:office`) ?? "0"), world: Number(sessionStorage.getItem(`${key}:world`) ?? "0") }), OFFICE_ADDS);
+
+const OFFICE_OR_WORLD_CHUNK = /assets\/(CareerOffice|WorldView)-/;
+const requested = new WeakMap();
+const requestsOf = (page) => requested.get(page) ?? [];
+
+/** A fresh context (fresh storage) and a page in it, its errors watched, its requests and office elements counted. */
+const freshPage = async (browser, { size = DESKTOP, allowed = null, ...options } = {}) => {
+  const context = await browser.newContext({ viewport: size, ...options });
+  await context.addInitScript(countOfficeAdds, OFFICE_ADDS);
+  const page = await context.newPage();
+  const urls = [];
+  requested.set(page, urls);
+  page.on("request", (request) => urls.push(request.url()));
+  watch(page, allowed);
+  await stubAnalytics(page);
+  return { context, page };
+};
+
+const shot = async (page, name) => {
+  if (shotsDir !== null) await page.screenshot({ path: join(shotsDir, name) });
+};
+
+// ---------------------------------------------------------------------------------------------------------------
+// The page
+
+const header = (page) => page.locator("main header h1");
+const dialog = (page) => page.locator('[role="dialog"]');
+const endButton = (page, year) => page.getByRole("button", { name: `End ${year}`, exact: true });
+const toggle = (page) => page.locator("main header").getByRole("button", { name: WORDS.toggle, exact: true });
+const reloadButton = (page) => page.locator("main header").getByRole("button", { name: WORDS.reload, exact: true });
+const playBar = (page) => page.locator('[role="status"]', { has: page.getByRole("button", { name: WORDS.skip, exact: true }) });
+const skipButton = (page) => page.getByRole("button", { name: WORDS.skip, exact: true });
+const planPanel = (page) => page.locator('section[aria-label^="Plan for "]');
+const officeCell = (page) => page.locator("[data-office]");
+const carryStrip = (page) => page.getByRole("group", { name: WORDS.carry, exact: true });
+const careerSave = (page) => page.evaluate((key) => localStorage.getItem(key), CAREER_KEY);
+
+/** The office's probe, called by name with JSON arguments. */
+const office = (page, method, ...args) =>
+  page.evaluate(([method, args]) => {
+    const probe = window.__careerOffice;
+    if (probe === undefined) return method === "status" ? "none" : null;
+    return probe[method](...args);
+  }, [method, args]);
+
+/** Waits for the office to be running, within `ms`. */
+const running = async (page, ms = 30000) => {
+  const until = Date.now() + ms;
+  let status = null;
+  while (Date.now() < until) {
+    status = await office(page, "status");
+    if (status === "running" && (await office(page, "stats")) !== null) return;
+    await sleep(200);
+  }
+  assert(false, `the office's status is ${JSON.stringify(status)}, not "running", after ${ms / 1000} s`);
+};
+
+/**
+ * Watches `framesDrawn` (of the live world, or of the retired one) until no frame has been drawn for QUIET_MS, or
+ * `watchMs` passes. Returns whether it rested, the page time from now to the last frame, the frames drawn, and the
+ * world seconds of those frames up to a second before the last one (when the last thing stopped moving), measured
+ * as the world measures a frame: the first after a stop counts 1/60 s, none more than 0.1 s.
+ */
+const watchRest = (page, { retired = false, watchMs = 30000 } = {}) =>
+  page.evaluate(
+    ({ retired, watchMs, quietMs, graceMs }) =>
+      new Promise((done) => {
+        const probe = window.__careerOffice;
+        const read = () => (retired ? probe.retiredStats() : probe.stats())?.framesDrawn ?? null;
+        const start = performance.now();
+        const first = read();
+        let frames = first;
+        let previous = null;
+        const drawn = [];
+        const look = () => {
+          const now = performance.now();
+          const count = read();
+          if (count !== frames) {
+            frames = count;
+            const seconds = previous === null ? 1 / 60 : Math.min(0.1, Math.max(0.001, (now - previous) / 1000));
+            drawn.push({ at: now, seconds });
+            previous = now;
+          }
+          const last = drawn.length > 0 ? drawn[drawn.length - 1].at : start;
+          if (now - last >= quietMs || now - start > watchMs) {
+            const settled = drawn.filter((frame) => frame.at <= last - graceMs).reduce((sum, frame) => sum + frame.seconds, 0);
+            done({ rested: now - last >= quietMs, restMs: Math.round(last - start), frames: (frames ?? 0) - (first ?? 0), settledS: settled, at: drawn.map((frame) => Math.round(frame.at - start)) });
+          } else setTimeout(look, 50);
+        };
+        setTimeout(look, 50);
+      }),
+    { retired, watchMs, quietMs: QUIET_MS, graceMs: REST_AFTER_MS },
+  );
+
+const rests = async (page, where, options) => {
+  const rest = await watchRest(page, options);
+  assert(rest.rested, `${where}: the office never came to rest`);
+  return rest;
+};
+
+/** framesDrawn does not change over one second of page time. */
+const stillForASecond = async (page, retired = false) => {
+  const read = () => office(page, retired ? "retiredStats" : "stats");
+  const before = await read();
+  await sleep(1000);
+  const after = await read();
+  return before !== null && after !== null && before.framesDrawn === after.framesDrawn;
+};
+
+/** The people the office draws for a scene: staff capped at 50, those at the door at 6. */
+const figures = (scene) =>
+  Math.min(scene.teams.product + scene.teams.growth + scene.teams.recruiting + scene.away + scene.leaving, MAX_STAFF_DRAWN) +
+  Math.min(scene.arriving, MAX_WAITING_DRAWN);
+const ceiling = (stats) => Math.min(800, 80 + 14 * stats.figures);
+
+/** Opens the dialog that shows and waits until it takes clicks. */
+const opened = async (page, timeout = 30000) => {
+  await dialog(page).waitFor({ timeout });
+  await page.waitForTimeout(SETTLE_MS);
+  return dialog(page);
+};
+const closeWith = async (page, name) => {
+  await dialog(page).getByRole("button", { name, exact: true }).click();
+  await dialog(page).waitFor({ state: "detached" });
+  await page.waitForTimeout(SETTLE_MS);
+};
+
+const readableText = (locator) =>
+  locator.evaluate((root) => {
+    const parts = [];
+    const skip = (element) => element.closest("[data-card-text]") !== null;
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT);
+    for (let node = walker.currentNode; node !== null; node = walker.nextNode()) {
+      if (node.nodeType === Node.TEXT_NODE) {
+        const parent = node.parentElement;
+        if (parent === null || skip(parent) || parent.closest("script, style") !== null) continue;
+        parts.push(node.textContent);
+      } else if (!skip(node)) {
+        for (const name of ["title", "aria-label"]) {
+          const value = node.getAttribute(name);
+          if (value !== null) parts.push(value);
+        }
+      }
+    }
+    return parts.join("\n");
+  });
+const noForbiddenWords = async (locator, where) => {
+  const text = await readableText(locator);
+  const found = text.match(FORBIDDEN);
+  if (found !== null) assert(false, `${where} says "${found[0]}": ${JSON.stringify(text.split("\n").find((each) => FORBIDDEN.test(each)))}`);
+};
+
+/** A new career, seed 1, named Check Co, on its first year. */
+const startCareer = async (page) => {
+  await page.goto(`${BASE}/`);
+  await page.getByLabel("Name your startup").waitFor();
+  await page.getByRole("group", { name: "Mode" }).getByRole("button", { name: /Career/ }).click();
+  await page.getByLabel("Name your startup").fill("Check Co");
+  await page.getByText("Replay a game with its seed").click();
+  await page.getByPlaceholder("for example 20417").fill("1");
+  await page.locator("form button[type=submit]").click();
+  await endButton(page, FIRST_YEAR).waitFor();
+};
+
+/** `save` under the career's key, loaded. */
+const loadSave = async (page, save, year) => {
+  await page.goto(`${BASE}/`);
+  await page.getByLabel("Name your startup").waitFor();
+  await page.evaluate(([key, value]) => localStorage.setItem(key, value), [CAREER_KEY, save]);
+  await page.reload();
+  await endButton(page, year).waitFor();
+};
+
+const box = async (locator) => {
+  const found = await locator.boundingBox();
+  assert(found !== null, "an element has no box");
+  return found;
+};
+
+/** The planning panel's count for a team. */
+const teamCount = async (page, name) => Number(await planPanel(page).locator(`[role="group"][aria-label="${name}"] output`).innerText());
+/** The hires the planning panel expects this year: "expect N." in its hiring hint, or 0 when it offers none. */
+const expectedHires = async (page) => {
+  const found = (await planPanel(page).innerText()).match(/expect (\d+)\./);
+  return found === null ? 0 : Number(found[1]);
+};
+
+/** The office is laid out as the career's main view, beside the plan, above the bottom bar, nothing scrolled. */
+const mainView = async (page, year, where) => {
+  const cell = await box(officeCell(page));
+  const plan = await box(planPanel(page));
+  const bar = await box(page.locator("div.fixed.inset-x-0.bottom-0").first());
+  const scrolled = await page.evaluate(() => window.scrollY);
+  assert(scrolled === 0, `${where}: the page is scrolled by ${scrolled} px`);
+  assert(cell.x + cell.width <= plan.x + 0.5, `${where}: the office (${cell.x}..${cell.x + cell.width}) is not left of the plan (${plan.x})`);
+  assert(cell.width >= 600, `${where}: the office is ${cell.width} px wide`);
+  assert(cell.x >= 0 && cell.y >= 0 && cell.x + cell.width <= DESKTOP.width && cell.y + cell.height <= DESKTOP.height, `${where}: the office is not wholly in the viewport: ${JSON.stringify(cell)}`);
+  assert(cell.y + cell.height <= bar.y + 0.5, `${where}: the office (bottom ${cell.y + cell.height}) runs under the bottom bar (top ${bar.y})`);
+  const heading = await header(page).innerText();
+  assert(heading.includes(`${year} · year ${year - FIRST_YEAR + 1} of ${YEARS}`), `${where}: the header reads ${JSON.stringify(heading)}`);
+  const timeline = page.locator('main section[aria-label="Timeline"]');
+  assert(await timeline.isVisible(), `${where}: the timeline is not visible`);
+  assert((await timeline.innerText()).includes(eraOf(year)), `${where}: the timeline does not name ${eraOf(year)}`);
+  const here = await timeline.evaluate((section) => {
+    const strip = section.querySelector(".overflow-x-auto").getBoundingClientRect();
+    const label = section.querySelector("[data-here]")?.getBoundingClientRect() ?? null;
+    return label === null ? null : label.left >= strip.left - 0.5 && label.right <= strip.right + 0.5;
+  });
+  assert(here === true, `${where}: "you are here" is cut off by the timeline's edge or missing`);
+  for (const label of ["Your career", "If this plan plays out", "Rivals"]) {
+    assert((await page.locator(`main section[aria-label="${label}"]`).count()) === 1, `${where}: the "${label}" panel is not on the page`);
+  }
+};
+
+/** The office's figures match the scene, it rests, and its draw calls are under the ceiling. Returns its stats. */
+const officeFigures = async (page, where) => {
+  await rests(page, where);
+  assert(await stillForASecond(page), `${where}: the office draws frames at rest`);
+  const stats = await office(page, "stats");
+  const scene = await office(page, "scene");
+  assert(stats.figures === figures(scene), `${where}: ${stats.figures} figures drawn, the scene has ${figures(scene)}`);
+  assert(stats.drawCalls <= ceiling(stats), `${where}: ${stats.drawCalls} draw calls, over the ceiling of ${ceiling(stats)}`);
+  return { stats, scene };
+};
+
+/** The draw calls measured on each office, for the report. */
+const measured = [];
+
+// ---------------------------------------------------------------------------------------------------------------
+// 1. The race unchanged
+
+const raceUnchanged = async (browser) => {
+  current = "1. Race unchanged";
+  const { context, page } = await freshPage(browser);
+  const expected = JSON.parse(readFileSync(resolve(ROOT, "scripts/race-text.snapshot.json"), "utf8"));
+  const texts = await raceText(page, BASE);
+  assert(texts.length === expected.length, `the race gave ${texts.length} texts, the snapshot has ${expected.length}`);
+  texts.forEach((text, n) => assert(text === expected[n], `the race's text ${n + 1} differs from scripts/race-text.snapshot.json`));
+  assert((await page.locator("canvas").count()) === 0, "a canvas is on the race's page");
+  const chunk = requestsOf(page).find((url) => OFFICE_OR_WORLD_CHUNK.test(url));
+  assert(chunk === undefined, `the race requested the office or the world: ${chunk}`);
+  const scripts = [...new Set(requestsOf(page).map((url) => new URL(url).pathname).filter((path) => /^\/assets\/[^/]+\.js$/.test(path)))];
+  assert(scripts.length > 0, "the race requested no script under assets/");
+  const renderer = scripts.filter((path) => readFileSync(resolve(ROOT, `dist${path}`), "utf8").includes("WebGLRenderer"));
+  assert(renderer.length === 0, `the race loaded three's renderer in ${renderer.join(", ")}`);
+  noErrors();
+  passed(`the race's text matches its snapshot; no canvas, no office or world chunk, none of its ${scripts.length} scripts holds WebGLRenderer`);
+  await context.close();
+};
+
+// ---------------------------------------------------------------------------------------------------------------
+// 2. The office opens as the main view
+
+const opens = async (browser, fixtures) => {
+  current = "2. The office opens";
+  const { context, page } = await freshPage(browser);
+  await startCareer(page);
+  await running(page);
+  await mainView(page, FIRST_YEAR, "1990");
+  const first = await officeFigures(page, "1990");
+  assert(first.scene.year === FIRST_YEAR, `the scene's year is ${first.scene.year}`);
+  measured.push({ where: "1990, garage (new career)", office: first.scene.office, figures: first.stats.figures, drawCalls: first.stats.drawCalls });
+  const news = [(await page.locator('main section[aria-label="This year\'s event"]').count()) > 0];
+  await shot(page, "1990-office.png");
+  noErrors();
+  passed(`1990: running, the office left of the plan and above the bar; ${first.stats.figures} figures as the scene says, ${first.stats.drawCalls} draw calls, at rest`);
+  await context.close();
+
+  for (const name of ["nineties", "noughties", "twenties"]) {
+    const { save, year } = fixtures[name];
+    const { context: other, page: there } = await freshPage(browser);
+    await loadSave(there, save, year);
+    await running(there);
+    await mainView(there, year, `${name} (${year})`);
+    const seen = await officeFigures(there, `${name} (${year})`);
+    news.push((await there.locator('main section[aria-label="This year\'s event"]').count()) > 0);
+    noErrors();
+    passed(`${year} (${name}): the office is the main view; ${seen.stats.figures} figures, ${seen.stats.drawCalls} draw calls, at rest`);
+    await other.close();
+  }
+  assert(news.some(Boolean) && news.some((shown) => !shown), `the four pages do not cover both a news card and none: ${JSON.stringify(news)}`);
+  passed(`the news card shown on ${news.filter(Boolean).length} of the four pages and not on ${news.filter((shown) => !shown).length}`);
+};
+
+// ---------------------------------------------------------------------------------------------------------------
+// 3. A year plays out, beat by beat; 4. moving a person by pointer
+
+/** Raises Recruiting by one with its stepper, taking someone off Product first when nobody is unassigned. */
+const raiseRecruiting = async (page) => {
+  const more = planPanel(page).getByRole("button", { name: "More: Recruiting", exact: true });
+  if (await more.isDisabled()) await planPanel(page).getByRole("button", { name: "Less: Product", exact: true }).click();
+  const before = await teamCount(page, "Recruiting");
+  await more.click();
+  assert((await teamCount(page, "Recruiting")) === before + 1, "Recruiting did not go up by one");
+};
+
+/** The caption's number of people: "One hire walks in" is 1, "3 hires walk in" is 3. */
+const countIn = (line) => (/^One /.test(line) ? 1 : Number(line.match(/^(\d+) /)?.[1] ?? NaN));
+
+/**
+ * Ends `year` and samples the bar and the scene every 200 ms while the bar shows. Returns the samples, the page time
+ * until the summary opened, and how many dialogs were ever open at once while the bar showed.
+ */
+/** Skip pressed and timed in the page: from the press to the first moment a dialog is in the document. */
+const skipTimed = (page) =>
+  page.evaluate(
+    () =>
+      new Promise((done) => {
+        const button = [...document.querySelectorAll("button")].find((each) => each.textContent === "Skip");
+        const start = performance.now();
+        const look = () => {
+          if (document.querySelector('[role="dialog"]') !== null) done(performance.now() - start);
+          else if (performance.now() - start > 10000) done(Infinity);
+          else setTimeout(look, 10);
+        };
+        button?.click();
+        look();
+      }),
+  );
+
+const playYear = async (page, year, { skip = false } = {}) => {
+  const started = Date.now();
+  await endButton(page, year).click();
+  await playBar(page).waitFor({ timeout: 5000 });
+  const caption = await playBar(page).textContent();
+  assert(caption.includes(`${year} plays out`), `the bar does not say "${year} plays out": ${JSON.stringify(caption)}`);
+  const samples = [];
+  let skipped = null;
+  while ((await playBar(page).count()) > 0) {
+    const sample = await page.evaluate(() => {
+      const bar = [...document.querySelectorAll('[role="status"]')].find((each) => each.querySelector("button")?.textContent === "Skip");
+      return { line: bar?.querySelector(".truncate")?.textContent ?? null, scene: window.__careerOffice.scene(), dialogs: document.querySelectorAll('[role="dialog"]').length };
+    });
+    samples.push(sample);
+    if (skip && skipped === null) {
+      // Skip does nothing for its first moments, so the second click of a double click on End cannot land on it.
+      await sleep(Math.max(0, SETTLE_MS + 150 - (Date.now() - started)));
+      skipped = await skipTimed(page);
+      break;
+    }
+    if (Date.now() - started > 15000) break;
+    await sleep(200);
+  }
+  await dialog(page).waitFor({ timeout: 8000 });
+  const summaryAfterMs = skipped ?? Date.now() - started;
+  return { samples, summaryAfterMs };
+};
+
+/** The samples agree with the beats: hires at the door while people leave or the company moves, none once they walk in. */
+const beatsAgree = (samples, where) => {
+  const shown = samples.filter((sample) => sample.line !== null && sample.scene !== null);
+  assert(shown.every((sample) => sample.dialogs === 0), `${where}: a dialog was open while the year played out`);
+  const arrive = shown.find((sample) => /walks? in$/.test(sample.line));
+  const hires = arrive === undefined ? null : countIn(arrive.line);
+  for (const sample of shown) {
+    if (/leaves?$|moves to a bigger place/.test(sample.line)) {
+      assert(hires !== null && hires > 0, `${where}: people leave or the company moves in a year with no hires walking in (${sample.line})`);
+      assert(sample.scene.arriving === hires, `${where}: during "${sample.line}" ${sample.scene.arriving} wait at the door, not the year's ${hires} hires`);
+    }
+    if (/walks? in$/.test(sample.line)) assert(sample.scene.arriving === 0, `${where}: during "${sample.line}" ${sample.scene.arriving} still wait at the door`);
+  }
+  return { hires, lines: [...new Set(shown.map((sample) => sample.line))] };
+};
+
+const yearAndMoves = async (browser) => {
+  current = "3. A year plays out";
+  const { context, page } = await freshPage(browser);
+  await startCareer(page);
+  await running(page);
+  await rests(page, "1990");
+  await raiseRecruiting(page);
+  const played = await playYear(page, FIRST_YEAR);
+  const { hires, lines } = beatsAgree(played.samples, "1990");
+  assert(hires !== null && hires > 0, `1990 showed no hires walking in: ${JSON.stringify(lines)}`);
+  assert(played.summaryAfterMs <= 8000, `the summary opened ${played.summaryAfterMs} ms after End`);
+  await page.waitForTimeout(SETTLE_MS);
+  assert((await dialog(page).count()) === 1, `${await dialog(page).count()} dialogs are open`);
+  assert((await office(page, "scene")).year === FIRST_YEAR + 1, "the scene's year is not 1991 once the year played out");
+  passed(`End 1990 played out as ${JSON.stringify(lines)} (${played.samples.length} samples), then one summary within ${played.summaryAfterMs} ms`);
+  await closeWith(page, `Plan ${FIRST_YEAR + 1}`);
+  const expected = await expectedHires(page);
+  const waiting = await office(page, "scene");
+  assert(waiting.arriving === expected, `${waiting.arriving} wait at the door in 1991, the plan expects ${expected}`);
+  passed(`once the summary closed, ${expected} expected hires wait at the door, as the plan says`);
+
+  // A double click on End plays one year only, and opens one summary. The second click lands where Skip appears,
+  // and must not skip the year it started.
+  await endButton(page, 1991).dblclick();
+  await page.waitForTimeout(150);
+  assert((await playBar(page).count()) === 1 && (await dialog(page).count()) === 0, 'a double click on "End 1991" skipped the year as it started');
+  passed('a double click on "End 1991" leaves the year playing: its second click does not skip it');
+
+  // Skip (once past its first moments) ends the year at once, and the office rests soon after.
+  await page.waitForTimeout(SETTLE_MS);
+  assert((await playBar(page).count()) === 1, "1991 stopped playing before Skip was pressed");
+  const skippedMs = await skipTimed(page);
+  assert(skippedMs <= 1000, `the summary opened ${skippedMs} ms after Skip`);
+  const rest = await rests(page, "after Skip");
+  assert(rest.restMs <= 2000, `the office rested ${rest.restMs} ms after the summary opened, not within 2 s (frames at ${rest.at.join(", ")} ms)`);
+  passed(`Skip opened the summary within ${Math.round(skippedMs)} ms and the office rested ${rest.restMs} ms later`);
+  await page.waitForTimeout(1500);
+  assert((await dialog(page).count()) === 1, `${await dialog(page).count()} dialogs are open after a double click`);
+  assert((await office(page, "scene")).year === 1992, `a double click on "End 1991" left the scene in ${(await office(page, "scene")).year}`);
+  // Enter on End while the summary is open: End cannot take focus (the page behind is inert), and even pressed
+  // through the DOM it changes neither the year nor the save.
+  const saveBefore = await careerSave(page);
+  const focused = await endButton(page, 1992).evaluate((button) => {
+    button.focus();
+    return document.activeElement === button;
+  });
+  assert(!focused, '"End 1992" took the focus while the summary is open');
+  await endButton(page, 1992).evaluate((button) => {
+    button.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    button.click();
+  });
+  await page.waitForTimeout(1500);
+  assert((await careerSave(page)) === saveBefore, "pressing End while the summary is open changed the save");
+  assert((await office(page, "scene")).year === 1992 && (await playBar(page).count()) === 0, "pressing End while the summary is open played a year");
+  passed('a double click on "End 1991" played one year and opened one summary; End pressed under the summary changed nothing');
+  await closeWith(page, "Plan 1992");
+
+  // Seed 1's career with the Recruiting raised runs out of cash a second time in 1992 (see step 4): a year in which
+  // the company goes out does not play out (its people do not leave one by one); the summary opens at once.
+  const sawBar = page.evaluate(
+    () =>
+      new Promise((done) => {
+        const start = performance.now();
+        const look = () => {
+          if ([...document.querySelectorAll("button")].some((each) => each.textContent === "Skip")) done(true);
+          else if (document.querySelector('[role="dialog"]') !== null || performance.now() - start > 5000) done(false);
+          else requestAnimationFrame(look);
+        };
+        look();
+      }),
+  );
+  await endButton(page, 1992).click();
+  assert(!(await sawBar), '"End 1992", in which the company goes out, played the year out');
+  await dialog(page).waitFor({ timeout: 2000 });
+  passed('"End 1992", the second failure, opens its summary at once with no playback');
+  noErrors();
+  await context.close();
+};
+
+/**
+ * On the nineties fixture (1994, the shared office half full, cash for ten years): seed 1's new career, with the
+ * Recruiting raised in 1990, runs out of cash in 1992, so the moves are made on a company that has years ahead.
+ */
+const movingPeople = async (browser, fixtures) => {
+  current = "4. Moving a person by pointer";
+  const { context, page } = await freshPage(browser);
+  const { save, year } = fixtures.nineties;
+  await loadSave(page, save, year);
+  await running(page);
+  await rests(page, `${year}`);
+  const canvas = page.locator("[data-office] canvas");
+  // A person's projected anchor sits above their head, where a click finds whoever stands behind them: the click
+  // goes to the middle of the box they are drawn in, under the anchor.
+  const clickOn = async (personId) => {
+    const point = await office(page, "project", { kind: "person", personId });
+    assert(point !== null, `${personId} is not in the scene`);
+    const drawn = await office(page, "screenBounds", { kind: "person", personId });
+    assert(drawn !== null, `${personId} is not drawn`);
+    const at = await box(canvas);
+    await page.mouse.click(at.x + point.x, at.y + (drawn.top + drawn.bottom) / 2);
+    await page.waitForTimeout(300);
+  };
+  const desks = async () => {
+    const found = [];
+    for (let desk = 0; desk < 60; desk++) {
+      const personId = await office(page, "personAt", desk);
+      if (personId === null) continue;
+      found.push({ personId, team: await office(page, "teamOf", { kind: "person", personId }) });
+    }
+    return found;
+  };
+  if ((await teamCount(page, "Product")) < 1) {
+    await planPanel(page).getByRole("button", { name: "Less: Growth", exact: true }).click();
+    await planPanel(page).getByRole("button", { name: "More: Product", exact: true }).click();
+    await rests(page, "a Product person added");
+  }
+  let people = await desks();
+  const mover = people.find((person) => person.team === "product");
+  assert(mover !== undefined, `no Product person sits at a desk: ${JSON.stringify(people)}`);
+  const product = await teamCount(page, "Product");
+  const growth = await teamCount(page, "Growth");
+  await clickOn(mover.personId);
+  assert((await carryStrip(page).count()) === 1, "no strip shows after clicking a Product person");
+  assert((await carryStrip(page).innerText()).includes("Move one Product person to"), `the strip reads ${JSON.stringify(await carryStrip(page).innerText())}`);
+  await carryStrip(page).getByRole("button", { name: "Growth", exact: true }).click();
+  assert((await teamCount(page, "Product")) === product - 1 && (await teamCount(page, "Growth")) === growth + 1, "the plan's Product and Growth did not move by one");
+  let scene = await office(page, "scene");
+  assert(scene.teams.product === product - 1 && scene.teams.growth === growth + 1, `the scene's teams ${JSON.stringify(scene.teams)} do not agree with the plan`);
+  await rests(page, "after the move");
+  assert((await office(page, "teamOf", { kind: "person", personId: mover.personId })) === "growth", "the person picked does not work in Growth once the office rests");
+  passed(`a Product person picked up and set down in Growth with the strip's button: the plan, the scene and the person agree`);
+
+  await clickOn(mover.personId);
+  const strip = (await carryStrip(page).count()) === 0 ? null : await carryStrip(page).innerText();
+  assert(strip !== null && strip.includes("Move one Growth person to"), `the strip does not offer to move the Growth person: ${JSON.stringify(strip)}`);
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(300);
+  assert((await carryStrip(page).count()) === 0, "Escape did not put the person back");
+  assert((await teamCount(page, "Growth")) === growth + 1 && (await teamCount(page, "Product")) === product - 1, "Escape changed the plan");
+  await clickOn(mover.personId);
+  assert((await carryStrip(page).count()) === 1, "the strip does not show after picking the person again");
+  await clickOn(mover.personId);
+  assert((await carryStrip(page).count()) === 0, "the same person clicked twice is not put back");
+  assert((await teamCount(page, "Growth")) === growth + 1, "clicking the same person twice changed the plan");
+  passed("Escape puts the person back; the same person clicked twice is picked up, then put back; neither changes the plan");
+
+  // Pick a Product person and set them down on someone of another team: the same move as the button.
+  await rests(page, "before the second move");
+  people = await desks();
+  const second = people.find((person) => person.team === "product");
+  const other = people.find((person) => person.team !== null && person.team !== "product");
+  if (second !== undefined && other !== undefined) {
+    const before = { product: await teamCount(page, "Product"), to: await teamCount(page, other.team === "growth" ? "Growth" : "Recruiting") };
+    await clickOn(second.personId);
+    assert((await carryStrip(page).count()) === 1, "no strip after picking the second Product person");
+    await clickOn(other.personId);
+    assert((await carryStrip(page).count()) === 0, "the strip stays after setting the person down on another team");
+    const toName = other.team === "growth" ? "Growth" : "Recruiting";
+    assert((await teamCount(page, "Product")) === before.product - 1 && (await teamCount(page, toName)) === before.to + 1, `setting a Product person down on a ${toName} person did not move one`);
+    await rests(page, "after the second move");
+    assert((await office(page, "teamOf", { kind: "person", personId: second.personId })) === other.team, "the second person picked does not work in their new team");
+    passed(`a Product person set down on a ${toName} person moved, as with the button`);
+  } else {
+    assert(false, `no second Product person and person of another team to move between: ${JSON.stringify(people)}`);
+  }
+  scene = await office(page, "scene");
+  assert(Object.values(scene.teams).every((count) => count >= 0), "a team went below none");
+  noErrors();
+  await context.close();
+};
+
+// ---------------------------------------------------------------------------------------------------------------
+// 5. An office move and the looks
+
+const movesAndLooks = async (browser, fixtures) => {
+  current = "5. An office move";
+  {
+    const { context, page } = await freshPage(browser);
+    const { save, year } = fixtures.office;
+    await loadSave(page, save, year);
+    await running(page);
+    await rests(page, "the office fixture");
+    const before = (await office(page, "scene")).office;
+    const played = await playYear(page, year);
+    const { lines } = beatsAgree(played.samples, "the office move");
+    assert(lines.some((line) => line.startsWith("The company moves to a bigger place")), `the office move's year shows no move: ${JSON.stringify(lines)}`);
+    await rests(page, "after the move");
+    const after = await office(page, "scene");
+    assert(after.office === before + 1, `the office went from ${before} to ${after.office}`);
+    await page.waitForTimeout(SETTLE_MS);
+    await closeWith(page, `Plan ${year + 1}`);
+    await rests(page, "the shared office");
+    const stats = await office(page, "stats");
+    measured.push({ where: `${year + 1}, shared office (office fixture)`, office: after.office, figures: stats.figures, drawCalls: stats.drawCalls });
+    await shot(page, `${year + 1}-office-move.png`);
+    noErrors();
+    passed(`the office fixture's year played out as ${JSON.stringify(lines)} and moved the company from office ${before} to ${after.office}`);
+    await context.close();
+  }
+
+  current = "5. The looks";
+  for (const [name, look, file] of [["nineties", "nineties", "1994-nineties.png"], ["noughties", "noughties", "2004-noughties.png"], ["twenties", "twenties", "2023-twenties.png"]]) {
+    const { context, page } = await freshPage(browser);
+    const { save, year } = fixtures[name];
+    await loadSave(page, save, year);
+    await running(page);
+    const { stats, scene } = await officeFigures(page, name);
+    assert(lookFor(scene.era) === look, `${year} is the ${scene.era} era, look ${lookFor(scene.era)}, not ${look}`);
+    measured.push({ where: `${year}, office ${scene.office} (${name} fixture)`, office: scene.office, figures: stats.figures, drawCalls: stats.drawCalls });
+    await shot(page, file);
+    noErrors();
+    passed(`${year}: era ${scene.era} has the ${look} look; office ${scene.office}, ${stats.figures} figures, ${stats.drawCalls} draw calls`);
+    await context.close();
+  }
+  {
+    const { context, page } = await freshPage(browser);
+    const { save, year } = fixtures.campus;
+    await loadSave(page, save, year);
+    await running(page);
+    const { stats, scene } = await officeFigures(page, "the campus");
+    assert(stats.figures <= MAX_STAFF_DRAWN + MAX_WAITING_DRAWN, `${stats.figures} figures on the campus`);
+    assert(stats.hidden > 0, "the campus counts nobody on the sign");
+    measured.push({ where: `${year}, campus (campus fixture)`, office: scene.office, figures: stats.figures, drawCalls: stats.drawCalls });
+    await shot(page, `${year}-campus.png`);
+    noErrors();
+    passed(`the campus: ${stats.figures} figures (at most 56), ${stats.hidden} on the sign, ${stats.drawCalls} draw calls`);
+    await context.close();
+  }
+};
+
+// ---------------------------------------------------------------------------------------------------------------
+// 6. Taken down cleanly
+
+/** The last world taken down holds nothing and draws nothing. */
+const freed = async (page, where, live) => {
+  const gone = await office(page, "retiredStats");
+  assert(gone !== null, `${where}: no world was taken down`);
+  // The world taken down is the one that ran: it had drawn at least the frames counted before it went.
+  if (live !== undefined) assert(gone.framesDrawn >= live, `${where}: the world taken down drew ${gone.framesDrawn} frames, the live one ${live}`);
+  assert(gone.geometries === 0 && gone.textures === 0, `${where}: the world taken down holds ${gone.geometries} geometries and ${gone.textures} textures`);
+  assert(await stillForASecond(page, true), `${where}: the world taken down still draws`);
+};
+
+const takenDown = async (browser) => {
+  current = "6. Taken down cleanly";
+  const { context, page } = await freshPage(browser);
+  await startCareer(page);
+  await running(page);
+  let live = (await office(page, "stats")).framesDrawn;
+  await page.getByRole("button", { name: "New game", exact: true }).click();
+  await page.getByRole("button", { name: "Save and leave", exact: true }).click();
+  await page.getByLabel("Name your startup").waitFor();
+  await freed(page, '"Save and leave"', live);
+  assert((await office(page, "status")) === "none", `after "Save and leave" the status is ${await office(page, "status")}`);
+  passed('"Save and leave": the world freed, nothing drawn, status "none"');
+
+  await page.getByRole("button", { name: `Resume your career (${FIRST_YEAR})`, exact: true }).click();
+  await running(page);
+  await rests(page, "resumed");
+  live = (await office(page, "stats")).framesDrawn;
+  await page.getByRole("button", { name: "New game", exact: true }).click();
+  await page.getByRole("button", { name: "Abandon game", exact: true }).click();
+  await page.getByLabel("Name your startup").waitFor();
+  await freed(page, '"New game" then "Abandon"', live);
+  assert((await office(page, "status")) === "none", `after "Abandon" the status is ${await office(page, "status")}`);
+  passed('resumed, then "New game" and "Abandon": the world freed, status "none"');
+
+  await startCareer(page);
+  await running(page);
+  await rests(page, "1990");
+  const firstFrames = (await office(page, "stats")).framesDrawn;
+  await toggle(page).click();
+  await page.locator("[data-office]").waitFor({ state: "detached" });
+  await freed(page, 'the "3D office" switch turned off', firstFrames);
+  await toggle(page).click();
+  await running(page);
+  await rests(page, "the office back on");
+  passed(`the switch turned off frees the world; turned on again, a new office runs (${firstFrames} frames before)`);
+
+  live = (await office(page, "stats")).framesDrawn;
+  await office(page, "loseContext");
+  await reloadButton(page).waitFor({ timeout: 10000 });
+  await reloadButton(page).click();
+  await running(page);
+  await freed(page, '"Reload 3D view" after a lost context', live);
+  passed('"Reload 3D view" after a lost context: the lost world freed, a new office runs');
+  noErrors();
+  await context.close();
+};
+
+// ---------------------------------------------------------------------------------------------------------------
+// 7. A hidden tab and resizes
+
+const hiddenAndResized = async (browser) => {
+  current = "7. Hidden tab and resize";
+  const { context, page } = await freshPage(browser);
+  await startCareer(page);
+  await running(page);
+  await rests(page, "1990");
+  await raiseRecruiting(page);
+  await endButton(page, FIRST_YEAR).click();
+  await playBar(page).waitFor({ timeout: 5000 });
+  const setHidden = (hidden) =>
+    page.evaluate((hidden) => {
+      Object.defineProperty(document, "hidden", { configurable: true, get: () => hidden });
+      Object.defineProperty(document, "visibilityState", { configurable: true, get: () => (hidden ? "hidden" : "visible") });
+      document.dispatchEvent(new Event("visibilitychange"));
+    }, hidden);
+  await setHidden(true);
+  await page.waitForTimeout(100);
+  assert(await stillForASecond(page), "the office draws frames while the tab is hidden");
+  await setHidden(false);
+  await dialog(page).waitFor({ timeout: 10000 });
+  passed("hidden, the office draws nothing during a year; visible again, the year finishes and the summary opens");
+  await page.waitForTimeout(SETTLE_MS);
+  await closeWith(page, "Plan 1991");
+
+  const sameSize = async (where) => {
+    await rests(page, where);
+    // The view fills the cell, and the canvas fills the view inside its 1 px frame (world.css, .world-viewport).
+    const sizes = await page.evaluate(() => {
+      const cell = document.querySelector("[data-office]").getBoundingClientRect();
+      const view = document.querySelector("[data-office] [data-world]");
+      const frame = view.getBoundingClientRect();
+      const border = parseFloat(getComputedStyle(view).borderLeftWidth) + parseFloat(getComputedStyle(view).borderRightWidth);
+      const canvas = document.querySelector("[data-office] canvas").getBoundingClientRect();
+      return { cell: [cell.width, cell.height], view: [frame.width, frame.height], border, canvas: [canvas.width, canvas.height] };
+    });
+    const near = (a, b) => Math.abs(a - b) <= 0.5;
+    assert(near(sizes.view[0], sizes.cell[0]) && near(sizes.view[1], sizes.cell[1]), `${where}: the view is ${sizes.view.join("x")}, the cell ${sizes.cell.join("x")}`);
+    assert(
+      near(sizes.canvas[0], sizes.cell[0] - sizes.border) && near(sizes.canvas[1], sizes.cell[1] - sizes.border),
+      `${where}: the canvas is ${sizes.canvas.join("x")}, the cell ${sizes.cell.join("x")} less its ${sizes.border} px frame`,
+    );
+  };
+  await page.setViewportSize({ width: 1100, height: 800 });
+  await sameSize("at 1100x800");
+  await page.setViewportSize(DESKTOP);
+  await sameSize("back at 1280x800");
+  passed("resized to 1100 and back: the canvas fills the office cell each time");
+  await page.setViewportSize({ width: 1000, height: 800 });
+  await page.locator("[data-office]").waitFor({ state: "detached" });
+  assert((await page.locator("canvas").count()) === 0, "a canvas is on the page at 1000 px");
+  await freed(page, "at 1000x800");
+  await page.setViewportSize(DESKTOP);
+  await running(page);
+  passed("at 1000 px the 2D layout shows and the world is freed; back at 1280 px a new office runs");
+  noErrors();
+  await context.close();
+};
+
+// ---------------------------------------------------------------------------------------------------------------
+// 8. Reduced motion
+
+const reducedMotion = async (browser) => {
+  current = "8. Reduced motion";
+  const { context, page } = await freshPage(browser, { reducedMotion: "reduce" });
+  await startCareer(page);
+  await running(page);
+  await rests(page, "1990");
+  await raiseRecruiting(page);
+  await endButton(page, FIRST_YEAR).click();
+  await dialog(page).waitFor({ timeout: 2000 });
+  assert((await playBar(page).count()) === 0, "a year plays out under reduced motion");
+  const rest = await rests(page, "under reduced motion");
+  assert(rest.settledS <= 1, `under reduced motion the office took ${rest.settledS.toFixed(2)} world seconds to settle`);
+  noErrors();
+  passed(`under reduced motion End opens the summary at once, no bar; the office settles in ${rest.settledS.toFixed(2)} world seconds`);
+  await context.close();
+};
+
+// ---------------------------------------------------------------------------------------------------------------
+// 9. The switch
+
+const theSwitch = async (browser) => {
+  current = "9. The switch";
+  const { context, page } = await freshPage(browser);
+  await startCareer(page);
+  await running(page);
+  const save = await careerSave(page);
+  await toggle(page).click();
+  await page.locator("[data-office]").waitFor({ state: "detached" });
+  const grid2D = async (where) => {
+    assert((await page.locator("canvas").count()) === 0, `${where}: a canvas is on the page`);
+    for (const label of [`Plan for ${FIRST_YEAR}`, "If this plan plays out", "Rivals", "Timeline", "Your career"]) {
+      assert(await page.locator(`main section[aria-label="${label}"]`).isVisible(), `${where}: "${label}" is not visible`);
+    }
+  };
+  await grid2D("switched off");
+  assert((await toggle(page).getAttribute("aria-pressed")) === "false", "the switch is not shown off");
+  await page.reload();
+  await endButton(page, FIRST_YEAR).waitFor();
+  await page.waitForTimeout(1000);
+  await grid2D("after a reload");
+  assert((await page.evaluate((key) => localStorage.getItem(key), OFFICE_KEY)) === "off", `localStorage["${OFFICE_KEY}"] is not "off"`);
+  assert((await careerSave(page)) === save, "switching the office off changed the career save");
+  await toggle(page).click();
+  await running(page);
+  assert((await careerSave(page)) === save, "switching the office on changed the career save");
+  noErrors();
+  passed("the switch turns the office off into the 2D grid, stays off across a reload, and turns it back on; the save untouched");
+  await context.close();
+};
+
+// ---------------------------------------------------------------------------------------------------------------
+// 10. Fallbacks
+
+const fallbacks = async (browser, noWebGL) => {
+  current = "10. Fallbacks";
+  {
+    const { context, page } = await freshPage(noWebGL);
+    await startCareer(page);
+    assert(await toggle(page).isDisabled(), "with WebGL off the switch is enabled");
+    assert((await toggle(page).getAttribute("title")) === WORDS.unavailable, "with WebGL off the switch does not say why");
+    await page.waitForTimeout(5000);
+    const adds = await officeAdds(page);
+    assert(adds.office === 0 && adds.world === 0, `with WebGL off ${adds.office} [data-office] and ${adds.world} [data-world] elements were added`);
+    assert((await page.locator("canvas").count()) === 0, "with WebGL off a canvas is on the page");
+    noErrors();
+    passed("WebGL off: the 2D grid from the first paint, the switch disabled, no office or world element ever added");
+    await context.close();
+  }
+  {
+    // The check aborts the chunk itself: the browser's "Failed to load resource" line for it, and React's report of
+    // the import's failure that the office's boundary caught (React logs every caught error), are expected; only
+    // those two, and only about this chunk.
+    const { context, page } = await freshPage(browser, { allowed: /^Failed to load resource|Failed to fetch dynamically imported module: \S*\/assets\/CareerOffice-/ });
+    await page.route(/assets\/CareerOffice-/, (route) => route.abort());
+    await startCareer(page);
+    await page.waitForTimeout(5000);
+    assert((await page.locator("[data-office]").count()) === 0, "with the office's chunk blocked the office cell stays");
+    assert(await toggle(page).isDisabled(), "with the office's chunk blocked the switch is enabled");
+    const adds = await officeAdds(page);
+    assert(adds.office <= 1, `with the office's chunk blocked [data-office] was added ${adds.office} times`);
+    assert(await planPanel(page).isVisible(), "with the office's chunk blocked the plan is not shown");
+    noErrors();
+    passed(`the office's chunk blocked: the 2D grid, the switch disabled, the office cell added ${adds.office} time(s)`);
+    await context.close();
+  }
+  {
+    const { context, page } = await freshPage(browser);
+    await startCareer(page);
+    await running(page);
+    await rests(page, "1990");
+    await raiseRecruiting(page);
+    await endButton(page, FIRST_YEAR).click();
+    await playBar(page).waitFor({ timeout: 5000 });
+    await office(page, "loseContext");
+    await dialog(page).waitFor({ timeout: 2000 });
+    assert((await playBar(page).count()) === 0, "the bar stays after the context was lost");
+    await page.waitForTimeout(SETTLE_MS);
+    await closeWith(page, "Plan 1991");
+    for (let n = 0; n < 5; n++) {
+      assert((await page.locator("[data-office]").count()) === 0, "the office came back by itself after a lost context");
+      assert(await reloadButton(page).isVisible(), '"Reload 3D view" is not in the header');
+      await page.waitForTimeout(1000);
+    }
+    assert(await planPanel(page).isVisible(), "the plan is not shown after a lost context");
+    await reloadButton(page).click();
+    await running(page);
+    noErrors();
+    passed('a context lost during a year: the summary at once, the 2D grid with "Reload 3D view" for 5 s; pressed, the office runs again');
+    await context.close();
+  }
+};
+
+// ---------------------------------------------------------------------------------------------------------------
+// 11. A reload while a year plays out
+
+const reloadMidYear = async (browser, noWebGL) => {
+  current = "11. Reload mid-year";
+  const { context, page } = await freshPage(browser);
+  await startCareer(page);
+  await running(page);
+  await endButton(page, FIRST_YEAR).click();
+  await playBar(page).waitFor({ timeout: 5000 });
+  const save = await careerSave(page);
+  await page.reload();
+  await dialog(page).waitFor({ timeout: 10000 });
+  assert((await playBar(page).count()) === 0, "a year plays out again after the reload");
+  assert((await careerSave(page)) === save, "the save changed across the reload");
+  // The same year ended without 3D writes the same save.
+  const { context: flat, page: plain } = await freshPage(noWebGL);
+  await startCareer(plain);
+  await endButton(plain, FIRST_YEAR).click();
+  await dialog(plain).waitFor();
+  assert((await careerSave(plain)) === save, "the save differs from the one written with WebGL off");
+  noErrors();
+  passed("reloaded while 1990 played out: the summary is open, no bar, and the save is byte-identical, and the same as without 3D");
+  await flat.close();
+  await context.close();
+};
+
+// ---------------------------------------------------------------------------------------------------------------
+// 12. A whole career through the 3D screen
+
+const wholeCareer = async (browser) => {
+  current = "12. A whole career";
+  const { context, page } = await freshPage(browser);
+  await startCareer(page);
+  await running(page);
+  for (let year = FIRST_YEAR; year <= LAST_YEAR; year++) {
+    current = `12. A whole career, ${year}`;
+    await endButton(page, year).waitFor();
+    const heading = await header(page).innerText();
+    assert(heading.includes(`${year} · year ${year - FIRST_YEAR + 1} of ${YEARS}`), `the header reads ${JSON.stringify(heading)}`);
+    await endButton(page, year).click();
+    // Every year plays out, the last one too (src/ui/yearPlay.ts, yearPlaysOut): the turn does not move on after it,
+    // but its report is new. The summary opens once it is skipped.
+    const bar = await playBar(page).waitFor({ timeout: 5000 }).then(() => true, () => false);
+    assert(bar, `no playback bar after "End ${year}"`);
+    await noForbiddenWords(page.locator("body"), "the page while the year plays out");
+    await page.waitForTimeout(SETTLE_MS + 150); // past the guard that keeps a double click on End off Skip
+    await skipButton(page).click().catch(() => {});
+    await opened(page);
+    await noForbiddenWords(page.locator("body"), "the page with the summary open");
+    await closeWith(page, year === LAST_YEAR ? "See how it ended" : `Plan ${year + 1}`);
+    noErrors();
+  }
+  current = "12. A whole career, the end screen";
+  await page.getByRole("heading", { name: "Final standings" }).waitFor();
+  await noForbiddenWords(page.locator("body"), "the end screen");
+  noErrors();
+  passed(`every year from ${FIRST_YEAR} to ${LAST_YEAR} through the 3D screen, each played out and skipped, the last year too; no forbidden words; the end screen`);
+  await context.close();
+};
+
+// ---------------------------------------------------------------------------------------------------------------
+// 13. Narrow
+
+const narrow = async (browser, fixtures) => {
+  current = "13. Narrow";
+  const { context, page } = await freshPage(browser, { size: PHONE, hasTouch: true });
+  const { save, year } = fixtures.office;
+  await loadSave(page, save, year);
+  await page.waitForTimeout(2000);
+  assert((await page.locator("canvas").count()) === 0, "a canvas is on the page at 390 px");
+  assert((await page.locator("[data-office]").count()) === 0, "the office cell is on the page at 390 px");
+  const width = await page.evaluate(() => document.documentElement.scrollWidth);
+  assert(width <= PHONE.width, `the page is ${width} px wide at ${PHONE.width} px`);
+  assert(await toggle(page).isDisabled(), "the switch is enabled at 390 px");
+  assert((await toggle(page).getAttribute("title")) === WORDS.narrow, `the switch's title at 390 px is ${JSON.stringify(await toggle(page).getAttribute("title"))}`);
+  noErrors();
+  passed("390x844 with touch: no canvas, no office, no sideways scroll; the switch disabled with the narrow-window title");
+  await context.close();
+};
+
+// ---------------------------------------------------------------------------------------------------------------
+// Main
+
+const main = async () => {
+  if (build) {
+    const built = spawnSync("npx", ["vite", "build"], { cwd: ROOT, stdio: "inherit" });
+    if (built.status !== 0) {
+      console.error("office-check: vite build failed");
+      process.exit(1);
+    }
+  }
+  const made = spawnSync("npx", ["tsx", "scripts/career-fixtures.ts"], { cwd: ROOT, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
+  if (made.status !== 0) {
+    console.error(`office-check: the fixtures could not be made\n${made.stderr}`);
+    process.exit(1);
+  }
+  const fixtures = JSON.parse(made.stdout);
+  if (shotsDir !== null) mkdirSync(shotsDir, { recursive: true });
+
+  await startServer();
+  const browser = await chromium.launch();
+  browsers.push(browser);
+  const noWebGL = await chromium.launch({ args: ["--disable-3d-apis"] });
+  browsers.push(noWebGL);
+  try {
+    if (runs(1)) await raceUnchanged(browser);
+    if (runs(2)) await opens(browser, fixtures);
+    if (runs(3)) await yearAndMoves(browser);
+    if (runs(4)) await movingPeople(browser, fixtures);
+    if (runs(5)) await movesAndLooks(browser, fixtures);
+    if (runs(6)) await takenDown(browser);
+    if (runs(7)) await hiddenAndResized(browser);
+    if (runs(8)) await reducedMotion(browser);
+    if (runs(9)) await theSwitch(browser);
+    if (runs(10)) await fallbacks(browser, noWebGL);
+    if (runs(11)) await reloadMidYear(browser, noWebGL);
+    if (runs(12)) await wholeCareer(browser);
+    if (runs(13)) await narrow(browser, fixtures);
+    current = "14. No console errors";
+    noErrors();
+    passed("no console error or page error on any page");
+  } finally {
+    for (const each of browsers) await each.close();
+    stopServer();
+  }
+  if (measured.length > 0) {
+    console.log("office-check: draw calls at 1280x800");
+    for (const row of measured) console.log(`  ${row.where}: office ${row.office}, ${row.figures} figures, ${row.drawCalls} draw calls`);
+  }
+  console.log("office-check: every assertion passed");
+};
+
+main().catch(async (error) => {
+  if (error instanceof Failed) console.error(`office-check: FAILED ${error.message}`);
+  else console.error(`office-check: FAILED ${current}: ${error.stack ?? error}`);
+  for (const each of browsers) await each.close().catch(() => {});
+  stopServer();
+  process.exit(1);
+});

@@ -69,6 +69,30 @@ const FLOOR_STYLES: Record<LookId, readonly FloorStyle[]> = {
     { groove: 0xaeb1b3, side: 0xa3a6a8, tones: [0xd6d7d5, 0xd0d2d1, 0xdbdcda] },
     { groove: C.brass, side: 0x2c3038, tones: [0x454a57, 0x525866] },
   ],
+  // Grey-blue office carpet tiles.
+  nineties: [
+    { groove: 0x5a6472, side: 0x535c69, tones: [0x7a8696, 0x737f8f, 0x808c9b] },
+    { groove: 0x58637a, side: 0x515b70, tones: [0x76829a, 0x6f7b93, 0x7d88a0] },
+    { groove: 0x55617a, side: 0x4e5970, tones: [0x6f7d96, 0x68768f, 0x76839b] },
+    { groove: 0x5b6680, side: 0x545e76, tones: [0x7b87a0, 0x74809a, 0x828ea6] },
+    { groove: 0x4b5468, side: 0x2c3038, tones: [0x626c84, 0x5b657c, 0x69738a] },
+  ],
+  // Warm laminate planks.
+  noughties: [
+    { groove: 0xa47a4c, side: 0x9a7245, tones: [0xd2a676, 0xcc9f6e, 0xd8ad7e] },
+    { groove: 0xa9804f, side: 0x9f7749, tones: [0xdcb382, 0xd5ab79, 0xe1b98a, 0xcfa673] },
+    { groove: 0x9c7243, side: 0x936b3e, tones: [0xc9995f, 0xc39258, 0xcfa067] },
+    { groove: 0xa47a4c, side: 0x9a7245, tones: [0xd6ac7a, 0xd0a472, 0xdcb382] },
+    { groove: 0x8a6239, side: 0x2c3038, tones: [0xb88a55, 0xb2834e, 0xbe915c] },
+  ],
+  // Pale polished concrete.
+  twenties: [
+    { groove: 0xb9bbbb, side: 0xaeb0b0, tones: [0xd9dad8, 0xd4d5d3, 0xdedfdd] },
+    { groove: 0xbcbdbc, side: 0xb1b2b1, tones: [0xdcdcda, 0xd7d7d5, 0xe1e1df] },
+    { groove: 0xb6b8b9, side: 0xabadae, tones: [0xd6d8d9, 0xd1d3d4, 0xdbdddd] },
+    { groove: 0xbfc0bf, side: 0xb4b5b4, tones: [0xe0e0de, 0xdbdbd9, 0xe5e5e3] },
+    { groove: 0xb3b5b6, side: 0x2c3038, tones: [0xd2d4d5, 0xcdcfd0, 0xd7d9da] },
+  ],
 };
 
 const drawFloor = (b: ModelBuilder, w: number, d: number, office: OfficeIndex, look: LookId): void => {
@@ -249,6 +273,9 @@ export type WallStyle = "drywall" | "brick" | "plaster" | "glass" | "panel";
 /** The wall finish that goes with each office, by look and then by office (0 the garage … 4 the campus). */
 export const WALL_STYLE_FOR_PHASE: Record<LookId, readonly WallStyle[]> = {
   classic: ["drywall", "brick", "plaster", "glass", "panel"],
+  nineties: ["drywall", "brick", "plaster", "glass", "panel"],
+  noughties: ["drywall", "brick", "plaster", "glass", "panel"],
+  twenties: ["drywall", "brick", "plaster", "glass", "panel"],
 };
 
 /** The wall finish of an office in a look. */

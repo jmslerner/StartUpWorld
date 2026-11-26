@@ -32,6 +32,8 @@ export class SceneFrames {
   readonly seating = new SeatingPlan();
   private current: OfficeLayout = getOfficeLayout(0);
   private previous: WorldFrame | null = null;
+  /** Who to move first in the next scene, with the run and year it was given for. */
+  private hint: { readonly personId: string; readonly runId: string; readonly year: number } | null = null;
   private readonly fault: (label: string, error: unknown) => void;
 
   /** `fault` is told of a step that threw; the frame is made all the same, with what there is. */
@@ -49,13 +51,22 @@ export class SceneFrames {
     return this.previous;
   }
 
+  /** Hold a hint for the next scene staged, if it is of the same run and year as the last one; any next scene drops it. */
+  releaseFirst(personId: string | null): void {
+    const last = this.previous?.scene;
+    this.hint = personId === null || last === undefined ? null : { personId, runId: last.runId, year: last.year };
+  }
+
   /**
    * Make the frame for `scene`. `onNewRun` is called when the scene belongs to another run, before the seating
    * forgets the old one and before the layout changes: the moment to take down whatever was built for that run.
    */
   stage(scene: OfficeScene, onNewRun?: () => void): StagedFrame {
     const before = this.previous;
-    const cast = nextCast(before?.cast ?? null, scene);
+    const hint = this.hint;
+    this.hint = null;
+    const sameYear = hint !== null && hint.runId === scene.runId && hint.year === scene.year;
+    const cast = nextCast(before?.cast ?? null, scene, sameYear ? { releaseFirst: hint.personId } : {});
     const events = sceneEvents(before?.scene ?? null, scene);
     const newRun = before !== null && events.some((event) => event.kind === "run-reset");
     if (newRun) {
@@ -88,6 +99,7 @@ export class SceneFrames {
   /** Forget everything (the world is disposed). */
   clear(): void {
     this.previous = null;
+    this.hint = null;
     this.current = getOfficeLayout(0);
     this.seating.reset();
   }

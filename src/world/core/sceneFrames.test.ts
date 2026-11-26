@@ -168,3 +168,46 @@ describe("SceneFrames: from a scene to the one frame every system is handed", ()
     expect([staged.prev, staged.newRun]).toEqual([null, false]);
   });
 });
+
+describe("SceneFrames: a hint of who moves", () => {
+  const teamsOf = (frames: SceneFrames): string[] =>
+    (frames.last?.cast.people ?? []).map((person) => `${person.id}:${person.team ?? "-"}`);
+
+  it("a hint goes to the next scene of the same year only, once", () => {
+    const frames = new SceneFrames();
+    frames.stage(scene([3, 0, 0]));
+    frames.releaseFirst("p0");
+    frames.stage(scene([2, 1, 0]));
+    expect(teamsOf(frames)).toEqual(["p0:growth", "p1:product", "p2:product"]);
+    // Back, and the same move again with no new hint: the ordinary ruling, the most recent product joiner moves.
+    frames.stage(scene([3, 0, 0]));
+    expect(teamsOf(frames)).toEqual(["p0:product", "p1:product", "p2:product"]);
+    frames.stage(scene([2, 1, 0]));
+    expect(teamsOf(frames)).toEqual(["p0:product", "p1:product", "p2:growth"]);
+  });
+
+  it("a hint followed by no scene of its year is dropped: next year's changes follow the ordinary ruling", () => {
+    const hinted = new SceneFrames();
+    hinted.stage(scene([3, 0, 0]));
+    hinted.releaseFirst("p0");
+    hinted.stage(scene([2, 1, 0], { year: 1991 }));
+    const plain = new SceneFrames();
+    plain.stage(scene([3, 0, 0]));
+    plain.stage(scene([2, 1, 0], { year: 1991 }));
+    expect(teamsOf(hinted)).toEqual(teamsOf(plain));
+    expect(teamsOf(hinted)).toEqual(["p0:product", "p1:product", "p2:growth"]);
+    // And it does not wait for a later scene of its own year either.
+    hinted.stage(scene([3, 0, 0], { year: 1991 }));
+    hinted.stage(scene([2, 1, 0], { year: 1991 }));
+    expect(teamsOf(hinted)).toEqual(["p0:product", "p1:product", "p2:growth"]);
+  });
+
+  it("a hint cleared with null, or made of another run, changes nothing", () => {
+    const frames = new SceneFrames();
+    frames.stage(scene([3, 0, 0]));
+    frames.releaseFirst("p0");
+    frames.releaseFirst(null);
+    frames.stage(scene([2, 1, 0]));
+    expect(teamsOf(frames)).toEqual(["p0:product", "p1:product", "p2:growth"]);
+  });
+});

@@ -57,80 +57,86 @@ interface ShellSpec {
  * calendar and pricing board hang on the −Z wall, so its windows sit in the
  * gaps and toward the +X end; the −X wall is mostly free above the corner desks.
  *
- * By look, then by office (0 the garage … 4 the campus).
+ * By office (0 the garage … 4 the campus).
  */
+const CLASSIC_SHELLS: readonly ShellSpec[] = [
+  {
+    wall: "drywall",
+    feature: "drywall",
+    backFeatures: [],
+    sideFeatures: [[-3.2, -1.5]],
+    kerb: null,
+    sideKerb: null,
+    annex: 0,
+    rollUpDoor: true,
+  },
+  {
+    wall: "brick",
+    feature: "brick",
+    backFeatures: [
+      [-5.6, -3.7],
+      [6.3, 8.3],
+    ],
+    sideFeatures: [[-4.4, -0.3]],
+    kerb: "brick",
+    // Open toward the neighbours: the loft simply carries on.
+    sideKerb: null,
+    annex: LOFT_ANNEX_WIDTH,
+    rollUpDoor: false,
+  },
+  {
+    wall: "plaster",
+    feature: "plaster",
+    backFeatures: [
+      [-8.0, -5.2],
+      [2.4, 3.9],
+    ],
+    sideFeatures: [
+      [-2.8, -0.9],
+      [3.9, 6.2],
+    ],
+    kerb: "plaster",
+    sideKerb: "plaster",
+    annex: 0,
+    rollUpDoor: false,
+  },
+  {
+    wall: "plaster",
+    feature: "glass",
+    backFeatures: [
+      [-11.5, -5.7],
+      [6.9, 11.5],
+    ],
+    sideFeatures: [
+      [-8.5, -5.0],
+      [1.2, 8.5],
+    ],
+    kerb: "glass",
+    sideKerb: "glass",
+    annex: 0,
+    rollUpDoor: false,
+  },
+  {
+    wall: "panel",
+    feature: "panel",
+    backFeatures: [[-11.8, -7.2]],
+    sideFeatures: [
+      [-9.0, -6.6],
+      [3.6, 7.8],
+    ],
+    kerb: "panel",
+    sideKerb: "panel",
+    annex: 0,
+    rollUpDoor: false,
+  },
+];
+
+/** By look, then by office. The buildings are the floor plans, so every look has the same ones; the looks dress them. */
 const SHELL_SPECS: Record<LookId, readonly ShellSpec[]> = {
-  classic: [
-    {
-      wall: "drywall",
-      feature: "drywall",
-      backFeatures: [],
-      sideFeatures: [[-3.2, -1.5]],
-      kerb: null,
-      sideKerb: null,
-      annex: 0,
-      rollUpDoor: true,
-    },
-    {
-      wall: "brick",
-      feature: "brick",
-      backFeatures: [
-        [-5.6, -3.7],
-        [6.3, 8.3],
-      ],
-      sideFeatures: [[-4.4, -0.3]],
-      kerb: "brick",
-      // Open toward the neighbours: the loft simply carries on.
-      sideKerb: null,
-      annex: LOFT_ANNEX_WIDTH,
-      rollUpDoor: false,
-    },
-    {
-      wall: "plaster",
-      feature: "plaster",
-      backFeatures: [
-        [-8.0, -5.2],
-        [2.4, 3.9],
-      ],
-      sideFeatures: [
-        [-2.8, -0.9],
-        [3.9, 6.2],
-      ],
-      kerb: "plaster",
-      sideKerb: "plaster",
-      annex: 0,
-      rollUpDoor: false,
-    },
-    {
-      wall: "plaster",
-      feature: "glass",
-      backFeatures: [
-        [-11.5, -5.7],
-        [6.9, 11.5],
-      ],
-      sideFeatures: [
-        [-8.5, -5.0],
-        [1.2, 8.5],
-      ],
-      kerb: "glass",
-      sideKerb: "glass",
-      annex: 0,
-      rollUpDoor: false,
-    },
-    {
-      wall: "panel",
-      feature: "panel",
-      backFeatures: [[-11.8, -7.2]],
-      sideFeatures: [
-        [-9.0, -6.6],
-        [3.6, 7.8],
-      ],
-      kerb: "panel",
-      sideKerb: "panel",
-      annex: 0,
-      rollUpDoor: false,
-    },
-  ],
+  classic: CLASSIC_SHELLS,
+  nineties: CLASSIC_SHELLS,
+  noughties: CLASSIC_SHELLS,
+  twenties: CLASSIC_SHELLS,
 };
 
 /** Width of the garage's roll-up opening, and of the gap a framed door needs in the kerb. */

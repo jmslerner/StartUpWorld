@@ -4,7 +4,7 @@ import { useStore } from "zustand";
 import { createGameStore, type GameStore, type StorageLike } from "./gameStore";
 
 /** The browser's storage, or null where it is blocked: the game still plays, it just is not saved. */
-const browserStorage = (): StorageLike | null => {
+export const browserStorage = (): StorageLike | null => {
   try {
     return typeof window === "undefined" ? null : window.localStorage;
   } catch {

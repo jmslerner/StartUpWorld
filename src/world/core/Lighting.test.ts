@@ -3,7 +3,8 @@ import { describe, expect, it } from "vitest";
 import { nextCast } from "../cast";
 import { sceneEvents } from "../sceneEvents";
 import type { OfficeIndex, OfficeScene, QualityLevel, WorldFrame } from "../types";
-import { getLightingState, Lighting, LIGHTING_LOOKS } from "./Lighting";
+import { LOOKS, PHASES } from "./colors";
+import { getLightingState, Lighting, LIGHTING_LOOKS, restingLook } from "./Lighting";
 
 const FRAME = 1 / 60;
 
@@ -360,6 +361,11 @@ describe("Lighting endings", () => {
 });
 
 describe("Lighting looks", () => {
+  it("each look rests in its own light", () => {
+    expect(LOOKS.map((look) => restingLook(2, look))).toEqual(["morning", "afternoon", "morning", "sunrise"]);
+    expect(new Set(PHASES.map((office) => restingLook(office, "nineties")))).toEqual(new Set(["afternoon"]));
+  });
+
   it("can be pinned to a named look, matching what frames produce", () => {
     for (const [look, ending] of [["morning", null], ["win", "won"], ["loss", "lost"]] as const) {
       const pinned = makeLighting();

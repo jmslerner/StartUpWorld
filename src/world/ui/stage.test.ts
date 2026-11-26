@@ -96,4 +96,31 @@ describe("the stage store", () => {
     stage.reset();
     expect(INITIAL_STAGE_STATE).toEqual({ status: "starting", handle: null, hover: null, selected: null, size: { width: 0, height: 0 } });
   });
+
+  it("tells every tap, the same one twice included, until a listener stops; a reset keeps listeners", () => {
+    const stage = createStage();
+    const seen: unknown[] = [];
+    const stop = stage.taps.subscribe((target) => seen.push(target));
+    stage.taps.tell(DESK);
+    stage.taps.tell(DESK);
+    stage.reset();
+    stage.taps.tell(null);
+    stop();
+    stage.taps.tell(DOOR);
+    expect(seen).toEqual([DESK, DESK, null]);
+  });
+
+  it("a listener that throws does not keep the others from hearing the tap", () => {
+    const stage = createStage();
+    const seen: unknown[] = [];
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    stage.taps.subscribe(() => {
+      throw new Error("broken listener");
+    });
+    stage.taps.subscribe((target) => seen.push(target));
+    expect(() => stage.taps.tell(DOOR)).not.toThrow();
+    expect(seen).toEqual([DOOR]);
+    expect(consoleError).toHaveBeenCalledTimes(1);
+    consoleError.mockRestore();
+  });
 });

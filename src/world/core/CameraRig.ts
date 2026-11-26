@@ -339,6 +339,25 @@ export class CameraRig {
     this.shakeAmplitude = Math.max(this.shakeAmplitude, saturate(strength));
   }
 
+  /** End a glide where it was going and stop a shake, at once: the world settling whatever moves. */
+  finish(): void {
+    let changed = false;
+    if (this.tween.active) {
+      this.tween.active = false;
+      this.target.x = this.tween.toX;
+      this.target.z = this.tween.toZ;
+      this.zoomLevel = this.tween.toZoom;
+      changed = true;
+    }
+    if (this.shakeAmplitude > 0) {
+      this.shakeAmplitude = 0;
+      this.shakeU = 0;
+      this.shakeV = 0;
+      changed = true;
+    }
+    if (changed) this.sync();
+  }
+
   /** Advance tweens and shake. Call once per frame before rendering. */
   update(dt: number): void {
     let changed = false;

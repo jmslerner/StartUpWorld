@@ -14,6 +14,8 @@
 import { C, NEON, phaseTier, themeFor } from "../core/palette";
 import type { LookId, OfficeIndex } from "../types";
 import { decorSize, getLayoutDecor, groundRect, LOFT_ANNEX_WIDTH, WALL_GAP } from "./layouts";
+import { createSignatureProp, SIGNATURE_PROPS, SIGNATURE_SIZES } from "./props/signature";
+import type { SignatureKind } from "./props/signature";
 import type { DecorKind, DecorSpot, GroundRect } from "./layouts";
 import {
   createArcadeCabinet,
@@ -115,6 +117,46 @@ const DECOR_FACTORIES: Record<DecorKind, (office: OfficeIndex, look: LookId, spo
 /** Build the prop for one piece of floor-plan décor (exported for the size test). */
 export const createDecorProp = (office: OfficeIndex, spot: DecorSpot, look: LookId = "classic"): PropHandle =>
   DECOR_FACTORIES[spot.kind](office, look, spot);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Signature props: what says which decade it is
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Décor a signature prop may stand in for. Never reception, meeting pods, partitions, couches, tables or games. */
+export const REPLACEABLE_DECOR: readonly DecorKind[] = ["plant", "plant-large", "boxes", "filing-cabinet", "water-cooler", "vending", "bookshelf"];
+
+const NO_SIGNATURES: ReadonlyMap<number, SignatureKind> = new Map();
+
+/**
+ * Where a look's signature props stand, by index into `decor`. Each of the look's props in turn takes the smallest
+ * free spot (by floor area; the earlier spot on a tie) of a replaceable kind with room for it in width and depth.
+ * A prop with no such spot left is not shown; none stands twice. The classic look has none.
+ */
+export const signaturePlan = (decor: readonly DecorSpot[], look: LookId): ReadonlyMap<number, SignatureKind> => {
+  if (look === "classic") return NO_SIGNATURES;
+  const plan = new Map<number, SignatureKind>();
+  for (const kind of SIGNATURE_PROPS[look]) {
+    const need = SIGNATURE_SIZES[kind];
+    let best = -1;
+    let bestArea = Infinity;
+    decor.forEach((spot, index) => {
+      if (plan.has(index) || !REPLACEABLE_DECOR.includes(spot.kind)) return;
+      const size = decorSize(spot);
+      if (size.width < need.width || size.depth < need.depth) return;
+      const area = size.width * size.depth;
+      if (area < bestArea) {
+        best = index;
+        bestArea = area;
+      }
+    });
+    if (best >= 0) plan.set(best, kind);
+  }
+  return plan;
+};
+
+/** The signature prop standing on spot `index` of `decor` in a look, or null for the spot's own décor. */
+export const signatureAt = (decor: readonly DecorSpot[], index: number, look: LookId): SignatureKind | null =>
+  signaturePlan(decor, look).get(index) ?? null;
 
 /** An orange extension lead snaking across the garage floor to a power strip: flat, so nobody trips. */
 const createExtensionLead = (): PropHandle => {
@@ -333,6 +375,11 @@ const SCENES: readonly Scene[] = [garageScene, sharedScene, ownScene, floorScene
 
 /** Dress the office that `kit` is building: floor-plan décor first, then the office's scene. */
 export const dressOffice = (kit: StageKit): void => {
-  for (const spot of getLayoutDecor(kit.layout)) kit.place(createDecorProp(kit.office, spot, kit.look), spot);
+  const decor = getLayoutDecor(kit.layout);
+  const signatures = signaturePlan(decor, kit.look);
+  decor.forEach((spot, index) => {
+    const signature = signatures.get(index);
+    kit.place(signature === undefined ? createDecorProp(kit.office, spot, kit.look) : createSignatureProp(signature, decorSize(spot), spot.variant), spot);
+  });
   SCENES[phaseTier(kit.office)](new Dresser(kit));
 };

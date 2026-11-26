@@ -17,6 +17,12 @@
  * looked for in the page's text and its title and aria-label attributes, leaving out every element that carries
  * `data-card-text` (a card's name and text come from the config as they are).
  *
+ * Chromium runs with WebGL switched off (`--disable-3d-apis`): this script is the proof that a career is complete
+ * without 3D, in the 2D screens; scripts/office-check.mjs covers the 3D office. So every career page must show the
+ * "3D office" switch as unavailable, draw no canvas, never add a `[data-office]` or `[data-world]` element (counted by
+ * a MutationObserver from the page's first script, across reloads) and never fetch the office's chunk. The race must
+ * never fetch the office or the world either, load no script holding three's renderer, and show no "3D office" switch.
+ *
  * Exits 1 on the first failed assertion, naming it. `--shots <dir>` saves 1990, 2007, 2023 and the end screen.
  * `--no-build` serves the `dist` that is there. Not part of `npm test`: it needs a browser and takes minutes.
  */
@@ -171,13 +177,50 @@ const noErrors = () => {
   for (const bad of pages) assert(bad.length === 0, bad.join(" | "));
 };
 
-/** A fresh context (fresh storage) and a page in it, its errors watched and the analytics script stubbed. */
+/** The tab's count of `[data-office]` and `[data-world]` elements ever added, kept in sessionStorage across reloads. */
+const OFFICE_ADDS = "careerCheck:officeAdds";
+const countOfficeAdds = (key) => {
+  const seen = (node) => {
+    if (node.nodeType !== Node.ELEMENT_NODE) return 0;
+    const self = node.matches("[data-office], [data-world]") ? 1 : 0;
+    return self + node.querySelectorAll("[data-office], [data-world]").length;
+  };
+  new MutationObserver((records) => {
+    let found = 0;
+    for (const record of records) for (const node of record.addedNodes) found += seen(node);
+    if (found > 0) sessionStorage.setItem(key, String(Number(sessionStorage.getItem(key) ?? "0") + found));
+  }).observe(document, { childList: true, subtree: true });
+};
+const officeAdds = (page) => page.evaluate((key) => Number(sessionStorage.getItem(key) ?? "0"), OFFICE_ADDS);
+
+/** The office's lazy chunk, and the world's; neither is ever fetched with WebGL off, nor by a race. */
+const OFFICE_CHUNK = /assets\/CareerOffice-/;
+const OFFICE_OR_WORLD_CHUNK = /assets\/(CareerOffice|WorldView)-/;
+
+/** Every URL a page requests. */
+const requested = new WeakMap();
+const requestsOf = (page) => requested.get(page) ?? [];
+
+/** A fresh context (fresh storage) and a page in it, its errors watched, its requests and office elements counted. */
 const freshPage = async (size = DESKTOP) => {
   const context = await browser.newContext({ viewport: size });
+  await context.addInitScript(countOfficeAdds, OFFICE_ADDS);
   const page = await context.newPage();
+  const urls = [];
+  requested.set(page, urls);
+  page.on("request", (request) => urls.push(request.url()));
   watch(page);
   await stubAnalytics(page);
   return { context, page };
+};
+
+/** The page shows the 2D screens only: no office element, ever added or there now, and no office chunk fetched. */
+const stays2D = async (page, where) => {
+  assert((await page.locator("[data-office]").count()) === 0, `${where}: a [data-office] element is on the page`);
+  const adds = await officeAdds(page);
+  assert(adds === 0, `${where}: ${adds} [data-office] or [data-world] elements were added to the page`);
+  const chunk = requestsOf(page).find((url) => OFFICE_CHUNK.test(url));
+  assert(chunk === undefined, `${where}: the office's chunk was requested: ${chunk}`);
 };
 
 /** The text under `root` that a player can read, leaving out card text: text nodes, titles and aria-labels. */
@@ -279,6 +322,7 @@ const loadSave = async (save, size = DESKTOP) => {
   await page.evaluate(([key, value]) => localStorage.setItem(key, value), [CAREER_KEY, save]);
   await page.reload();
   await header(page).waitFor();
+  await stays2D(page, "a loaded save");
   return { context, page };
 };
 
@@ -319,6 +363,15 @@ const raceUnchanged = async () => {
   assert((await report.locator("h2").first().innerText()) === "Race Co: Q1 report", 'the report is not titled "Race Co: Q1 report"');
   assert((await report.getByRole("button", { name: "Plan Q2", exact: true }).count()) === 1, 'the report has no "Plan Q2" button');
   await closeWith(page, "Plan Q2");
+  assert((await page.locator("main header").getByRole("button", { name: "3D office" }).count()) === 0, 'the race\'s header has a "3D office" button');
+  const officeOrWorld = requestsOf(page).find((url) => OFFICE_OR_WORLD_CHUNK.test(url));
+  assert(officeOrWorld === undefined, `the race requested the office or the world: ${officeOrWorld}`);
+  const scripts = [...new Set(requestsOf(page).map((url) => new URL(url).pathname).filter((path) => /^\/assets\/[^/]+\.js$/.test(path)))];
+  assert(scripts.length > 0, "the race requested no script under assets/");
+  // Read from dist: three may sit in a chunk shared with the lab, under another name.
+  const renderer = scripts.filter((path) => readFileSync(resolve(ROOT, `dist${path}`), "utf8").includes("WebGLRenderer"));
+  assert(renderer.length === 0, `the race loaded three's renderer in ${renderer.join(", ")}`);
+  passed(`the race fetched neither the office nor the world, and none of its ${scripts.length} scripts holds WebGLRenderer; no "3D office" button`);
   raceSave = (await storageKeys(page)).race;
   await page.getByRole("button", { name: "New game", exact: true }).click();
   await page.getByRole("button", { name: "Abandon game", exact: true }).click();
@@ -360,6 +413,23 @@ const wholeCareer = async () => {
   for (let year = FIRST_YEAR; year <= LAST_YEAR; year++) {
     current = `3. A whole career, ${year}`;
     await endButton(page, year).waitFor();
+
+    if (year === FIRST_YEAR) {
+      // At once: the WebGL 2 probe says no before the first paint.
+      const toggle = page.locator("main header").getByRole("button", { name: "3D office", exact: true });
+      assert((await toggle.count()) === 1, 'the header has no "3D office" button');
+      assert(await toggle.isDisabled(), 'the "3D office" button is enabled with WebGL off');
+      const why = "The 3D office cannot be shown on this device. The game is complete without it.";
+      assert((await toggle.getAttribute("title")) === why, `the "3D office" button's title is ${JSON.stringify(await toggle.getAttribute("title"))}`);
+      assert((await page.locator("canvas").count()) === 0, "a canvas is on the page with WebGL off");
+      for (const [name, label] of [["the plan", `Plan for ${year}`], ["the projection", "If this plan plays out"], ["the rivals", "Rivals"]]) {
+        assert(await page.locator(`section[aria-label="${label}"]`).isVisible(), `${name} is not visible at 1280x800`);
+      }
+      await stays2D(page, "the first year");
+      await page.waitForTimeout(5000);
+      await stays2D(page, "the first year after 5 s");
+      passed('with WebGL off the "3D office" button is disabled and says why; no canvas, no office; the plan, the projection and the rivals are shown');
+    }
 
     if (year === 2005) {
       await page.reload();
@@ -430,6 +500,8 @@ const wholeCareer = async () => {
   current = "3. A whole career";
   assert(aheadSeen, 'no year from 2027 showed a dated card labelled "Invented"');
   passed('every year from 1990 to 2038: header, timeline ("you are here" not cut off), era, button, summary, full report, no forbidden words');
+  await stays2D(page, "the whole career");
+  passed("the whole career stayed in the 2D screens: no office or world element ever added, no office chunk fetched");
 
   // The end screen.
   current = "3. A whole career, the end screen";
@@ -630,7 +702,8 @@ const main = async () => {
   if (shotsDir !== null) mkdirSync(shotsDir, { recursive: true });
 
   await startServer();
-  browser = await chromium.launch();
+  // WebGL off: this check proves the career complete in the 2D screens (scripts/office-check.mjs covers the 3D office).
+  browser = await chromium.launch({ args: ["--disable-3d-apis"] });
   try {
     await raceUnchanged();
     await wholeCareer();

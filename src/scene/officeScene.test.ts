@@ -1,13 +1,17 @@
 import { describe, expect, it } from "vitest";
+import { newGameSetup } from "../ai/names";
+import { CAREER } from "../config";
 import { DESIGN } from "../config.design";
 import { CAREER_RULES, CAREER_TEST, atTurn, newCareer, withCareer, withCareerOf, withEras } from "../engine/careerKit";
 import { DEPARTMENTS, normalizePlan, resolveTurn } from "../engine/index";
 import type { CompanyId, GameState, Outcome, Plan } from "../engine/index";
+import { createGame } from "../engine/setup";
 import { newGame, onlyActive, planOf, withCompany, withState } from "../engine/testKit";
 import { MAX_STAFF_DRAWN } from "../world/cast";
+import { lookFor } from "../world/core/colors";
 import { DESKS } from "../world/office/layouts";
 import { TEAMS } from "../world/types/scene";
-import { officeSceneFor } from "./officeScene";
+import { officeSceneFor, sameOfficeScene } from "./officeScene";
 import type { OfficeSceneInput } from "./officeScene";
 
 const sceneOf = (game: GameState, companyId: CompanyId, extra: Partial<OfficeSceneInput> = {}) =>
@@ -187,5 +191,24 @@ describe("the office scene of a company", () => {
 
   it("the world's team names are the engine's departments", () => {
     expect([...TEAMS]).toEqual([...DEPARTMENTS]);
+  });
+});
+
+describe("the look of each era", () => {
+  it("every era of the shipped career has a look of its own, by decade", () => {
+    for (const era of CAREER.career!.eras) expect(lookFor(era.id)).not.toBe("classic");
+    // Turn 1 is 1990 (yearOf = firstYear + turn - 1).
+    const lookIn = (year: number) =>
+      lookFor(sceneOf(atTurn(createGame(newGameSetup(1, "Acme"), CAREER), year - 1990 + 1), 0, { config: CAREER }).era);
+    expect([1990, 1999, 2000, 2021, 2022, 2038].map(lookIn)).toEqual(["nineties", "nineties", "noughties", "noughties", "twenties", "twenties"]);
+  });
+});
+
+describe("two office scenes", () => {
+  it("two scenes are the same when every field is", () => {
+    const a = sceneOf(newCareer(), 0);
+    expect(sameOfficeScene(a, { ...a, teams: { ...a.teams } })).toBe(true);
+    for (const patch of [{ year: a.year + 1 }, { arriving: 1 }, { teams: { ...a.teams, growth: a.teams.growth + 1 } }, { ending: "lost" as const }])
+      expect(sameOfficeScene(a, { ...a, ...patch })).toBe(false);
   });
 });

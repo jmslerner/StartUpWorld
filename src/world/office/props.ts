@@ -14,4 +14,5 @@ export * from "./props/stations";
 export * from "./props/building";
 export * from "./props/decor";
 export * from "./props/markers";
+export * from "./props/signature";
 export * from "./props/catalog";

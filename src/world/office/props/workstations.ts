@@ -24,7 +24,7 @@ import {
   drawStickyNote,
   monitorScreen,
 } from "./parts";
-import type { ChairStyle, MonitorSpec } from "./parts";
+import type { ChairStyle, MonitorKind, MonitorSpec } from "./parts";
 import { createScreenSurface, PropKit, screenQuads } from "./shared";
 import type { PropFootprint, PropHandle, ScreenKind } from "./shared";
 
@@ -37,6 +37,10 @@ export const DESK_STYLES: readonly DeskStyle[] = ["garage", "hotdesk", "standard
  */
 export const DESK_STYLE_FOR_PHASE: Record<LookId, readonly DeskStyle[]> = {
   classic: ["garage", "hotdesk", "standard", "premium", "executive"],
+  // The buildings are the plans; the looks dress them: the same desk bodies, another computer on them.
+  nineties: ["garage", "hotdesk", "standard", "premium", "executive"],
+  noughties: ["garage", "hotdesk", "standard", "premium", "executive"],
+  twenties: ["garage", "hotdesk", "standard", "premium", "executive"],
 };
 
 /** The desk and chair style of an office in a look. */
@@ -73,18 +77,56 @@ export const DESK_VARIANTS = 3;
 
 const TOP = DESK_TOP_Y;
 
-const deskMonitors = (style: DeskStyle): MonitorSpec[] => {
-  switch (style) {
-    case "garage":
-      return [{ kind: "crt", x: 0.1, y: TOP, z: 0.1 }];
-    case "hotdesk":
-      return [{ kind: "laptop", x: 0, y: TOP + 0.07, z: 0.03, shell: C.chrome }];
-    case "standard":
-      return [{ kind: "flat", x: 0, y: TOP, z: 0.15, shell: C.greyLight }];
-    case "premium":
-      return [{ kind: "wide", x: 0, y: TOP, z: 0.15, shell: C.white }];
-    case "executive":
-      return [{ kind: "flat", x: 0, y: TOP, z: 0.17, shell: C.brass }];
+/** The computer each desk style has in the classic look: the old one, office by office. */
+const CLASSIC_MONITORS: Record<DeskStyle, MonitorKind> = {
+  garage: "crt",
+  hotdesk: "laptop",
+  standard: "flat",
+  premium: "wide",
+  executive: "flat",
+};
+
+/**
+ * The computer on a desk of a style in a look: a tube monitor on every desk of the nineties, flat screens (wide on
+ * the two best desks) in the noughties, a laptop on every desk of the twenties.
+ */
+export const monitorFor = (style: DeskStyle, look: LookId): MonitorKind => {
+  switch (look) {
+    case "classic":
+      return CLASSIC_MONITORS[style];
+    case "nineties":
+      return "crt";
+    case "noughties":
+      return style === "premium" || style === "executive" ? "wide" : "flat";
+    case "twenties":
+      return "laptop";
+  }
+};
+
+/** The casing of each style's computer, whatever kind it is: it matches the desk. */
+const MONITOR_SHELL: Record<DeskStyle, number | undefined> = {
+  garage: undefined,
+  hotdesk: C.chrome,
+  standard: C.greyLight,
+  premium: C.white,
+  executive: C.brass,
+};
+
+/** Where a computer of each kind stands on the top: a tube sits back and to one side, a laptop near the edge. */
+const deskMonitors = (style: DeskStyle, look: LookId): MonitorSpec[] => {
+  const kind = monitorFor(style, look);
+  const shell = MONITOR_SHELL[style];
+  const withShell = (spec: MonitorSpec): MonitorSpec => (shell === undefined ? spec : { ...spec, shell });
+  switch (kind) {
+    case "crt":
+      return [withShell({ kind, x: 0.1, y: TOP, z: 0.1 })];
+    case "laptop":
+      // The hot desk's wedge stand lifts it to eye level.
+      return [withShell({ kind, x: 0, y: style === "hotdesk" ? TOP + 0.07 : TOP, z: 0.03 })];
+    case "flat":
+      return [withShell({ kind, x: 0, y: TOP, z: style === "executive" ? 0.17 : 0.15 })];
+    case "wide":
+      return [withShell({ kind, x: 0, y: TOP, z: style === "executive" ? 0.17 : 0.15 })];
   }
 };
 
@@ -301,10 +343,10 @@ const vacantFilter: ColorFilter = (color) => {
   color.b += (grey - color.b) * 0.45 + pale;
 };
 
-const drawDesk = (b: ModelBuilder, style: DeskStyle, accent: number, occupied: boolean, variant: number): void => {
+const drawDesk = (b: ModelBuilder, style: DeskStyle, look: LookId, accent: number, occupied: boolean, variant: number): void => {
   if (!occupied) b.setColorFilter(vacantFilter);
   drawBody(b, style, accent);
-  for (const monitor of deskMonitors(style)) drawMonitor(b, monitor);
+  for (const monitor of deskMonitors(style, look)) drawMonitor(b, monitor);
   drawHardware(b, style, accent);
   if (occupied) drawClutter(b, style, accent, variant);
   b.setColorFilter(null);
@@ -324,6 +366,8 @@ export interface DeskOptions {
   variant?: number;
   /** Start vacant. Default occupied. */
   occupied?: boolean;
+  /** The office's look: which decade's computer stands on the desk. Default "classic". */
+  look?: LookId;
 }
 
 export interface DeskHandle extends PropHandle {
@@ -338,19 +382,21 @@ export interface DeskHandle extends PropHandle {
 
 export const createDesk = (options: DeskOptions): DeskHandle => {
   const { style } = options;
+  const look = options.look ?? "classic";
+  const monitor = monitorFor(style, look);
   const accent = options.accent ?? DESK_ACCENT[style];
   const variant = (((options.variant ?? 0) % DESK_VARIANTS) + DESK_VARIANTS) % DESK_VARIANTS;
   const kit = new PropKit(`desk:${style}`);
 
   const geometryFor = (occupied: boolean): THREE.BufferGeometry =>
-    bakeModel(`desk:${style}:${accent.toString(16)}:${occupied ? `busy${variant}` : "vacant"}`, (b) =>
-      drawDesk(b, style, accent, occupied, variant)
+    bakeModel(`desk:${style}:${monitor}:${accent.toString(16)}:${occupied ? `busy${variant}` : "vacant"}`, (b) =>
+      drawDesk(b, style, look, accent, occupied, variant)
     );
 
   const body = kit.add(modelMesh(geometryFor(true)));
   const screen = createScreenSurface(options.screen ?? "code");
   kit.own(screen.material);
-  const screens = new THREE.Mesh(screenQuads(`desk:${style}`, deskMonitors(style).map(monitorScreen)), screen.material);
+  const screens = new THREE.Mesh(screenQuads(`desk:${style}:${monitor}`, deskMonitors(style, look).map(monitorScreen)), screen.material);
   kit.add(screens);
 
   const setScreenGlow = (amount: number): void => screen.setGlow(amount);
