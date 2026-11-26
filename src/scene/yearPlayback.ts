@@ -8,7 +8,7 @@
 import type { CompanyReport } from "../engine/index";
 import type { OfficeIndex, OfficeScene, Team } from "../world/types/scene";
 
-export type BeatKind = "leave" | "move" | "arrive" | "year";
+export type BeatKind = "leave" | "move" | "arrive" | "year" | "market";
 
 export interface PlaybackBeat {
   readonly kind: BeatKind;
@@ -25,9 +25,16 @@ export interface YearPlayback {
   readonly seconds: number;
 }
 
-export const BEAT_SECONDS: Readonly<Record<BeatKind, number>> = { leave: 1.5, move: 2.5, arrive: 2.5, year: 1.2 };
+export const BEAT_SECONDS: Readonly<Record<BeatKind, number>> = {
+  leave: 1.5,
+  move: 2.5,
+  arrive: 2.5,
+  year: 1.2,
+  market: 2,
+};
 export const MAX_PLAYBACK_SECONDS = 6;
 export const NO_PLAYBACK: YearPlayback = { beats: [], seconds: 0 };
+export const MARKET_BEAT_SECONDS = BEAT_SECONDS.market;
 
 const beat = (kind: BeatKind, count: number, office: number | null = null): PlaybackBeat => ({
   kind,
@@ -52,6 +59,16 @@ export const yearPlayback = (report: CompanyReport | null, reducedMotion: boolea
 
   const seconds = Math.min(MAX_PLAYBACK_SECONDS, beats.reduce((sum, b) => sum + b.seconds, 0));
   return { beats, seconds };
+};
+
+/** The office's beats scaled into what MARKET_BEAT_SECONDS leaves of MAX_PLAYBACK_SECONDS, then the market's.
+ *  No playback stays none. */
+export const withMarket = (playback: YearPlayback): YearPlayback => {
+  if (playback.beats.length === 0) return playback;
+  const office = playback.beats.reduce((sum, b) => sum + b.seconds, 0);
+  const k = office > 0 ? Math.min(1, (MAX_PLAYBACK_SECONDS - MARKET_BEAT_SECONDS) / office) : 1;
+  const beats: PlaybackBeat[] = [...playback.beats.map((b) => ({ ...b, seconds: b.seconds * k })), beat("market", 0)];
+  return { beats, seconds: Math.min(MAX_PLAYBACK_SECONDS, beats.reduce((sum, b) => sum + b.seconds, 0)) };
 };
 
 /** The same scene once the year has played out: next year's expected hires are not at the door yet. */
@@ -88,6 +105,9 @@ export const beatScenes = (before: OfficeScene, after: OfficeScene, playback: Ye
         return inOffice(after.office, after.capacity);
       case "arrive":
       case "year":
+        return playedOut(after);
+      case "market":
+        // The office behind the market has played its year out.
         return playedOut(after);
     }
   });

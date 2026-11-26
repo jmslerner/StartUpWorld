@@ -86,4 +86,9 @@ describe("officeView", () => {
     const text = [...Object.values(OFFICE_WORDS), playingLine(1990), ...beats].join("\n");
     expect(text).not.toMatch(/\b(quarters?|quarterly|turns?)\b|\bQ\d{1,2}\b/i);
   });
+  it("says the market beat in plain words", () => {
+    const line = beatLine({ kind: "market", seconds: 2, count: 0, office: null }, []);
+    expect(line).toBe("Where the year's new users went");
+    expect(line).not.toMatch(/\b(quarters?|quarterly|turns?)\b|\bQ\d{1,2}\b/i);
+  });
 });

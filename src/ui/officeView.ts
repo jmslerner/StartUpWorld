@@ -127,5 +127,7 @@ export const beatLine = (beat: PlaybackBeat, officeNames: readonly string[]): st
     }
     case "year":
       return "A quiet year";
+    case "market":
+      return "Where the year's new users went";
   }
 };
