@@ -120,7 +120,7 @@ export interface WorldHandle {
   personAt(desk: number): string | null;
   /** The next scene, if it is of this year and takes someone from this person's team, moves this person. Used once. */
   releaseFirst(personId: string | null): void;
-  /** Finish at once whatever is moving (walks, an office rising, the lights), then draw it. */
+  /** Finish at once whatever is moving (walks, an office rising, the lights, the camera's glide), then draw it. */
   settle(): void;
   dispose(): void;
 }

@@ -4,7 +4,9 @@
  */
 
 import type { PlaybackBeat, YearPlayback } from "../scene/yearPlayback";
+import type { WorldHandle } from "../world/types/handle";
 import type { OfficeAvailability } from "./officeView";
+import type { OfficeSource } from "./officeSource";
 
 export type YearPlay =
   | { readonly phase: "idle" }
@@ -57,3 +59,19 @@ export const endRefused = (play: YearPlay, reportOpen: boolean): boolean => play
 /** The year really ended: the turn moved on by exactly one and the store reports no failure. */
 export const yearEnded = (turnBefore: number, after: { readonly turn: number | null; readonly failure: Error | null }): boolean =>
   after.failure === null && after.turn === turnBefore + 1;
+
+/**
+ * Ends a year that plays out (its time is up, Skip, or the office went away): the new year is shown first, then the
+ * world finishes at once whatever moves, the walks that new scene starts included, so nothing walks on after Skip.
+ * Returns the play from then on: idle.
+ */
+export const finishYearPlay = (
+  play: YearPlay,
+  source: Pick<OfficeSource, "showBeat">,
+  world: Pick<WorldHandle, "settle"> | null,
+): YearPlay => {
+  if (play.phase !== "playing") return play;
+  source.showBeat(play.playback, null);
+  world?.settle();
+  return IDLE;
+};

@@ -75,6 +75,20 @@ describe("the career office's check hook", () => {
     expect(handle.loseContext).toHaveBeenCalledTimes(1);
   });
 
+  it("reads where a target is drawn, for a check to point at a person's body rather than above their head", () => {
+    const probe = createOfficeProbe();
+    const source: SceneSource = { get: () => scene, subscribe: () => () => undefined };
+    let state: WorldViewState = { status: "starting", handle: null };
+    probe.attach(() => state, source, () => "unknown");
+    expect(probe.screenBounds({ kind: "person", personId: "p0" })).toBeNull();
+    const handle = fakeHandle();
+    const box = { left: 1, top: 2, right: 3, bottom: 4 };
+    vi.mocked(handle.screenBounds).mockReturnValue(box);
+    state = { status: "running", handle };
+    expect(probe.screenBounds({ kind: "person", personId: "p0" })).toEqual(box);
+    expect(handle.screenBounds).toHaveBeenCalledWith({ kind: "person", personId: "p0" });
+  });
+
   it("keeps the last world taken down readable", () => {
     const probe = createOfficeProbe();
     const handle = fakeHandle();

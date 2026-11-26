@@ -46,7 +46,7 @@ import {
   type OfficeAvailability,
 } from "../officeView";
 import { wordsFor } from "../words";
-import { beatIndexNow, beatNow, endRefused, IDLE, startYearPlay, yearEnded, yearPlayAfterLoss, yearPlayDone, type YearPlay } from "../yearPlay";
+import { beatIndexNow, beatNow, endRefused, finishYearPlay, IDLE, startYearPlay, yearEnded, yearPlayAfterLoss, yearPlayDone, type YearPlay } from "../yearPlay";
 
 type Tab = "plan" | "rivals";
 
@@ -141,13 +141,10 @@ export const GameScreen = () => {
 
   const onChange = useCallback((plan: Plan) => setDraft(plan), [setDraft]);
 
-  /** The year stops playing: the world finishes what is moving, the new year shows, and the summary opens. */
+  /** The year stops playing: the new year shows, the world finishes what is moving, and the summary opens. */
   const finishPlay = useCallback(() => {
-    const current = playRef.current;
-    if (current.phase !== "playing") return;
-    viewRef.current.handle?.settle();
-    officeSource.showBeat(current.playback, null);
-    playRef.current = IDLE;
+    if (playRef.current.phase !== "playing") return;
+    playRef.current = finishYearPlay(playRef.current, officeSource, viewRef.current.handle);
     beatShown.current = null;
     setPlay(IDLE);
   }, [officeSource]);

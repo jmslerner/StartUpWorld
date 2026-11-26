@@ -50,9 +50,9 @@ const newCareer = (seed: number): GameState => createGame(newGameSetup(seed, NAM
 
 /**
  * A new career moved on to `turn`, as if its years had passed quietly: neutral climate and modifiers, and that
- * year's dated card dealt as a new game deals the first year's, or no card.
+ * year's dated card dealt as a new game deals the first year's, or no card (always none when `deal` is false).
  */
-const datedTo = (game: GameState, turn: number): GameState => {
+const datedTo = (game: GameState, turn: number, deal = true): GameState => {
   const moved: GameState = {
     ...game,
     turn,
@@ -61,7 +61,7 @@ const datedTo = (game: GameState, turn: number): GameState => {
     modifiers: { newUsers: 1, marketing: 1, extraCandidates: 0 },
     wave: { multiplier: 1, turnsLeft: 0 },
   };
-  const card = datedCardFor(turn, CAREER);
+  const card = deal ? datedCardFor(turn, CAREER) : null;
   if (card === null) return moved;
   const event = { cardId: card.id, targetId: null };
   const dealt = applyEvent(moved, event, CAREER);
@@ -215,4 +215,31 @@ const campusGame = withPlayer(datedTo(newCareer(CAMPUS_SEED), CAMPUS_TURN), (sel
 if (hiresWithinCap(1, campusGame.companies[PLAYER].headcount, campusRules) !== 0) fail("the campus fixture's team still has room");
 const campus = saveOf("campus", CAMPUS_SEED, campusGame);
 
-console.log(JSON.stringify({ listing, rescue, failure, board, office, campus }));
+// ---------------------------------------------------------------------------------------------------------------
+// Three decades' looks for the 3D check (scripts/office-check.mjs): 1994 in the shared office, 2004 in the third
+// office, 2023 in the fourth, each half full, with cash for ten years of its salaries. 2004's dated card is left
+// undealt, so that one of the check's pages shows no news card (every one of these three years has a dated card).
+
+const LOOKS_SEED = 1;
+const decade = (what: string, turn: number, officeIndex: number, deal = true): Fixture => {
+  const rules = rulesForTurn(CAREER, turn);
+  const capacity = rules.career?.offices[officeIndex]?.capacity ?? fail(`the ${what} fixture's office ${officeIndex} has no capacity`);
+  const headcount = Math.max(1, Math.floor(capacity / 2));
+  const game = withPlayer(datedTo(newCareer(LOOKS_SEED), turn, deal), (self) => ({
+    ...self,
+    headcount,
+    headcountAtLastClose: headcount,
+    cash: Math.max(self.cash, 10 * headcount * rules.salary),
+    career: { ...self.career!, office: officeIndex },
+  }));
+  return saveOf(what, LOOKS_SEED, game);
+};
+const nineties = decade("nineties", 5, 1);
+const noughties = decade("noughties", 15, 2, false);
+if (JSON.parse(noughties.save).game?.event != null) fail("the noughties fixture has a card in force");
+const twenties = decade("twenties", 34, 3);
+for (const [what, fixture, want] of [["nineties", nineties, 1994], ["noughties", noughties, 2004], ["twenties", twenties, 2023]] as const) {
+  if (fixture.year !== want) fail(`the ${what} fixture opens on ${fixture.year}, not ${want}`);
+}
+
+console.log(JSON.stringify({ listing, rescue, failure, board, office, campus, nineties, noughties, twenties }));

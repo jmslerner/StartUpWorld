@@ -478,6 +478,8 @@ class World {
         },
         MAX_FRAME_SECONDS
       );
+      // The camera's glide to a new office's framing, and any shake, end at once too.
+      this.rig.finish();
     } catch (error) {
       this.runner.reportFailure("settle", error);
     }

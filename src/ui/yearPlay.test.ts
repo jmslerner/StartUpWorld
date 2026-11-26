@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { NO_PLAYBACK, type PlaybackBeat, type YearPlayback } from "../scene/yearPlayback";
-import { beatIndexNow, beatNow, endRefused, IDLE, startYearPlay, yearEnded, yearPlayAfterLoss, yearPlayDone } from "./yearPlay";
+import { beatIndexNow, beatNow, endRefused, finishYearPlay, IDLE, startYearPlay, yearEnded, yearPlayAfterLoss, yearPlayDone } from "./yearPlay";
 
 const playback = (seconds: number, beats: PlaybackBeat[]): YearPlayback => ({ beats, seconds });
 const leave = { kind: "leave", seconds: 1.5, count: 2, office: null } as const;
@@ -42,5 +42,26 @@ describe("a year playing out", () => {
   it("an office that stops drawing ends the year at once (Review Focus 2)", () => {
     const play = startYearPlay(IDLE, playback(4, [leave, arrive]), 1994, 1000);
     expect((["running", "context-lost", "failed", "unsupported", "unknown"] as const).map((a) => yearPlayAfterLoss(play, a) === IDLE)).toEqual([false, true, true, true, true]);
+  });
+});
+
+describe("finishing a year that plays out", () => {
+  it("shows the new year first, then tells the world to finish at once, so nothing walks on after Skip", () => {
+    const calls: string[] = [];
+    const p = playback(4, [leave, arrive]);
+    const play = startYearPlay(IDLE, p, 1994, 1000);
+    const source = { showBeat: (shown: YearPlayback, index: number | null) => calls.push(`show ${shown === p ? "playback" : "other"} ${index}`) };
+    const world = { settle: () => calls.push("settle") };
+    expect(finishYearPlay(play, source, world)).toBe(IDLE);
+    expect(calls).toEqual(["show playback null", "settle"]);
+  });
+  it("does nothing when no year plays out, and needs no world", () => {
+    const calls: string[] = [];
+    const source = { showBeat: () => calls.push("show") };
+    expect(finishYearPlay(IDLE, source, { settle: () => calls.push("settle") })).toBe(IDLE);
+    expect(calls).toEqual([]);
+    const play = startYearPlay(IDLE, playback(4, [leave]), 1994, 0);
+    expect(finishYearPlay(play, source, null)).toBe(IDLE);
+    expect(calls).toEqual(["show"]);
   });
 });

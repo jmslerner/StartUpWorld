@@ -7,7 +7,7 @@
  */
 
 import type { SceneSource, WorldViewState } from "../world/mountWorld";
-import type { ScreenPoint, WorldHandle, WorldStats } from "../world/types/handle";
+import type { ScreenPoint, ScreenRect, WorldHandle, WorldStats } from "../world/types/handle";
 import type { InteractableTarget } from "../world/types/interaction";
 import type { OfficeScene, Team } from "../world/types/scene";
 import type { StageStatus } from "../world/ui/stage";
@@ -29,6 +29,8 @@ export interface CareerOfficeProbe {
   personAt(desk: number): string | null;
   teamOf(target: InteractableTarget): Team | null;
   project(target: InteractableTarget): ScreenPoint | null;
+  /** Where a target is drawn on the canvas (a person's anchor is above their head; this box is their body). */
+  screenBounds(target: InteractableTarget): ScreenRect | null;
   loseContext(): void;
 }
 
@@ -80,6 +82,7 @@ export const createOfficeProbe = (): CareerOfficeProbe & OfficeProbeLink => {
     personAt: (desk) => handle()?.personAt(desk) ?? null,
     teamOf: (target) => handle()?.teamOf(target) ?? null,
     project: (target) => handle()?.project(target) ?? null,
+    screenBounds: (target) => handle()?.screenBounds(target) ?? null,
     loseContext: () => handle()?.loseContext(),
     attach: (view, source, availability) => {
       const mine: Link = { view, source, availability };
