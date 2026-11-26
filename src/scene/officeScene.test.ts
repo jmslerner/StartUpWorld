@@ -11,7 +11,7 @@ import { MAX_STAFF_DRAWN } from "../world/cast";
 import { lookFor } from "../world/core/colors";
 import { DESKS } from "../world/office/layouts";
 import { TEAMS } from "../world/types/scene";
-import { officeSceneFor } from "./officeScene";
+import { officeSceneFor, sameOfficeScene } from "./officeScene";
 import type { OfficeSceneInput } from "./officeScene";
 
 const sceneOf = (game: GameState, companyId: CompanyId, extra: Partial<OfficeSceneInput> = {}) =>
@@ -201,5 +201,14 @@ describe("the look of each era", () => {
     const lookIn = (year: number) =>
       lookFor(sceneOf(atTurn(createGame(newGameSetup(1, "Acme"), CAREER), year - 1990 + 1), 0, { config: CAREER }).era);
     expect([1990, 1999, 2000, 2021, 2022, 2038].map(lookIn)).toEqual(["nineties", "nineties", "noughties", "noughties", "twenties", "twenties"]);
+  });
+});
+
+describe("two office scenes", () => {
+  it("two scenes are the same when every field is", () => {
+    const a = sceneOf(newCareer(), 0);
+    expect(sameOfficeScene(a, { ...a, teams: { ...a.teams } })).toBe(true);
+    for (const patch of [{ year: a.year + 1 }, { arriving: 1 }, { teams: { ...a.teams, growth: a.teams.growth + 1 } }, { ending: "lost" as const }])
+      expect(sameOfficeScene(a, { ...a, ...patch })).toBe(false);
   });
 });

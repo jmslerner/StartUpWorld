@@ -63,3 +63,20 @@ export const officeSceneFor = ({ game, companyId, config, seed, draft, expectedH
     ending,
   };
 };
+
+/** Two scenes are the same when every field is, the teams compared person by person. */
+export const sameOfficeScene = (a: OfficeScene, b: OfficeScene): boolean =>
+  a === b ||
+  (a.runId === b.runId &&
+    a.seed === b.seed &&
+    a.year === b.year &&
+    a.office === b.office &&
+    a.capacity === b.capacity &&
+    a.era === b.era &&
+    a.teams.product === b.teams.product &&
+    a.teams.growth === b.teams.growth &&
+    a.teams.recruiting === b.teams.recruiting &&
+    a.away === b.away &&
+    a.leaving === b.leaving &&
+    a.arriving === b.arriving &&
+    a.ending === b.ending);
