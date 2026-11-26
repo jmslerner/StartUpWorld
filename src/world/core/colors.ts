@@ -1,5 +1,5 @@
 /** Split from core/palette.ts (M5): the palette — UI colours, diorama colours, team/outfit/skin/hair colours, the looks and the per-office themes, the scale guide and colour math. Re-exported by ./palette, so every existing import from "./palette" / "../core/palette" keeps working. */
-import type { LookId, OfficeIndex, Team } from "../types";
+import type { FurnitureSet, LookId, OfficeIndex, Team } from "../types";
 
 /** App UI colours (mirrors tailwind.config.js). */
 export const INK = 0x0d0f12;
@@ -84,6 +84,12 @@ export const C = {
   foam: 0xe9f6fb,
   // Glass & screens
   glass: 0xbfe6f5,
+  // Era finishes
+  silver: 0xc0c6cf,
+  mint: 0x8fe0c0,
+  sand: 0xe2cfae,
+  violet: 0x7c5cc4,
+  lavender: 0xb9a6e8,
   screenOff: 0x1c2128,
   screenDim: 0x27425a,
   // Lights
@@ -123,14 +129,46 @@ export const HAIR_COLORS: readonly number[] = [
 export const PANTS_COLORS: readonly number[] = [0x34405a, 0x3a4049, 0xb79c6f, 0x2f4b7c, 0x5a4a42];
 export const SHOE_COLORS: readonly number[] = [0x20242a, 0xf0ede4, 0x7a4a2e, 0xe4574a];
 
-/** Every look there is. A look is how an office of a given size is dressed: the classic one, then one per decade. */
-export const LOOKS: readonly LookId[] = ["classic", "nineties", "noughties", "twenties"];
+/**
+ * Every look there is: the classic one, then one per era of the career in time order. A look is how an office is
+ * dressed (palette, resting light, signature props); the furniture under it is its set's (`furnitureOf`).
+ */
+export const LOOKS: readonly LookId[] = [
+  "classic",
+  "dial-up",
+  "gold-rush",
+  "bust",
+  "phones",
+  "cheap-money",
+  "winter-ai",
+  "agents",
+  "ambient",
+];
 
 /**
- * The look of each era the career has, by its decade's furniture. Era ids are free text to the world (the rules
+ * The look of each era the career has: the look of the same name. Era ids are free text to the world (the rules
  * name the eras); these are the ids the shipped career uses.
  */
 export const ERA_LOOKS: Readonly<Record<string, LookId>> = Object.freeze({
+  "dial-up": "dial-up",
+  "gold-rush": "gold-rush",
+  bust: "bust",
+  phones: "phones",
+  "cheap-money": "cheap-money",
+  "winter-ai": "winter-ai",
+  agents: "agents",
+  ambient: "ambient",
+});
+
+/** The look of an era. Any string has one: an era not listed (or a name an object inherits) keeps the classic look. */
+export const lookFor = (era: string): LookId => (Object.hasOwn(ERA_LOOKS, era) ? ERA_LOOKS[era] : "classic");
+
+/** Every furniture set there is: the classic one, then the three decades'. */
+export const FURNITURE_SETS: readonly FurnitureSet[] = ["classic", "nineties", "noughties", "twenties"];
+
+/** The furniture each look stands on: its decade's set; the classic look keeps the classic set. */
+const FURNITURE_OF: Readonly<Record<LookId, FurnitureSet>> = {
+  classic: "classic",
   "dial-up": "nineties",
   "gold-rush": "nineties",
   bust: "noughties",
@@ -139,10 +177,10 @@ export const ERA_LOOKS: Readonly<Record<string, LookId>> = Object.freeze({
   "winter-ai": "twenties",
   agents: "twenties",
   ambient: "twenties",
-});
+};
 
-/** The look of an era. Any string has one: an era not listed (or a name an object inherits) keeps the classic look. */
-export const lookFor = (era: string): LookId => (Object.hasOwn(ERA_LOOKS, era) ? ERA_LOOKS[era] : "classic");
+/** The furniture set of a look. */
+export const furnitureOf = (look: LookId): FurnitureSet => FURNITURE_OF[look];
 
 /** Furniture finish for one office in one look: the garage scrappy → the campus polished. */
 export interface PhaseTheme {
@@ -162,7 +200,7 @@ export interface PhaseTheme {
 /** One theme per office (0 the garage … 4 the campus). */
 export type OfficeThemes = readonly [PhaseTheme, PhaseTheme, PhaseTheme, PhaseTheme, PhaseTheme];
 
-/** The themes, by look and then by office. "classic" is the old polish for each size of office. */
+/** The themes, by look and then by office. "classic" is the old polish for each size of office; each era has its own. */
 export const PHASE_THEMES: Record<LookId, OfficeThemes> = {
   classic: [
     { wood: C.plywood, woodDark: C.pallet, frame: C.galvanised, panel: C.cardboard, accents: [C.red, C.yellow, C.blue], glow: EMBER },
@@ -172,28 +210,68 @@ export const PHASE_THEMES: Record<LookId, OfficeThemes> = {
     { wood: C.walnut, woodDark: C.walnutDark, frame: C.brass, panel: C.marble, accents: [C.burgundy, C.navy, C.brass], glow: EMBER },
   ],
   // Beige casework and grey metal: the office furniture of the dial-up years.
-  nineties: [
+  "dial-up": [
     { wood: C.pallet, woodDark: C.cardboardDark, frame: C.grey, panel: C.bone, accents: [C.teal, C.purple, C.yellow], glow: EMBER },
     { wood: C.oak, woodDark: C.pallet, frame: C.grey, panel: C.cream, accents: [C.navy, C.teal, C.coral], glow: EMBER },
     { wood: C.oak, woodDark: C.walnut, frame: C.greyDark, panel: C.bone, accents: [C.burgundy, C.teal, C.yellow], glow: NEON },
     { wood: C.birch, woodDark: C.oak, frame: C.grey, panel: C.cream, accents: [C.navy, C.burgundy, C.teal], glow: NEON },
     { wood: C.walnut, woodDark: C.walnutDark, frame: C.brass, panel: C.bone, accents: [C.navy, C.burgundy, C.green], glow: EMBER },
   ],
-  // Light woods on steel frames.
-  noughties: [
+  // The same beige, brighter primaries: the money is pouring in.
+  "gold-rush": [
+    { wood: C.pallet, woodDark: C.cardboardDark, frame: C.grey, panel: C.bone, accents: [C.red, C.yellow, C.blue], glow: EMBER },
+    { wood: C.oak, woodDark: C.pallet, frame: C.grey, panel: C.cream, accents: [C.blue, C.red, C.yellow], glow: EMBER },
+    { wood: C.oak, woodDark: C.walnut, frame: C.greyDark, panel: C.bone, accents: [C.yellow, C.blue, C.red], glow: NEON },
+    { wood: C.birch, woodDark: C.oak, frame: C.grey, panel: C.cream, accents: [C.red, C.blue, C.green], glow: NEON },
+    { wood: C.walnut, woodDark: C.walnutDark, frame: C.brass, panel: C.bone, accents: [C.blue, C.yellow, C.red], glow: EMBER },
+  ],
+  // Light woods on steel frames: the lean years after the bust.
+  bust: [
     { wood: C.birch, woodDark: C.plywood, frame: C.steel, panel: C.greyLight, accents: [C.orange, C.blue, C.leaf], glow: NEON },
     { wood: C.plywood, woodDark: C.oak, frame: C.steel, panel: C.white, accents: [C.orange, C.leafLight, C.blue], glow: NEON },
     { wood: C.birch, woodDark: C.oak, frame: C.steel, panel: C.white, accents: [C.blue, C.orange, C.leafLight], glow: NEON },
     { wood: C.oak, woodDark: C.walnut, frame: C.chrome, panel: C.greyLight, accents: [C.blue, C.pink, C.orange], glow: NEON },
     { wood: C.oak, woodDark: C.walnut, frame: C.steel, panel: C.charcoal, accents: [C.orange, C.blue, C.chrome], glow: NEON },
   ],
+  // White gloss and silver: the years of the phone in every pocket.
+  phones: [
+    { wood: C.birch, woodDark: C.plywood, frame: C.silver, panel: C.white, accents: [C.blue, C.silver, C.black], glow: NEON },
+    { wood: C.plywood, woodDark: C.birch, frame: C.silver, panel: C.white, accents: [C.black, C.blue, C.silver], glow: NEON },
+    { wood: C.birch, woodDark: C.oak, frame: C.chrome, panel: C.white, accents: [C.silver, C.blue, C.black], glow: NEON },
+    { wood: C.birch, woodDark: C.oak, frame: C.chrome, panel: C.paper, accents: [C.blue, C.black, C.pink], glow: NEON },
+    { wood: C.oak, woodDark: C.walnut, frame: C.silver, panel: C.white, accents: [C.black, C.silver, C.blue], glow: NEON },
+  ],
+  // Warm wood and coral: cheap money and perks.
+  "cheap-money": [
+    { wood: C.oak, woodDark: C.walnut, frame: C.black, panel: C.cream, accents: [C.coral, C.yellow, C.teal], glow: EMBER },
+    { wood: C.oak, woodDark: C.walnut, frame: C.copper, panel: C.cream, accents: [C.coral, C.teal, C.yellow], glow: NEON },
+    { wood: C.walnut, woodDark: C.walnutDark, frame: C.black, panel: C.cream, accents: [C.coral, C.leaf, C.yellow], glow: NEON },
+    { wood: C.oak, woodDark: C.walnut, frame: C.copper, panel: C.bone, accents: [C.coral, C.navy, C.leafLight], glow: NEON },
+    { wood: C.walnut, woodDark: C.walnutDark, frame: C.brass, panel: C.cream, accents: [C.coral, C.burgundy, C.leaf], glow: EMBER },
+  ],
   // Birch and white with green and teal.
-  twenties: [
+  "winter-ai": [
     { wood: C.birch, woodDark: C.plywood, frame: C.white, panel: C.bone, accents: [C.leaf, C.teal, C.yellow], glow: NEON },
     { wood: C.birch, woodDark: C.oak, frame: C.charcoal, panel: C.white, accents: [C.leaf, C.teal, C.coral], glow: NEON },
     { wood: C.birch, woodDark: C.oak, frame: C.white, panel: C.greyLight, accents: [C.teal, C.leaf, C.pink], glow: NEON },
     { wood: C.plywood, woodDark: C.oak, frame: C.white, panel: C.white, accents: [C.leafDark, C.teal, C.yellow], glow: NEON },
     { wood: C.oak, woodDark: C.walnut, frame: C.black, panel: C.white, accents: [C.leaf, C.teal, C.brass], glow: EMBER },
+  ],
+  // Cool white and mint: the years the machines start doing the work.
+  agents: [
+    { wood: C.birch, woodDark: C.plywood, frame: C.white, panel: C.white, accents: [C.mint, C.teal, C.greyLight], glow: NEON },
+    { wood: C.birch, woodDark: C.oak, frame: C.chrome, panel: C.white, accents: [C.mint, C.blue, C.teal], glow: NEON },
+    { wood: C.plywood, woodDark: C.oak, frame: C.white, panel: C.paper, accents: [C.teal, C.mint, C.blue], glow: NEON },
+    { wood: C.birch, woodDark: C.oak, frame: C.chrome, panel: C.paper, accents: [C.mint, C.navy, C.teal], glow: NEON },
+    { wood: C.birch, woodDark: C.oak, frame: C.white, panel: C.white, accents: [C.mint, C.teal, C.chrome], glow: NEON },
+  ],
+  // Soft sand and violet: computing that has melted into the room.
+  ambient: [
+    { wood: C.sand, woodDark: C.oak, frame: C.bone, panel: C.cream, accents: [C.violet, C.lavender, C.pink], glow: NEON },
+    { wood: C.sand, woodDark: C.oak, frame: C.white, panel: C.cream, accents: [C.lavender, C.violet, C.teal], glow: NEON },
+    { wood: C.sand, woodDark: C.walnut, frame: C.bone, panel: C.white, accents: [C.violet, C.pink, C.lavender], glow: NEON },
+    { wood: C.birch, woodDark: C.sand, frame: C.white, panel: C.cream, accents: [C.violet, C.lavender, C.coral], glow: NEON },
+    { wood: C.sand, woodDark: C.walnut, frame: C.brass, panel: C.cream, accents: [C.violet, C.navy, C.lavender], glow: EMBER },
   ],
 };
 

@@ -627,32 +627,32 @@ describe("OfficeSystem when the office changes", () => {
     }
   });
 
-  it("a year that crosses into another decade rebuilds the office in place; a year within it does not", () => {
+  it("every change of era rebuilds the office in place; a year within an era does not", () => {
     const world = new Harness();
     world.apply({ office: 2, capacity: 22, era: "bust", year: 2006 }, (seating) => seating.seat("product", 3));
     world.settle();
     const bust = world.system.currentStage!;
-    expect(bust.look).toBe("noughties");
-    world.apply({ era: "phones", year: 2007 });
-    expect(world.system.currentStage).toBe(bust);
-    expect(bust.look).toBe("noughties");
+    expect(bust.look).toBe("bust");
+    world.apply({ era: "phones", year: 2007 }); // bust → phones, the same decade: a new stage all the same
+    const phones = world.system.currentStage!;
+    expect(phones).not.toBe(bust);
+    expect(phones.look).toBe("phones");
     world.settle();
-
-    world.apply({ era: "cheap-money", year: 2021 });
-    expect(world.system.currentStage).toBe(bust);
+    world.apply({ year: 2008 }); // the same era: the same stage
+    expect(world.system.currentStage).toBe(phones);
     world.settle();
-    world.apply({ era: "winter-ai", year: 2022 });
-    const twenties = world.system.currentStage!;
-    expect(twenties).not.toBe(bust);
-    expect(twenties.look).toBe("twenties");
-    expect(twenties.office).toBe(2);
+    world.apply({ era: "cheap-money", year: 2014 }); // a new era: a new stage in the same office
+    const cheap = world.system.currentStage!;
+    expect(cheap).not.toBe(phones);
+    expect(cheap.look).toBe("cheap-money");
+    expect(cheap.office).toBe(2);
     // The old office sinks away while the new one rises in the same place.
     const root = world.scene.children[0];
-    expect(root.children).toEqual([bust.root, twenties.root]);
+    expect(root.children).toEqual([phones.root, cheap.root]);
     world.run(0.2);
-    expect(bust.root.position.y).toBeLessThan(0);
+    expect(phones.root.position.y).toBeLessThan(0);
     world.settle();
-    expect(root.children).toEqual([twenties.root]);
+    expect(root.children).toEqual([cheap.root]);
     expect(world.freeDesks()).toEqual(world.seating!.freeDeskSlots());
   });
 

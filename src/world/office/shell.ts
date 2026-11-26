@@ -6,8 +6,8 @@
  * windows are, whether the entrance is a roll-up garage door.
  */
 import * as THREE from "three";
-import { phaseTier } from "../core/palette";
-import type { LookId, OfficeLayout, Vec2 } from "../types";
+import { furnitureOf, phaseTier } from "../core/palette";
+import type { FurnitureSet, OfficeLayout, Vec2 } from "../types";
 import { forwardOf, GROUND_SINK, groundRect, LOFT_ANNEX_WIDTH } from "./layouts";
 import {
   createCornerPost,
@@ -131,8 +131,11 @@ const CLASSIC_SHELLS: readonly ShellSpec[] = [
   },
 ];
 
-/** By look, then by office. The buildings are the floor plans, so every look has the same ones; the looks dress them. */
-const SHELL_SPECS: Record<LookId, readonly ShellSpec[]> = {
+/**
+ * By furniture set, then by office. The buildings are the floor plans, so every set has the same ones; the looks
+ * dress them.
+ */
+const SHELL_SPECS: Record<FurnitureSet, readonly ShellSpec[]> = {
   classic: CLASSIC_SHELLS,
   nineties: CLASSIC_SHELLS,
   noughties: CLASSIC_SHELLS,
@@ -230,7 +233,7 @@ const buildKerbRun = (
 
 export const buildShell = (kit: StageKit): Shell => {
   const { layout, office, look } = kit;
-  const spec = SHELL_SPECS[look][phaseTier(office)];
+  const spec = SHELL_SPECS[furnitureOf(look)][phaseTier(office)];
   const { minX, maxX, minZ, maxZ } = layout.floor;
   const half = WALL_THICKNESS / 2;
 

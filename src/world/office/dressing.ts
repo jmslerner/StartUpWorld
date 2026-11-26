@@ -119,7 +119,7 @@ export const createDecorProp = (office: OfficeIndex, spot: DecorSpot, look: Look
   DECOR_FACTORIES[spot.kind](office, look, spot);
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Signature props: what says which decade it is
+// Signature props: what says which era it is
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** Décor a signature prop may stand in for. Never reception, meeting pods, partitions, couches, tables or games. */

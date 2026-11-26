@@ -1,15 +1,22 @@
 import { describe, expect, it } from "vitest";
 import { TEAMS } from "../types";
 import type { OfficeIndex } from "../types";
-import { C, EMBER, LOOKS, lookFor, NEON, PHASE_THEMES, PHASES, phaseTier, ROLE_COLORS, themeFor } from "./colors";
+import { C, EMBER, FURNITURE_SETS, furnitureOf, LOOKS, lookFor, NEON, PHASE_THEMES, PHASES, phaseTier, ROLE_COLORS, themeFor } from "./colors";
+
+const ERAS = ["dial-up", "gold-rush", "bust", "phones", "cheap-money", "winter-ai", "agents", "ambient"] as const;
 
 describe("looks", () => {
-  it("each era of the career has the look of its decade's furniture", () => {
-    expect(["dial-up", "gold-rush", "bust", "phones", "cheap-money", "winter-ai", "agents", "ambient"].map(lookFor)).toEqual(
-      ["nineties", "nineties", "noughties", "noughties", "noughties", "twenties", "twenties", "twenties"]);
+  it("each era of the career has a look of its own", () => {
+    expect(ERAS.map(lookFor)).toEqual([...ERAS]);
+    expect(LOOKS).toEqual(["classic", ...ERAS]);
   });
-  it("an era nobody has heard of, or none at all, keeps the classic look", () => {
+  it("an era nobody has heard of keeps the classic look", () => {
     expect(["flat", "", "constructor", "__proto__", "classic", "nineties"].map(lookFor)).toEqual(Array(6).fill("classic"));
+  });
+  it("eight looks sit on four furniture sets, the decade's", () => {
+    expect(ERAS.map(furnitureOf)).toEqual(["nineties", "nineties", "noughties", "noughties", "noughties", "twenties", "twenties", "twenties"]);
+    expect(furnitureOf("classic")).toBe("classic");
+    expect(FURNITURE_SETS).toEqual(["classic", "nineties", "noughties", "twenties"]);
   });
   it("every look has five themes, and no two looks dress the same office alike", () => {
     for (const office of PHASES) {

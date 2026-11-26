@@ -6,7 +6,7 @@
  * own geometry and free it in dispose(); fixed shapes come from the shared cache.
  */
 import * as THREE from "three";
-import type { LookId, OfficeIndex } from "../../types";
+import type { FurnitureSet, LookId, OfficeIndex } from "../../types";
 import {
   bakeModel,
   C,
@@ -15,6 +15,7 @@ import {
   cssColor,
   darken,
   EMBER,
+  furnitureOf,
   glassMat,
   glowMat,
   INK,
@@ -60,8 +61,8 @@ interface FloorStyle {
   tones: readonly number[];
 }
 
-/** The floor finish, by look and then by office (0 the garage … 4 the campus). */
-const FLOOR_STYLES: Record<LookId, readonly FloorStyle[]> = {
+/** The floor finish, by furniture set and then by office (0 the garage … 4 the campus). */
+const FLOOR_STYLES: Record<FurnitureSet, readonly FloorStyle[]> = {
   classic: [
     { groove: C.concreteDark, side: C.concreteDark, tones: [C.concrete, 0xa5a6a6, 0xb2b3b2] },
     { groove: 0xb08f63, side: 0xa98a60, tones: [0xe6cba0, 0xe0c296, 0xebd3ab, 0xdcbc8d] },
@@ -97,7 +98,7 @@ const FLOOR_STYLES: Record<LookId, readonly FloorStyle[]> = {
 
 const drawFloor = (b: ModelBuilder, w: number, d: number, office: OfficeIndex, look: LookId): void => {
   const tier = phaseTier(office);
-  const style = FLOOR_STYLES[look][tier];
+  const style = FLOOR_STYLES[furnitureOf(look)][tier];
   const lip = 0.014;
   b.box(w, FLOOR_THICKNESS - lip, d, style.groove, 0, -FLOOR_THICKNESS, 0, { r: 0 });
   // Skirt so the cut edge is one clean colour rather than a stack of tile ends.
@@ -270,16 +271,17 @@ export const createDriveway = (w: number, d: number): PropHandle => {
 
 export type WallStyle = "drywall" | "brick" | "plaster" | "glass" | "panel";
 
-/** The wall finish that goes with each office, by look and then by office (0 the garage … 4 the campus). */
-export const WALL_STYLE_FOR_PHASE: Record<LookId, readonly WallStyle[]> = {
+/** The wall finish that goes with each office, by furniture set and then by office (0 the garage … 4 the campus). */
+export const WALL_STYLE_FOR_PHASE: Record<FurnitureSet, readonly WallStyle[]> = {
   classic: ["drywall", "brick", "plaster", "glass", "panel"],
   nineties: ["drywall", "brick", "plaster", "glass", "panel"],
   noughties: ["drywall", "brick", "plaster", "glass", "panel"],
   twenties: ["drywall", "brick", "plaster", "glass", "panel"],
 };
 
-/** The wall finish of an office in a look. */
-export const wallStyleFor = (office: OfficeIndex, look: LookId = "classic"): WallStyle => WALL_STYLE_FOR_PHASE[look][phaseTier(office)];
+/** The wall finish of an office in a look: its furniture set's. */
+export const wallStyleFor = (office: OfficeIndex, look: LookId = "classic"): WallStyle =>
+  WALL_STYLE_FOR_PHASE[furnitureOf(look)][phaseTier(office)];
 
 export const WALL_THICKNESS = 0.16;
 const WALL_CAP = 0x3b424c;

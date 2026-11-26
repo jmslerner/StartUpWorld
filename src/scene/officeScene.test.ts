@@ -195,12 +195,13 @@ describe("the office scene of a company", () => {
 });
 
 describe("the look of each era", () => {
-  it("every era of the shipped career has a look of its own, by decade", () => {
-    for (const era of CAREER.career!.eras) expect(lookFor(era.id)).not.toBe("classic");
+  it("every era of the shipped career has the look of its own name", () => {
+    for (const era of CAREER.career!.eras) expect(lookFor(era.id)).toBe(era.id);
     // Turn 1 is 1990 (yearOf = firstYear + turn - 1).
     const lookIn = (year: number) =>
       lookFor(sceneOf(atTurn(createGame(newGameSetup(1, "Acme"), CAREER), year - 1990 + 1), 0, { config: CAREER }).era);
-    expect([1990, 1999, 2000, 2021, 2022, 2038].map(lookIn)).toEqual(["nineties", "nineties", "noughties", "noughties", "twenties", "twenties"]);
+    expect([1994, 1995, 2006, 2007, 2014, 2022, 2027, 2033].map(lookIn)).toEqual(
+      ["dial-up", "gold-rush", "bust", "phones", "cheap-money", "winter-ai", "agents", "ambient"]);
   });
 });
 

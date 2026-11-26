@@ -1,5 +1,5 @@
 /**
- * Signature props: the few things that say which decade an office is in at a glance. Each look other than classic
+ * Signature props: the few things that say which era an office is in at a glance. Each look other than classic
  * has three; the office's dressing (../dressing.ts) stands them in for some of its plain décor.
  *
  * Every prop is built to fill the floor area it is given (`size`: width across its facing, depth along it), front
@@ -24,11 +24,23 @@ export type SignatureKind =
   | "ring-light"
   | "scooter";
 
-/** Each decade's three props, in the order they claim a spot. */
+const NINETIES: readonly SignatureKind[] = ["fax-machine", "software-shelf", "tube-tv"];
+const NOUGHTIES: readonly SignatureKind[] = ["flat-tv", "beanbag", "foosball"];
+const TWENTIES: readonly SignatureKind[] = ["plant-wall", "ring-light", "scooter"];
+
+/**
+ * Each era's three props, in the order they claim a spot. For now each era borrows its decade's row; the eras get
+ * rows of their own when their props are built.
+ */
 export const SIGNATURE_PROPS: Readonly<Record<Exclude<LookId, "classic">, readonly SignatureKind[]>> = {
-  nineties: ["fax-machine", "software-shelf", "tube-tv"],
-  noughties: ["flat-tv", "beanbag", "foosball"],
-  twenties: ["plant-wall", "ring-light", "scooter"],
+  "dial-up": NINETIES,
+  "gold-rush": NINETIES,
+  bust: NOUGHTIES,
+  phones: NOUGHTIES,
+  "cheap-money": NOUGHTIES,
+  "winter-ai": TWENTIES,
+  agents: TWENTIES,
+  ambient: TWENTIES,
 };
 
 /** The least footprint each prop needs (width across its facing, depth). */

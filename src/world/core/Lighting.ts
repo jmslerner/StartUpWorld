@@ -15,7 +15,7 @@ export interface LightingDeps {
 }
 
 /** One complete look for the scene. Lighting only ever blends between these. */
-interface LightKey {
+export interface LightKey {
   readonly sunColor: THREE.Color;
   readonly skyColor: THREE.Color;
   readonly groundColor: THREE.Color;
@@ -93,10 +93,35 @@ const WIN = key(0xffe39a, 2.2, [-0.2, 0.95, 0.6], 0xfff0c2, 0xb89b6a, 1.5, 1.1, 
  */
 const LOSS = key(0x9aabcb, 0.78, [0.1, 0.9, 0.5], 0x56627e, 0x161a22, 0.62, 0.34, 0.45);
 
+// The resting lights of the eras that have no decade's light of their own. Daylight all (no glow), but twilight's
+// faint dusk, so no two eras rest in the same light.
+/** A high white sun: the gold rush at full tilt. */
+const NOON = key(0xffffff, 1.85, [-0.15, 1, 0.3], 0xe6f0ff, 0xb8b2aa, 1.35, 1.1, 0);
+/** Grey-blue and low in contrast: the bust. */
+const OVERCAST = key(0xdfe6f0, 1.2, [-0.2, 1, 0.5], 0xd0d8e4, 0xa8aab0, 1.55, 1.2, 0);
+/** A warm late sun: the years of cheap money. */
+const GOLDEN = key(0xffd08a, 1.75, [0.2, 0.62, 0.95], 0xf6e6d2, 0x9c8468, 1.1, 0.9, 0);
+/** An even cool white: the agents' years. */
+const STUDIO = key(0xf2f6ff, 1.6, [-0.25, 1, 0.55], 0xeef3ff, 0xc2c6cc, 1.45, 1.2, 0);
+/** A violet sky and a low warm sun: the ambient years. */
+const TWILIGHT = key(0xffc49a, 1.4, [0.25, 0.5, 1], 0xc8b8f0, 0x5c5070, 1.0, 0.7, 0.3);
+
 const MORNING_BRIGHTNESS = floorBrightness(MORNING);
 
 /** Every look the lighting can settle on, by name. */
-export type LightingLook = "morning" | "afternoon" | "dusk" | "night" | "sunrise" | "win" | "loss";
+export type LightingLook =
+  | "morning"
+  | "afternoon"
+  | "dusk"
+  | "night"
+  | "sunrise"
+  | "win"
+  | "loss"
+  | "noon"
+  | "overcast"
+  | "golden"
+  | "studio"
+  | "twilight";
 
 const LOOKS: Record<LightingLook, LightKey> = {
   morning: MORNING,
@@ -106,21 +131,56 @@ const LOOKS: Record<LightingLook, LightKey> = {
   sunrise: SUNRISE,
   win: WIN,
   loss: LOSS,
+  noon: NOON,
+  overcast: OVERCAST,
+  golden: GOLDEN,
+  studio: STUDIO,
+  twilight: TWILIGHT,
 };
 
-export const LIGHTING_LOOKS: readonly LightingLook[] = ["morning", "afternoon", "dusk", "night", "sunrise", "win", "loss"];
+export const LIGHTING_LOOKS: readonly LightingLook[] = [
+  "morning",
+  "afternoon",
+  "dusk",
+  "night",
+  "sunrise",
+  "win",
+  "loss",
+  "noon",
+  "overcast",
+  "golden",
+  "studio",
+  "twilight",
+];
+
+/** The key of a mood: what the lighting glides to when it settles on it. Read it, do not change it. */
+export const lightingKeyFor = (mood: LightingLook): Readonly<LightKey> => LOOKS[mood];
 
 /**
  * The daytime look each office rests in, by the office's look and then by office (0 the garage … 4 the campus).
  * A year has no clock, so an office has one light for as long as nothing happens. The classic look is the old
- * full-energy morning everywhere; each decade's look rests in a light of its own, the same in all five offices.
+ * full-energy morning everywhere; each era rests in a light of its own, the same in all five offices.
  */
+const allDay = (mood: LightingLook): readonly [LightingLook, LightingLook, LightingLook, LightingLook, LightingLook] => [
+  mood,
+  mood,
+  mood,
+  mood,
+  mood,
+];
 const RESTING_LOOKS: Record<LookId, readonly [LightingLook, LightingLook, LightingLook, LightingLook, LightingLook]> = {
-  classic: ["morning", "morning", "morning", "morning", "morning"],
-  // The warm low sun of the nineties, the fresh morning of the noughties, the clean early light of the twenties.
-  nineties: ["afternoon", "afternoon", "afternoon", "afternoon", "afternoon"],
-  noughties: ["morning", "morning", "morning", "morning", "morning"],
-  twenties: ["sunrise", "sunrise", "sunrise", "sunrise", "sunrise"],
+  classic: allDay("morning"),
+  // The warm low sun of dial-up, the high noon of the gold rush, the grey of the bust, the fresh morning of the
+  // phones, the golden light of cheap money, the clean early light of the winter, the studio white of the agents
+  // and the violet twilight of the ambient years.
+  "dial-up": allDay("afternoon"),
+  "gold-rush": allDay("noon"),
+  bust: allDay("overcast"),
+  phones: allDay("morning"),
+  "cheap-money": allDay("golden"),
+  "winter-ai": allDay("sunrise"),
+  agents: allDay("studio"),
+  ambient: allDay("twilight"),
 };
 
 /** The look an office rests in. An office out of range rests as the garage does. */

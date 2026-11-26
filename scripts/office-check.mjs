@@ -51,16 +51,16 @@ const MAX_WAITING_DRAWN = 6;
 /** The world's second of grace before it rests (core/rest.ts); no frame for this long means it rests. */
 const REST_AFTER_MS = 1000;
 const QUIET_MS = 1500;
-/** The look of each era id (src/world/core/colors.ts, ERA_LOOKS), copied: any other id is "classic". */
+/** The look of each era id (src/world/core/colors.ts, ERA_LOOKS), copied: each era has the look of its own name; any other id is "classic". */
 const ERA_LOOKS = {
-  "dial-up": "nineties",
-  "gold-rush": "nineties",
-  bust: "noughties",
-  phones: "noughties",
-  "cheap-money": "noughties",
-  "winter-ai": "twenties",
-  agents: "twenties",
-  ambient: "twenties",
+  "dial-up": "dial-up",
+  "gold-rush": "gold-rush",
+  bust: "bust",
+  phones: "phones",
+  "cheap-money": "cheap-money",
+  "winter-ai": "winter-ai",
+  agents: "agents",
+  ambient: "ambient",
 };
 const lookFor = (era) => (Object.hasOwn(ERA_LOOKS, era) ? ERA_LOOKS[era] : "classic");
 /** The eras by first year, as the design fixes them. */
@@ -794,7 +794,7 @@ const movesAndLooks = async (browser, fixtures) => {
   }
 
   current = "5. The looks";
-  for (const [name, look, file] of [["nineties", "nineties", "1994-nineties.png"], ["noughties", "noughties", "2004-noughties.png"], ["twenties", "twenties", "2023-twenties.png"]]) {
+  for (const [name, look, file] of [["nineties", "dial-up", "1994-nineties.png"], ["noughties", "bust", "2004-noughties.png"], ["twenties", "winter-ai", "2023-twenties.png"]]) {
     const { context, page } = await freshPage(browser);
     const { save, year } = fixtures[name];
     await loadSave(page, save, year);

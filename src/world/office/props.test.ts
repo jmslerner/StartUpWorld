@@ -340,7 +340,7 @@ describe("prop catalog", () => {
     expect(new Set(LOOKS.map((look) => signature(createDesk({ style: "standard", look })))).size).toBeGreaterThan(1);
   });
 
-  it("each look puts its decade's computer on every desk", () => {
+  it("each furniture set puts its decade's computer on every desk", () => {
     expect(DESK_STYLES.map((style) => monitorFor(style, "classic"))).toEqual(["crt", "laptop", "flat", "wide", "flat"]);
     expect(DESK_STYLES.map((style) => monitorFor(style, "nineties"))).toEqual(Array(5).fill("crt"));
     expect(DESK_STYLES.map((style) => monitorFor(style, "noughties"))).toEqual(["flat", "flat", "flat", "wide", "wide"]);

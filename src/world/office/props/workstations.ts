@@ -7,9 +7,9 @@
  * (+Z) side of the top with its screen facing back toward −Z.
  */
 import * as THREE from "three";
-import { bakeModel, C, darken, modelMesh, phaseTier, SCALE } from "../../core/palette";
+import { bakeModel, C, darken, furnitureOf, modelMesh, phaseTier, SCALE } from "../../core/palette";
 import type { ColorFilter, ModelBuilder } from "../../core/palette";
-import type { LookId, OfficeIndex, Team } from "../../types";
+import type { FurnitureSet, LookId, OfficeIndex, Team } from "../../types";
 import { CHAIR_SIZE, DESK_SIZE } from "../footprints";
 import {
   drawCan,
@@ -32,10 +32,10 @@ export type DeskStyle = "garage" | "hotdesk" | "standard" | "premium" | "executi
 export const DESK_STYLES: readonly DeskStyle[] = ["garage", "hotdesk", "standard", "premium", "executive"];
 
 /**
- * The desk and chair of each office, by look and then by office (0 the garage … 4 the campus). This is where an
+ * The desk and chair of each office, by furniture set and then by office (0 the garage … 4 the campus). This is where an
  * era gets its own furniture: the "garage" desk is already a 1990s one (plywood, a beige tower, a tube monitor).
  */
-export const DESK_STYLE_FOR_PHASE: Record<LookId, readonly DeskStyle[]> = {
+export const DESK_STYLE_FOR_PHASE: Record<FurnitureSet, readonly DeskStyle[]> = {
   classic: ["garage", "hotdesk", "standard", "premium", "executive"],
   // The buildings are the plans; the looks dress them: the same desk bodies, another computer on them.
   nineties: ["garage", "hotdesk", "standard", "premium", "executive"],
@@ -43,8 +43,9 @@ export const DESK_STYLE_FOR_PHASE: Record<LookId, readonly DeskStyle[]> = {
   twenties: ["garage", "hotdesk", "standard", "premium", "executive"],
 };
 
-/** The desk and chair style of an office in a look. */
-export const deskStyleFor = (office: OfficeIndex, look: LookId = "classic"): DeskStyle => DESK_STYLE_FOR_PHASE[look][phaseTier(office)];
+/** The desk and chair style of an office in a look: its furniture set's. */
+export const deskStyleFor = (office: OfficeIndex, look: LookId = "classic"): DeskStyle =>
+  DESK_STYLE_FOR_PHASE[furnitureOf(look)][phaseTier(office)];
 
 export const DESK_FOOTPRINT: PropFootprint = { w: DESK_SIZE.width, d: DESK_SIZE.depth };
 export const DESK_TOP_Y = SCALE.deskTop;
@@ -87,11 +88,11 @@ const CLASSIC_MONITORS: Record<DeskStyle, MonitorKind> = {
 };
 
 /**
- * The computer on a desk of a style in a look: a tube monitor on every desk of the nineties, flat screens (wide on
- * the two best desks) in the noughties, a laptop on every desk of the twenties.
+ * The computer on a desk of a style in a furniture set: a tube monitor on every desk of the nineties, flat screens
+ * (wide on the two best desks) in the noughties, a laptop on every desk of the twenties.
  */
-export const monitorFor = (style: DeskStyle, look: LookId): MonitorKind => {
-  switch (look) {
+export const monitorFor = (style: DeskStyle, set: FurnitureSet): MonitorKind => {
+  switch (set) {
     case "classic":
       return CLASSIC_MONITORS[style];
     case "nineties":
@@ -114,7 +115,7 @@ const MONITOR_SHELL: Record<DeskStyle, number | undefined> = {
 
 /** Where a computer of each kind stands on the top: a tube sits back and to one side, a laptop near the edge. */
 const deskMonitors = (style: DeskStyle, look: LookId): MonitorSpec[] => {
-  const kind = monitorFor(style, look);
+  const kind = monitorFor(style, furnitureOf(look));
   const shell = MONITOR_SHELL[style];
   const withShell = (spec: MonitorSpec): MonitorSpec => (shell === undefined ? spec : { ...spec, shell });
   switch (kind) {
@@ -383,7 +384,7 @@ export interface DeskHandle extends PropHandle {
 export const createDesk = (options: DeskOptions): DeskHandle => {
   const { style } = options;
   const look = options.look ?? "classic";
-  const monitor = monitorFor(style, look);
+  const monitor = monitorFor(style, furnitureOf(look));
   const accent = options.accent ?? DESK_ACCENT[style];
   const variant = (((options.variant ?? 0) % DESK_VARIANTS) + DESK_VARIANTS) % DESK_VARIANTS;
   const kit = new PropKit(`desk:${style}`);
