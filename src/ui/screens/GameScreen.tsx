@@ -46,7 +46,7 @@ import {
   type OfficeAvailability,
 } from "../officeView";
 import { wordsFor } from "../words";
-import { beatIndexNow, beatNow, endRefused, finishYearPlay, IDLE, startYearPlay, yearEnded, yearPlayAfterLoss, yearPlayDone, type YearPlay } from "../yearPlay";
+import { beatIndexNow, beatNow, endRefused, finishYearPlay, IDLE, startYearPlay, yearPlaysOut, yearPlayAfterLoss, yearPlayDone, type YearPlay } from "../yearPlay";
 
 type Tab = "plan" | "rivals";
 
@@ -109,6 +109,8 @@ export const GameScreen = () => {
   const [playNow, setPlayNow] = useState(0);
   const beatShown = useRef<number | null>(null);
   const skipRef = useRef<HTMLButtonElement | null>(null);
+  // When the year started playing: the second click of a double click on End lands on Skip, and must not skip it.
+  const playStartedAt = useRef(Number.NEGATIVE_INFINITY);
 
   const [tab, setTab] = useState<Tab>("plan");
   const [helpOpen, setHelpOpen] = useState(false);
@@ -242,13 +244,15 @@ export const GameScreen = () => {
       officeSource.startPlay();
       endQuarter();
       const after = gameStore.getState();
-      if (yearEnded(turnBefore, { turn: after.game?.turn ?? null, failure: after.failure })) {
+      const playerOut = after.game === null || after.game.companies[PLAYER_ID].out !== null;
+      if (yearPlaysOut({ log: before.lastLog }, { log: after.lastLog, failure: after.failure, playerOut })) {
         const now = performance.now();
         playRef.current = startYearPlay(playRef.current, yearPlayback(after.lastLog?.companies[PLAYER_ID] ?? null, false), year, now);
         setPlayNow(now);
       }
       const started = playRef.current;
       if (started.phase === "playing") {
+        playStartedAt.current = performance.now();
         beatShown.current = 0;
         officeSource.showBeat(started.playback, 0);
       } else {
@@ -304,6 +308,11 @@ export const GameScreen = () => {
     closeReport();
   }, [closeReport, fullReport]);
 
+  const onSkip = useCallback(() => {
+    if (performance.now() - playStartedAt.current < SETTLE_MS) return;
+    finishPlay();
+  }, [finishPlay]);
+
   const showFullReport = useCallback(() => setFullReport(true), []);
 
   const closeHelp = useCallback(() => setHelpOpen(false), []);
@@ -315,6 +324,9 @@ export const GameScreen = () => {
   // The most serious thing to know before ending the year or quarter, if there is one.
   const headline = planning.warnings.find((warning) => warning.level !== "note");
   const playing = play.phase === "playing";
+  // While a year plays out the page behind already shows the next year: it is dimmed, so the office and the
+  // caption are the one year in view.
+  const dim = `transition-opacity duration-300 ${playing ? "opacity-40" : ""}`;
   const beat = beatNow(play, playNow);
   const officeNames = rulesForTurn(config, game.turn).career?.offices.map((office) => office.name) ?? [];
 
@@ -322,7 +334,7 @@ export const GameScreen = () => {
     <>
       <div inert={report !== null || helpOpen || playing}>
         <main className="mx-auto w-full max-w-6xl space-y-3 px-3 pb-44 pt-3 md:pb-28">
-          <header className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+          <header className={`flex flex-wrap items-center justify-between gap-x-3 gap-y-2 ${dim}`}>
             <p className={LABEL}>StartUpWorld</p>
             <h1 ref={titleRef} tabIndex={-1} className="order-last w-full min-w-0 truncate text-sm font-semibold text-gray-100 outline-none sm:order-none sm:w-auto sm:flex-1">
               {resource.companyName}{" "}
@@ -379,22 +391,28 @@ export const GameScreen = () => {
 
           {layout === "3d" ? (
             <>
-              {timeline !== null && <Timeline view={timeline} />}
-              {event !== null && (
-                <EventBanner event={event} words={words} datedYear={datedYear(game.event, game.turn, config)} historyEnds={timeline?.historyEnds ?? null} />
-              )}
+              <div className={`space-y-3 ${dim}`}>
+                {timeline !== null && <Timeline view={timeline} />}
+                {event !== null && (
+                  <EventBanner event={event} words={words} datedYear={datedYear(game.event, game.turn, config)} historyEnds={timeline?.historyEnds ?? null} />
+                )}
+              </div>
               {/* A desktop window: the office and the year's figures on the left, the plan on the right. */}
               <div className="grid items-start gap-3 grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
                 <div className="space-y-3">
                   <div ref={cellRef} data-office className="overflow-hidden rounded-xl" style={cellHeight === null ? undefined : { height: cellHeight }}>
                     <OfficeSlot source={officeSource} draft={draft} onMove={onMove} onView={onView} onFailed={onOfficeFailed} />
                   </div>
-                  {status !== null && <CareerStatus view={status} />}
-                  <ResourceBar view={resource} boardRunwayTurns={rulesForTurn(config, game.turn).board.runwayTurns} words={words} rescueUsed={status !== null && status.rescueYear !== null} />
-                  <ProjectionCard company={company} view={planning} words={words} move={move} />
-                  <RivalsPanel you={resource} rivals={rivals} words={words} careers={rivalCareers} />
+                  <div className={`space-y-3 ${dim}`}>
+                    {status !== null && <CareerStatus view={status} />}
+                    <ResourceBar view={resource} boardRunwayTurns={rulesForTurn(config, game.turn).board.runwayTurns} words={words} rescueUsed={status !== null && status.rescueYear !== null} compact />
+                    <ProjectionCard company={company} view={planning} words={words} move={move} />
+                    <RivalsPanel you={resource} rivals={rivals} words={words} careers={rivalCareers} />
+                  </div>
                 </div>
-                <PlanningPanel company={company} turn={game.turn} draft={draft} view={planning} config={rulesForTurn(config, game.turn)} words={words} listing={listing} onChange={onChange} />
+                <div className={dim}>
+                  <PlanningPanel company={company} turn={game.turn} draft={draft} view={planning} config={rulesForTurn(config, game.turn)} words={words} listing={listing} onChange={onChange} />
+                </div>
               </div>
             </>
           ) : (
@@ -466,7 +484,7 @@ export const GameScreen = () => {
               <div className="text-[0.6rem] uppercase tracking-[0.16em] text-mist/60">{playingLine(play.year)}</div>
               <div className="truncate font-semibold text-gray-100">{beat === null ? "\u00a0" : beatLine(beat, officeNames)}</div>
             </div>
-            <button ref={skipRef} type="button" onClick={finishPlay} className={`${PRIMARY} shrink-0`}>
+            <button ref={skipRef} type="button" onClick={onSkip} className={`${PRIMARY} shrink-0`}>
               {OFFICE_WORDS.skip}
             </button>
           </div>

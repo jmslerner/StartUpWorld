@@ -56,9 +56,15 @@ export const yearPlayAfterLoss = (play: YearPlay, availability: OfficeAvailabili
 /** End is refused while a year plays out or a report is open: checked before endQuarter runs. */
 export const endRefused = (play: YearPlay, reportOpen: boolean): boolean => play.phase === "playing" || reportOpen;
 
-/** The year really ended: the turn moved on by exactly one and the store reports no failure. */
-export const yearEnded = (turnBefore: number, after: { readonly turn: number | null; readonly failure: Error | null }): boolean =>
-  after.failure === null && after.turn === turnBefore + 1;
+/**
+ * The year that End just closed plays out: a new report came in and the store reports no failure. The career's last
+ * year plays out too (the turn does not move on after it, but its report is new). A year in which the player's
+ * company went out does not: its people do not leave one by one, so the summary opens at once.
+ */
+export const yearPlaysOut = (
+  before: { readonly log: object | null },
+  after: { readonly log: object | null; readonly failure: Error | null; readonly playerOut: boolean },
+): boolean => after.failure === null && after.log !== null && after.log !== before.log && !after.playerOut;
 
 /**
  * Ends a year that plays out (its time is up, Skip, or the office went away): the new year is shown first, then the

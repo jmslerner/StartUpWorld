@@ -532,6 +532,23 @@ const countIn = (line) => (/^One /.test(line) ? 1 : Number(line.match(/^(\d+) /)
  * Ends `year` and samples the bar and the scene every 200 ms while the bar shows. Returns the samples, the page time
  * until the summary opened, and how many dialogs were ever open at once while the bar showed.
  */
+/** Skip pressed and timed in the page: from the press to the first moment a dialog is in the document. */
+const skipTimed = (page) =>
+  page.evaluate(
+    () =>
+      new Promise((done) => {
+        const button = [...document.querySelectorAll("button")].find((each) => each.textContent === "Skip");
+        const start = performance.now();
+        const look = () => {
+          if (document.querySelector('[role="dialog"]') !== null) done(performance.now() - start);
+          else if (performance.now() - start > 10000) done(Infinity);
+          else setTimeout(look, 10);
+        };
+        button?.click();
+        look();
+      }),
+  );
+
 const playYear = async (page, year, { skip = false } = {}) => {
   const started = Date.now();
   await endButton(page, year).click();
@@ -547,21 +564,9 @@ const playYear = async (page, year, { skip = false } = {}) => {
     });
     samples.push(sample);
     if (skip && skipped === null) {
-      // Pressed and timed in the page: from the press to the first moment a dialog is in the document.
-      skipped = await page.evaluate(
-        () =>
-          new Promise((done) => {
-            const button = [...document.querySelectorAll("button")].find((each) => each.textContent === "Skip");
-            const start = performance.now();
-            const look = () => {
-              if (document.querySelector('[role="dialog"]') !== null) done(performance.now() - start);
-              else if (performance.now() - start > 10000) done(Infinity);
-              else setTimeout(look, 10);
-            };
-            button?.click();
-            look();
-          }),
-      );
+      // Skip does nothing for its first moments, so the second click of a double click on End cannot land on it.
+      await sleep(Math.max(0, SETTLE_MS + 150 - (Date.now() - started)));
+      skipped = await skipTimed(page);
       break;
     }
     if (Date.now() - started > 15000) break;
@@ -609,9 +614,21 @@ const yearAndMoves = async (browser) => {
   assert(waiting.arriving === expected, `${waiting.arriving} wait at the door in 1991, the plan expects ${expected}`);
   passed(`once the summary closed, ${expected} expected hires wait at the door, as the plan says`);
 
-  // A double click on End plays one year only, and opens one summary.
+  // A double click on End plays one year only, and opens one summary. The second click lands where Skip appears,
+  // and must not skip the year it started.
   await endButton(page, 1991).dblclick();
-  await dialog(page).waitFor({ timeout: 10000 });
+  await page.waitForTimeout(150);
+  assert((await playBar(page).count()) === 1 && (await dialog(page).count()) === 0, 'a double click on "End 1991" skipped the year as it started');
+  passed('a double click on "End 1991" leaves the year playing: its second click does not skip it');
+
+  // Skip (once past its first moments) ends the year at once, and the office rests soon after.
+  await page.waitForTimeout(SETTLE_MS);
+  assert((await playBar(page).count()) === 1, "1991 stopped playing before Skip was pressed");
+  const skippedMs = await skipTimed(page);
+  assert(skippedMs <= 1000, `the summary opened ${skippedMs} ms after Skip`);
+  const rest = await rests(page, "after Skip");
+  assert(rest.restMs <= 2000, `the office rested ${rest.restMs} ms after the summary opened, not within 2 s (frames at ${rest.at.join(", ")} ms)`);
+  passed(`Skip opened the summary within ${Math.round(skippedMs)} ms and the office rested ${rest.restMs} ms later`);
   await page.waitForTimeout(1500);
   assert((await dialog(page).count()) === 1, `${await dialog(page).count()} dialogs are open after a double click`);
   assert((await office(page, "scene")).year === 1992, `a double click on "End 1991" left the scene in ${(await office(page, "scene")).year}`);
@@ -633,12 +650,24 @@ const yearAndMoves = async (browser) => {
   passed('a double click on "End 1991" played one year and opened one summary; End pressed under the summary changed nothing');
   await closeWith(page, "Plan 1992");
 
-  // Skip ends the year at once, and the office rests soon after.
-  const skipped = await playYear(page, 1992, { skip: true });
-  assert(skipped.summaryAfterMs <= 1000, `the summary opened ${skipped.summaryAfterMs} ms after Skip`);
-  const rest = await rests(page, "after Skip");
-  assert(rest.restMs <= 2000, `the office rested ${rest.restMs} ms after the summary opened, not within 2 s (frames at ${rest.at.join(", ")} ms)`);
-  passed(`Skip opened the summary within ${Math.round(skipped.summaryAfterMs)} ms and the office rested ${rest.restMs} ms later`);
+  // Seed 1's career with the Recruiting raised runs out of cash a second time in 1992 (see step 4): a year in which
+  // the company goes out does not play out (its people do not leave one by one); the summary opens at once.
+  const sawBar = page.evaluate(
+    () =>
+      new Promise((done) => {
+        const start = performance.now();
+        const look = () => {
+          if ([...document.querySelectorAll("button")].some((each) => each.textContent === "Skip")) done(true);
+          else if (document.querySelector('[role="dialog"]') !== null || performance.now() - start > 5000) done(false);
+          else requestAnimationFrame(look);
+        };
+        look();
+      }),
+  );
+  await endButton(page, 1992).click();
+  assert(!(await sawBar), '"End 1992", in which the company goes out, played the year out');
+  await dialog(page).waitFor({ timeout: 2000 });
+  passed('"End 1992", the second failure, opens its summary at once with no playback');
   noErrors();
   await context.close();
 };
@@ -1071,18 +1100,14 @@ const wholeCareer = async (browser) => {
     const heading = await header(page).innerText();
     assert(heading.includes(`${year} · year ${year - FIRST_YEAR + 1} of ${YEARS}`), `the header reads ${JSON.stringify(heading)}`);
     await endButton(page, year).click();
-    if (year === LAST_YEAR) {
-      // The last year ends the career: the turn does not move on, so it does not play out (src/ui/yearPlay.ts,
-      // yearEnded) and the summary opens at once, as without 3D.
-      await opened(page, 5000);
-      assert((await playBar(page).count()) === 0, `"End ${year}" shows a playback bar and a summary together`);
-    } else {
-      const bar = await playBar(page).waitFor({ timeout: 5000 }).then(() => true, () => false);
-      assert(bar, `no playback bar after "End ${year}"`);
-      await noForbiddenWords(page.locator("body"), "the page while the year plays out");
-      await skipButton(page).click().catch(() => {});
-      await opened(page);
-    }
+    // Every year plays out, the last one too (src/ui/yearPlay.ts, yearPlaysOut): the turn does not move on after it,
+    // but its report is new. The summary opens once it is skipped.
+    const bar = await playBar(page).waitFor({ timeout: 5000 }).then(() => true, () => false);
+    assert(bar, `no playback bar after "End ${year}"`);
+    await noForbiddenWords(page.locator("body"), "the page while the year plays out");
+    await page.waitForTimeout(SETTLE_MS + 150); // past the guard that keeps a double click on End off Skip
+    await skipButton(page).click().catch(() => {});
+    await opened(page);
     await noForbiddenWords(page.locator("body"), "the page with the summary open");
     await closeWith(page, year === LAST_YEAR ? "See how it ended" : `Plan ${year + 1}`);
     noErrors();
@@ -1091,7 +1116,7 @@ const wholeCareer = async (browser) => {
   await page.getByRole("heading", { name: "Final standings" }).waitFor();
   await noForbiddenWords(page.locator("body"), "the end screen");
   noErrors();
-  passed(`every year from ${FIRST_YEAR} to ${LAST_YEAR} through the 3D screen, skipped each year; no forbidden words; the end screen`);
+  passed(`every year from ${FIRST_YEAR} to ${LAST_YEAR} through the 3D screen, each played out and skipped, the last year too; no forbidden words; the end screen`);
   await context.close();
 };
 

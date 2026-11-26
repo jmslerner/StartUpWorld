@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { NO_PLAYBACK, type PlaybackBeat, type YearPlayback } from "../scene/yearPlayback";
-import { beatIndexNow, beatNow, endRefused, finishYearPlay, IDLE, startYearPlay, yearEnded, yearPlayAfterLoss, yearPlayDone } from "./yearPlay";
+import { beatIndexNow, beatNow, endRefused, finishYearPlay, IDLE, startYearPlay, yearPlaysOut, yearPlayAfterLoss, yearPlayDone } from "./yearPlay";
 
 const playback = (seconds: number, beats: PlaybackBeat[]): YearPlayback => ({ beats, seconds });
 const leave = { kind: "leave", seconds: 1.5, count: 2, office: null } as const;
@@ -28,12 +28,18 @@ describe("a year playing out", () => {
     const play = startYearPlay(IDLE, playback(4, [leave, arrive]), 1994, 1000);
     expect([endRefused(IDLE, false), endRefused(play, false), endRefused(IDLE, true), endRefused(play, true)]).toEqual([false, true, true, true]);
   });
-  it("plays a year only when it really ended: one turn on, and no failure (Review Focus 1)", () => {
-    expect(yearEnded(5, { turn: 6, failure: null })).toBe(true);
-    expect(yearEnded(5, { turn: 5, failure: null })).toBe(false); // over, or nothing happened: last year must not replay
-    expect(yearEnded(5, { turn: 5, failure: new Error("x") })).toBe(false);
-    expect(yearEnded(5, { turn: 7, failure: null })).toBe(false);
-    expect(yearEnded(5, { turn: null, failure: null })).toBe(false);
+  it("plays a year only when it really ended: a new report and no failure (Review Focus 1)", () => {
+    const log = { turn: 5 }; const next = { turn: 6 };
+    expect(yearPlaysOut({ log }, { log: next, failure: null, playerOut: false })).toBe(true);
+    expect(yearPlaysOut({ log }, { log, failure: null, playerOut: false })).toBe(false); // nothing happened: last year must not replay
+    expect(yearPlaysOut({ log }, { log, failure: new Error("x"), playerOut: false })).toBe(false);
+    expect(yearPlaysOut({ log: null }, { log: null, failure: null, playerOut: false })).toBe(false);
+  });
+  it("the career's last year plays out too: the turn stays, but its report is new", () => {
+    expect(yearPlaysOut({ log: { turn: 48 } }, { log: { turn: 49 }, failure: null, playerOut: false })).toBe(true);
+  });
+  it("a year in which the player's company went out does not play out: the summary opens at once", () => {
+    expect(yearPlaysOut({ log: { turn: 12 } }, { log: { turn: 13 }, failure: null, playerOut: true })).toBe(false);
   });
   it("a beat list held to six seconds ends at six seconds, whatever its beats add up to", () => {
     const play = startYearPlay(IDLE, playback(6, [leave, { kind: "move", seconds: 2.5, count: 0, office: 1 }, arrive]), 2001, 0);

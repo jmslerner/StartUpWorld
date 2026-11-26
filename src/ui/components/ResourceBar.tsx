@@ -14,15 +14,23 @@ interface StatProps {
   subShort: ReactNode;
   tone?: string;
   tip: ReactNode;
+  /** A narrow column at any window width: the short second line only. */
+  compact?: boolean;
 }
 
-const Stat = ({ label, value, sub, subShort, tone = "text-gray-100", tip }: StatProps) => (
+const Stat = ({ label, value, sub, subShort, tone = "text-gray-100", tip, compact = false }: StatProps) => (
   <Tooltip content={tip} className="min-w-0">
     <div className="min-w-0" tabIndex={0}>
       <div className="truncate text-[0.58rem] font-semibold uppercase tracking-[0.16em] text-mist/60 sm:text-[0.62rem]">{label}</div>
       <div className={`truncate text-sm font-semibold tabular-nums sm:text-base ${tone}`}>{value}</div>
-      <div className="truncate text-[0.62rem] tabular-nums text-mist/70 sm:hidden">{subShort}</div>
-      <div className="hidden truncate text-[0.68rem] tabular-nums text-mist/70 sm:block">{sub}</div>
+      {compact ? (
+        <div className="truncate text-[0.68rem] tabular-nums text-mist/70">{subShort}</div>
+      ) : (
+        <>
+          <div className="truncate text-[0.62rem] tabular-nums text-mist/70 sm:hidden">{subShort}</div>
+          <div className="hidden truncate text-[0.68rem] tabular-nums text-mist/70 sm:block">{sub}</div>
+        </>
+      )}
     </div>
   </Tooltip>
 );
@@ -46,10 +54,12 @@ interface ResourceBarProps {
   words: Words;
   /** A career's one rescue is spent: the next year below $0 ends it. Always false in a race. */
   rescueUsed: boolean;
+  /** Drawn in a column narrower than the window (beside the 3D office): four to a row, with the short second lines. */
+  compact?: boolean;
 }
 
 /** The company's three resources and what follows from them, across the top of the game. */
-export const ResourceBar = ({ view, boardRunwayTurns, words, rescueUsed }: ResourceBarProps) => {
+export const ResourceBar = ({ view, boardRunwayTurns, words, rescueUsed, compact = false }: ResourceBarProps) => {
   const runwayTone = view.runway === null ? TONE.good : view.runway < boardRunwayTurns ? TONE.danger : view.runway < boardRunwayTurns + 1 ? TONE.caution : "text-gray-100";
   const change = view.usersChange;
   const changeTone = change === null ? undefined : change > 0 ? TONE.good : change < 0 ? TONE.danger : undefined;
@@ -63,8 +73,9 @@ export const ResourceBar = ({ view, boardRunwayTurns, words, rescueUsed }: Resou
       ? "End a year below $0 and your career ends."
       : "End a year below $0 and the company is rescued once; a second time ends your career.";
   return (
-    <section aria-label="Your company" className="panel-surface grid grid-cols-4 gap-x-3 gap-y-2 rounded-xl px-3 py-2.5 lg:grid-cols-8">
+    <section aria-label="Your company" className={`panel-surface grid grid-cols-4 gap-x-3 gap-y-2 rounded-xl px-3 py-2.5 ${compact ? "" : "lg:grid-cols-8"}`}>
       <Stat
+        compact={compact}
         label="Cash"
         value={money(view.cash)}
         sub={view.runway === null ? "profitable" : `runway ${words.runway(view.runway)}`}
@@ -77,6 +88,7 @@ export const ResourceBar = ({ view, boardRunwayTurns, words, rescueUsed }: Resou
         }
       />
       <Stat
+        compact={compact}
         label="Talent"
         value={view.headcount}
         sub={`work of ${view.effectiveWork.toFixed(1)}`}
@@ -88,6 +100,7 @@ export const ResourceBar = ({ view, boardRunwayTurns, words, rescueUsed }: Resou
         }
       />
       <Stat
+        compact={compact}
         label="Users"
         value={count(view.users)}
         sub={change === null ? `${count(view.ipoUsers)} to go public` : <span className={changeTone}>
@@ -111,6 +124,7 @@ export const ResourceBar = ({ view, boardRunwayTurns, words, rescueUsed }: Resou
         }
       />
       <Stat
+        compact={compact}
         label="Quality"
         value={Math.floor(view.quality)}
         sub={view.launched ? "product is live" : `launches at ${view.launchAt}`}
@@ -123,6 +137,7 @@ export const ResourceBar = ({ view, boardRunwayTurns, words, rescueUsed }: Resou
         }
       />
       <Stat
+        compact={compact}
         label="Hype"
         value={Math.floor(view.hype)}
         sub={`fades each ${period}`}
@@ -130,6 +145,7 @@ export const ResourceBar = ({ view, boardRunwayTurns, words, rescueUsed }: Resou
         tip={`Hype, 0 to 100. It multiplies how many users you win and your valuation, puts you ahead in the queue for candidates, and improves your odds when poaching. It fades every ${period}.`}
       />
       <Stat
+        compact={compact}
         label="Valuation"
         value={money(view.valuation)}
         sub={climate === null ? "normal funding" : `×${climate.multiplier}, ${words.left(climate.turnsLeft)}`}
@@ -143,6 +159,7 @@ export const ResourceBar = ({ view, boardRunwayTurns, words, rescueUsed }: Resou
         }
       />
       <Stat
+        compact={compact}
         label="Equity"
         value={percent(view.equity)}
         sub={`stake ${money(view.stake)}`}
@@ -162,6 +179,7 @@ export const ResourceBar = ({ view, boardRunwayTurns, words, rescueUsed }: Resou
         }
       />
       <Stat
+        compact={compact}
         label="Board"
         value={`${view.board.founderSeats}–${view.board.investorSeats}`}
         sub={CONTROL_TEXT[view.board.control]}
