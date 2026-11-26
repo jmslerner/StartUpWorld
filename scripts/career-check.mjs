@@ -3,13 +3,14 @@
  * The browser check of the career: builds the app, serves `dist` with `vite preview`, and plays it in headless
  * Chromium at 1280x800.
  *
- *   node scripts/career-check.mjs [--no-build] [--shots <dir>]
+ *   node scripts/career-check.mjs [--no-build] [--shots <dir>] [--only <n,n,...>]
  *
  * In order: the race is unchanged (its on-screen text matches scripts/race-text.snapshot.json, and a fresh race
  * plays its first quarter); the first screen in Career; a whole career from 1990 to 2038 with seed 1, checking each
  * year's header, timeline, button, report and words, a reload, "Save and leave" and the end screen; then, from the
  * saves scripts/career-fixtures.ts makes, going public, the rescue, the board firing the founder and the rescue
- * keeping them on, the second failure, an office move and a full campus; last, no sideways scroll at 390 px. Every
+ * keeping them on, the second failure, an office move and a full campus; no sideways scroll at 390 px; last (11), a
+ * milestone's sound in the 2D screens: the office move's year ends and its sound is asked for once. Every
  * year, "you are here" must sit inside the timeline; on an end screen the timeline must fit with no sideways scroll,
  * every era named in full and no "you are here"; and a finished career beside a race save is offered by its ending.
  *
@@ -24,7 +25,8 @@
  * never fetch the office or the world either, load no script holding three's renderer, and show no "3D office" switch.
  *
  * Exits 1 on the first failed assertion, naming it. `--shots <dir>` saves 1990, 2007, 2023 and the end screen.
- * `--no-build` serves the `dist` that is there. Not part of `npm test`: it needs a browser and takes minutes.
+ * `--no-build` serves the `dist` that is there. `--only` runs only the steps named (2 and 3 are one: the whole
+ * career). Not part of `npm test`: it needs a browser and takes minutes.
  */
 import { spawn, spawnSync } from "node:child_process";
 import { mkdirSync, readFileSync } from "node:fs";
@@ -77,10 +79,14 @@ const argValue = (name) => {
     console.error(`${name} needs a value`);
     process.exit(2);
   }
-  return resolve(value);
+  return value;
 };
-const shotsDir = argValue("--shots");
+const shotsArg = argValue("--shots");
+const shotsDir = shotsArg === null ? null : resolve(shotsArg);
+const onlyArg = argValue("--only");
+const only = onlyArg === null ? null : new Set(onlyArg.split(",").map(Number));
 const build = !process.argv.includes("--no-build");
+const runs = (step) => only === null || only.has(step);
 
 // ---------------------------------------------------------------------------------------------------------------
 // The server, killed on every way out
@@ -624,6 +630,7 @@ const secondFailure = async ({ save, year }) => {
   passed(`a second failure in ${year} ends the career, and the end screen (its timeline fits, no "you are here") stays after a reload`);
 
   // With a race save beside it, the first screen offers the finished career's ending, dated to its last year.
+  if (raceSave === null && !runs(1)) raceSave = await aRaceSave();
   assert(raceSave !== null, "no race save was kept from the race played first");
   await page.evaluate(([key, value]) => localStorage.setItem(key, value), [RACE_KEY, raceSave]);
   await page.reload();
@@ -636,6 +643,23 @@ const secondFailure = async ({ save, year }) => {
   noErrors();
   passed(`beside a race save, the finished career is offered as "See how your career ended (${year})", and opens on its end screen`);
   await context.close();
+};
+
+/** A race save made on its own, for `--only` runs that leave out step 1: a new race with its first quarter played. */
+const aRaceSave = async () => {
+  const { context, page } = await freshPage();
+  await page.goto(`${BASE}/`);
+  await page.getByLabel("Name your startup").waitFor();
+  await page.getByRole("group", { name: "Mode" }).getByRole("button", { name: /Quick race/ }).click();
+  await page.getByLabel("Name your startup").fill("Race Co");
+  await page.locator("form button[type=submit]").click();
+  await endButton(page, "Q1").waitFor();
+  await endButton(page, "Q1").click();
+  await opened(page);
+  await closeWith(page, "Plan Q2");
+  const save = (await storageKeys(page)).race;
+  await context.close();
+  return save;
 };
 
 const officeMove = async ({ save, year }) => {
@@ -682,6 +706,25 @@ const narrow = async ({ save }) => {
   await context.close();
 };
 
+const milestoneSound = async ({ save, year }) => {
+  current = "11. A milestone's sound in 2D";
+  const { context, page } = await loadSave(save);
+  const before = await page.evaluate(() => window.__careerOffice?.sounds() ?? null);
+  assert(before !== null && before.length === 0, `before End the sounds asked for are ${JSON.stringify(before)}`);
+  await endButton(page, year).click();
+  await opened(page);
+  const heard = await page.evaluate(() => window.__careerOffice.sounds());
+  assert(heard.filter((each) => each === "asset-office-upgrade").length === 1, `as the summary opened the sounds asked for are ${JSON.stringify(heard)}`);
+  assert(!heard.includes("users-trickle"), `the 2D screens streamed the market's users: ${JSON.stringify(heard)}`);
+  await closeWith(page, `Plan ${year + 1}`);
+  const after = await page.evaluate(() => window.__careerOffice.sounds());
+  assert(JSON.stringify(after) === JSON.stringify(heard), `closing the summary asked for more sounds: ${JSON.stringify(after)}`);
+  await stays2D(page, "the office move's year");
+  noErrors();
+  passed(`the office move of ${year} heard once as its summary opens, in the 2D screens; nothing more as it closes`);
+  await context.close();
+};
+
 // ---------------------------------------------------------------------------------------------------------------
 // Main
 
@@ -705,15 +748,16 @@ const main = async () => {
   // WebGL off: this check proves the career complete in the 2D screens (scripts/office-check.mjs covers the 3D office).
   browser = await chromium.launch({ args: ["--disable-3d-apis"] });
   try {
-    await raceUnchanged();
-    await wholeCareer();
-    await goingPublic(fixtures.listing);
-    await theRescue(fixtures.rescue);
-    await firedAndRescued(fixtures.board);
-    await secondFailure(fixtures.failure);
-    await officeMove(fixtures.office);
-    await fullCampus(fixtures.campus);
-    await narrow(fixtures.office);
+    if (runs(1)) await raceUnchanged();
+    if (runs(2) || runs(3)) await wholeCareer();
+    if (runs(4)) await goingPublic(fixtures.listing);
+    if (runs(5)) await theRescue(fixtures.rescue);
+    if (runs(6)) await firedAndRescued(fixtures.board);
+    if (runs(7)) await secondFailure(fixtures.failure);
+    if (runs(8)) await officeMove(fixtures.office);
+    if (runs(9)) await fullCampus(fixtures.campus);
+    if (runs(10)) await narrow(fixtures.office);
+    if (runs(11)) await milestoneSound(fixtures.office);
   } finally {
     await browser.close();
     stopServer();

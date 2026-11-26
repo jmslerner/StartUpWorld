@@ -12,7 +12,11 @@
  * pointing; (5) an office move and the three looks, and a full campus; (6) the world taken down cleanly on every way
  * out; (7) a hidden tab and resizes; (8) reduced motion; (9) the "3D office" switch; (10) the fallbacks: no WebGL, the
  * office's chunk blocked, a context lost during a year; (11) a reload while a year plays out; (12) a whole career
- * through the 3D screen; (13) a narrow touch window. Every page fails on any console error or page error, but the
+ * through the 3D screen; (13) a narrow touch window; (15) the market view: the switch, the buildings, a company's card,
+ * the year ending on the market, and Skip, a narrowed window or a lost context during that beat; (16) every era's
+ * look within its draw-call ceiling; (17) the market's draw calls in every era; (18) the career's sounds: the
+ * milestone once as the summary opens, the market's stream, footsteps, nothing on a reload. Step 14, no console
+ * errors on any page, runs last, always. Every page fails on any console error or page error, but the
  * software renderer's "GPU stall due to ReadPixels".
  *
  * Exits 1 on the first failed assertion, naming it. `--shots <dir>` saves screenshots into <dir>. `--no-build` serves
@@ -1141,6 +1145,363 @@ const narrow = async (browser, fixtures) => {
 };
 
 // ---------------------------------------------------------------------------------------------------------------
+// 15 to 18: the market, every era's look, the market's draw calls, the career's sounds
+
+/** The market's ceiling on draw calls (src/world/market/marketLayout.ts, MARKET_DRAW_CEILING), copied. */
+const MARKET_DRAW_CEILING = 60;
+/** The caption of the year's last beat (src/ui/officeView.ts, beatLine). */
+const MARKET_LINE = "Where the year's new users went";
+const views = (page) => page.getByRole("group", { name: "Show the office or the market", exact: true });
+const viewButton = (page, name) => views(page).getByRole("button", { name, exact: true });
+const marketCardOf = (page) => page.locator('section[aria-label="Company in the market"]');
+const showInMarket = (page) => page.getByRole("button", { name: "Show in market", exact: true });
+const countOf = (list, name) => list.filter((each) => each === name).length;
+
+/**
+ * Ends `year` and waits for its market beat (the caption reads MARKET_LINE), sampling the sounds asked for and the
+ * caption meanwhile. Returns the lines seen and the sounds heard up to the last moment before the market beat.
+ */
+const toMarketBeat = async (page, year) => {
+  await endButton(page, year).click();
+  await playBar(page).waitFor({ timeout: 5000 });
+  const lines = [];
+  let heard = [];
+  const until = Date.now() + 10000;
+  while (Date.now() < until) {
+    // The caption and the sounds read in one go: the market beat's sound is asked for as its caption goes up.
+    const [line, now] = await page.evaluate(() => {
+      const bar = [...document.querySelectorAll('[role="status"]')].find((each) => each.querySelector("button")?.textContent === "Skip");
+      return [bar === undefined ? null : (bar.querySelector(".truncate")?.textContent ?? null), window.__careerOffice?.sounds() ?? []];
+    });
+    if (line !== null && !lines.includes(line)) lines.push(line);
+    if (line === MARKET_LINE) return { lines, heard };
+    heard = now;
+    assert(line !== null, `${year} stopped playing before its market beat: ${JSON.stringify(lines)}`);
+    await sleep(50);
+  }
+  return assert(false, `${year} never reached its market beat: ${JSON.stringify(lines)}`);
+};
+
+/** The summary opens, and once open (past the settle), it is the only dialog. */
+const oneSummary = async (page, where) => {
+  await dialog(page).waitFor({ timeout: 8000 });
+  await page.waitForTimeout(SETTLE_MS + 400);
+  assert((await dialog(page).count()) === 1, `${where}: ${await dialog(page).count()} dialogs are open`);
+};
+
+/** Picks up the first Product (or any) person at a desk by clicking them; returns their id. */
+const pickSomeone = async (page) => {
+  const canvas = page.locator("[data-office] canvas");
+  for (let desk = 0; desk < 60; desk++) {
+    const personId = await office(page, "personAt", desk);
+    if (personId === null) continue;
+    const point = await office(page, "project", { kind: "person", personId });
+    const drawn = await office(page, "screenBounds", { kind: "person", personId });
+    if (point === null || drawn === null) continue;
+    const at = await box(canvas);
+    await page.mouse.click(at.x + point.x, at.y + (drawn.top + drawn.bottom) / 2);
+    await page.waitForTimeout(300);
+    if ((await carryStrip(page).count()) === 1) return personId;
+  }
+  return assert(false, "nobody at a desk could be picked up");
+};
+
+/** The plan's three teams as the planning panel counts them. */
+const planTeams = async (page) => ({ product: await teamCount(page, "Product"), growth: await teamCount(page, "Growth"), recruiting: await teamCount(page, "Recruiting") });
+
+/** The office fixture loaded at 1280x800, its office running and at rest. */
+const officeFixturePage = async (browser, fixtures, options = {}) => {
+  const { context, page } = await freshPage(browser, options);
+  const { save, year } = fixtures.office;
+  await loadSave(page, save, year);
+  await running(page);
+  await rests(page, "the office fixture");
+  return { context, page, year };
+};
+
+const theMarket = async (browser, fixtures) => {
+  current = "15. The market view";
+  {
+    const { context, page, year } = await officeFixturePage(browser, fixtures);
+    assert(await viewButton(page, "Market").isDisabled(), '"Market" is enabled before any year was played');
+    assert((await office(page, "market")) === null, "a market is given before any year was played");
+
+    // The year ends on the market, then the summary opens once on the player's choice.
+    const { lines } = await toMarketBeat(page, year);
+    assert((await office(page, "view")) === "market", `during the market beat the view is ${await office(page, "view")}`);
+    assert(await viewButton(page, "Office").isDisabled(), "the switch is enabled while the year plays");
+    await sleep(300);
+    const lot = await office(page, "screenBounds", { kind: "company", seat: 1 });
+    assert(lot !== null, "during the market beat seat 1's building is not on the canvas (the camera went back to the office)");
+    await oneSummary(page, "after the market beat");
+    assert((await office(page, "view")) === "office", `once the summary opened the view is ${await office(page, "view")}, not the choice`);
+    passed(`End ${year} played ${JSON.stringify(lines)}, the last beat on the market with seat 1 in view; then one summary, back in the office`);
+    await closeWith(page, `Plan ${year + 1}`);
+
+    // The switch, the buildings, a company's card.
+    await viewButton(page, "Market").click();
+    assert((await office(page, "view")) === "market", `"Market" pressed, the view is ${await office(page, "view")}`);
+    await rests(page, "the market");
+    const market = await office(page, "market");
+    assert(market !== null && market.companies.length === 4, `the market has ${market?.companies.length} companies`);
+    const byUsers = [...market.companies].sort((a, b) => a.users - b.users);
+    for (let n = 1; n < byUsers.length; n++) {
+      assert(byUsers[n].height >= byUsers[n - 1].height, `heights do not order as users: ${JSON.stringify(market.companies.map((c) => [c.users, c.height]))}`);
+    }
+    const stats = await office(page, "stats");
+    assert(stats.drawCalls <= MARKET_DRAW_CEILING, `the market draws ${stats.drawCalls} draw calls, over ${MARKET_DRAW_CEILING}`);
+    measured.push({ where: `${year + 1}, the market (office fixture)`, office: "market", figures: stats.figures, drawCalls: stats.drawCalls, ceiling: MARKET_DRAW_CEILING });
+    await shot(page, `${year + 1}-market.png`);
+    const tallest = market.companies.filter((c) => c.state === "rival").sort((a, b) => b.height - a.height)[0];
+    const bounds = await office(page, "screenBounds", { kind: "company", seat: tallest.seat });
+    assert(bounds !== null, `the tallest rival, ${tallest.name}, is not on the canvas`);
+    const canvasBox = await box(page.locator("[data-office] canvas"));
+    await page.mouse.click(canvasBox.x + (bounds.left + bounds.right) / 2, canvasBox.y + (bounds.top + bounds.bottom) / 2);
+    await marketCardOf(page).waitFor({ timeout: 3000 });
+    const cardTitle = await marketCardOf(page).locator("h3").innerText();
+    const cardText = await marketCardOf(page).innerText();
+    assert(cardTitle === tallest.name, `the card is titled ${JSON.stringify(cardTitle)}, not ${JSON.stringify(tallest.name)}`);
+    assert(/ users/.test(cardText) && cardText.includes("last year's new users"), `the card reads ${JSON.stringify(cardText)}`);
+    await shot(page, `${year + 1}-market-card.png`);
+    await page.keyboard.press("Escape");
+    await page.waitForTimeout(300);
+    assert((await marketCardOf(page).count()) === 0, "Escape did not close the card");
+    await viewButton(page, "Office").click();
+    assert((await office(page, "view")) === "office", `"Office" pressed, the view is ${await office(page, "view")}`);
+    passed(`"Market": four buildings ordered by users, ${stats.drawCalls} draw calls; ${tallest.name}'s building clicked shows its card, Escape closes it; "Office" goes back`);
+
+    // Nobody stays carried across the market.
+    await rests(page, "back in the office");
+    const plan = await planTeams(page);
+    await pickSomeone(page);
+    await viewButton(page, "Market").click();
+    await page.waitForTimeout(300);
+    await viewButton(page, "Office").click();
+    await page.waitForTimeout(300);
+    assert((await carryStrip(page).count()) === 0, "a person is still carried after the market was shown");
+    assert(JSON.stringify(await planTeams(page)) === JSON.stringify(plan), "showing the market changed the plan");
+    passed("a person picked up, then the market and the office shown: nobody carried, the plan unchanged");
+
+    // "Show in market" on a rival's card.
+    const rivalName = market.companies.find((c) => c.state === "rival").name;
+    const rivalCard = page.locator('main section[aria-label="Rivals"] li', { has: page.locator("span", { hasText: rivalName }) }).first();
+    await rivalCard.getByRole("button", { name: "Show in market", exact: true }).click();
+    await page.waitForTimeout(300);
+    assert((await office(page, "view")) === "market", `"Show in market" shows the ${await office(page, "view")}`);
+    assert((await marketCardOf(page).count()) === 1 && (await marketCardOf(page).locator("h3").innerText()) === rivalName, `"Show in market" for ${rivalName} does not show its card`);
+    passed(`"Show in market" on ${rivalName}'s card shows the market with it selected`);
+    await viewButton(page, "Office").click();
+
+    // The 2D layout has neither.
+    await toggle(page).click();
+    await page.locator("[data-office]").waitFor({ state: "detached" });
+    assert((await showInMarket(page).count()) === 0 && (await views(page).count()) === 0, 'the 2D layout has a "Show in market" button or a "Market" switch');
+    await toggle(page).click();
+    await running(page);
+    passed('the 2D layout has no "Show in market" and no "Market" switch');
+    noErrors();
+    await context.close();
+  }
+  {
+    // Skip during the market beat.
+    const { context, page, year } = await officeFixturePage(browser, fixtures);
+    await toMarketBeat(page, year);
+    const skippedMs = await skipTimed(page);
+    assert(skippedMs <= 1000, `the summary opened ${skippedMs} ms after Skip`);
+    await oneSummary(page, "Skip during the market beat");
+    assert((await office(page, "view")) === "office", `after Skip the view is ${await office(page, "view")}`);
+    await closeWith(page, `Plan ${year + 1}`);
+    assert(await viewButton(page, "Market").isEnabled(), 'after Skip "Market" is disabled');
+    assert(await viewButton(page, "Office").isEnabled(), 'after Skip "Office" is disabled');
+    noErrors();
+    passed("Skip during the market beat: one summary, the office again, the switch enabled");
+    await context.close();
+  }
+  {
+    // A window narrowed during the market beat.
+    const { context, page, year } = await officeFixturePage(browser, fixtures);
+    await toMarketBeat(page, year);
+    await page.setViewportSize({ width: 900, height: 800 });
+    await oneSummary(page, "narrowed during the market beat");
+    assert((await page.locator("[data-office]").count()) === 0 && (await page.locator("canvas").count()) === 0, "at 900 px the office is still on the page");
+    await closeWith(page, `Plan ${year + 1}`);
+    assert(await planPanel(page).isVisible(), "at 900 px the plan is not shown");
+    const heard = await office(page, "sounds");
+    assert(countOf(heard, "asset-office-upgrade") === 1, `narrowed during the market beat, the sounds are ${JSON.stringify(heard)}`);
+    noErrors();
+    passed("the window narrowed to 900 px during the market beat: one summary, the 2D screens, the office move heard once");
+    await context.close();
+  }
+  {
+    // A context lost during the market beat.
+    const { context, page, year } = await officeFixturePage(browser, fixtures);
+    await toMarketBeat(page, year);
+    await office(page, "loseContext");
+    await oneSummary(page, "a context lost during the market beat");
+    await closeWith(page, `Plan ${year + 1}`);
+    await reloadButton(page).waitFor({ timeout: 10000 });
+    await reloadButton(page).click();
+    await running(page);
+    assert((await office(page, "view")) === "office", `after "Reload 3D view" the view is ${await office(page, "view")}, not the player's choice`);
+    assert(await viewButton(page, "Market").isEnabled(), 'after "Reload 3D view" "Market" is disabled');
+    noErrors();
+    passed('a context lost during the market beat: one summary; "Reload 3D view" runs the office on the player\'s choice');
+    await context.close();
+  }
+  {
+    // Reduced motion: no year plays out; the market rests at once.
+    const { context, page, year } = await officeFixturePage(browser, fixtures, { reducedMotion: "reduce" });
+    await endButton(page, year).click();
+    await dialog(page).waitFor({ timeout: 2000 });
+    await page.waitForTimeout(SETTLE_MS);
+    await closeWith(page, `Plan ${year + 1}`);
+    await rests(page, "under reduced motion");
+    await viewButton(page, "Market").click();
+    assert((await office(page, "view")) === "market", `under reduced motion "Market" shows the ${await office(page, "view")}`);
+    // Nothing moves (no dots stream, the camera cuts): the world settles within a frame or two, then draws only its
+    // second of grace before it rests (core/rest.ts), as step 8 measures it.
+    const rest = await rests(page, "the market under reduced motion");
+    assert(rest.settledS <= 0.1, `under reduced motion the market moved for ${rest.settledS.toFixed(2)} world seconds (frames at ${rest.at.join(", ")} ms)`);
+    assert(rest.restMs <= REST_AFTER_MS + 250, `under reduced motion the market drew frames for ${rest.restMs} ms (at ${rest.at.join(", ")} ms)`);
+    noErrors();
+    passed(`under reduced motion the market shows, settles in ${rest.settledS.toFixed(2)} world seconds and rests ${rest.restMs} ms after "Market" (its second of grace)`);
+    await context.close();
+  }
+  {
+    // A race has neither the button nor the switch.
+    const { context, page } = await freshPage(browser);
+    await page.goto(`${BASE}/`);
+    await page.getByLabel("Name your startup").waitFor();
+    await page.getByRole("group", { name: "Mode" }).getByRole("button", { name: /Quick race/ }).click();
+    await page.getByLabel("Name your startup").fill("Race Co");
+    await page.locator("form button[type=submit]").click();
+    await endButton(page, "Q1").waitFor();
+    await endButton(page, "Q1").click();
+    await opened(page);
+    await closeWith(page, "Plan Q2");
+    assert((await showInMarket(page).count()) === 0 && (await views(page).count()) === 0, 'a race has a "Show in market" button or a "Market" switch');
+    assert((await office(page, "sounds")) === null, "a race page has the career's probe");
+    noErrors();
+    passed('a race, after its first quarter: no "Show in market", no "Market" switch, no career probe');
+    await context.close();
+  }
+};
+
+/** The eight era fixtures in order, with the era each opens in. */
+const ERA_FIXTURES = [
+  ["nineties", "dial-up"],
+  ["goldRush", "gold-rush"],
+  ["noughties", "bust"],
+  ["phones", "phones"],
+  ["cheapMoney", "cheap-money"],
+  ["twenties", "winter-ai"],
+  ["agents", "agents"],
+  ["ambient", "ambient"],
+];
+
+const everyEraLook = async (browser, fixtures) => {
+  current = "16. Every era's look";
+  for (const [name, era] of ERA_FIXTURES) {
+    const { context, page } = await freshPage(browser);
+    const { save, year } = fixtures[name];
+    await loadSave(page, save, year);
+    await running(page);
+    const { stats, scene } = await officeFigures(page, `${year} (${era})`);
+    assert(scene.era === era, `the ${name} fixture's scene is in ${scene.era}, not ${era}`);
+    assert(lookFor(scene.era) === era, `${year}: era ${scene.era} has the look ${lookFor(scene.era)}`);
+    const row = { where: `${year}, office ${scene.office} (${era})`, office: scene.office, figures: stats.figures, drawCalls: stats.drawCalls, ceiling: ceiling(stats) };
+    measured.push(row);
+    await shot(page, `${year}-${era}.png`);
+    noErrors();
+    passed(`${year}: era ${era}, its own look; office ${scene.office}, ${stats.figures} figures, ${stats.drawCalls} of ${row.ceiling} draw calls`);
+    if (era === "agents") console.log(`      the agents full floor: ${stats.drawCalls} draw calls, ceiling ${row.ceiling}, margin ${row.ceiling - stats.drawCalls}`);
+    await context.close();
+  }
+};
+
+const everyEraMarket = async (browser, fixtures) => {
+  current = "17. The market's draw calls in every era";
+  for (const [name, era] of ERA_FIXTURES) {
+    const { context, page } = await freshPage(browser);
+    const { save, year } = fixtures[name];
+    await loadSave(page, save, year);
+    await running(page);
+    // The market is given once a year has been played: the year is ended and skipped.
+    await endButton(page, year).click();
+    if (await playBar(page).waitFor({ timeout: 5000 }).then(() => true, () => false)) {
+      await page.waitForTimeout(SETTLE_MS + 150);
+      await skipButton(page).click().catch(() => {});
+    }
+    await opened(page);
+    await closeWith(page, `Plan ${year + 1}`);
+    await viewButton(page, "Market").click();
+    assert((await office(page, "view")) === "market", `${year + 1}: "Market" shows the ${await office(page, "view")}`);
+    await rests(page, `${year + 1}, the market`);
+    const stats = await office(page, "stats");
+    const market = await office(page, "market");
+    assert(stats.drawCalls <= MARKET_DRAW_CEILING, `${year + 1} (${market.era}): the market draws ${stats.drawCalls} draw calls, over ${MARKET_DRAW_CEILING}`);
+    measured.push({ where: `${year + 1}, the market (${name} fixture, ${market.era})`, office: "market", figures: stats.figures, drawCalls: stats.drawCalls, ceiling: MARKET_DRAW_CEILING });
+    noErrors();
+    passed(`${year + 1} (${market.era}): the market draws ${stats.drawCalls} draw calls, at most ${MARKET_DRAW_CEILING}`);
+    await context.close();
+  }
+};
+
+const theSounds = async (browser, fixtures) => {
+  current = "18. Sounds fire";
+  {
+    const { context, page, year } = await officeFixturePage(browser, fixtures);
+    const { heard: beforeMarket } = await toMarketBeat(page, year);
+    assert(countOf(beforeMarket, "users-trickle") === 0, `users-trickle was heard before the market beat: ${JSON.stringify(beforeMarket)}`);
+    assert(beforeMarket.includes("footsteps"), `no footsteps were heard while the hires walked in: ${JSON.stringify(beforeMarket)}`);
+    assert(countOf(beforeMarket, "asset-office-upgrade") === 0, `the office move was heard before the summary: ${JSON.stringify(beforeMarket)}`);
+    await sleep(400);
+    const inMarket = await office(page, "sounds");
+    assert(countOf(inMarket, "users-trickle") === 1, `the market beat's sounds are ${JSON.stringify(inMarket)}`);
+    await dialog(page).waitFor({ timeout: 8000 });
+    await page.waitForTimeout(SETTLE_MS);
+    const atSummary = await office(page, "sounds");
+    assert(countOf(atSummary, "asset-office-upgrade") === 1, `as the summary opened the sounds are ${JSON.stringify(atSummary)}`);
+    passed(`End ${year}: footsteps as the hires walk in, users-trickle in the market beat, asset-office-upgrade once as the summary opens`);
+    await page.reload();
+    await dialog(page).waitFor({ timeout: 10000 });
+    await running(page);
+    await page.waitForTimeout(1500);
+    const reloaded = await office(page, "sounds");
+    assert(reloaded.length === 0, `reloaded with the report open, the sounds are ${JSON.stringify(reloaded)}`);
+    noErrors();
+    passed("reloaded with the report open: no sound asked for");
+    await context.close();
+  }
+  {
+    const { context, page, year } = await officeFixturePage(browser, fixtures, { reducedMotion: "reduce" });
+    await endButton(page, year).click();
+    await dialog(page).waitFor({ timeout: 2000 });
+    const heard = await office(page, "sounds");
+    assert(countOf(heard, "asset-office-upgrade") === 1, `under reduced motion, as the summary opened, the sounds are ${JSON.stringify(heard)}`);
+    assert(countOf(heard, "users-trickle") === 0, `under reduced motion users-trickle was heard: ${JSON.stringify(heard)}`);
+    noErrors();
+    passed("under reduced motion: asset-office-upgrade as the summary opens, no users-trickle");
+    await context.close();
+  }
+  {
+    const { context, page } = await freshPage(browser);
+    const { save, year } = fixtures.listing;
+    await loadSave(page, save, year);
+    await running(page);
+    await page.getByRole("group", { name: "Go public" }).getByRole("button", { name: /Go public/ }).click();
+    await endButton(page, year).click();
+    await dialog(page).waitFor({ timeout: 10000 });
+    await page.waitForTimeout(SETTLE_MS);
+    const heard = await office(page, "sounds");
+    assert(countOf(heard, "crowd-cheer") === 1, `going public in ${year}, the sounds are ${JSON.stringify(heard)}`);
+    noErrors();
+    passed(`going public in ${year}: crowd-cheer once`);
+    await context.close();
+  }
+};
+
+// ---------------------------------------------------------------------------------------------------------------
 // Main
 
 const main = async () => {
@@ -1178,6 +1539,10 @@ const main = async () => {
     if (runs(11)) await reloadMidYear(browser, noWebGL);
     if (runs(12)) await wholeCareer(browser);
     if (runs(13)) await narrow(browser, fixtures);
+    if (runs(15)) await theMarket(browser, fixtures);
+    if (runs(16)) await everyEraLook(browser, fixtures);
+    if (runs(17)) await everyEraMarket(browser, fixtures);
+    if (runs(18)) await theSounds(browser, fixtures);
     current = "14. No console errors";
     noErrors();
     passed("no console error or page error on any page");
@@ -1187,7 +1552,10 @@ const main = async () => {
   }
   if (measured.length > 0) {
     console.log("office-check: draw calls at 1280x800");
-    for (const row of measured) console.log(`  ${row.where}: office ${row.office}, ${row.figures} figures, ${row.drawCalls} draw calls`);
+    for (const row of measured) {
+      const margin = row.ceiling === undefined ? "" : ` (ceiling ${row.ceiling}, margin ${row.ceiling - row.drawCalls})`;
+      console.log(`  ${row.where}: office ${row.office}, ${row.figures} figures, ${row.drawCalls} draw calls${margin}`);
+    }
   }
   console.log("office-check: every assertion passed");
 };

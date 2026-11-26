@@ -216,9 +216,10 @@ if (hiresWithinCap(1, campusGame.companies[PLAYER].headcount, campusRules) !== 0
 const campus = saveOf("campus", CAMPUS_SEED, campusGame);
 
 // ---------------------------------------------------------------------------------------------------------------
-// Three decades' looks for the 3D check (scripts/office-check.mjs): 1994 in the shared office, 2004 in the third
-// office, 2023 in the fourth, each half full, with cash for ten years of its salaries. 2004's dated card is left
-// undealt, so that one of the check's pages shows no news card (every one of these three years has a dated card).
+// Every era's look for the 3D check (scripts/office-check.mjs), each office half full, with cash for ten years of its
+// salaries: 1994 (dial-up) in the shared office, 1997 (gold rush) in the shared office, 2004 (bust) in the third office,
+// 2010 (phones) in the third, 2017 (cheap money) and 2023 (winter and AI) and 2029 (agents) in the fourth, 2035 (ambient)
+// in the fifth. 2004's dated card is left undealt, so that one of the check's pages shows no news card.
 
 const LOOKS_SEED = 1;
 const decade = (what: string, turn: number, officeIndex: number, deal = true): Fixture => {
@@ -238,8 +239,22 @@ const nineties = decade("nineties", 5, 1);
 const noughties = decade("noughties", 15, 2, false);
 if (JSON.parse(noughties.save).game?.event != null) fail("the noughties fixture has a card in force");
 const twenties = decade("twenties", 34, 3);
-for (const [what, fixture, want] of [["nineties", nineties, 1994], ["noughties", noughties, 2004], ["twenties", twenties, 2023]] as const) {
+const goldRush = decade("gold-rush", 8, 1);
+const phones = decade("phones", 21, 2);
+const cheapMoney = decade("cheap-money", 28, 3);
+const agents = decade("agents", 40, 3);
+const ambient = decade("ambient", 46, 4);
+for (const [what, fixture, want] of [
+  ["nineties", nineties, 1994],
+  ["noughties", noughties, 2004],
+  ["twenties", twenties, 2023],
+  ["gold-rush", goldRush, 1997],
+  ["phones", phones, 2010],
+  ["cheap-money", cheapMoney, 2017],
+  ["agents", agents, 2029],
+  ["ambient", ambient, 2035],
+] as const) {
   if (fixture.year !== want) fail(`the ${what} fixture opens on ${fixture.year}, not ${want}`);
 }
 
-console.log(JSON.stringify({ listing, rescue, failure, board, office, campus, nineties, noughties, twenties }));
+console.log(JSON.stringify({ listing, rescue, failure, board, office, campus, nineties, noughties, twenties, goldRush, phones, cheapMoney, agents, ambient }));
