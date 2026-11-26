@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { TEAMS } from "../types";
 import type { OfficeIndex } from "../types";
-import { C, EMBER, FURNITURE_SETS, furnitureOf, LOOKS, lookFor, NEON, PHASE_THEMES, PHASES, phaseTier, ROLE_COLORS, themeFor } from "./colors";
+import { averageColor, C, colorDistance, EMBER, FURNITURE_SETS, furnitureOf, LOOKS, lookFor, NEON, PHASE_THEMES, PHASES, phaseTier, ROLE_COLORS, themeFor } from "./colors";
 
 const ERAS = ["dial-up", "gold-rush", "bust", "phones", "cheap-money", "winter-ai", "agents", "ambient"] as const;
 
@@ -76,5 +76,22 @@ describe("office themes", () => {
       expect(phaseTier(odd as OfficeIndex)).toBe(0);
     }
     expect(PHASES.map(phaseTier)).toEqual([0, 1, 2, 3, 4]);
+  });
+});
+
+describe("colour distance", () => {
+  it("is zero for one colour, symmetric, and about 100 from black to white", () => {
+    expect(colorDistance(0x4f8fdc, 0x4f8fdc)).toBe(0);
+    expect(colorDistance(0x4f8fdc, 0xe4574a)).toBeCloseTo(colorDistance(0xe4574a, 0x4f8fdc), 10);
+    expect(colorDistance(0x000000, 0xffffff)).toBeCloseTo(100, 0);
+  });
+  it("sees a step in hue the eye sees, and not one it does not", () => {
+    expect(colorDistance(0xff0000, 0x00ff00)).toBeGreaterThan(80);
+    expect(colorDistance(0xf6f2e9, 0xf4f0e7)).toBeLessThan(2);
+  });
+  it("averages colours channel by channel", () => {
+    expect(averageColor([0x000000, 0xffffff])).toBe(0x808080);
+    expect(averageColor([0x102030])).toBe(0x102030);
+    expect(averageColor([])).toBe(0);
   });
 });

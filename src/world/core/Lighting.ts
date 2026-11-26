@@ -103,6 +103,8 @@ const OVERCAST = key(0xdfe6f0, 1.2, [-0.2, 1, 0.5], 0xd0d8e4, 0xa8aab0, 1.55, 1.
 const GOLDEN = key(0xffd08a, 1.75, [0.2, 0.62, 0.95], 0xf6e6d2, 0x9c8468, 1.1, 0.9, 0);
 /** An even cool white: the agents' years. */
 const STUDIO = key(0xf2f6ff, 1.6, [-0.25, 1, 0.55], 0xeef3ff, 0xc2c6cc, 1.45, 1.2, 0);
+/** A crisp white sun under a clear blue sky: the phones' years, all gloss and glass. */
+const CLEAR = key(0xffffff, 1.95, [-0.35, 1, 0.4], 0xb9d6ff, 0xc4c8cc, 1.2, 1.15, 0);
 /** A violet sky and a low warm sun: the ambient years. */
 const TWILIGHT = key(0xffc49a, 1.4, [0.25, 0.5, 1], 0xc8b8f0, 0x5c5070, 1.0, 0.7, 0.3);
 
@@ -121,7 +123,8 @@ export type LightingLook =
   | "overcast"
   | "golden"
   | "studio"
-  | "twilight";
+  | "twilight"
+  | "clear";
 
 const LOOKS: Record<LightingLook, LightKey> = {
   morning: MORNING,
@@ -136,6 +139,7 @@ const LOOKS: Record<LightingLook, LightKey> = {
   golden: GOLDEN,
   studio: STUDIO,
   twilight: TWILIGHT,
+  clear: CLEAR,
 };
 
 export const LIGHTING_LOOKS: readonly LightingLook[] = [
@@ -151,6 +155,7 @@ export const LIGHTING_LOOKS: readonly LightingLook[] = [
   "golden",
   "studio",
   "twilight",
+  "clear",
 ];
 
 /** The key of a mood: what the lighting glides to when it settles on it. Read it, do not change it. */
@@ -170,13 +175,13 @@ const allDay = (mood: LightingLook): readonly [LightingLook, LightingLook, Light
 ];
 const RESTING_LOOKS: Record<LookId, readonly [LightingLook, LightingLook, LightingLook, LightingLook, LightingLook]> = {
   classic: allDay("morning"),
-  // The warm low sun of dial-up, the high noon of the gold rush, the grey of the bust, the fresh morning of the
+  // The warm low sun of dial-up, the high noon of the gold rush, the grey of the bust, the clear blue day of the
   // phones, the golden light of cheap money, the clean early light of the winter, the studio white of the agents
   // and the violet twilight of the ambient years.
   "dial-up": allDay("afternoon"),
   "gold-rush": allDay("noon"),
   bust: allDay("overcast"),
-  phones: allDay("morning"),
+  phones: allDay("clear"),
   "cheap-money": allDay("golden"),
   "winter-ai": allDay("sunrise"),
   agents: allDay("studio"),

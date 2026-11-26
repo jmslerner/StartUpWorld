@@ -7,7 +7,7 @@
  * (+Z) side of the top with its screen facing back toward −Z.
  */
 import * as THREE from "three";
-import { bakeModel, C, darken, furnitureOf, lighten, modelMesh, phaseTier, SCALE } from "../../core/palette";
+import { bakeModel, C, darken, furnitureOf, lighten, LOOK_SURFACES, mixColor, modelMesh, phaseTier, SCALE } from "../../core/palette";
 import type { ColorFilter, ModelBuilder } from "../../core/palette";
 import type { FurnitureSet, LookId, OfficeIndex, Team } from "../../types";
 import { CHAIR_SIZE, DESK_SIZE } from "../footprints";
@@ -51,6 +51,27 @@ export const deskStyleFor = (office: OfficeIndex, look: LookId = "classic"): Des
 export const DESK_FOOTPRINT: PropFootprint = { w: DESK_SIZE.width, d: DESK_SIZE.depth };
 export const DESK_TOP_Y = SCALE.deskTop;
 export const CHAIR_FOOTPRINT: PropFootprint = { w: CHAIR_SIZE.width, d: CHAIR_SIZE.depth };
+
+/** The top of each desk style in the classic look: plywood, birch, white laminate, oak, walnut. */
+const DESK_TOPS: Record<DeskStyle, number> = {
+  garage: C.plywood,
+  hotdesk: C.birch,
+  standard: C.white,
+  premium: C.oak,
+  executive: C.walnut,
+};
+
+/** How far a look's desk finish covers a style's own top: the grain of each desk still shows through. */
+const DESK_FINISH_TAKES = 0.7;
+
+/** The colour of a desk style's top in a look: its own, under the look's finish (LOOK_SURFACES). */
+export const deskTopFor = (style: DeskStyle, look: LookId = "classic"): number => {
+  const finish = LOOK_SURFACES[look].desk;
+  return finish === undefined ? DESK_TOPS[style] : mixColor(DESK_TOPS[style], finish, DESK_FINISH_TAKES);
+};
+
+/** The colour of the desk tops of an office in a look. */
+export const deskColorFor = (office: OfficeIndex, look: LookId): number => deskTopFor(deskStyleFor(office, look), look);
 
 const DESK_ACCENT: Record<DeskStyle, number> = {
   garage: C.red,
@@ -181,13 +202,13 @@ const drawTower = (b: ModelBuilder, style: DeskStyle): void => {
   b.box(0.03, 0.03, 0.01, C.good, x - 0.05, 0.2, front, { r: 0 });
 };
 
-const drawBody = (b: ModelBuilder, style: DeskStyle, accent: number, set: FurnitureSet): void => {
+const drawBody = (b: ModelBuilder, style: DeskStyle, accent: number, set: FurnitureSet, top: number): void => {
   if (deskHardware(style, set).tower) drawTower(b, style);
   switch (style) {
     case "garage": {
       // A sheet of plywood across two sawhorses.
-      b.box(1.3, 0.05, 0.65, C.plywood, 0, TOP - 0.05, 0, { r: 0.008 });
-      b.box(1.304, 0.012, 0.654, darken(C.plywood, 0.18), 0, TOP - 0.032, 0, { r: 0 });
+      b.box(1.3, 0.05, 0.65, top, 0, TOP - 0.05, 0, { r: 0.008 });
+      b.box(1.304, 0.012, 0.654, darken(top, 0.18), 0, TOP - 0.032, 0, { r: 0 });
       for (const sx of [-1, 1]) {
         const x = sx * 0.45;
         b.box(0.08, 0.06, 0.6, C.pallet, x, TOP - 0.11, 0, { r: 0.01 });
@@ -201,7 +222,7 @@ const drawBody = (b: ModelBuilder, style: DeskStyle, accent: number, set: Furnit
     }
     case "hotdesk": {
       // Pale birch top on painted A-frame trestles.
-      b.box(1.3, 0.04, 0.65, C.birch, 0, TOP - 0.04, 0, { r: 0.016 });
+      b.box(1.3, 0.04, 0.65, top, 0, TOP - 0.04, 0, { r: 0.016 });
       for (const sx of [-1, 1]) {
         const x = sx * 0.5;
         for (const sz of [-1, 1]) b.strut([x, 0, sz * 0.26], [x, TOP - 0.05, sz * 0.07], 0.048, accent);
@@ -213,7 +234,7 @@ const drawBody = (b: ModelBuilder, style: DeskStyle, accent: number, set: Furnit
     }
     case "standard": {
       // White laminate on slab legs with a drawer pedestal.
-      b.box(1.3, 0.04, 0.65, C.white, 0, TOP - 0.04, 0, { r: 0.012 });
+      b.box(1.3, 0.04, 0.65, top, 0, TOP - 0.04, 0, { r: 0.012 });
       for (const sx of [-1, 1]) {
         b.box(0.045, TOP - 0.04, 0.54, C.steel, sx * 0.6, 0, 0, { r: 0.012 });
         b.box(0.075, 0.028, 0.62, C.greyDark, sx * 0.6, 0, 0, { r: 0.01 });
@@ -228,7 +249,7 @@ const drawBody = (b: ModelBuilder, style: DeskStyle, accent: number, set: Furnit
     }
     case "premium": {
       // Thick oak top on white sit-stand legs.
-      b.box(1.3, 0.05, 0.65, C.oak, 0, TOP - 0.05, 0, { r: 0.022 });
+      b.box(1.3, 0.05, 0.65, top, 0, TOP - 0.05, 0, { r: 0.022 });
       for (const sx of [-1, 1]) {
         b.box(0.08, 0.035, 0.6, C.white, sx * 0.52, 0, 0, { r: 0.014 });
         b.box(0.09, 0.36, 0.11, C.white, sx * 0.52, 0.035, 0.04, { r: 0.014 });
@@ -242,7 +263,7 @@ const drawBody = (b: ModelBuilder, style: DeskStyle, accent: number, set: Furnit
     }
     case "executive": {
       // Dark walnut partner's desk with brass inlay.
-      b.box(1.3, 0.06, 0.65, C.walnut, 0, TOP - 0.06, 0, { r: 0.02 });
+      b.box(1.3, 0.06, 0.65, top, 0, TOP - 0.06, 0, { r: 0.02 });
       b.box(1.308, 0.014, 0.658, C.brass, 0, TOP - 0.04, 0, { r: 0 });
       for (const sx of [-1, 1]) {
         b.box(0.34, 0.02, 0.58, C.black, sx * 0.46, 0, 0, { r: 0 });
@@ -408,7 +429,7 @@ const vacantFilter: ColorFilter = (color) => {
 const drawDesk = (b: ModelBuilder, style: DeskStyle, look: LookId, accent: number, occupied: boolean, variant: number): void => {
   if (!occupied) b.setColorFilter(vacantFilter);
   const set = furnitureOf(look);
-  drawBody(b, style, accent, set);
+  drawBody(b, style, accent, set, deskTopFor(style, look));
   for (const monitor of deskMonitors(style, look)) drawMonitor(b, monitor);
   drawHardware(b, style, accent, set);
   if (occupied) drawClutter(b, style, accent, variant);
@@ -452,7 +473,7 @@ export const createDesk = (options: DeskOptions): DeskHandle => {
   const kit = new PropKit(`desk:${style}`);
 
   const geometryFor = (occupied: boolean): THREE.BufferGeometry =>
-    bakeModel(`desk:${style}:${monitor}:${accent.toString(16)}:${occupied ? `busy${variant}` : "vacant"}`, (b) =>
+    bakeModel(`desk:${style}:${look}:${monitor}:${accent.toString(16)}:${occupied ? `busy${variant}` : "vacant"}`, (b) =>
       drawDesk(b, style, look, accent, occupied, variant)
     );
 

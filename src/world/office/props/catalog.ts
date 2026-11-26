@@ -270,7 +270,7 @@ const building: CatalogEntry[] = [
     set: "building",
     label: "wall",
     styled: true,
-    create: (office, look) => createWall(4.2, { style: wallStyleFor(office, look), windows: office === 0 ? 1 : 2 }),
+    create: (office, look) => createWall(4.2, { style: wallStyleFor(office, look), windows: office === 0 ? 1 : 2, look }),
   }),
   entry({ id: "wall-plain", set: "building", label: "wall · brick, no windows", create: () => createWall(2.4, { style: "brick" }) }),
   entry({ id: "corner-post", set: "building", label: "corner post", create: () => createCornerPost({ style: "plaster" }) }),

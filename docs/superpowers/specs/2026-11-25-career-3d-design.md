@@ -341,7 +341,10 @@ Era looks are laid over the five office plans, not drawn as new rooms per era: f
 old office. A look is a furniture set plus a palette, a lighting mood and two or three signature props. This version
 ships four furniture sets: 1990s, 2000s to 2010s, 2020s (all three in step 4) and the invented future from 2027 (step
 5). Each of the eight eras gets its own palette, lighting and signature props on top of one of those sets, so every
-era can be told apart at a glance without eight sets of furniture.
+era can be told apart at a glance without eight sets of furniture. The palette reaches the surfaces that fill most of the picture:
+each era lays its own tint over the floor, its own paint on the walls and its own finish on the desk tops, and a
+test holds any two eras visibly apart (a colour distance of at least 12 in L\*a\*b\*) in at least two of those three
+in every office.
 
 **On a phone held upright** the screen is, from the top: the timeline strip; the office, fixed at about 40% of the
 height; and the plan in a sheet that pulls up from the bottom, whose closed state shows the three team steppers, the

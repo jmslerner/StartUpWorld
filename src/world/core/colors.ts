@@ -331,3 +331,80 @@ export const desaturate = (color: number, amount: number): number => {
 
 /** CSS string for canvas drawing. */
 export const cssColor = (color: number): string => `#${color.toString(16).padStart(6, "0")}`;
+
+/** A colour in CIE L*a*b* (D65): L 0 (black) … 100 (white); a green → red; b blue → yellow. */
+export const labOf = (color: number): readonly [number, number, number] => {
+  const linear = (channel: number): number => {
+    const c = channel / 255;
+    return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  };
+  const r = linear((color >> 16) & 0xff);
+  const g = linear((color >> 8) & 0xff);
+  const b = linear(color & 0xff);
+  const x = (0.4124 * r + 0.3576 * g + 0.1805 * b) / 0.95047;
+  const y = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  const z = (0.0193 * r + 0.1192 * g + 0.9505 * b) / 1.08883;
+  const f = (t: number): number => (t > 216 / 24389 ? Math.cbrt(t) : (24389 / 27 * t + 16) / 116);
+  return [116 * f(y) - 16, 500 * (f(x) - f(y)), 200 * (f(y) - f(z))];
+};
+
+/**
+ * How far apart two colours look: the straight distance between them in L*a*b* (CIE 1976 ΔE). About 2 is the
+ * smallest difference anyone sees side by side; past 10 two colours read as different at a glance.
+ */
+export const colorDistance = (a: number, b: number): number => {
+  const [l1, a1, b1] = labOf(a);
+  const [l2, a2, b2] = labOf(b);
+  return Math.hypot(l1 - l2, a1 - a2, b1 - b2);
+};
+
+/** The average of some colours, channel by channel. */
+export const averageColor = (colors: readonly number[]): number => {
+  if (colors.length === 0) return 0;
+  const mean = (shift: number): number => Math.round(colors.reduce((sum, c) => sum + ((c >> shift) & 0xff), 0) / colors.length);
+  return (mean(16) << 16) | (mean(8) << 8) | mean(0);
+};
+
+/** A colour laid over another: `color` mixed in by `amount` (0 nothing of it … 1 all of it). */
+export interface Tint {
+  readonly color: number;
+  readonly amount: number;
+}
+
+/** A colour with a tint laid over it; no tint leaves it as it is. */
+export const tinted = (color: number, tint: Tint | undefined): number => (tint ? mixColor(color, tint.color, tint.amount) : color);
+
+/**
+ * What a look lays over the big surfaces of its furniture set, which fill most of the picture: the floor, the walls
+ * and the desk tops. Eras that share a set (and every era shares the buildings) would otherwise share these, and an
+ * office would only tell its era by its small things. The classic look lays nothing.
+ */
+export interface LookSurfaces {
+  /** Over every colour of the floor: tiles, grooves, the slab's edge. */
+  readonly floor?: Tint;
+  /** The paint on the walls (each finish takes it as far as it can: brick and panelling keep some of their own). */
+  readonly wall?: number;
+  /** The finish of the desk tops. */
+  readonly desk?: number;
+}
+
+/** The surfaces of each look. */
+export const LOOK_SURFACES: Readonly<Record<LookId, LookSurfaces>> = {
+  classic: {},
+  // Putty walls and beige laminate over the grey-blue carpet.
+  "dial-up": { wall: 0xd9c9a0, desk: 0xd8cbb0 },
+  // The carpet goes violet, the walls gold, the desks cherry: money everywhere.
+  "gold-rush": { floor: { color: 0x6a4fb0, amount: 0.3 }, wall: 0xe8c45e, desk: 0xb4573c },
+  // The lean years: the planks worn grey, grey walls, grey laminate.
+  bust: { floor: { color: 0x8d8a84, amount: 0.45 }, wall: 0xa9b0b6, desk: 0xa7aaae },
+  // White gloss and sky blue: bleached planks, pale blue walls, white desks.
+  phones: { floor: { color: 0xf2f4f6, amount: 0.6 }, wall: 0xa9cdef, desk: 0xfafbfc },
+  // Warm wood and coral: the planks a deep honey, blush walls, walnut desks.
+  "cheap-money": { floor: { color: 0xb8622e, amount: 0.25 }, wall: 0xeea98e, desk: 0x8a5a3c },
+  // Sage walls and sage-grey laminate on the polished concrete.
+  "winter-ai": { wall: 0x9fcf98, desk: 0xc2d6b6 },
+  // Mint walls and grey-white desks on the white resin.
+  agents: { wall: 0xc6eedc, desk: 0xb4bec6 },
+  // Lavender walls and sand desks; the resin goes warm.
+  ambient: { floor: { color: 0xe0c9a6, amount: 0.65 }, wall: 0xcdbcea, desk: 0xe2cfae },
+};

@@ -7,7 +7,7 @@
  */
 import * as THREE from "three";
 import { furnitureOf, phaseTier } from "../core/palette";
-import type { FurnitureSet, OfficeLayout, Vec2 } from "../types";
+import type { FurnitureSet, LookId, OfficeLayout, Vec2 } from "../types";
 import { forwardOf, GROUND_SINK, groundRect, LOFT_ANNEX_WIDTH } from "./layouts";
 import {
   createCornerPost,
@@ -186,6 +186,7 @@ const doorSide = (layout: OfficeLayout): "x" | "z" => {
  */
 const buildWallRun = (
   spec: ShellSpec,
+  look: LookId,
   from: number,
   to: number,
   features: readonly Span[],
@@ -198,6 +199,7 @@ const buildWallRun = (
     const wall = createWall(length, {
       style: glazed ? spec.feature : spec.wall,
       windows: feature && !glazed ? Math.max(1, Math.round(length / WINDOW_PITCH)) : 0,
+      look,
     });
     put(wall, (a + b) / 2);
   };
@@ -216,6 +218,7 @@ const buildWallRun = (
 /** A kerb from `from` to `to` along one open edge, leaving `gap` (if any) free for the doorway. */
 const buildKerbRun = (
   style: WallStyle,
+  look: LookId,
   from: number,
   to: number,
   gap: Span | null,
@@ -223,7 +226,7 @@ const buildKerbRun = (
 ): void => {
   const piece = (a: number, b: number): void => {
     if (b - a < 0.2) return;
-    put(createKerb(b - a, { height: KERB_HEIGHT, style }), (a + b) / 2);
+    put(createKerb(b - a, { height: KERB_HEIGHT, style, look }), (a + b) / 2);
   };
   if (!gap) {
     piece(from, to);
@@ -252,13 +255,13 @@ export const buildShell = (kit: StageKit): Shell => {
   }
 
   // Back walls: their inner faces sit exactly on the floor's −Z and −X edges.
-  buildWallRun(spec, minX, maxX + spec.annex, spec.backFeatures, (wall, centre) => {
+  buildWallRun(spec, look, minX, maxX + spec.annex, spec.backFeatures, (wall, centre) => {
     kit.build(wall, { x: centre, z: minZ - half });
   });
-  buildWallRun(spec, minZ, maxZ, spec.sideFeatures, (wall, centre) => {
+  buildWallRun(spec, look, minZ, maxZ, spec.sideFeatures, (wall, centre) => {
     kit.build(wall, { x: minX - half, z: centre, facing: Math.PI / 2 });
   });
-  kit.build(createCornerPost({ style: spec.wall }), { x: minX - half, z: minZ - half });
+  kit.build(createCornerPost({ style: spec.wall, look }), { x: minX - half, z: minZ - half });
 
   const edge = doorOnEdge(layout);
   const side = doorSide(layout);
@@ -268,12 +271,12 @@ export const buildShell = (kit: StageKit): Shell => {
   if (spec.kerb) {
     // Runs on past the corner by a wall's thickness so the two kerbs meet.
     const end = maxX + spec.annex + (spec.sideKerb ? WALL_THICKNESS : 0);
-    buildKerbRun(spec.kerb, minX, end, side === "z" ? gap : null, (kerb, centre) => {
+    buildKerbRun(spec.kerb, look, minX, end, side === "z" ? gap : null, (kerb, centre) => {
       kit.build(kerb, { x: centre, z: maxZ + half });
     });
   }
   if (spec.sideKerb) {
-    buildKerbRun(spec.sideKerb, minZ, maxZ, side === "x" ? gap : null, (kerb, centre) => {
+    buildKerbRun(spec.sideKerb, look, minZ, maxZ, side === "x" ? gap : null, (kerb, centre) => {
       kit.build(kerb, { x: maxX + half, z: centre, facing: Math.PI / 2 });
     });
   }

@@ -21,6 +21,8 @@ import {
   INK,
   LABEL_FONT,
   lighten,
+  LOOK_SURFACES,
+  averageColor,
   mixColor,
   ModelBuilder,
   modelMesh,
@@ -30,6 +32,7 @@ import {
   SCALE,
   STEEL,
   themeFor,
+  tinted,
   unitDisc,
   unitPlane,
   vertexMat,
@@ -54,7 +57,7 @@ export const GROUND_THICKNESS = 0.5;
  */
 export const GROUND_DROP = 0.1;
 
-interface FloorStyle {
+export interface FloorStyle {
   /** Slab body, also what shows in the grooves between tiles. */
   groove: number;
   side: number;
@@ -109,9 +112,25 @@ const FLOOR_STYLES: Record<FurnitureSet, readonly FloorStyle[]> = {
   ],
 };
 
+/** The floor finish of an office in a look: its furniture set's, under the look's tint (LOOK_SURFACES). */
+export const floorStyleFor = (office: OfficeIndex, look: LookId): FloorStyle => {
+  const style = FLOOR_STYLES[furnitureOf(look)][phaseTier(office)];
+  const tint = LOOK_SURFACES[look].floor;
+  if (!tint) return style;
+  return {
+    groove: tinted(style.groove, tint),
+    side: tinted(style.side, tint),
+    tones: style.tones.map((tone) => tinted(tone, tint)),
+    ...(style.lines === undefined ? {} : { lines: style.lines }),
+  };
+};
+
+/** The colour a floor reads as from across the room: the average of its tiles. */
+export const floorColorFor = (office: OfficeIndex, look: LookId): number => averageColor(floorStyleFor(office, look).tones);
+
 const drawFloor = (b: ModelBuilder, w: number, d: number, office: OfficeIndex, look: LookId): void => {
   const tier = phaseTier(office);
-  const style = FLOOR_STYLES[furnitureOf(look)][tier];
+  const style = floorStyleFor(office, look);
   const lip = 0.014;
   b.box(w, FLOOR_THICKNESS - lip, d, style.groove, 0, -FLOOR_THICKNESS, 0, { r: 0 });
   // Skirt so the cut edge is one clean colour rather than a stack of tile ends.
@@ -323,12 +342,29 @@ const WALL_LOOKS: Record<WallStyle, WallLook> = {
   panel: { face: C.walnut, back: C.walnutDark, base: C.marble },
 };
 
+/** How far each finish takes a look's paint: painted brick and stained panelling keep some of their own colour. */
+const PAINT_TAKES: Record<WallStyle, number> = { drywall: 0.85, brick: 0.6, plaster: 0.85, glass: 0.85, panel: 0.55 };
+
+/** A wall finish in a look: its own colours under the look's paint (LOOK_SURFACES); the skirting stays. */
+export const wallLookFor = (style: WallStyle, look: LookId = "classic"): WallLook => {
+  const own = WALL_LOOKS[style];
+  const paint = LOOK_SURFACES[look].wall;
+  if (paint === undefined) return own;
+  const amount = PAINT_TAKES[style];
+  return { face: mixColor(own.face, paint, amount), back: mixColor(own.back, darken(paint, 0.15), amount), base: own.base };
+};
+
+/** The colour of an office's walls in a look, as the room sees them. */
+export const wallColorFor = (office: OfficeIndex, look: LookId): number => wallLookFor(wallStyleFor(office, look), look).face;
+
 export interface WallOptions {
   /** Default 2.6 (spec scale guide). */
   height?: number;
   style?: WallStyle;
   /** Number of windows, spread evenly. Ignored by "glass" (which is all window). */
   windows?: number;
+  /** The office's look: the paint on the wall. Default "classic". */
+  look?: LookId;
 }
 
 const WINDOW_W = 1.25;
@@ -336,11 +372,10 @@ const WINDOW_H = 1.15;
 const WINDOW_SILL = 1.0;
 
 /** Surface detail on the interior (+Z) face. */
-const drawWallFinish = (b: ModelBuilder, style: WallStyle, x0: number, x1: number, y0: number, y1: number, face: number): void => {
+const drawWallFinish = (b: ModelBuilder, look: WallLook, style: WallStyle, x0: number, x1: number, y0: number, y1: number, face: number): void => {
   const span = x1 - x0;
   if (span < 0.05 || y1 - y0 < 0.05) return;
   const cx = (x0 + x1) / 2;
-  const look = WALL_LOOKS[style];
   if (style === "brick") {
     const course = 0.17;
     const rows = Math.floor((y1 - y0) / course);
@@ -372,8 +407,7 @@ const drawWallFinish = (b: ModelBuilder, style: WallStyle, x0: number, x1: numbe
   }
 };
 
-const drawWall = (b: ModelBuilder, glass: ModelBuilder, length: number, height: number, style: WallStyle, windows: number): void => {
-  const look = WALL_LOOKS[style];
+const drawWall = (b: ModelBuilder, glass: ModelBuilder, length: number, height: number, style: WallStyle, windows: number, look: WallLook): void => {
   const t = WALL_THICKNESS;
   const face = t / 2;
   const skirting = 0.12;
@@ -397,7 +431,7 @@ const drawWall = (b: ModelBuilder, glass: ModelBuilder, length: number, height: 
   const top = height - 0.05;
   if (count === 0) {
     b.box(length, top, t, look.face, 0, 0, 0, { r: 0 });
-    drawWallFinish(b, style, -length / 2, length / 2, skirting, top, face);
+    drawWallFinish(b, look, style, -length / 2, length / 2, skirting, top, face);
     return;
   }
   // No CSG: build the wall as a band below the windows, a band above, and piers between.
@@ -405,15 +439,15 @@ const drawWall = (b: ModelBuilder, glass: ModelBuilder, length: number, height: 
   const headY = Math.min(top - 0.2, WINDOW_SILL + WINDOW_H);
   b.box(length, sillY, t, look.face, 0, 0, 0, { r: 0 });
   b.box(length, top - headY, t, look.face, 0, headY, 0, { r: 0 });
-  drawWallFinish(b, style, -length / 2, length / 2, skirting, sillY, face);
-  drawWallFinish(b, style, -length / 2, length / 2, headY, top, face);
+  drawWallFinish(b, look, style, -length / 2, length / 2, skirting, sillY, face);
+  drawWallFinish(b, look, style, -length / 2, length / 2, headY, top, face);
   const pitch = length / count;
   let cursor = -length / 2;
   for (let i = 0; i < count; i += 1) {
     const wx = -length / 2 + pitch * (i + 0.5);
     const left = wx - WINDOW_W / 2;
     b.box(left - cursor, headY - sillY, t, look.face, (cursor + left) / 2, sillY, 0, { r: 0 });
-    drawWallFinish(b, style, cursor, left, sillY, headY, face);
+    drawWallFinish(b, look, style, cursor, left, sillY, headY, face);
     cursor = wx + WINDOW_W / 2;
     // Frame, sill, glazing bars.
     const trim = style === "panel" ? C.brass : C.white;
@@ -425,7 +459,7 @@ const drawWall = (b: ModelBuilder, glass: ModelBuilder, length: number, height: 
     glass.box(WINDOW_W - 0.08, headY - sillY - 0.06, 0.02, 0xffffff, wx, sillY + 0.02, 0, { r: 0 });
   }
   b.box(length / 2 - cursor, headY - sillY, t, look.face, (cursor + length / 2) / 2, sillY, 0, { r: 0 });
-  drawWallFinish(b, style, cursor, length / 2, sillY, headY, face);
+  drawWallFinish(b, look, style, cursor, length / 2, sillY, headY, face);
 };
 
 /**
@@ -440,7 +474,7 @@ export const createWall = (length: number, options: WallOptions = {}): PropHandl
   const kit = new PropKit(`wall:${style}`);
   const solid = new ModelBuilder();
   const panes = new ModelBuilder();
-  drawWall(solid, panes, length, height, style, options.windows ?? 0);
+  drawWall(solid, panes, length, height, style, options.windows ?? 0, wallLookFor(style, options.look));
   kit.add(modelMesh(kit.own(solid.bake())));
   if (panes.indexCount > 0) {
     const glass = new THREE.Mesh(kit.own(panes.bake()), glassMat());
@@ -451,10 +485,10 @@ export const createWall = (length: number, options: WallOptions = {}): PropHandl
 };
 
 /** Square post for the corner where the two back walls meet. Same origin rule as walls (centre of its footprint). */
-export const createCornerPost = (options: { height?: number; style?: WallStyle } = {}): PropHandle => {
+export const createCornerPost = (options: { height?: number; style?: WallStyle; look?: LookId } = {}): PropHandle => {
   const height = options.height ?? SCALE.wall;
   const style = options.style ?? "plaster";
-  const look = WALL_LOOKS[style];
+  const look = wallLookFor(style, options.look);
   const kit = new PropKit("corner-post");
   kit.ownModel((b) => {
     const s = WALL_THICKNESS + 0.04;
@@ -468,12 +502,14 @@ export interface KerbOptions {
   /** Default 0.2 (the spec caps the open edges at 0.25). */
   height?: number;
   style?: WallStyle;
+  /** The office's look: the paint on the kerb, as on the walls. Default "classic". */
+  look?: LookId;
 }
 
 /** Low cut-away wall for the open +X / +Z edges, running along local X. */
 export const createKerb = (length: number, options: KerbOptions = {}): PropHandle => {
   const height = Math.min(0.25, options.height ?? 0.2);
-  const look = WALL_LOOKS[options.style ?? "plaster"];
+  const look = wallLookFor(options.style ?? "plaster", options.look);
   const kit = new PropKit("kerb");
   kit.ownModel((b) => {
     b.box(length, height - 0.03, WALL_THICKNESS, look.face, 0, 0, 0, { r: 0 });

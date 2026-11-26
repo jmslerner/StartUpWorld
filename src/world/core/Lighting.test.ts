@@ -363,12 +363,16 @@ describe("Lighting endings", () => {
 describe("Lighting looks", () => {
   it("each era rests in a light of its own, the same in all five offices", () => {
     expect(LOOKS.map((look) => restingLook(2, look))).toEqual(
-      ["morning", "afternoon", "noon", "overcast", "morning", "golden", "sunrise", "studio", "twilight"]);
+      ["morning", "afternoon", "noon", "overcast", "clear", "golden", "sunrise", "studio", "twilight"]);
+    // No two eras rest in one light, and none in the classic look's morning.
+    const eras = LOOKS.filter((look) => look !== "classic").map((look) => restingLook(2, look));
+    expect(new Set(eras).size).toBe(eras.length);
+    expect(eras).not.toContain("morning");
     for (const look of LOOKS) expect(new Set(PHASES.map((office) => restingLook(office, look))).size).toBe(1);
   });
 
   it("lists every mood, and every mood is a light of its own", () => {
-    expect(LIGHTING_LOOKS).toEqual(["morning", "afternoon", "dusk", "night", "sunrise", "win", "loss", "noon", "overcast", "golden", "studio", "twilight"]);
+    expect(LIGHTING_LOOKS).toEqual(["morning", "afternoon", "dusk", "night", "sunrise", "win", "loss", "noon", "overcast", "golden", "studio", "twilight", "clear"]);
     // A light's key: sun colour, sun intensity and sky colour; no two moods share one.
     const text = (mood: LightingLook): string => {
       const k = lightingKeyFor(mood);
@@ -376,7 +380,7 @@ describe("Lighting looks", () => {
     };
     expect(new Set(LIGHTING_LOOKS.map(text)).size).toBe(LIGHTING_LOOKS.length);
     // The resting moods of the new eras are daylight: no prop glows in them but faintly at twilight.
-    expect(["noon", "overcast", "golden", "studio"].map((m) => lightingKeyFor(m as LightingLook).dusk)).toEqual([0, 0, 0, 0]);
+    expect(["noon", "overcast", "golden", "studio", "clear"].map((m) => lightingKeyFor(m as LightingLook).dusk)).toEqual([0, 0, 0, 0, 0]);
     expect(lightingKeyFor("twilight").dusk).toBeLessThanOrEqual(0.3);
   });
 
@@ -403,8 +407,8 @@ describe("Lighting looks", () => {
       lighting.showLook(look);
       seen.add(`${sun.color.getHexString()}|${sun.intensity}|${getLightingState(scene).daylight.toFixed(3)}`);
     }
-    expect(LIGHTING_LOOKS).toHaveLength(12);
-    expect(seen.size).toBe(12);
+    expect(LIGHTING_LOOKS).toHaveLength(13);
+    expect(seen.size).toBe(13);
   });
 });
 
