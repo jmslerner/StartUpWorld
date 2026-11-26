@@ -3,7 +3,7 @@ import { useStore } from "zustand";
 import { mountWorld, watchStage, type SceneSource, type WorldViewState } from "./mountWorld";
 import { SHELL_WORDS } from "./ui/shellWords";
 import { createStage } from "./ui/stage";
-import type { InteractableTarget } from "./types";
+import type { InteractableTarget, WorldSoundListener } from "./types";
 import { WorldUnavailableNote } from "./ui/WorldShell";
 import "./world.css";
 
@@ -25,6 +25,11 @@ export interface WorldViewProps {
    * store together). A tap on nothing is null. Optional.
    */
   onTap?: (target: InteractableTarget | null, select: (target: InteractableTarget | null) => void) => void;
+  /**
+   * Told of the sounds only the world can time (footsteps, chairs). Optional. Keep it the same object from one
+   * render to the next: each world reads it once, when it is made.
+   */
+  sound?: WorldSoundListener;
 }
 
 interface WorldStageProps extends WorldViewProps {
@@ -32,7 +37,7 @@ interface WorldStageProps extends WorldViewProps {
   onReload: () => void;
 }
 
-const WorldStageView = ({ source, onState, onTap, onReload }: WorldStageProps) => {
+const WorldStageView = ({ source, onState, onTap, sound, onReload }: WorldStageProps) => {
   const viewportRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [stage] = useState(createStage);
@@ -54,8 +59,8 @@ const WorldStageView = ({ source, onState, onTap, onReload }: WorldStageProps) =
     const canvas = canvasRef.current;
     const viewport = viewportRef.current;
     if (!canvas || !viewport) return;
-    return mountWorld(canvas, viewport, stage, source);
-  }, [stage, source]);
+    return mountWorld(canvas, viewport, stage, source, sound === undefined ? {} : { sound });
+  }, [stage, source, sound]);
 
   return (
     <div ref={viewportRef} data-world className="world-viewport world-stage">
@@ -91,7 +96,7 @@ const WorldStageView = ({ source, onState, onTap, onReload }: WorldStageProps) =
  * canvas element itself: a canvas whose WebGL context was lost for good cannot be given a new one. Everything that
  * could be tested is in ./mountWorld.ts; nothing here decides anything.
  */
-const WorldView = ({ source, onState, onTap }: WorldViewProps) => {
+const WorldView = ({ source, onState, onTap, sound }: WorldViewProps) => {
   const [generation, setGeneration] = useState(0);
   return (
     <WorldStageView
@@ -99,6 +104,7 @@ const WorldView = ({ source, onState, onTap }: WorldViewProps) => {
       source={source}
       onState={onState}
       onTap={onTap}
+      sound={sound}
       onReload={() => setGeneration((value) => value + 1)}
     />
   );

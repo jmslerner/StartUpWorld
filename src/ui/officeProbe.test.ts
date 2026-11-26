@@ -3,6 +3,7 @@ import type { SceneSource, WorldViewState } from "../world/mountWorld";
 import type { WorldHandle, WorldStats } from "../world/types/handle";
 import type { MarketScene } from "../world/types/market";
 import type { OfficeScene } from "../world/types/scene";
+import { playCareerSound } from "./careerSound";
 import { createOfficeProbe } from "./officeProbe";
 
 const scene: OfficeScene = {
@@ -115,6 +116,12 @@ describe("the career office's check hook", () => {
     expect([probe.view(), probe.market()]).toEqual(["market", market]);
     detach();
     expect([probe.view(), probe.market()]).toEqual([null, null]);
+  });
+
+  it("reads the sounds the career asked for", () => {
+    const probe = createOfficeProbe();
+    playCareerSound("neutral");
+    expect(probe.sounds().at(-1)).toBe("neutral");
   });
 
   it("keeps the last world taken down readable", () => {

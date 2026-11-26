@@ -2,6 +2,8 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { flushSync } from "react-dom";
 import { rulesForTurn, yearOf } from "../../engine/career";
 import type { Plan } from "../../engine/types";
+import type { SoundName } from "../../audio/sounds";
+import type { GameStore } from "../../state/gameStore";
 import { PLAYER_ID } from "../../state/player";
 import { browserStorage, gameStore, useGame } from "../../state/useGame";
 import { marketSceneFor } from "../../scene/marketScene";
@@ -16,6 +18,7 @@ import { ProjectionCard } from "../components/ProjectionCard";
 import { QuarterReport } from "../components/QuarterReport";
 import { ResourceBar } from "../components/ResourceBar";
 import { careerEndView } from "../careerEnd";
+import { beatSoundFor, playCareerSound, soundOnce, yearSoundFor } from "../careerSound";
 import { listingView, officeMoveView } from "../careerPlan";
 import { careerReportView, rivalCareerRows } from "../careerReport";
 import { careerStatusView, datedYear, timelineView } from "../careerTimeline";
@@ -74,6 +77,26 @@ const PLAY_TICK_MS = 250;
 const reducedMotionNow = (): boolean =>
   typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
+/** The sound a year earns, and the key that lets it play once: the office scene's runId and the year played. */
+interface YearCue {
+  readonly key: string;
+  readonly sound: SoundName | null;
+}
+
+/** The cue of the year just ended, from the store before and after it; null in a race, or when no year was played. */
+const yearCueOf = (before: GameStore, after: GameStore): YearCue | null => {
+  const game = before.game;
+  const founded = game?.companies[PLAYER_ID]?.career?.founded;
+  if (game === null || before.config.career === undefined || before.seed === null || founded === undefined) return null;
+  if (after.lastLog === before.lastLog) return null;
+  const sound = yearSoundFor({
+    config: before.config,
+    before: { turn: game.turn, record: before.record },
+    after: { turn: after.game?.turn ?? game.turn + 1, record: after.record, over: after.over },
+  });
+  return { key: `${before.seed}:${PLAYER_ID}:${founded}:${game.turn}`, sound };
+};
+
 const desktopWindow = (): boolean => typeof window !== "undefined" && typeof window.matchMedia === "function" && window.matchMedia(DESKTOP_QUERY).matches;
 
 /** The game itself: resources on top, the plan and the rivals side by side, the report over everything after each year or quarter. */
@@ -116,6 +139,8 @@ export const GameScreen = () => {
   const skipRef = useRef<HTMLButtonElement | null>(null);
   // When the year started playing: the second click of a double click on End lands on Skip, and must not skip it.
   const playStartedAt = useRef(Number.NEGATIVE_INFINITY);
+  // The sound of the year playing out, heard as its summary opens.
+  const yearCueRef = useRef<YearCue | null>(null);
 
   const [tab, setTab] = useState<Tab>("plan");
   const [helpOpen, setHelpOpen] = useState(false);
@@ -173,6 +198,9 @@ export const GameScreen = () => {
     playRef.current = finishYearPlay(playRef.current, officeSource, viewRef.current.handle);
     beatShown.current = null;
     setPlay(IDLE);
+    const cue = yearCueRef.current;
+    yearCueRef.current = null;
+    if (cue !== null) soundOnce(cue.key, cue.sound);
   }, [officeSource]);
 
   useEffect(() => {
@@ -275,6 +303,9 @@ export const GameScreen = () => {
         setPlayNow(now);
       }
       const started = playRef.current;
+      const cue = yearCueOf(before, after);
+      if (started.phase === "playing") yearCueRef.current = cue;
+      else if (cue !== null) soundOnce(cue.key, cue.sound);
       if (started.phase === "playing") {
         playStartedAt.current = performance.now();
         beatShown.current = 0;
@@ -285,6 +316,11 @@ export const GameScreen = () => {
       setPlay(started);
     } else {
       endQuarter();
+      // A career's year without playback is heard at once, as its summary opens; a race computes nothing.
+      if (before.config.career !== undefined) {
+        const cue = yearCueOf(before, gameStore.getState());
+        if (cue !== null) soundOnce(cue.key, cue.sound);
+      }
     }
     setTab("plan");
     window.scrollTo({ top: 0 });
@@ -316,6 +352,9 @@ export const GameScreen = () => {
     if (step.kind === "beat" && play.phase === "playing") {
       beatShown.current = step.index;
       officeSource.showBeat(play.playback, step.index);
+      const beat = play.playback.beats[step.index];
+      const sound = beat === undefined ? null : beatSoundFor(beat);
+      if (sound !== null) playCareerSound(sound);
     }
   }, [play, playNow, officeSource]);
 

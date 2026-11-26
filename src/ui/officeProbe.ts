@@ -6,12 +6,14 @@
  * changes is `loseContext()`, which takes the graphics context away as a browser may. Nothing in the game reads it.
  */
 
+import type { SoundName } from "../audio/sounds";
 import type { SceneSource, WorldViewState } from "../world/mountWorld";
 import type { ScreenPoint, ScreenRect, WorldHandle, WorldStats } from "../world/types/handle";
 import type { InteractableTarget } from "../world/types/interaction";
 import type { MarketScene, WorldViewKind } from "../world/types/market";
 import type { OfficeScene, Team } from "../world/types/scene";
 import type { StageStatus } from "../world/ui/stage";
+import { soundsHeard } from "./careerSound";
 import type { OfficeAvailability } from "./officeView";
 
 /** Where the career screen installs the probe. */
@@ -37,6 +39,8 @@ export interface CareerOfficeProbe {
   view(): WorldViewKind | null;
   /** The market the career screen gives the world, or null. */
   market(): MarketScene | null;
+  /** The last sounds the career asked for, oldest first. */
+  sounds(): readonly SoundName[];
 }
 
 export interface OfficeProbeLink {
@@ -97,6 +101,7 @@ export const createOfficeProbe = (): CareerOfficeProbe & OfficeProbeLink => {
     loseContext: () => handle()?.loseContext(),
     view: () => handle()?.view() ?? null,
     market: () => link?.market() ?? null,
+    sounds: () => soundsHeard(),
     attach: (view, source, availability, market = () => null) => {
       const mine: Link = { view, source, availability, market };
       link = mine;

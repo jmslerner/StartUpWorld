@@ -8,6 +8,7 @@ import type { Team } from "../../world/types/scene";
 import { drawnTeams } from "../../world/cast";
 import WorldView from "../../world/WorldView";
 import { WorldBoundary, WorldUnavailableNote } from "../../world/ui/WorldShell";
+import { careerWorldSound } from "../careerSound";
 import { marketCard, MARKET_WORDS } from "../marketView";
 import { asDrawn, CARRY_WORDS, carryLine, carryStep, highlightFor, TEAM_NAMES, unseenLine, type Carry, type Picked } from "../officeMoves";
 import type { OfficeSource } from "../officeSource";
@@ -248,7 +249,7 @@ const CareerOffice = ({ source, draft, onMove, onView, onFailed, market, view, s
   return (
     <div className="relative h-full w-full">
       <WorldBoundary fallback={<WorldUnavailableNote />} onError={onFailed}>
-        <WorldView source={source} onState={viewState} onTap={onTap} />
+        <WorldView source={source} onState={viewState} onTap={onTap} sound={careerWorldSound} />
       </WorldBoundary>
       <div role="group" aria-label={OFFICE_WORDS.views} className="panel-surface absolute left-2 top-2 z-10 flex gap-1 rounded-lg p-1 text-xs">
         {VIEWS.map((kind) => (

@@ -379,6 +379,15 @@ describe("mountWorld", () => {
     for (const probe of Object.values(fakes.environment)) expect(probe).toHaveBeenCalledTimes(2);
   });
 
+  it("hands the world the sound listener it was given, and none when given none", () => {
+    const listener = { onFootsteps: vi.fn(), onChairSit: vi.fn() };
+    mountWorld(canvas, viewport as HTMLElement, stage, source, { sound: listener })();
+    expect(created().options.sound).toBe(listener);
+    stage = createStage();
+    mount()();
+    expect(created().options.sound).toBeUndefined();
+  });
+
   it("mirrors what the world reports into the stage: hover with a mouse only, selection, the anchor", () => {
     const hit: InteractableHit = { target: { kind: "door" }, label: "Door", screen: { x: 10, y: 20 } };
     const cleanup = mount();
