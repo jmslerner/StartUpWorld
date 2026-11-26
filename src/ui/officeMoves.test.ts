@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { newCareer } from "../engine/careerKit";
 import { defaultPlan } from "../engine/plan";
 import type { Plan } from "../engine/types";
-import { CARRY_WORDS, TEAM_NAMES, carryLine, carryStep, highlightFor, moveBetweenTeams } from "./officeMoves";
+import { CARRY_WORDS, TEAM_NAMES, asDrawn, carryLine, carryStep, highlightFor, moveBetweenTeams } from "./officeMoves";
 
 const draft = (product: number, growth: number, recruiting: number): Plan =>
   ({ ...defaultPlan(newCareer().companies[0]), allocation: { product, growth, recruiting } });
@@ -49,5 +49,20 @@ describe("officeMoves", () => {
     expect(Object.values(TEAM_NAMES)).toEqual(["Product", "Growth", "Recruiting"]);
     const text = [...(["product", "growth", "recruiting"] as const).map(carryLine), ...Object.values(TEAM_NAMES), ...Object.values(CARRY_WORDS)].join("\n");
     expect(text).not.toMatch(/\b(quarters?|quarterly|turns?)\b|\bQ\d{1,2}\b/i);
+  });
+  it("moves one of the people the office draws when the plan leaves some unassigned", () => {
+    // A plan of 1/0/0 for four people is drawn as 4/0/0: one move takes one drawn person, not the whole team.
+    const carry = { team: "product" as const, personId: "p0" };
+    const drawn = asDrawn(draft(1, 0, 0), { product: 4, growth: 0, recruiting: 0 });
+    expect(carryStep(carry, { team: "growth", personId: null }, drawn).move).toEqual({ allocation: { product: 3, growth: 1, recruiting: 0 } });
+  });
+  it("moves from a team the office draws though the plan has nobody in it", () => {
+    const carry = { team: "growth" as const, personId: "p3" };
+    const drawn = asDrawn(draft(0, 0, 0), { product: 2, growth: 2, recruiting: 0 });
+    expect(carryStep(carry, { team: "recruiting", personId: null }, drawn).move).toEqual({ allocation: { product: 2, growth: 1, recruiting: 1 } });
+  });
+  it("keeps the rest of the plan as drafted", () => {
+    const plan = { ...draft(1, 0, 0), layoffs: 1 };
+    expect(asDrawn(plan, { product: 3, growth: 0, recruiting: 0 })).toEqual({ ...plan, allocation: { product: 3, growth: 0, recruiting: 0 } });
   });
 });

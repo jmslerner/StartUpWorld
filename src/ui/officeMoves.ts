@@ -25,6 +25,16 @@ export const moveBetweenTeams = (draft: Plan, from: Department, to: Department):
   return { allocation: { ...allocation, [from]: allocation[from] - 1, [to]: allocation[to] + 1 } };
 };
 
+/**
+ * The plan as the office draws it: the drafted plan with the split the scene shows (the plan refitted to everyone,
+ * as the engine will resolve it). Moves are made on this, so one move changes one person drawn and one plan count,
+ * and a person carried always comes from a team that has someone in it.
+ */
+export const asDrawn = (draft: Plan, teams: Readonly<Record<Team, number>>): Plan => ({
+  ...draft,
+  allocation: { ...draft.allocation, product: teams.product, growth: teams.growth, recruiting: teams.recruiting },
+});
+
 const NOTHING = { carry: null, move: null } as const;
 
 /** One tap, given what is carried and the plan being drafted. */

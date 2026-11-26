@@ -6,7 +6,7 @@ import type { WorldHandle } from "../../world/types/handle";
 import type { Team } from "../../world/types/scene";
 import WorldView from "../../world/WorldView";
 import { WorldBoundary, WorldUnavailableNote } from "../../world/ui/WorldShell";
-import { CARRY_WORDS, carryLine, carryStep, highlightFor, TEAM_NAMES, type Carry, type Picked } from "../officeMoves";
+import { asDrawn, CARRY_WORDS, carryLine, carryStep, highlightFor, TEAM_NAMES, type Carry, type Picked } from "../officeMoves";
 import type { OfficeSource } from "../officeSource";
 import { BUTTON } from "../styles";
 
@@ -78,7 +78,8 @@ const CareerOffice = ({ source, draft, onMove, onView, onFailed }: CareerOfficeP
         return;
       }
       const carried = carryRef.current;
-      const next = carryStep(carried, picked, draftRef.current);
+      // The office draws the plan refitted to everyone: a move is one of the people drawn.
+      const next = carryStep(carried, picked, asDrawn(draftRef.current, source.get().teams));
       if (next.move !== null && carried !== null) moveCarried(carried.personId, next.move);
       else setCarried(next.carry);
     },
