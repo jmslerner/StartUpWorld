@@ -11,19 +11,38 @@ const career = () => {
   store.getState().startCareer("Test", 1);
   return store;
 };
-/** A draft for 1990 that hires: one person moved from Product to Recruiting. */
-const hiring = (store: ReturnType<typeof career>) => {
+/** Moves one person from Product to Recruiting in the plan being drafted. */
+const moveToRecruiting = (store: ReturnType<typeof career>) => {
   const { allocation } = store.getState().draft!;
   store.getState().setDraft({ allocation: { ...allocation, product: allocation.product - 1, recruiting: allocation.recruiting + 1 } });
+};
+/** Ends the year shown and closes its report. */
+const endYear = (store: ReturnType<typeof career>) => {
+  store.getState().endQuarter();
+  store.getState().closeReport();
+};
+/** A draft that hires: one person moved from Product to Recruiting. */
+const hiring = (store: ReturnType<typeof career>) => {
+  moveToRecruiting(store);
   const { game, draft, config } = store.getState();
-  // The precondition: this year's plan wants hires. (The projection expects none in 1990, the rivals' hype outbidding
-  // the player's, yet the year does hire: the test below checks that on the year's report.)
+  // The precondition: this year's plan wants hires. (The projection expects none in 1990 or 1991, the rivals' hype
+  // outbidding the player's, yet the year does hire: the tests below check that on the year's report.)
   expect(planningView(game!, draft!, config).hiring.wanted).toBeGreaterThan(0);
+};
+/** The hires the plan being drafted expects. */
+const expectedHires = (store: ReturnType<typeof career>) => {
+  const { game, draft, config } = store.getState();
+  return planningView(game!, draft!, config).hiring.expected;
 };
 
 describe("the office scene from the store", () => {
   it("shows the player's office for the plan being drafted, with the hires it expects", () => {
     const store = career();
+    endYear(store);
+    endYear(store);
+    moveToRecruiting(store);
+    const expected = expectedHires(store);
+    expect(expected).toBeGreaterThan(0); // the precondition: 1992's plan expects hires (3 with seed 1)
     const { game, draft, config, seed } = store.getState();
     expect(createOfficeSource(store).get()).toEqual(
       officeSceneFor({
@@ -32,9 +51,10 @@ describe("the office scene from the store", () => {
         config,
         seed: seed!,
         draft: draft!,
-        expectedHires: planningView(game!, draft!, config).hiring.expected,
+        expectedHires: expected,
       }),
     );
+    expect(createOfficeSource(store).get().arriving).toBe(expected);
   });
 
   it("a change that changes nothing in the office keeps the same scene and tells nobody", () => {
@@ -61,7 +81,8 @@ describe("the office scene from the store", () => {
 
   it("while a year plays out the source shows its beats in turn, and next year's hires only at the end", () => {
     const store = career();
-    hiring(store);
+    endYear(store);
+    hiring(store); // 1991 hires, and 1992's plan, the same people in Recruiting, expects hires too
     const source = createOfficeSource(store);
     const told = vi.fn();
     source.subscribe(told);
@@ -72,7 +93,9 @@ describe("the office scene from the store", () => {
     expect(told).not.toHaveBeenCalled();
     const playback = yearPlayback(store.getState().lastLog!.companies[PLAYER_ID]!, false);
     const hires = playback.beats.find((b) => b.kind === "arrive")?.count ?? 0;
-    expect(hires).toBeGreaterThan(0); // the precondition: 1990 hired someone
+    expect(hires).toBeGreaterThan(0); // the precondition: 1991 hired someone
+    const expected = expectedHires(store);
+    expect(expected).toBeGreaterThan(0); // the precondition: 1992's plan expects hires
     const { game, draft, config, seed } = store.getState();
     const next = officeSceneFor({
       game: game!,
@@ -80,16 +103,18 @@ describe("the office scene from the store", () => {
       config,
       seed: seed!,
       draft: draft!,
-      expectedHires: planningView(game!, draft!, config).hiring.expected,
+      expectedHires: expected,
     });
     playback.beats.forEach((_, i) => {
       source.showBeat(playback, i);
       expect(source.get()).toEqual(beatScenes(start, next, playback)[i]);
+      if (playback.beats[i]!.kind === "arrive") expect(source.get().arriving).toBe(0); // the arrive beat: hires at their desks
     });
-    expect(source.get().arriving).toBe(0); // the arrive beat: hires at their desks
+    expect(playback.beats.at(-1)!.kind).toBe("arrive");
+    expect(source.get().arriving).toBe(0); // the last beat shown, the arrive beat: no one waiting yet
     source.showBeat(playback, null);
     expect([source.get(), source.playing]).toEqual([next, false]);
-    expect(source.get().arriving).toBe(planningView(game!, draft!, config).hiring.expected);
+    expect(source.get().arriving).toBe(expected); // next year's hires, only now
   });
 
   it("a source made while a report is open is not playing (Review Focus 3)", () => {
