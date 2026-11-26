@@ -1224,6 +1224,8 @@ const theMarket = async (browser, fixtures) => {
   {
     const { context, page, year } = await officeFixturePage(browser, fixtures);
     assert(await viewButton(page, "Market").isDisabled(), '"Market" is enabled before any year was played');
+    const laterTitle = await viewButton(page, "Market").getAttribute("title");
+    assert(laterTitle === "The market shows after your first year", `the disabled "Market" says ${JSON.stringify(laterTitle)}`);
     assert((await office(page, "market")) === null, "a market is given before any year was played");
 
     // The year ends on the market, then the summary opens once on the player's choice.
@@ -1263,12 +1265,33 @@ const theMarket = async (browser, fixtures) => {
     assert(cardTitle === tallest.name, `the card is titled ${JSON.stringify(cardTitle)}, not ${JSON.stringify(tallest.name)}`);
     assert(/ users/.test(cardText) && cardText.includes("last year's new users"), `the card reads ${JSON.stringify(cardText)}`);
     await shot(page, `${year + 1}-market-card.png`);
+    // With the card open, no building is under it, at each of the three desktop sizes: each can still be clicked.
+    for (const size of [DESKTOP, { width: 1440, height: 900 }, { width: 1920, height: 1080 }]) {
+      await page.setViewportSize(size);
+      await page.waitForTimeout(400);
+      await rests(page, `the market with a card open at ${size.width}x${size.height}`);
+      const card = await box(marketCardOf(page));
+      const at = await box(page.locator("[data-office] canvas"));
+      for (const each of market.companies.filter((c) => c.state !== "out")) {
+        const drawn = await office(page, "screenBounds", { kind: "company", seat: each.seat });
+        assert(drawn !== null, `at ${size.width}x${size.height} ${each.name}'s building is not on the canvas`);
+        const x = at.x + (drawn.left + drawn.right) / 2;
+        const y = at.y + (drawn.top + drawn.bottom) / 2;
+        const under = x >= card.x && x <= card.x + card.width && y >= card.y && y <= card.y + card.height;
+        assert(!under, `at ${size.width}x${size.height} the card covers ${each.name}'s building`);
+      }
+      if (size.width === 1440) await shot(page, `${year + 1}-market-card-1440.png`);
+      if (size.width === 1920) await shot(page, `${year + 1}-market-card-1920.png`);
+    }
+    await page.setViewportSize(DESKTOP);
+    await page.waitForTimeout(400);
+    await rests(page, "the market back at 1280x800");
     await page.keyboard.press("Escape");
     await page.waitForTimeout(300);
     assert((await marketCardOf(page).count()) === 0, "Escape did not close the card");
     await viewButton(page, "Office").click();
     assert((await office(page, "view")) === "office", `"Office" pressed, the view is ${await office(page, "view")}`);
-    passed(`"Market": four buildings ordered by users, ${stats.drawCalls} draw calls; ${tallest.name}'s building clicked shows its card, Escape closes it; "Office" goes back`);
+    passed(`"Market": four buildings ordered by users, ${stats.drawCalls} draw calls; ${tallest.name}'s building clicked shows its card, which covers no building at 1280, 1440 or 1920; Escape closes it; "Office" goes back`);
 
     // Nobody stays carried across the market.
     await rests(page, "back in the office");

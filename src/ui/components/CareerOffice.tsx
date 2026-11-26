@@ -258,6 +258,7 @@ const CareerOffice = ({ source, draft, onMove, onView, onFailed, market, view, s
             type="button"
             aria-pressed={shown === kind}
             disabled={playing || (kind === "market" && market === null)}
+            title={kind === "market" && market === null ? OFFICE_WORDS.marketLater : undefined}
             onClick={() => onChooseView(kind)}
             className={`${shown === kind ? BUTTON_ON : BUTTON} px-2 py-1 text-[0.7rem] disabled:opacity-50`}
           >
@@ -268,7 +269,7 @@ const CareerOffice = ({ source, draft, onMove, onView, onFailed, market, view, s
       {card !== null && (
         <section
           aria-label={MARKET_WORDS.card}
-          className="panel-surface absolute bottom-2 right-2 z-10 w-64 max-w-[calc(100%-1rem)] rounded-lg px-3 py-2 text-xs"
+          className="panel-surface absolute right-2 top-2 z-10 w-64 max-w-[calc(100%-1rem)] rounded-lg px-3 py-2 text-xs"
         >
           <div className="flex items-baseline justify-between gap-2">
             <h3 className="truncate text-sm font-semibold text-gray-100">{card.title}</h3>

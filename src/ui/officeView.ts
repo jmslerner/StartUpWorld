@@ -112,6 +112,7 @@ export const OFFICE_WORDS = {
   office: "Office",
   market: "Market",
   views: "Show the office or the market",
+  marketLater: "The market shows after your first year",
 } as const;
 
 /** The caption while a year plays out. */

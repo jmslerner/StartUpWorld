@@ -19,12 +19,12 @@ the ones listed under step 4 below. The saves come from `npx tsx scripts/career-
 for each of the eight eras: `nineties` (1994, dial-up), `goldRush` (1997), `noughties` (2004, bust), `phones` (2010),
 `cheapMoney` (2017), `twenties` (2023, winter and AI), `agents` (2029, the full floor) and `ambient` (2035).
 
-15. **The market view.** Before any year is played the market has nothing to show and "Market" is disabled. Ending
+15. **The market view.** Before any year is played the market has nothing to show and "Market" is disabled, saying why on hover. Ending
     1990 on the `office` fixture: during the year's last beat the caption reads "Where the year's new users went", the
     view is the market and the switch is disabled; then one summary opens and the view is the office again. Pressed,
     "Market" shows four companies whose heights order as their users, within 60 draw calls; a click on the tallest
-    rival's building opens its card with its users and its share of last year's new users; Escape closes it; "Office"
-    goes back. A person picked up is put back by a change of view, and the plan is unchanged. "Show in market" on a
+    rival's building opens its card with its users and its share of last year's new users; with the card open (top
+    right) no building's centre is under it at 1280×800, 1440×900 or 1920×1080; Escape closes it; "Office" goes back. A person picked up is put back by a change of view, and the plan is unchanged. "Show in market" on a
     rival in the rivals panel opens the market with that rival's card; the 2D layout has neither that button nor the
     switch. During the market beat, each on a fresh page: Skip (one summary within a second, the office shown, both
     buttons enabled), a window narrowed to 900 px (one summary, the 2D screens, the year's sound heard once) and a lost
@@ -94,8 +94,6 @@ world's chunk; the race and a career without 3D never download it.
 
 ### Still open after step 5
 
-- With a rival's card open, the card (16 rem wide, bottom right) covers most of the right-most building at 1280×800;
-  that building is hard to click until the card is closed.
 - The footsteps and chairs have not been listened to for level or feel; their sound's own spacing keeps a crowd from
   stacking up.
 - Office 3 (the shared full floor) keeps about 25 draw calls of margin in its busiest eras: there is little room for
@@ -173,7 +171,7 @@ The design's budget of 300 draw calls is a phone's. This plan shows the office o
 office stays under its ceiling; the full floor and the campus are above 300, as the groundwork measured, and phones get
 the 2D screens until instanced far figures are built (step 5). The full floor sits exactly on its ceiling: a single
 extra draw call there fails the check. (Since then, by the owner's decision of 26 November 2026, phones keep the 2D
-screens for good and instanced far figures are not built; the full floor now measures well under its ceiling, as the
+screens for good and instanced far figures are not built; the full floor now measures under its ceiling, with about 25 draw calls to spare, as the
 step 5 section above records.)
 
 ### The download
