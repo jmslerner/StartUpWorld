@@ -1,6 +1,7 @@
 /** The React-facing WorldHandle and its callbacks. Re-exported by ../types. */
 
 import type { InteractableTarget } from "./interaction";
+import type { MarketScene, WorldViewKind } from "./market";
 import type { OfficeScene, Team } from "./scene";
 
 /** CSS pixels relative to the canvas's top-left corner. */
@@ -120,6 +121,15 @@ export interface WorldHandle {
   personAt(desk: number): string | null;
   /** The next scene, if it is of this year and takes someone from this person's team, moves this person. Used once. */
   releaseFirst(personId: string | null): void;
+  /** The market to draw when the market view shows. The same object again changes nothing. */
+  setMarket(scene: MarketScene): void;
+  /**
+   * Which view the canvas shows: the office (as it starts) or the market. Only what the view shows is drawn and can
+   * be picked; the camera frames it.
+   */
+  setView(view: WorldViewKind): void;
+  /** The view shown now. */
+  view(): WorldViewKind;
   /** Finish at once whatever is moving (walks, an office rising, the lights, the camera's glide), then draw it. */
   settle(): void;
   dispose(): void;

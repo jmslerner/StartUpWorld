@@ -40,6 +40,9 @@ const fakeHandle = (): WorldHandle => ({
   personAt: vi.fn((desk: number) => (desk === 0 ? "p0" : null)),
   releaseFirst: vi.fn(),
   settle: vi.fn(),
+  setMarket: vi.fn(),
+  setView: vi.fn(),
+  view: vi.fn(() => "office" as const),
   dispose: vi.fn(),
 });
 

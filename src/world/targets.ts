@@ -16,6 +16,8 @@ export const targetKey = (target: InteractableTarget): string => {
       return "door";
     case "sign":
       return "sign";
+    case "company":
+      return `company:${target.seat}`;
   }
 };
 
@@ -26,7 +28,7 @@ export const sameTarget = (a: InteractableTarget | null, b: InteractableTarget |
 
 /**
  * The team a target belongs to: a person working has their team (someone away, leaving or waiting at the door has
- * none), a desk has the team whose area it is in, a team area is its own team, and anything else has none.
+ * none), a desk has the team whose area it is in, a team area is its own team, and anything else (a company in the market included) has none.
  */
 export const teamOfTarget = (target: InteractableTarget, cast: Cast | null, seating: Pick<SeatingApi, "teamOfDesk">): Team | null => {
   switch (target.kind) {
