@@ -49,6 +49,22 @@ export const beatNow = (play: YearPlay, nowMs: number): PlaybackBeat | null => {
 /** Nothing is playing at `nowMs`. */
 export const yearPlayDone = (play: YearPlay, nowMs: number): boolean => play.phase !== "playing" || nowMs >= play.endsMs;
 
+export type YearPlayStep = { readonly kind: "none" } | { readonly kind: "beat"; readonly index: number } | { readonly kind: "finish" };
+
+/**
+ * What the office does for the moment the caption shows (`nowMs`, the moment the caption was drawn for), given the
+ * beat it shows (`shown`): nothing, show the caption's beat, or finish the year once its time is up. The screen
+ * shows a beat as it puts that beat's caption on the page, never ahead of it on its own clock, and finishes the year
+ * in the same commit that takes the caption away, so the scene and the caption change together: the office never
+ * shows the next beat (the hires walking in, the new office) under the last one's caption.
+ */
+export const yearPlayStep = (play: YearPlay, shown: number | null, nowMs: number): YearPlayStep => {
+  if (play.phase !== "playing") return { kind: "none" };
+  if (yearPlayDone(play, nowMs)) return { kind: "finish" };
+  const index = beatIndexNow(play, nowMs);
+  return index === null || index === shown ? { kind: "none" } : { kind: "beat", index };
+};
+
 /** The office stopped drawing (or is not known to draw): the year ends at once. */
 export const yearPlayAfterLoss = (play: YearPlay, availability: OfficeAvailability): YearPlay =>
   availability === "running" ? play : IDLE;

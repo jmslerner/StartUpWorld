@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import { rulesForTurn, yearOf } from "../../engine/career";
 import type { Plan } from "../../engine/types";
 import { PLAYER_ID } from "../../state/player";
@@ -46,7 +47,7 @@ import {
   type OfficeAvailability,
 } from "../officeView";
 import { wordsFor } from "../words";
-import { beatIndexNow, beatNow, endRefused, finishYearPlay, IDLE, startYearPlay, yearPlaysOut, yearPlayAfterLoss, yearPlayDone, type YearPlay } from "../yearPlay";
+import { beatNow, endRefused, finishYearPlay, IDLE, startYearPlay, yearPlaysOut, yearPlayAfterLoss, yearPlayStep, type YearPlay } from "../yearPlay";
 
 type Tab = "plan" | "rivals";
 
@@ -266,25 +267,34 @@ export const GameScreen = () => {
     window.scrollTo({ top: 0 });
   }, [endQuarter, layout, officeSource]);
 
-  // While a year plays out: the clock moves the caption and the beats on, and the year ends when its time is up.
+  // While a year plays out the clock moves the caption's moment on, and ends the year when its time is up (or, should
+  // a change of view have slipped past its handler, when the office stopped drawing). The year ends in one go: the
+  // new year shown and the caption taken away before anything is drawn, so no frame shows the new year's expected
+  // hires at the door under the last beat's caption.
   useEffect(() => {
     if (play.phase !== "playing") return;
     const timer = window.setInterval(() => {
       const now = performance.now();
-      // Time is up, or (should a change of view have slipped past its handler) the office stopped drawing.
-      if (yearPlayDone(playRef.current, now) || yearPlayAfterLoss(playRef.current, availabilityRef.current) === IDLE) {
-        finishPlay();
+      if (yearPlayStep(playRef.current, beatShown.current, now).kind === "finish" || yearPlayAfterLoss(playRef.current, availabilityRef.current) === IDLE) {
+        flushSync(finishPlay);
         return;
-      }
-      const index = beatIndexNow(playRef.current, now);
-      if (index !== null && index !== beatShown.current) {
-        beatShown.current = index;
-        officeSource.showBeat(play.playback, index);
       }
       setPlayNow(now);
     }, PLAY_TICK_MS);
     return () => window.clearInterval(timer);
-  }, [play, finishPlay, officeSource]);
+  }, [play, finishPlay]);
+
+  // The office follows the caption: as the page takes the caption for a moment, before anything is drawn, the scene
+  // takes that moment's beat. Showing a beat on the clock instead let a frame or two draw the next beat (the hires
+  // walking in, the new office) under the last beat's caption.
+  useLayoutEffect(() => {
+    if (play !== playRef.current) return;
+    const step = yearPlayStep(play, beatShown.current, playNow);
+    if (step.kind === "beat" && play.phase === "playing") {
+      beatShown.current = step.index;
+      officeSource.showBeat(play.playback, step.index);
+    }
+  }, [play, playNow, officeSource]);
 
   // Skip has the focus while a year plays out.
   useEffect(() => {

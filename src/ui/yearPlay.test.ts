@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { NO_PLAYBACK, type PlaybackBeat, type YearPlayback } from "../scene/yearPlayback";
-import { beatIndexNow, beatNow, endRefused, finishYearPlay, IDLE, startYearPlay, yearPlaysOut, yearPlayAfterLoss, yearPlayDone } from "./yearPlay";
+import { beatIndexNow, beatNow, endRefused, finishYearPlay, IDLE, startYearPlay, yearPlaysOut, yearPlayAfterLoss, yearPlayDone, yearPlayStep } from "./yearPlay";
 
 const playback = (seconds: number, beats: PlaybackBeat[]): YearPlayback => ({ beats, seconds });
 const leave = { kind: "leave", seconds: 1.5, count: 2, office: null } as const;
@@ -48,6 +48,32 @@ describe("a year playing out", () => {
   it("an office that stops drawing ends the year at once (Review Focus 2)", () => {
     const play = startYearPlay(IDLE, playback(4, [leave, arrive]), 1994, 1000);
     expect((["running", "context-lost", "failed", "unsupported", "unknown"] as const).map((a) => yearPlayAfterLoss(play, a) === IDLE)).toEqual([false, true, true, true, true]);
+  });
+});
+
+describe("the office's step for the moment the caption shows", () => {
+  const move = { kind: "move", seconds: 2.5, count: 0, office: 1 } as const;
+  it("is the caption's own beat, read off the same moment, so the scene never runs ahead of the caption", () => {
+    const play = startYearPlay(IDLE, playback(6, [leave, move, arrive]), 1990, 1000);
+    for (const now of [1000, 2499, 2500, 4999, 5000, 6999]) {
+      const step = yearPlayStep(play, null, now);
+      expect(step.kind).toBe("beat");
+      if (step.kind === "beat") expect(play.phase === "playing" && play.playback.beats[step.index]).toBe(beatNow(play, now));
+    }
+  });
+  it("asks for nothing while the beat shown is the caption's, and for the next beat once the caption moves on", () => {
+    const play = startYearPlay(IDLE, playback(6, [leave, move, arrive]), 1990, 1000);
+    expect([yearPlayStep(play, 0, 2499), yearPlayStep(play, 0, 2500), yearPlayStep(play, 1, 4999), yearPlayStep(play, 1, 5000)]).toEqual([
+      { kind: "none" },
+      { kind: "beat", index: 1 },
+      { kind: "none" },
+      { kind: "beat", index: 2 },
+    ]);
+  });
+  it("finishes the year at the moment its caption is gone, and asks nothing of an idle office", () => {
+    const play = startYearPlay(IDLE, playback(6, [leave, move, arrive]), 1990, 1000);
+    expect([yearPlayStep(play, 2, 6999), yearPlayStep(play, 2, 7000), yearPlayStep(IDLE, null, 7000)]).toEqual([{ kind: "none" }, { kind: "finish" }, { kind: "none" }]);
+    expect(beatNow(play, 7000)).toBeNull();
   });
 });
 
