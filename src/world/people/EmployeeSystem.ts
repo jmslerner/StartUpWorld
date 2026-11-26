@@ -23,7 +23,7 @@ import { Crew } from "./crew";
 import type { CrewHost } from "./crew";
 
 /** What the people read of the world. A whole WorldContext is one of these. */
-export type PeopleContext = Pick<WorldContext, "scene" | "reducedMotion" | "interactables" | "fx" | "seating" | "signals" | "getLayout">;
+export type PeopleContext = Pick<WorldContext, "scene" | "reducedMotion" | "interactables" | "fx" | "seating" | "signals" | "getLayout" | "sound">;
 
 /** The inspector card hangs just above the head anchor (which already sits over the hair). */
 const CARD_LIFT = 0.15;
@@ -36,6 +36,9 @@ const DUST_INTENSITY = 0.6;
 const CLICK_BOX = { x: 0, y: 0, z: 0, width: 0.66, height: 1.6, depth: 0.66 } as const;
 /** Below this a body is hidden rather than drawn as a speck (and never given a zero scale). */
 const MIN_VISIBLE_SCALE = 0.02;
+/** World units of walking per footstep heard; a walk is heard as one to six steps (the sound's own range). */
+const STRIDE = 1.2;
+const MAX_STEPS = 6;
 /** How near the doorway somebody has to be for the door to be held open for them. */
 const DOORWAY_RADIUS = 1.7;
 
@@ -69,6 +72,10 @@ interface Body {
   teleports: number;
   scale: number;
   team: Team | null;
+  /** On a walk that is heard (in, out, or to another desk) as of the last sync. */
+  walking: boolean;
+  /** Came in through the door and has not sat down yet, as of the last sync. */
+  arriving: boolean;
 }
 
 export class EmployeeSystem implements WorldSystem, CrewHost {
@@ -153,7 +160,7 @@ export class EmployeeSystem implements WorldSystem, CrewHost {
     character.group.visible = false;
     addHitBox(character.group, CLICK_BOX);
     this.root.add(character.group);
-    this.bodies.set(actor, { character, pose: null, seated: false, teleports: -1, scale: 1, team: actor.team });
+    this.bodies.set(actor, { character, pose: null, seated: false, teleports: -1, scale: 1, team: actor.team, walking: false, arriving: false });
     this.register(actor, character);
   }
 
@@ -280,6 +287,26 @@ export class EmployeeSystem implements WorldSystem, CrewHost {
     return true;
   }
 
+  /**
+   * The moments only the people can time, told to the sound sink when there is one: a walk starting in through the
+   * door, out through it or to another desk (a wander to the coffee machine is not heard), and somebody who walked in
+   * sitting down. People placed without a walk make no sound.
+   */
+  private hear(actor: Actor, body: Body): void {
+    const sound = this.ctx.sound;
+    const walking = actor.mode === "walking" && actor.goal !== "errand";
+    if (sound !== undefined && walking && !body.walking) {
+      const from = { x: actor.x, z: actor.z };
+      const { door } = this.ctx.getLayout();
+      const to = actor.goal === "exit" ? { x: door.x, z: door.z } : { x: actor.home.x, z: actor.home.z };
+      const steps = Math.min(MAX_STEPS, Math.max(1, Math.round(actor.distanceLeft / STRIDE)));
+      sound.footsteps(from, to, steps, actor.arriving ? 1 : actor.goal === "exit" ? -1 : 0);
+    }
+    if (sound !== undefined && body.arriving && !actor.arriving && actor.mode === "seated") sound.chairSit({ x: actor.x, z: actor.z });
+    body.walking = walking;
+    body.arriving = actor.arriving;
+  }
+
   /** Copy one actor's state onto its character and advance the character's animation. */
   private sync(actor: Actor, dt: number, elapsed: number): void {
     const body = this.bodies.get(actor);
@@ -292,6 +319,7 @@ export class EmployeeSystem implements WorldSystem, CrewHost {
       if (!actor.dismissed) this.register(actor, character);
     }
     if (!this.place(actor, body)) return;
+    this.hear(actor, body);
 
     character.setWalkSpeed(actor.walkSpeed);
     character.setEnergy(actor.energy);
