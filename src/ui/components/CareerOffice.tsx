@@ -5,10 +5,11 @@ import type { InteractableTarget } from "../../world/types/interaction";
 import type { WorldHandle } from "../../world/types/handle";
 import type { MarketScene, WorldViewKind } from "../../world/types/market";
 import type { Team } from "../../world/types/scene";
+import { drawnTeams } from "../../world/cast";
 import WorldView from "../../world/WorldView";
 import { WorldBoundary, WorldUnavailableNote } from "../../world/ui/WorldShell";
 import { marketCard, MARKET_WORDS } from "../marketView";
-import { asDrawn, CARRY_WORDS, carryLine, carryStep, highlightFor, TEAM_NAMES, type Carry, type Picked } from "../officeMoves";
+import { asDrawn, CARRY_WORDS, carryLine, carryStep, highlightFor, TEAM_NAMES, unseenLine, type Carry, type Picked } from "../officeMoves";
 import type { OfficeSource } from "../officeSource";
 import { OFFICE_WORDS } from "../officeView";
 import { BUTTON, BUTTON_ON } from "../styles";
@@ -43,6 +44,8 @@ type Select = (target: InteractableTarget | null) => void;
 
 const TEAMS: readonly Team[] = ["product", "growth", "recruiting"];
 const VIEWS: readonly WorldViewKind[] = ["office", "market"];
+/** How long the note of a move nobody walks for stays, in ms. */
+const UNSEEN_MS = 4000;
 
 /**
  * The career's office in 3D. The one place under src/ui that brings in the world by value, so it is only ever
@@ -54,6 +57,8 @@ const VIEWS: readonly WorldViewKind[] = ["office", "market"];
  */
 const CareerOffice = ({ source, draft, onMove, onView, onFailed, market, view, selectedSeat, playing, rivals, onSelectCompany, onChooseView }: CareerOfficeProps) => {
   const [carry, setCarry] = useState<Carry>(null);
+  /** A move that changed the plan but not the people drawn, said in the strip's place for a moment. */
+  const [unseen, setUnseen] = useState<string | null>(null);
   const [handle, setHandle] = useState<WorldHandle | null>(null);
   // Without a market there is nothing to show but the office.
   const shown: WorldViewKind = market === null ? "office" : view;
@@ -86,11 +91,20 @@ const CareerOffice = ({ source, draft, onMove, onView, onFailed, market, view, s
     (personId: string, move: Pick<Plan, "allocation">) => {
       const handle = handleRef.current;
       const shown = source.get();
+      // Worked out now: the store updates the scene later. The allocation is people per team, the scene's teams.
+      const hidden = handle?.hiddenCount() ?? 0;
+      const same = drawnTeams(shown);
+      const after = drawnTeams({ ...shown, teams: move.allocation });
+      const nobodyWalks = hidden > 0 && same.product === after.product && same.growth === after.growth && same.recruiting === after.recruiting;
       handle?.releaseFirst(personId);
       onMove(move);
       // The plan did not change the office: the hint must not wait for a later scene.
       if (source.get() === shown) handle?.releaseFirst(null);
       setCarried(null);
+      if (nobodyWalks) {
+        const total = shown.teams.product + shown.teams.growth + shown.teams.recruiting + shown.away + shown.leaving;
+        setUnseen(unseenLine(total - hidden, total));
+      }
     },
     [source, onMove, setCarried],
   );
@@ -203,6 +217,13 @@ const CareerOffice = ({ source, draft, onMove, onView, onFailed, market, view, s
     });
   }, [source, drop]);
 
+  // The note of a move nobody walks for goes after a moment (it is not shown over the market or a new carry).
+  useEffect(() => {
+    if (unseen === null) return;
+    const timer = window.setTimeout(() => setUnseen(null), UNSEEN_MS);
+    return () => window.clearTimeout(timer);
+  }, [unseen]);
+
   // Escape puts the person back.
   useEffect(() => {
     if (carry === null) return;
@@ -260,6 +281,11 @@ const CareerOffice = ({ source, draft, onMove, onView, onFailed, market, view, s
             ))}
           </ul>
         </section>
+      )}
+      {carry === null && unseen !== null && shown === "office" && (
+        <div role="status" className="panel-surface absolute bottom-2 left-2 z-10 max-w-[calc(100%-1rem)] rounded-lg px-2 py-1.5 text-xs text-mist/90">
+          {unseen}
+        </div>
       )}
       {carry !== null && shown === "office" && (
         <div

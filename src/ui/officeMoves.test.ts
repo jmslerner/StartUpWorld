@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { newCareer } from "../engine/careerKit";
 import { defaultPlan } from "../engine/plan";
 import type { Plan } from "../engine/types";
-import { CARRY_WORDS, TEAM_NAMES, asDrawn, carryLine, carryStep, highlightFor, moveBetweenTeams } from "./officeMoves";
+import { CARRY_WORDS, TEAM_NAMES, asDrawn, carryLine, carryStep, highlightFor, moveBetweenTeams, unseenLine } from "./officeMoves";
 
 const draft = (product: number, growth: number, recruiting: number): Plan =>
   ({ ...defaultPlan(newCareer().companies[0]), allocation: { product, growth, recruiting } });
@@ -64,5 +64,8 @@ describe("officeMoves", () => {
   it("keeps the rest of the plan as drafted", () => {
     const plan = { ...draft(1, 0, 0), layoffs: 1 };
     expect(asDrawn(plan, { product: 3, growth: 0, recruiting: 0 })).toEqual({ ...plan, allocation: { product: 3, growth: 0, recruiting: 0 } });
+  });
+  it("says when a move changes the plan but nobody walks", () => {
+    expect(unseenLine(50, 120)).toBe("Moved in the plan. The office draws 50 of your 120 people, so nobody walks.");
   });
 });
