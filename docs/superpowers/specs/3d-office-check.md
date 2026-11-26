@@ -24,7 +24,11 @@ for each of the eight eras: `nineties` (1994, dial-up), `goldRush` (1997), `noug
     view is the market and the switch is disabled; then one summary opens and the view is the office again. Pressed,
     "Market" shows four companies whose heights order as their users, within 60 draw calls; a click on the tallest
     rival's building opens its card with its users and its share of last year's new users; with the card open (top
-    right) no building's centre is under it at 1280×800, 1440×900 or 1920×1080; Escape closes it; "Office" goes back. A person picked up is put back by a change of view, and the plan is unchanged. "Show in market" on a
+    right) no building's centre is under it at 1280×800, 1440×900 or 1920×1080; Escape closes it; "Office" goes back.
+    Over the market, each building still standing has a label with its name and users (the player's starting "You"
+    and drawn apart) and the bar has one ("Bar to go public: N users"), during the market beat and after it: at the
+    three sizes no two overlap, none leaves the canvas, none is under the card, none takes the pointer or focus (the
+    canvas is under each), and they are gone in the office and with the 3D view off. A person picked up is put back by a change of view, and the plan is unchanged. "Show in market" on a
     rival in the rivals panel opens the market with that rival's card; the 2D layout has neither that button nor the
     switch. During the market beat, each on a fresh page: Skip (one summary within a second, the office shown, both
     buttons enabled), a window narrowed to 900 px (one summary, the 2D screens, the year's sound heard once) and a lost
@@ -35,7 +39,7 @@ for each of the eight eras: `nineties` (1994, dial-up), `goldRush` (1997), `noug
     are those the scene asks for, the office comes to rest, and its draw calls are under its ceiling
     (`min(800, 80 + 14 × figures)`).
 17. **The market's draw calls in every era.** Each era fixture plays its year, and the market drawn afterwards keeps
-    within its ceiling of 60.
+    within its ceiling of 60, its labels read as in step 15.
 18. **Sounds.** On the `office` fixture in 3D: footsteps are heard while the year's people walk; the market beat's
     `users-trickle` is heard once, during that beat and not before it; the office move's `asset-office-upgrade` is
     heard once, as the summary opens. A reload with the summary open plays nothing. Under reduced motion the
@@ -60,11 +64,11 @@ plays `asset-office-upgrade` once as its summary opens, and nothing else; closin
 | Agents (future set) | Full floor | `agents`, 2029 | 20 | 335 | 360 | 25 |
 | Cheap money | Campus | `campus`, 2019 | 50 | 609 | 780 | 171 |
 | Ambient (future set) | Campus | `ambient`, 2035 | 50 | 610 | 780 | 170 |
-| The market | (every era, each fixture's next year) | all eight era fixtures and `office` | 3 to 50 | 8 | 60 | 52 |
+| The market | (every era, each fixture's next year) | all eight era fixtures and `office` | 3 to 50 | 7 | 60 | 53 |
 
 The full floor (office 3, now the agents fixture at 2029) was 360 of its 360 in the step 4 run (the twenties look at
 2023, below); merging the office's still furniture into a few meshes brought it down to 335 to 336 for the same
-fixture, and with the invented future's set (agents, 2029) it measures 335 of 360. The market draws 8 calls in every era against its own ceiling of 60.
+fixture, and with the invented future's set (agents, 2029) it measures 335 of 360. The market draws 7 calls in every era against its own ceiling of 60 (8 while the bar was a translucent two-sided plane, which three.js draws twice; it is now one opaque ring per building).
 
 ### The download
 

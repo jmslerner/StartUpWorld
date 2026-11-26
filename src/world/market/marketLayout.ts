@@ -19,6 +19,12 @@ export const LOT_WIDTH = 3.2;
 export const LOT_SPACING = 4.4;
 /** How far in front of the lots the source stands. */
 export const SOURCE_Z = 4.5;
+/** Height of the plaza the lots stand on. */
+export const PLAZA_HEIGHT = 0.08;
+/** A building's footprint inside its lot. */
+export const BUILDING_WIDTH = 2.2;
+/** The side of the square the bar for going public draws round each building's footprint, at the bar's height. */
+export const BAR_RING = BUILDING_WIDTH + 0.4;
 /** Ground kept around the lots and the source. */
 const BOUNDS_MARGIN = 2;
 
@@ -28,6 +34,8 @@ export interface MarketLot {
   readonly z: number;
   readonly width: number;
   readonly height: number;
+  /** The company went out: an empty lot, no building. */
+  readonly out: boolean;
 }
 
 export interface MarketLayout {
@@ -47,6 +55,7 @@ export const marketLayout = (scene: MarketScene): MarketLayout => {
       z: 0,
       width: LOT_WIDTH,
       height: company.state === "out" ? 0 : company.height * MARKET_BUILDING_HEIGHT,
+      out: company.state === "out",
     })
   );
   const half = LOT_WIDTH / 2;
@@ -61,6 +70,57 @@ export const marketLayout = (scene: MarketScene): MarketLayout => {
       minZ: -half - BOUNDS_MARGIN,
       maxZ: SOURCE_Z + BOUNDS_MARGIN,
     },
+  };
+};
+
+export interface WorldPoint {
+  readonly x: number;
+  readonly y: number;
+  readonly z: number;
+}
+
+/** The points the labels over the market stand on, in world units: the world projects them to the canvas. */
+export interface MarketMarks {
+  /** Each building still standing: the centre of its roof and the roof's four corners. */
+  readonly lots: readonly { readonly seat: number; readonly centre: WorldPoint; readonly corners: readonly WorldPoint[] }[];
+  /**
+   * The bar's leftmost and rightmost points as the camera (from +X, +Z) sees them, and the highest: the back corner
+   * of the first lot's ring. Null with no lots.
+   */
+  readonly bar: { readonly left: WorldPoint; readonly right: WorldPoint; readonly top: WorldPoint } | null;
+}
+
+export const marketMarks = (layout: MarketLayout): MarketMarks => {
+  const half = BUILDING_WIDTH / 2;
+  const lots = layout.lots
+    .filter((lot) => !lot.out)
+    .map((lot) => {
+      const y = PLAZA_HEIGHT + lot.height;
+      return {
+        seat: lot.seat,
+        centre: { x: lot.x, y, z: lot.z },
+        corners: [
+          { x: lot.x - half, y, z: lot.z - half },
+          { x: lot.x + half, y, z: lot.z - half },
+          { x: lot.x - half, y, z: lot.z + half },
+          { x: lot.x + half, y, z: lot.z + half },
+        ],
+      };
+    });
+  const first = layout.lots[0];
+  const last = layout.lots[layout.lots.length - 1];
+  const y = PLAZA_HEIGHT + layout.barY;
+  const ring = BAR_RING / 2;
+  return {
+    lots,
+    bar:
+      first && last
+        ? {
+            left: { x: first.x - ring, y, z: first.z + ring },
+            right: { x: last.x + ring, y, z: last.z - ring },
+            top: { x: first.x - ring, y, z: first.z - ring },
+          }
+        : null,
   };
 };
 

@@ -13,6 +13,7 @@ import type {
   OfficeLayout,
   OfficeScene,
   QualityLevel,
+  MarketScreenMarks,
   ScreenPoint,
   ScreenRect,
   WorldCallbacks,
@@ -357,6 +358,7 @@ class World {
       setMarket: (market) => this.setMarket(market),
       setView: (view) => this.setView(view),
       view: () => this.viewKind,
+      marketMarks: () => this.marketMarks(),
       dispose: () => this.dispose(),
     };
     debugByHandle.set(this.handle, { ctx, rig: this.rig, renderer });
@@ -458,6 +460,21 @@ class World {
 
   private project(target: InteractableTarget): ScreenPoint | null {
     return this.disposed ? null : this.interaction.project(target);
+  }
+
+  /** The market's marks projected with the camera as it stands now; null unless the market shows. */
+  private marketMarks(): MarketScreenMarks | null {
+    if (this.disposed || this.viewKind !== "market") return null;
+    const marks = this.market.marks();
+    if (marks === null) return null;
+    const project = (point: { x: number; y: number; z: number }): ScreenPoint => this.rig.project(point, { x: 0, y: 0 });
+    return {
+      lots: marks.lots.map(({ seat, centre, corners }) => ({
+        seat,
+        top: { x: project(centre).x, y: Math.min(...corners.map((corner) => project(corner).y)) },
+      })),
+      bar: marks.bar === null ? null : { left: project(marks.bar.left), right: project(marks.bar.right), top: project(marks.bar.top) },
+    };
   }
 
   private screenBounds(target: InteractableTarget): ScreenRect | null {

@@ -8,7 +8,7 @@
 
 import type { SoundName } from "../audio/sounds";
 import type { SceneSource, WorldViewState } from "../world/mountWorld";
-import type { ScreenPoint, ScreenRect, WorldHandle, WorldStats } from "../world/types/handle";
+import type { MarketScreenMarks, ScreenPoint, ScreenRect, WorldHandle, WorldStats } from "../world/types/handle";
 import type { InteractableTarget } from "../world/types/interaction";
 import type { MarketScene, WorldViewKind } from "../world/types/market";
 import type { OfficeScene, Team } from "../world/types/scene";
@@ -39,6 +39,8 @@ export interface CareerOfficeProbe {
   view(): WorldViewKind | null;
   /** The market the career screen gives the world, or null. */
   market(): MarketScene | null;
+  /** Where the live world draws the market's buildings and bar (for the labels over them); null unless it shows. */
+  marketMarks(): MarketScreenMarks | null;
   /** The last sounds the career asked for, oldest first. */
   sounds(): readonly SoundName[];
 }
@@ -101,6 +103,7 @@ export const createOfficeProbe = (): CareerOfficeProbe & OfficeProbeLink => {
     loseContext: () => handle()?.loseContext(),
     view: () => handle()?.view() ?? null,
     market: () => link?.market() ?? null,
+    marketMarks: () => handle()?.marketMarks() ?? null,
     sounds: () => soundsHeard(),
     attach: (view, source, availability, market = () => null) => {
       const mine: Link = { view, source, availability, market };

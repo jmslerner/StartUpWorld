@@ -1,6 +1,7 @@
 /**
  * The market drawn on the office's canvas: four lots on a plaza, each company's building as tall as its users, the
- * bar for going public as one translucent plane across them, and the year's new users as dots that stream from a
+ * bar for going public as a glowing mark at its height (a ring round each building's footprint, which a building
+ * grows into, and a rail joining the rings), and the year's new users as dots that stream from a
  * source in front of the lots to whoever won them, then stand at their feet.
  *
  * It is not an office frame: applyFrame does nothing. The world hands it a market scene (show) and tells it when it
@@ -10,7 +11,18 @@ import * as THREE from "three";
 import { C, EMBER, NEON, bakeModel, darken, lighten, lookFor, modelMesh, PHASE_THEMES } from "../core/palette";
 import type { ModelBuilder } from "../core/palette";
 import type { MarketCompany, MarketScene, WorldContext, WorldFrame, WorldSystem } from "../types";
-import { flowDots, FLOW_DOTS, marketLayout, type MarketLayout, type MarketLot } from "./marketLayout";
+import {
+  BAR_RING,
+  BUILDING_WIDTH,
+  flowDots,
+  FLOW_DOTS,
+  marketLayout,
+  marketMarks,
+  PLAZA_HEIGHT,
+  type MarketLayout,
+  type MarketLot,
+  type MarketMarks,
+} from "./marketLayout";
 
 /** How long the year's users take to arrive, in seconds. */
 export const STREAM_SECONDS = 1.6;
@@ -20,9 +32,9 @@ const DOT_RADIUS = 0.12;
 const DOT_ARC = 1.4;
 /** Height of one storey of a building. */
 const FLOOR_HEIGHT = 0.5;
-/** A building's footprint inside its lot. */
-const BUILDING_WIDTH = 2.2;
-const PLAZA_HEIGHT = 0.08;
+/** The bar's ring round each building and the rail joining them: their thickness, and how tall they stand. */
+const BAR_THICK = 0.12;
+const BAR_TALL = 0.1;
 /** Rivals' colours, in seat order, skipping the player's. */
 const RIVAL_COLORS: readonly number[] = [C.blue, C.coral, C.leaf, C.purple, C.yellow, C.teal];
 
@@ -173,6 +185,11 @@ export class MarketSystem implements WorldSystem {
     return this.plan;
   }
 
+  /** The points the labels over the market stand on, in world units; null before any market was shown. */
+  marks(): MarketMarks | null {
+    return this.plan === null ? null : marketMarks(this.plan);
+  }
+
   /** Meshes the market draws (its own count for the check). */
   meshCount(): number {
     let count = 0;
@@ -229,18 +246,31 @@ export class MarketSystem implements WorldSystem {
       return { company, lot, mesh };
     });
 
-    // The bar for going public: one translucent plane across every lot.
+    // The bar for going public: a ring round each building's footprint at the bar's height, joined by a rail along
+    // their backs, unlit so it reads in every era's light. A building short of the bar stands below its ring; one
+    // past it wears the ring as a collar. One mesh, one draw call.
     const first = plan.lots[0];
     const last = plan.lots[plan.lots.length - 1];
     if (first && last) {
-      const span = last.x - first.x + first.width + 0.6;
-      const bar = new THREE.Mesh(
-        new THREE.PlaneGeometry(span, first.width + 0.4),
-        new THREE.MeshBasicMaterial({ color: EMBER, transparent: true, opacity: 0.28, depthWrite: false, side: THREE.DoubleSide })
-      );
-      bar.rotation.x = -Math.PI / 2;
-      bar.position.set((first.x + last.x) / 2, PLAZA_HEIGHT + plan.barY, first.z);
-      bar.renderOrder = 1;
+      const ring = BAR_RING;
+      const y = PLAZA_HEIGHT + plan.barY;
+      const geometry = bakeModel(null, (b) => {
+        for (const lot of plan.lots) {
+          const front = lot.z + ring / 2 - BAR_THICK / 2;
+          const back = lot.z - ring / 2 + BAR_THICK / 2;
+          b.box(ring, BAR_TALL, BAR_THICK, C.white, lot.x, y - BAR_TALL / 2, front, { r: 0 });
+          b.box(ring, BAR_TALL, BAR_THICK, C.white, lot.x, y - BAR_TALL / 2, back, { r: 0 });
+          b.box(BAR_THICK, BAR_TALL, ring - 2 * BAR_THICK, C.white, lot.x - ring / 2 + BAR_THICK / 2, y - BAR_TALL / 2, lot.z, { r: 0 });
+          b.box(BAR_THICK, BAR_TALL, ring - 2 * BAR_THICK, C.white, lot.x + ring / 2 - BAR_THICK / 2, y - BAR_TALL / 2, lot.z, { r: 0 });
+        }
+        // The rail between the rings, along their backs.
+        const railFrom = first.x + ring / 2;
+        const railTo = last.x - ring / 2;
+        if (railTo > railFrom) {
+          b.box(railTo - railFrom, BAR_TALL * 0.6, BAR_THICK * 0.6, C.white, (railFrom + railTo) / 2, y - BAR_TALL * 0.3, first.z - ring / 2 + BAR_THICK / 2, { r: 0 });
+        }
+      });
+      const bar = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ color: EMBER }));
       bar.name = "market:bar";
       this.root.add(bar);
       this.bar = bar;

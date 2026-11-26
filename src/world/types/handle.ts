@@ -18,6 +18,14 @@ export interface ScreenRect {
   bottom: number;
 }
 
+/** Where the market's buildings and its bar are drawn on the canvas, for the labels over them. */
+export interface MarketScreenMarks {
+  /** Each building still standing, in seat order: the centre of its roof across, the roof's highest point down. */
+  readonly lots: readonly { readonly seat: number; readonly top: ScreenPoint }[];
+  /** The bar for going public: its leftmost, rightmost and highest points on screen (the last, its first ring's back corner). */
+  readonly bar: { readonly left: ScreenPoint; readonly right: ScreenPoint; readonly top: ScreenPoint } | null;
+}
+
 export interface WorldFocusOptions {
   /**
    * CSS pixels at the bottom of the canvas that are covered (a docked card):
@@ -130,6 +138,8 @@ export interface WorldHandle {
   setView(view: WorldViewKind): void;
   /** The view shown now. */
   view(): WorldViewKind;
+  /** Where the market's buildings and bar are drawn right now; null unless the market shows. */
+  marketMarks(): MarketScreenMarks | null;
   /** Finish at once whatever is moving (walks, an office rising, the lights, the camera's glide), then draw it. */
   settle(): void;
   dispose(): void;

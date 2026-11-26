@@ -13,8 +13,10 @@
  * out; (7) a hidden tab and resizes; (8) reduced motion; (9) the "3D office" switch; (10) the fallbacks: no WebGL, the
  * office's chunk blocked, a context lost during a year; (11) a reload while a year plays out; (12) a whole career
  * through the 3D screen; (13) a narrow touch window; (15) the market view: the switch, the buildings, a company's card,
- * the year ending on the market, and Skip, a narrowed window or a lost context during that beat; (16) every era's
- * look within its draw-call ceiling; (17) the market's draw calls in every era; (18) the career's sounds: the
+ * the year ending on the market, and Skip, a narrowed window or a lost context during that beat, and the labels over
+ * the buildings and the bar (their words, the player's "You", none overlapping or under the card, none a target, gone
+ * with the market); (16) every era's look within its draw-call ceiling; (17) the market's draw calls and labels in
+ * every era; (18) the career's sounds: the
  * milestone once as the summary opens, the market's stream, footsteps, nothing on a reload. Step 14, no console
  * errors on any page, runs last, always. Every page fails on any console error or page error, but the
  * software renderer's "GPU stall due to ReadPixels".
@@ -1156,6 +1158,69 @@ const viewButton = (page, name) => views(page).getByRole("button", { name, exact
 const marketCardOf = (page) => page.locator('section[aria-label="Company in the market"]');
 const showInMarket = (page) => page.getByRole("button", { name: "Show in market", exact: true });
 const countOf = (list, name) => list.filter((each) => each === name).length;
+const marketLabelsOf = (page) => page.locator("[data-market-label]");
+
+/**
+ * The labels over the market (src/ui/marketLabels.ts): one over each building still standing, its name and users,
+ * the player's marked "You" and drawn apart; one on the bar in the rivals' panel's words. None overlap, none leave the
+ * canvas, none is under `covers` (the company's card), none can be pointed at or focused, and the canvas is under each.
+ */
+const labelsReadable = async (page, market, where, covers = null) => {
+  const labels = await page.evaluate(() =>
+    [...document.querySelectorAll("[data-market-label]")].map((element) => {
+      const rect = element.getBoundingClientRect();
+      const style = getComputedStyle(element);
+      const layer = element.parentElement;
+      const x = rect.left + rect.width / 2;
+      const y = rect.top + rect.height / 2;
+      const under = document.elementFromPoint(x, y);
+      return {
+        key: element.getAttribute("data-market-label"),
+        text: element.textContent,
+        box: { x: rect.left, y: rect.top, width: rect.width, height: rect.height },
+        clipped: element.scrollWidth > element.clientWidth + 1,
+        background: style.backgroundColor,
+        pointer: getComputedStyle(layer).pointerEvents,
+        focusable: element.querySelectorAll("a, button, input, select, textarea, [tabindex]").length + (element.hasAttribute("tabindex") ? 1 : 0),
+        underIs: under === null ? null : under.tagName.toLowerCase(),
+      };
+    })
+  );
+  const standing = market.companies.filter((c) => c.state !== "out");
+  const canvas = await box(page.locator("[data-office] canvas"));
+  const companyLabels = labels.filter((label) => label.key.startsWith("company:"));
+  const visible = covers === null ? standing : standing.filter((c) => companyLabels.some((label) => label.key === `company:${c.seat}`));
+  if (covers === null) assert(companyLabels.length === standing.length, `${where}: ${companyLabels.length} company labels for ${standing.length} buildings: ${JSON.stringify(labels.map((l) => l.text))}`);
+  for (const each of visible) {
+    const label = companyLabels.find((l) => l.key === `company:${each.seat}`);
+    assert(label !== undefined, `${where}: ${each.name} has no label`);
+    const you = each.state === "player";
+    assert(label.text.includes(each.name) && / users?$/.test(label.text), `${where}: ${each.name}'s label reads ${JSON.stringify(label.text)}`);
+    assert(label.text.startsWith("You") === you, `${where}: ${each.name}'s label ${you ? "is not" : "is"} marked You: ${JSON.stringify(label.text)}`);
+    assert(!label.clipped, `${where}: ${each.name}'s label is cut off: ${JSON.stringify(label.text)}`);
+  }
+  const yours = companyLabels.find((l) => l.text.startsWith("You"));
+  if (yours !== undefined) {
+    for (const other of companyLabels.filter((l) => l !== yours)) assert(other.background !== yours.background, `${where}: the "You" label looks like ${other.text}'s`);
+  }
+  const bar = labels.find((l) => l.key === "bar");
+  if (covers === null) assert(bar !== undefined, `${where}: the bar has no label`);
+  if (bar !== undefined) {
+    assert(/^Bar to go public: [\d.,]+[KM]? users$/.test(bar.text), `${where}: the bar's label reads ${JSON.stringify(bar.text)}`);
+    assert(!bar.clipped, `${where}: the bar's label is cut off`);
+  }
+  const overlaps = (a, b) => a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
+  for (const label of labels) {
+    const b = label.box;
+    assert(b.x >= canvas.x - 0.5 && b.y >= canvas.y - 0.5 && b.x + b.width <= canvas.x + canvas.width + 0.5 && b.y + b.height <= canvas.y + canvas.height + 0.5, `${where}: the label ${JSON.stringify(label.text)} leaves the canvas`);
+    for (const other of labels) if (other !== label) assert(!overlaps(b, other.box), `${where}: the labels ${JSON.stringify(label.text)} and ${JSON.stringify(other.text)} overlap`);
+    if (covers !== null) assert(!overlaps(b, covers), `${where}: the card covers the label ${JSON.stringify(label.text)}`);
+    assert(label.pointer === "none", `${where}: the label ${JSON.stringify(label.text)} takes the pointer (${label.pointer})`);
+    assert(label.focusable === 0, `${where}: the label ${JSON.stringify(label.text)} can be focused`);
+    assert(label.underIs === "canvas", `${where}: under the label ${JSON.stringify(label.text)} is a ${label.underIs}, not the canvas`);
+  }
+  return labels;
+};
 
 /**
  * Ends `year` and waits for its market beat (the caption reads MARKET_LINE), sampling the sounds asked for and the
@@ -1235,6 +1300,7 @@ const theMarket = async (browser, fixtures) => {
     await sleep(300);
     const lot = await office(page, "screenBounds", { kind: "company", seat: 1 });
     assert(lot !== null, "during the market beat seat 1's building is not on the canvas (the camera went back to the office)");
+    assert((await marketLabelsOf(page).count()) > 0, "during the market beat the buildings have no labels");
     await oneSummary(page, "after the market beat");
     assert((await office(page, "view")) === "office", `once the summary opened the view is ${await office(page, "view")}, not the choice`);
     passed(`End ${year} played ${JSON.stringify(lines)}, the last beat on the market with seat 1 in view; then one summary, back in the office`);
@@ -1253,6 +1319,8 @@ const theMarket = async (browser, fixtures) => {
     const stats = await office(page, "stats");
     assert(stats.drawCalls <= MARKET_DRAW_CEILING, `the market draws ${stats.drawCalls} draw calls, over ${MARKET_DRAW_CEILING}`);
     measured.push({ where: `${year + 1}, the market (office fixture)`, office: "market", figures: stats.figures, drawCalls: stats.drawCalls, ceiling: MARKET_DRAW_CEILING });
+    const labels = await labelsReadable(page, market, "the market at 1280x800");
+    if (process.env.MARKS) console.log(JSON.stringify({ size: DESKTOP, canvas: await box(page.locator("[data-office] canvas")), marks: await office(page, "marketMarks"), market }));
     await shot(page, `${year + 1}-market.png`);
     const tallest = market.companies.filter((c) => c.state === "rival").sort((a, b) => b.height - a.height)[0];
     const bounds = await office(page, "screenBounds", { kind: "company", seat: tallest.seat });
@@ -1272,6 +1340,7 @@ const theMarket = async (browser, fixtures) => {
       await rests(page, `the market with a card open at ${size.width}x${size.height}`);
       const card = await box(marketCardOf(page));
       const at = await box(page.locator("[data-office] canvas"));
+      await labelsReadable(page, market, `the market with a card open at ${size.width}x${size.height}`, card);
       for (const each of market.companies.filter((c) => c.state !== "out")) {
         const drawn = await office(page, "screenBounds", { kind: "company", seat: each.seat });
         assert(drawn !== null, `at ${size.width}x${size.height} ${each.name}'s building is not on the canvas`);
@@ -1289,9 +1358,20 @@ const theMarket = async (browser, fixtures) => {
     await page.keyboard.press("Escape");
     await page.waitForTimeout(300);
     assert((await marketCardOf(page).count()) === 0, "Escape did not close the card");
+    // Every label back, and tidy, at the three desktop sizes with no card open.
+    for (const size of [{ width: 1440, height: 900 }, { width: 1920, height: 1080 }, DESKTOP]) {
+      await page.setViewportSize(size);
+      await page.waitForTimeout(400);
+      await rests(page, `the market at ${size.width}x${size.height}`);
+      await labelsReadable(page, market, `the market at ${size.width}x${size.height}`);
+      if (process.env.MARKS) console.log(JSON.stringify({ size, canvas: await box(page.locator("[data-office] canvas")), marks: await office(page, "marketMarks") }));
+      if (size.width !== DESKTOP.width) await shot(page, `${year + 1}-market-${size.width}.png`);
+    }
     await viewButton(page, "Office").click();
     assert((await office(page, "view")) === "office", `"Office" pressed, the view is ${await office(page, "view")}`);
-    passed(`"Market": four buildings ordered by users, ${stats.drawCalls} draw calls; ${tallest.name}'s building clicked shows its card, which covers no building at 1280, 1440 or 1920; Escape closes it; "Office" goes back`);
+    await page.waitForTimeout(100);
+    assert((await marketLabelsOf(page).count()) === 0, "the market's labels stay over the office");
+    passed(`"Market": four buildings ordered by users, ${stats.drawCalls} draw calls; ${labels.length} labels (${labels.map((l) => JSON.stringify(l.text)).join(", ")}), none overlapping, none on the canvas's edge, none a target, at 1280, 1440 and 1920; ${tallest.name}'s building clicked shows its card, which covers no building and no label; Escape closes it; "Office" goes back and the labels go`);
 
     // Nobody stays carried across the market.
     await rests(page, "back in the office");
@@ -1316,12 +1396,16 @@ const theMarket = async (browser, fixtures) => {
     await viewButton(page, "Office").click();
 
     // The 2D layout has neither.
+    await viewButton(page, "Market").click();
+    await page.waitForTimeout(300);
+    assert((await marketLabelsOf(page).count()) > 0, "the market shows no labels");
     await toggle(page).click();
     await page.locator("[data-office]").waitFor({ state: "detached" });
     assert((await showInMarket(page).count()) === 0 && (await views(page).count()) === 0, 'the 2D layout has a "Show in market" button or a "Market" switch');
+    assert((await marketLabelsOf(page).count()) === 0, "the market's labels stay with the 3D view off");
     await toggle(page).click();
     await running(page);
-    passed('the 2D layout has no "Show in market" and no "Market" switch');
+    passed('the 2D layout has no "Show in market", no "Market" switch and no labels');
     noErrors();
     await context.close();
   }
@@ -1464,8 +1548,10 @@ const everyEraMarket = async (browser, fixtures) => {
     const market = await office(page, "market");
     assert(stats.drawCalls <= MARKET_DRAW_CEILING, `${year + 1} (${market.era}): the market draws ${stats.drawCalls} draw calls, over ${MARKET_DRAW_CEILING}`);
     measured.push({ where: `${year + 1}, the market (${name} fixture, ${market.era})`, office: "market", figures: stats.figures, drawCalls: stats.drawCalls, ceiling: MARKET_DRAW_CEILING });
+    const labels = await labelsReadable(page, market, `${year + 1} (${market.era}), the market`);
+    await shot(page, `${year + 1}-${market.era}-market.png`);
     noErrors();
-    passed(`${year + 1} (${market.era}): the market draws ${stats.drawCalls} draw calls, at most ${MARKET_DRAW_CEILING}`);
+    passed(`${year + 1} (${market.era}): the market draws ${stats.drawCalls} draw calls, at most ${MARKET_DRAW_CEILING}; its ${labels.length} labels read, none overlapping`);
     await context.close();
   }
 };

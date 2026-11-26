@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { Plan } from "../../engine/types";
 import type { WorldViewState } from "../../world/mountWorld";
 import type { InteractableTarget } from "../../world/types/interaction";
@@ -9,6 +9,7 @@ import { drawnTeams } from "../../world/cast";
 import WorldView from "../../world/WorldView";
 import { WorldBoundary, WorldUnavailableNote } from "../../world/ui/WorldShell";
 import { careerWorldSound } from "../careerSound";
+import { LABEL_WORDS, placeMarketLabels, type LabelRect, type PlacedLabel } from "../marketLabels";
 import { marketCard, MARKET_WORDS } from "../marketView";
 import { asDrawn, CARRY_WORDS, carryLine, carryStep, highlightFor, TEAM_NAMES, unseenLine, type Carry, type Picked } from "../officeMoves";
 import type { OfficeSource } from "../officeSource";
@@ -61,6 +62,13 @@ const CareerOffice = ({ source, draft, onMove, onView, onFailed, market, view, s
   /** A move that changed the plan but not the people drawn, said in the strip's place for a moment. */
   const [unseen, setUnseen] = useState<string | null>(null);
   const [handle, setHandle] = useState<WorldHandle | null>(null);
+  /** The world draws: neither starting, nor lost, nor unsupported. */
+  const [running, setRunning] = useState(false);
+  /** The labels over the market's buildings and its bar, where they stand on the canvas. */
+  const [labels, setLabels] = useState<readonly PlacedLabel[]>([]);
+  const cellRef = useRef<HTMLDivElement>(null);
+  const switchRef = useRef<HTMLDivElement>(null);
+  const cardRef = useRef<HTMLElement>(null);
   // Without a market there is nothing to show but the office.
   const shown: WorldViewKind = market === null ? "office" : view;
   const shownRef = useRef(shown);
@@ -157,6 +165,7 @@ const CareerOffice = ({ source, draft, onMove, onView, onFailed, market, view, s
         handleRef.current = state.handle;
         setHandle(state.handle);
       }
+      setRunning(state.status === "running");
       onView(state);
     },
     [onView, drop],
@@ -203,6 +212,40 @@ const CareerOffice = ({ source, draft, onMove, onView, onFailed, market, view, s
       ? null
       : marketCard(company, company.state === "player" ? null : (rivals.find((row) => row.id === company.seat) ?? null), market.barUsers);
 
+  // The labels over the market follow where the world draws it, every frame the market shows (the camera glides in,
+  // the player pans or zooms, the window changes), and stand clear of the view switch and the company's card. They
+  // are drawn only while the market shows on a running world: gone with the office, a lost context or the 2D layout.
+  const labelled = shown === "market" && running && handle !== null && market !== null;
+  useLayoutEffect(() => {
+    if (!labelled || handle === null || market === null) return;
+    let frame = 0;
+    let last = "";
+    const tick = (): void => {
+      frame = window.requestAnimationFrame(tick);
+      const canvas = cellRef.current?.querySelector("canvas");
+      if (!canvas) return;
+      const at = canvas.getBoundingClientRect();
+      const relative = (element: Element | null): LabelRect[] => {
+        if (element === null) return [];
+        const rect = element.getBoundingClientRect();
+        return [{ left: rect.left - at.left, top: rect.top - at.top, right: rect.right - at.left, bottom: rect.bottom - at.top }];
+      };
+      const next = placeMarketLabels({
+        companies: market.companies,
+        barUsers: market.barUsers,
+        marks: handle.marketMarks(),
+        cell: { width: at.width, height: at.height },
+        avoid: [...relative(switchRef.current), ...relative(cardRef.current)],
+      });
+      const key = JSON.stringify(next);
+      if (key === last) return;
+      last = key;
+      setLabels(next);
+    };
+    tick();
+    return () => window.cancelAnimationFrame(frame);
+  }, [labelled, handle, market]);
+
   // A new year in the office, or a year starting to play out, puts back whatever is carried.
   useEffect(() => {
     let year: number | null = null;
@@ -247,11 +290,42 @@ const CareerOffice = ({ source, draft, onMove, onView, onFailed, market, view, s
   }, [cardShown, onSelectCompany]);
 
   return (
-    <div className="relative h-full w-full">
+    <div ref={cellRef} className="relative h-full w-full">
       <WorldBoundary fallback={<WorldUnavailableNote />} onError={onFailed}>
         <WorldView source={source} onState={viewState} onTap={onTap} sound={careerWorldSound} />
       </WorldBoundary>
-      <div role="group" aria-label={OFFICE_WORDS.views} className="panel-surface absolute left-2 top-2 z-10 flex gap-1 rounded-lg p-1 text-xs">
+      {labelled && labels.length > 0 && (
+        // Over the canvas, under the switch and the card; never a target, never focused.
+        <div data-market-labels className="pointer-events-none absolute inset-0 z-[5] select-none overflow-hidden">
+          {labels.map((label) => (
+            <div
+              key={label.key}
+              data-market-label={label.key}
+              style={{ left: label.left, top: label.top, width: label.width, height: label.height }}
+              className={`absolute overflow-hidden whitespace-nowrap rounded border px-[6px] py-[3px] text-[11px] leading-[14px] shadow ${
+                label.kind === "bar"
+                  ? "border-amber-400/70 bg-black/60 text-amber-200"
+                  : label.you
+                    ? "border-sky-200 bg-sky-200 text-gray-900"
+                    : "border-white/15 bg-black/60 text-gray-100"
+              }`}
+            >
+              {label.kind === "bar" ? (
+                label.lines[0]
+              ) : (
+                <>
+                  <div className="font-semibold">
+                    {label.you && <span className="mr-1 rounded-sm bg-gray-900 px-[3px] text-[10px] font-bold text-sky-200">{LABEL_WORDS.you}</span>}
+                    {label.lines[0]}
+                  </div>
+                  <div className={label.you ? "text-gray-800" : "text-mist/80"}>{label.lines[1]}</div>
+                </>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+      <div ref={switchRef} role="group" aria-label={OFFICE_WORDS.views} className="panel-surface absolute left-2 top-2 z-10 flex gap-1 rounded-lg p-1 text-xs">
         {VIEWS.map((kind) => (
           <button
             key={kind}
@@ -268,6 +342,7 @@ const CareerOffice = ({ source, draft, onMove, onView, onFailed, market, view, s
       </div>
       {card !== null && (
         <section
+          ref={cardRef}
           aria-label={MARKET_WORDS.card}
           className="panel-surface absolute right-2 top-2 z-10 w-64 max-w-[calc(100%-1rem)] rounded-lg px-3 py-2 text-xs"
         >

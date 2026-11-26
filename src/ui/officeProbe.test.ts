@@ -45,6 +45,7 @@ const fakeHandle = (): WorldHandle => ({
   setMarket: vi.fn(),
   setView: vi.fn(),
   view: vi.fn(() => "office" as const),
+  marketMarks: vi.fn(() => null),
   dispose: vi.fn(),
 });
 
@@ -114,8 +115,11 @@ describe("the career office's check hook", () => {
     withoutMarket();
     const detach = probe.attach(() => ({ status: "running", handle }), source, () => "running", () => market);
     expect([probe.view(), probe.market()]).toEqual(["market", market]);
+    const marks = { lots: [{ seat: 0, top: { x: 5, y: 6 } }], bar: null };
+    vi.mocked(handle.marketMarks).mockReturnValue(marks);
+    expect(probe.marketMarks()).toEqual(marks);
     detach();
-    expect([probe.view(), probe.market()]).toEqual([null, null]);
+    expect([probe.view(), probe.market(), probe.marketMarks()]).toEqual([null, null, null]);
   });
 
   it("reads the sounds the career asked for", () => {
