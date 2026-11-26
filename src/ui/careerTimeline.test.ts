@@ -13,6 +13,15 @@ const real = (turn: number) => atTurn(createGame(newGameSetup(1, "Acme"), CAREER
 const datedUpTo = (year: number) => CAREER.career.dated.filter((card) => card.year <= year).map((card) => card.year);
 
 describe("the timeline", () => {
+  it("never shows the future but the announced shift: crashes stay a surprise", () => {
+    for (let turn = 1; turn <= CAREER.game.maxTurns; turn++) {
+      const view = timelineView(real(turn), [], CAREER)!;
+      expect(view.cards.filter((card) => card.year > view.year), `turn ${turn}`).toEqual([]);
+      const notice = upcomingShift(turn, CAREER);
+      expect(view.shift?.year ?? null, `turn ${turn}`).toBe(notice?.year ?? null);
+    }
+  });
+
   it("shows the year, its era, the whole career's eras and where history ends", () => {
     const view = timelineView(real(32), [], CAREER)!;
     expect(view).toMatchObject({ year: 2021, firstYear: 1990, lastYear: 2038, historyEnds: 2026 });

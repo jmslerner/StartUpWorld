@@ -5,6 +5,12 @@
 import { rulesForTurn, yearOf } from "../engine";
 import type { RulesConfig } from "../engine/types";
 import { percent } from "./format";
+import { MARKET_WORDS } from "./marketView";
+import { CARRY_WORDS } from "./officeMoves";
+import { DESKTOP_QUERY, OFFICE_WORDS } from "./officeView";
+
+/** The narrowest desktop window that shows the 3D office, read from the query that decides it. */
+const desktopWidth = (): string => /min-width:\s*(\d+)px/.exec(DESKTOP_QUERY)?.[1] ?? "1024";
 
 export interface HelpSection {
   readonly title: string;
@@ -74,6 +80,18 @@ export const careerHelp = (config: RulesConfig): readonly HelpSection[] => {
     {
       title: "Rivals come and go",
       text: `Your rivals play by the same rules, and each has one rescue too. A rival that goes out is replaced ${years(replacement.afterYears)} later by a new startup. The annual report says which rivals went public, were rescued or moved office.`,
+    },
+    {
+      title: "The 3D office",
+      text: `In a desktop browser window at least ${desktopWidth()} pixels wide, the career's main screen is your office, drawn in 3D; the "${OFFICE_WORDS.toggle}" switch shows or hides it. To move someone to another team, click a person, then a person of another team or that team's button; "${CARRY_WORDS.keep}" or Escape puts them back. After you end a year, it plays out for a few seconds with captions: people leave, hires walk in, the company moves. "${OFFICE_WORDS.skip}" ends it at once, and with reduced motion it does not play. If the office cannot be drawn, or stops drawing ("${OFFICE_WORDS.reload}" tries again), the 2D screens carry the whole game.`,
+    },
+    {
+      title: "The market",
+      text: `"${OFFICE_WORDS.market}" shows the four companies as buildings: the more users, the taller. The bar of users for going public is marked across them, and a public company flies a flag. Each year ends there, showing where its new users went. Click a building, or a rival's "${MARKET_WORDS.show}", to see its public numbers; "${OFFICE_WORDS.office}" goes back to your office.`,
+    },
+    {
+      title: "Sound",
+      text: "A short sound marks each year's main milestone, such as going public, a move or a new era, and people come and go with footsteps. The Sound menu mutes it or sets the volume.",
     },
   ];
 };
