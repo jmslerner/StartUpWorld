@@ -6,8 +6,8 @@
  * Everything here is drawn at the builder's current transform; (x, y, z) place
  * the part's floor-centre origin unless noted.
  */
-import { C, darken, lighten, NEON, SCALE } from "../../core/palette";
-import type { ModelBuilder } from "../../core/palette";
+import { C, darken, fittingsFor, lighten, NEON, SCALE } from "../../core/palette";
+import type { LookFittings, ModelBuilder } from "../../core/palette";
 import type { ScreenQuad } from "./shared";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -30,7 +30,8 @@ const starBase = (b: ModelBuilder, frame: number, reach: number): void => {
   b.cyl(0.05, 0.06, frame, 0, 0.04, 0);
 };
 
-export const drawChair = (b: ModelBuilder, style: ChairStyle, accent: number = C.teal): void => {
+/** `fit`: the look's fittings, which dress the executive chair (leather on brass until the future). */
+export const drawChair = (b: ModelBuilder, style: ChairStyle, accent: number = C.teal, fit: Pick<LookFittings, "metal" | "upholstery"> = fittingsFor("classic")): void => {
   switch (style) {
     case "garage": {
       // Folding metal chair: an X of tube legs, thin pressed seat and back, their pads in the accent colour.
@@ -89,11 +90,11 @@ export const drawChair = (b: ModelBuilder, style: ChairStyle, accent: number = C
       return;
     }
     case "executive": {
-      // High-back leather with brass base.
-      const leather = C.leather;
+      // High back on a metal base: leather on brass until the future's own (fittingsFor).
+      const leather = fit.upholstery;
       const seam = darken(leather, 0.25);
-      starBase(b, C.brass, 0.27);
-      b.cyl(0.03, 0.25, C.brass, 0, 0.09, 0, { seg: 8 });
+      starBase(b, fit.metal, 0.27);
+      b.cyl(0.03, 0.25, fit.metal, 0, 0.09, 0, { seg: 8 });
       b.box(0.5, 0.11, 0.48, leather, 0, SEAT_Y - 0.11, 0.0, { r: 0.045 });
       b.box(0.5, 0.78, 0.1, leather, 0, 0.47, -0.25, { rx: -0.09, r: 0.045 });
       for (const sy of [0.72, 0.92, 1.1]) b.box(0.4, 0.012, 0.012, seam, 0, sy, -0.2 - (sy - 0.47) * 0.09, { r: 0 });
@@ -112,7 +113,7 @@ export const drawChair = (b: ModelBuilder, style: ChairStyle, accent: number = C
 // whoever sits at the desk. The glowing picture is a separate ScreenQuad.
 // ─────────────────────────────────────────────────────────────────────────────
 
-export type MonitorKind = "flat" | "wide" | "crt" | "laptop";
+export type MonitorKind = "flat" | "wide" | "crt" | "laptop" | "glass";
 
 export interface MonitorSpec {
   kind: MonitorKind;
@@ -130,7 +131,11 @@ const MONITOR_SIZE: Record<MonitorKind, { w: number; h: number; lift: number }> 
   wide: { w: 0.78, h: 0.32, lift: 0.15 },
   crt: { w: 0.42, h: 0.34, lift: 0.04 },
   laptop: { w: 0.34, h: 0.22, lift: 0 },
+  glass: { w: 0.56, h: 0.3, lift: 0.17 },
 };
+
+/** Depth of the glass pane of the invented future's screen. */
+const GLASS_PANE = 0.012;
 
 const LAPTOP_TILT = 0.3;
 
@@ -168,6 +173,16 @@ export const drawMonitor = (b: ModelBuilder, spec: MonitorSpec): void => {
         });
         return;
       }
+      case "glass": {
+        // The invented future: a thin pane floating over a slim stand, held by nothing you can see but a pin.
+        b.cyl(0.08, 0.012, shell, 0, 0, 0.04, { seg: 16 });
+        b.cyl(0.012, size.lift - 0.03, shell, 0, 0.012, 0.04, { seg: 8 });
+        b.ball(0.016, lighten(shell, 0.3), 0, size.lift - 0.02, 0.04, { seg: 8 });
+        b.box(size.w, size.h, GLASS_PANE, C.glass, 0, size.lift, 0, { r: 0.004 });
+        // A pale rim of light along the bottom edge, painted on.
+        b.box(size.w - 0.04, 0.006, GLASS_PANE + 0.002, lighten(C.glass, 0.5), 0, size.lift + 0.004, 0, { r: 0 });
+        return;
+      }
     }
   });
 };
@@ -196,6 +211,12 @@ export const monitorScreen = (spec: MonitorSpec): ScreenQuad => {
       w = size.w - 0.03;
       h = size.h - 0.03;
       tilt = LAPTOP_TILT;
+      break;
+    case "glass":
+      dy = size.lift + size.h / 2;
+      dz = -(GLASS_PANE / 2 + 0.002);
+      w = size.w - 0.02;
+      h = size.h - 0.02;
       break;
     default:
       dy = size.lift + size.h / 2;

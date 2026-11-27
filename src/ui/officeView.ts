@@ -109,6 +109,10 @@ export const OFFICE_WORDS = {
   reload: "Reload 3D view",
   opening: "Opening the office…",
   skip: "Skip",
+  office: "Office",
+  market: "Market",
+  views: "Show the office or the market",
+  marketLater: "The market shows after your first year",
 } as const;
 
 /** The caption while a year plays out. */
@@ -127,5 +131,7 @@ export const beatLine = (beat: PlaybackBeat, officeNames: readonly string[]): st
     }
     case "year":
       return "A quiet year";
+    case "market":
+      return "Where the year's new users went";
   }
 };

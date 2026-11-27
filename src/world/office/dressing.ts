@@ -11,7 +11,8 @@
  * Nothing here is interactive, and nothing here changes after the office is
  * built. The signs say plain words: the world is told no company's name.
  */
-import { C, NEON, phaseTier, themeFor } from "../core/palette";
+import { CAMERA_AZIMUTH } from "../core/CameraRig";
+import { C, fittingsFor, NEON, phaseTier, themeFor } from "../core/palette";
 import type { LookId, OfficeIndex } from "../types";
 import { decorSize, getLayoutDecor, groundRect, LOFT_ANNEX_WIDTH, WALL_GAP } from "./layouts";
 import { createSignatureProp, SIGNATURE_PROPS, SIGNATURE_SIZES } from "./props/signature";
@@ -88,6 +89,11 @@ const createGuestDesk = (variant: number): PropHandle => {
 };
 
 const COUCH_COLORS = [C.teal, C.coral, C.navy, C.purple, C.leather];
+/** A couch's colour in a look: the leather one takes the look's upholstery (the future has no leather). */
+const couchColor = (variant: number, look: LookId): number => {
+  const color = COUCH_COLORS[variant % COUCH_COLORS.length];
+  return color === C.leather ? fittingsFor(look).upholstery : color;
+};
 const LAMP_STYLES = ["classic", "arc", "work"] as const;
 
 const DECOR_FACTORIES: Record<DecorKind, (office: OfficeIndex, look: LookId, spot: DecorSpot) => PropHandle> = {
@@ -96,8 +102,8 @@ const DECOR_FACTORIES: Record<DecorKind, (office: OfficeIndex, look: LookId, spo
   bookshelf: (office, look) => createBookshelf(office, look),
   "filing-cabinet": (_office, _look, spot) => createFilingCabinet({ drawers: 2 + (spot.variant % 2) }),
   boxes: (_office, _look, spot) => createCardboardBoxes(spot.variant),
-  couch: (_office, _look, spot) => createCouch({ seats: 2, color: COUCH_COLORS[spot.variant % COUCH_COLORS.length] }),
-  "couch-wide": (_office, _look, spot) => createCouch({ seats: 3, color: COUCH_COLORS[spot.variant % COUCH_COLORS.length] }),
+  couch: (_office, look, spot) => createCouch({ seats: 2, color: couchColor(spot.variant, look) }),
+  "couch-wide": (_office, look, spot) => createCouch({ seats: 3, color: couchColor(spot.variant, look) }),
   "coffee-table": (office, look) => createCoffeeTable(office, look),
   "water-cooler": () => createWaterCooler(),
   whiteboard: () => createWhiteboard(),
@@ -105,8 +111,8 @@ const DECOR_FACTORIES: Record<DecorKind, (office: OfficeIndex, look: LookId, spo
   "ping-pong": () => createPingPongTable(),
   arcade: (_office, _look, spot) => createArcadeCabinet({ color: [C.purple, C.teal, C.red][spot.variant % 3] }),
   vending: (_office, _look, spot) => createVendingMachine({ color: [C.red, C.blue][spot.variant % 2] }),
-  "trophy-shelf": () => createTrophyShelf(),
-  "stock-ticker": () => createStockTicker(),
+  "trophy-shelf": (_office, look) => createTrophyShelf({ look }),
+  "stock-ticker": (_office, look) => createStockTicker({ look }),
   reception: (office, look) => createReceptionDesk(office, look),
   "meeting-pod": (office, look) => createMeetingPod(office, look),
   "floor-lamp": (_office, _look, spot) => createFloorLamp({ style: LAMP_STYLES[spot.variant % LAMP_STYLES.length] }),
@@ -119,11 +125,18 @@ export const createDecorProp = (office: OfficeIndex, spot: DecorSpot, look: Look
   DECOR_FACTORIES[spot.kind](office, look, spot);
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Signature props: what says which decade it is
+// Signature props: what says which era it is
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** Décor a signature prop may stand in for. Never reception, meeting pods, partitions, couches, tables or games. */
 export const REPLACEABLE_DECOR: readonly DecorKind[] = ["plant", "plant-large", "boxes", "filing-cabinet", "water-cooler", "vending", "bookshelf"];
+
+/**
+ * A spot facing `facing` (front +Z turned by it) shows its front to the camera, which looks from (+X, +Z): a
+ * signature prop stands only on spots like this, so it is never seen from behind.
+ */
+export const facesCamera = (facing: number): boolean =>
+  Math.sin(facing) * Math.sin(CAMERA_AZIMUTH) + Math.cos(facing) * Math.cos(CAMERA_AZIMUTH) > 0;
 
 const NO_SIGNATURES: ReadonlyMap<number, SignatureKind> = new Map();
 
@@ -186,6 +199,13 @@ const createExtensionLead = (): PropHandle => {
 // The scene of each office
 // ─────────────────────────────────────────────────────────────────────────────
 
+/**
+ * Place a piece of contents: a prop that never animates or glows goes with the still things, to be merged into a
+ * few meshes; the rest stand on their own.
+ */
+const placeProp = <T extends PropHandle>(kit: StageKit, prop: T, spot: Spot): T =>
+  prop.update === undefined && prop.setGlow === undefined ? kit.placeStatic(prop, spot) : kit.place(prop, spot);
+
 /** Placement vocabulary for a scene, in floor-plan coordinates. */
 class Dresser {
   readonly kit: StageKit;
@@ -200,7 +220,12 @@ class Dresser {
 
   /** Stand a prop on the floor or the ground outside. */
   put<T extends PropHandle>(prop: T, x: number, z: number, facing = 0): T {
-    return this.kit.place(prop, { x, z, facing });
+    return this.stand(prop, { x, z, facing });
+  }
+
+  /** Put a prop into the office at `spot` (merged with the still things when it neither animates nor glows). */
+  stand<T extends PropHandle>(prop: T, spot: Spot): T {
+    return placeProp(this.kit, prop, spot);
   }
 
   /** Lay something flat on the office floor (a rug, a cable): part of the building, it rises with the shell. */
@@ -219,22 +244,22 @@ class Dresser {
 
   /** Hang a sign / poster / neon on the −Z wall: centred on `x`, bottom edge at height `y`. */
   hangBack<T extends PropHandle>(prop: T, x: number, y: number): T {
-    return this.kit.place(prop, this.backWallSpot(x, y));
+    return this.stand(prop, this.backWallSpot(x, y));
   }
 
   /** Hang a sign / poster / neon on the −X wall: centred on `z`, bottom edge at height `y`. */
   hangSide<T extends PropHandle>(prop: T, z: number, y: number): T {
-    return this.kit.place(prop, this.sideWallSpot(z, y));
+    return this.stand(prop, this.sideWallSpot(z, y));
   }
 
   /** Stand a wall-hugging prop (origin at its footprint centre) against the −Z wall. */
   againstBack<T extends PropHandle>(prop: T, x: number): T {
-    return this.kit.place(prop, { x, z: this.floor.minZ + WALL_GAP + prop.footprint.d / 2 });
+    return this.stand(prop, { x, z: this.floor.minZ + WALL_GAP + prop.footprint.d / 2 });
   }
 
   /** Stand a wall-hugging prop against the −X wall. */
   againstSide<T extends PropHandle>(prop: T, z: number): T {
-    return this.kit.place(prop, { x: this.floor.minX + WALL_GAP + prop.footprint.d / 2, z, facing: Math.PI / 2 });
+    return this.stand(prop, { x: this.floor.minX + WALL_GAP + prop.footprint.d / 2, z, facing: Math.PI / 2 });
   }
 
   backWallSpot(x: number, y: number): Spot {
@@ -286,7 +311,7 @@ const sharedScene: Scene = (d) => {
 
   d.lay(createRug(6.2, 3.6, { color: theme.accents[0], pattern: "border" }), 0.05, 0);
   // Above the coffee corner, clear of everything that hangs lower on that wall.
-  d.kit.place(createNeonSign("hello", { color: NEON, height: 0.42 }), d.backWallSpot(4.35, 1.98));
+  d.stand(createNeonSign("hello", { color: NEON, height: 0.42 }), d.backWallSpot(4.35, 1.98));
   d.hangSide(createWallArt(0), 4.5, 1.15);
   d.put(createPendantLamp({ shade: theme.accents[1] }), -1.05, 0.15);
   d.put(createPendantLamp({ shade: theme.accents[2] }), 1.75, 0.15);
@@ -313,7 +338,7 @@ const sharedScene: Scene = (d) => {
 const ownScene: Scene = (d) => {
   const { floor } = d;
 
-  d.kit.place(createSign("welcome", { height: 0.46, lit: true }), d.backWallSpot(6.0, 1.85));
+  d.stand(createSign("welcome", { height: 0.46, lit: true }), d.backWallSpot(6.0, 1.85));
   d.hangSide(createWallArt(2), -5.6, 1.2);
 
   d.put(createTree(0), floor.minX - 0.2, floor.maxZ + 1.3);
@@ -329,7 +354,7 @@ const floorScene: Scene = (d) => {
   const { floor } = d;
   const theme = themeFor(3, d.kit.look);
 
-  d.kit.place(createNeonSign("onwards", { color: theme.accents[2], height: 0.5 }), d.sideWallSpot(-1.35, 1.75));
+  d.stand(createNeonSign("onwards", { color: theme.accents[2], height: 0.5 }), d.sideWallSpot(-1.35, 1.75));
   d.lay(createRug(4.4, 3.4, { color: theme.accents[0], pattern: "stripes" }), 8.35, 4.05);
   d.lay(createRug(3.4, 2.6, { color: theme.accents[1], pattern: "border" }), -1.2, 6.4);
   d.lay(createRug(2.2, 1.5, { color: theme.accents[2], pattern: "plain" }), 4.3, 6.0);
@@ -349,10 +374,12 @@ const floorScene: Scene = (d) => {
 const campusScene: Scene = (d) => {
   const { floor } = d;
 
-  d.kit.place(createSign("HQ", { height: 0.5, background: C.marble, color: C.brass, lit: true }), d.backWallSpot(11.6, 1.55));
+  const { look } = d.kit;
+  const metal = fittingsFor(look).metal;
+  d.stand(createSign("HQ", { height: 0.5, background: C.marble, color: metal, lit: true }), d.backWallSpot(11.6, 1.55));
   // A ticker above the calendar: set dressing, the same made-up prices whatever the company does.
-  d.put(createStockTicker(), 0.2, floor.minZ + 0.32);
-  d.lay(createRug(2.2, 2.4, { color: C.burgundy, accent: C.brass, pattern: "border" }), 10.5, 7.9);
+  d.put(createStockTicker({ look }), 0.2, floor.minZ + 0.32);
+  d.lay(createRug(2.2, 2.4, { color: C.burgundy, accent: metal, pattern: "border" }), 10.5, 7.9);
   d.hangSide(createWallArt(3), -0.6, 1.25);
 
   // Skyline hints: towers close behind the back walls, which hide where they meet the ground.
@@ -379,7 +406,8 @@ export const dressOffice = (kit: StageKit): void => {
   const signatures = signaturePlan(decor, kit.look);
   decor.forEach((spot, index) => {
     const signature = signatures.get(index);
-    kit.place(signature === undefined ? createDecorProp(kit.office, spot, kit.look) : createSignatureProp(signature, decorSize(spot), spot.variant), spot);
+    placeProp(kit, signature === undefined ? createDecorProp(kit.office, spot, kit.look) : createSignatureProp(signature, decorSize(spot), spot.variant), spot);
   });
   SCENES[phaseTier(kit.office)](new Dresser(kit));
+  kit.mergeStatics();
 };

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MAX_STAFF_DRAWN, MAX_WAITING_DRAWN, nextCast } from "./cast";
+import { MAX_STAFF_DRAWN, MAX_WAITING_DRAWN, drawnTeams, nextCast } from "./cast";
 import type { Cast } from "./cast";
 import { hashText32 } from "./hash";
 import { TEAMS } from "./types";
@@ -243,5 +243,14 @@ describe("the cast, with a hint of who moves", () => {
     for (const hint of [{ releaseFirst: "p2" }, { releaseFirst: "p9" }, {}]) {
       expect(who(nextCast(before, scene([1, 2, 0]), hint))).toEqual(who(nextCast(before, scene([1, 2, 0]))));
     }
+  });
+
+  it("draws every person of a small company, and a large one by its shares", () => {
+    expect(drawnTeams(scene([3, 2, 1]))).toEqual({ product: 3, growth: 2, recruiting: 1 });
+    expect(drawnTeams(scene([120, 40, 40]))).toEqual({ product: 30, growth: 10, recruiting: 10 });
+  });
+
+  it("one move in a company of 200 can leave the drawn shares as they were", () => {
+    expect(drawnTeams(scene([119, 41, 40]))).toEqual(drawnTeams(scene([120, 40, 40])));
   });
 });

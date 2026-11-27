@@ -1,7 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import type { SceneSource, WorldViewState } from "../world/mountWorld";
 import type { WorldHandle, WorldStats } from "../world/types/handle";
+import type { MarketScene } from "../world/types/market";
 import type { OfficeScene } from "../world/types/scene";
+import { playCareerSound } from "./careerSound";
 import { createOfficeProbe } from "./officeProbe";
 
 const scene: OfficeScene = {
@@ -40,6 +42,11 @@ const fakeHandle = (): WorldHandle => ({
   personAt: vi.fn((desk: number) => (desk === 0 ? "p0" : null)),
   releaseFirst: vi.fn(),
   settle: vi.fn(),
+  setMarket: vi.fn(),
+  setView: vi.fn(),
+  view: vi.fn(() => "office" as const),
+  marketMarks: vi.fn(() => null),
+  onFrame: vi.fn(() => () => {}),
   dispose: vi.fn(),
 });
 
@@ -87,6 +94,39 @@ describe("the career office's check hook", () => {
     state = { status: "running", handle };
     expect(probe.screenBounds({ kind: "person", personId: "p0" })).toEqual(box);
     expect(handle.screenBounds).toHaveBeenCalledWith({ kind: "person", personId: "p0" });
+  });
+
+  it("reads the view and the market the screen shows, and nothing once detached", () => {
+    const probe = createOfficeProbe();
+    const source: SceneSource = { get: () => scene, subscribe: () => () => undefined };
+    const market: MarketScene = {
+      runId: "run",
+      year: 1991,
+      era: "dial-up",
+      barUsers: 1000,
+      bar: 0.9,
+      pool: 100,
+      companies: [{ seat: 0, name: "Acme", state: "player", users: 10, height: 0.1, won: 1, listed: false, newcomer: false }],
+    };
+    const handle = fakeHandle();
+    vi.mocked(handle.view).mockReturnValue("market");
+    expect([probe.view(), probe.market()]).toEqual([null, null]);
+    const withoutMarket = probe.attach(() => ({ status: "running", handle }), source, () => "running");
+    expect([probe.view(), probe.market()]).toEqual(["market", null]);
+    withoutMarket();
+    const detach = probe.attach(() => ({ status: "running", handle }), source, () => "running", () => market);
+    expect([probe.view(), probe.market()]).toEqual(["market", market]);
+    const marks = { lots: [{ seat: 0, top: { x: 5, y: 6 } }], bar: null };
+    vi.mocked(handle.marketMarks).mockReturnValue(marks);
+    expect(probe.marketMarks()).toEqual(marks);
+    detach();
+    expect([probe.view(), probe.market(), probe.marketMarks()]).toEqual([null, null, null]);
+  });
+
+  it("reads the sounds the career asked for", () => {
+    const probe = createOfficeProbe();
+    playCareerSound("neutral");
+    expect(probe.sounds().at(-1)).toBe("neutral");
   });
 
   it("keeps the last world taken down readable", () => {

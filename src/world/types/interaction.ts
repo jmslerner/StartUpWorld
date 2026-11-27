@@ -13,7 +13,9 @@ export type InteractableTarget =
   | { kind: "station"; station: StationKind }
   | { kind: "door" }
   /** The sign beside the door that counts the people who are not drawn. */
-  | { kind: "sign" };
+  | { kind: "sign" }
+  /** A company's building in the market view; `seat` 0 is the player. */
+  | { kind: "company"; seat: number };
 
 export interface InteractableOptions {
   /** Short hover label, e.g. "Whiteboard". */

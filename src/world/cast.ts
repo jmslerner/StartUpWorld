@@ -118,8 +118,17 @@ export interface CastHint {
   readonly releaseFirst?: string;
 }
 
+/** The scene's five groups, in the order of `GROUPS`, as whole people. */
+const countsOf = (scene: OfficeScene): number[] => [...TEAMS.map((team) => whole(scene.teams[team])), whole(scene.away), whole(scene.leaving)];
+
+/** The people drawn at work per team for a scene (the first three of its shares of MAX_STAFF_DRAWN). */
+export const drawnTeams = (scene: OfficeScene): Readonly<Record<Team, number>> => {
+  const shares = sharesOf(countsOf(scene), MAX_STAFF_DRAWN);
+  return { product: shares[0], growth: shares[1], recruiting: shares[2] };
+};
+
 export const nextCast = (prev: Cast | null, scene: OfficeScene, hint: CastHint = {}): Cast => {
-  const counts = [...TEAMS.map((team) => whole(scene.teams[team])), whole(scene.away), whole(scene.leaving)];
+  const counts = countsOf(scene);
   const total = counts.reduce((sum, count) => sum + count, 0);
   const shares = sharesOf(counts, MAX_STAFF_DRAWN);
   const staff = shares.reduce((sum, share) => sum + share, 0);

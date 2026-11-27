@@ -362,9 +362,10 @@ export class Actor {
     if (!moved || this.leaving) return;
     switch (this.mode) {
       case "waiting":
-        // Not on stage yet. Somebody due to pop in does so at the new seat; a walk-in
-        // works out its route when it starts.
-        if (this.afterWait === "pop") this.motion.place(seat.x, seat.z, seat.facing);
+        // Not on stage yet. Somebody due to pop in still pops in where they were due to (the spot at the door the
+        // new office put them at, say) and then walks over, just as if they had popped in before the seat changed:
+        // however slowly the world is drawn, a hire is seen walking to the desk. A walk-in works out its route when
+        // it starts.
         break;
       case "seated":
         this.dustOnSit = true;
@@ -568,6 +569,11 @@ export class Actor {
     this.visible = true;
     if (this.afterWait === "pop") {
       this.mode = "seated";
+      // The seat changed while they waited: up, and over to it.
+      if (this.motion.x !== this.home.x || this.motion.z !== this.home.z) {
+        this.dustOnSit = true;
+        this.beginRising();
+      }
       return;
     }
     if (this.waveOnEntry) stage.bubble(this, "wave");

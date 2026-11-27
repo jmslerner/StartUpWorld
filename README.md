@@ -7,8 +7,17 @@ React, TypeScript, Zustand and Tailwind CSS.
 The rules, the rulings on points the design left open and the tuning log are in
 [docs/turn-based-design.md](docs/turn-based-design.md).
 
-A second mode, the career (one company from 1990 to 2038, a turn a year), has no screens yet; its rules, rulings and
-tuning log are in [docs/career-rules.md](docs/career-rules.md).
+The game has two modes:
+
+- **The race**, described above: 20 quarters against three rivals, played in 2D screens.
+- **The career**: one company from 1990 to 2038, a year a turn, through eight eras, with going public as a milestone
+  and the founder's stake deciding the winner after the last year. On a desktop browser window of 1024 px or more with
+  WebGL 2, its main screen is a 3D office and market: the team at their desks, the year playing out in a few seconds,
+  the four companies as buildings sized by their users, a look of its own for every era and a sound for each year's
+  main milestone. Everywhere else (phones, touch screens, narrower windows, no WebGL, or 3D switched off) the career
+  is played in its complete 2D screens. Its rules, rulings and tuning log are in
+  [docs/career-rules.md](docs/career-rules.md); its design is in
+  [docs/superpowers/specs/2026-11-25-career-3d-design.md](docs/superpowers/specs/2026-11-25-career-3d-design.md).
 
 ## Local setup
 
@@ -18,7 +27,7 @@ npm run dev
 ```
 
 The game is then at http://localhost:5173. It saves itself in the browser after every change, so a refresh resumes the
-quarter you were planning.
+quarter you were planning in a race, and the year you were planning in a career.
 
 ## Commands
 
@@ -30,6 +39,13 @@ quarter you were planning.
 | `npm run sim:career` | Plays 1,000 seeded careers, 1990 to 2038, without a screen and prints the career's balance report. |
 | `npm run build` | Typechecks and builds for production. |
 | `npm run lint` | Runs ESLint. |
+| `node scripts/career-check.mjs [--no-build] [--shots <dir>] [--only n,n]` | Builds the app and plays the career in headless Chromium with WebGL off, through the 2D screens, and checks the race's text against its snapshot. |
+| `node scripts/office-check.mjs [--no-build] [--shots <dir>] [--only n,n]` | Builds the app and plays the career through its 3D office and market in headless Chromium: every era's look, the market, the sounds, the fallbacks and the draw calls. |
+| `node scripts/world-check.mjs` | Builds the app and checks each office on the office lab page: draw calls, rest, a year played out, a lost context. |
+| `npx tsx scripts/career-fixtures.ts` | Prints the career saves the browser checks load (one per era, an office move, a listing and others). |
+
+The browser checks need a Chromium that Playwright can launch; they are not part of `npm test` and take minutes.
+`--no-build` serves the `dist` that is there, `--shots <dir>` saves screenshots, and `--only` runs only the steps named.
 
 ## Tuning the game
 
@@ -96,8 +112,11 @@ src/
   sim/               the headless simulator and its report
   state/             the game store and the autosave
   ui/                screens, components and the tested view model behind them
-  audio/             synthesized sound effects
-scripts/sim.ts       npm run sim
+  scene/             the scene model: the office, the market and the year's playback as plain data, no three.js
+  world/             the career's 3D office and market (three.js), drawn from the scene model
+  lab/               the office lab page (office-lab.html), for looking at each office on its own
+  audio/             synthesised sound for the interface, the career's milestones and the office
+scripts/             the simulator (npm run sim), the browser checks and the career fixtures they load
 api/                 leaderboard functions from the earlier game (see Deployment)
 docs/                the game design
 ```

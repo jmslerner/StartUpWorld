@@ -2,10 +2,14 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { flushSync } from "react-dom";
 import { rulesForTurn, yearOf } from "../../engine/career";
 import type { Plan } from "../../engine/types";
+import type { SoundName } from "../../audio/sounds";
+import type { GameStore } from "../../state/gameStore";
 import { PLAYER_ID } from "../../state/player";
 import { browserStorage, gameStore, useGame } from "../../state/useGame";
-import { NO_PLAYBACK, yearPlayback } from "../../scene/yearPlayback";
+import { marketSceneFor } from "../../scene/marketScene";
+import { NO_PLAYBACK, withMarket, yearPlayback } from "../../scene/yearPlayback";
 import type { WorldViewState } from "../../world/mountWorld";
+import type { MarketScene, WorldViewKind } from "../../world/types/market";
 import { EventBanner } from "../components/EventBanner";
 import { OfficeSlot } from "../components/OfficeSlot";
 import { HowToPlayDialog } from "../components/HowToPlay";
@@ -14,6 +18,7 @@ import { ProjectionCard } from "../components/ProjectionCard";
 import { QuarterReport } from "../components/QuarterReport";
 import { ResourceBar } from "../components/ResourceBar";
 import { careerEndView } from "../careerEnd";
+import { beatSoundFor, playCareerSound, resetSoundOnce, soundOnce, yearSoundFor } from "../careerSound";
 import { listingView, officeMoveView } from "../careerPlan";
 import { careerReportView, rivalCareerRows } from "../careerReport";
 import { careerStatusView, datedYear, timelineView } from "../careerTimeline";
@@ -23,6 +28,7 @@ import { SoundMenu } from "../components/SoundMenu";
 import { Timeline } from "../components/Timeline";
 import { YearSummary } from "../components/YearSummary";
 import { money } from "../format";
+import { viewNow } from "../marketView";
 import { SFX } from "../sound";
 import { BUTTON, BUTTON_ON, LABEL, PRIMARY, TONE } from "../styles";
 import { SETTLE_MS } from "../useDialog";
@@ -71,6 +77,26 @@ const PLAY_TICK_MS = 250;
 const reducedMotionNow = (): boolean =>
   typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
+/** The sound a year earns, and the key that lets it play once: the career (seed, seat, founding year) and the year played. */
+interface YearCue {
+  readonly key: string;
+  readonly sound: SoundName | null;
+}
+
+/** The cue of the year just ended, from the store before and after it; null in a race, or when no year was played. */
+const yearCueOf = (before: GameStore, after: GameStore): YearCue | null => {
+  const game = before.game;
+  const founded = game?.companies[PLAYER_ID]?.career?.founded;
+  if (game === null || before.config.career === undefined || before.seed === null || founded === undefined) return null;
+  if (after.lastLog === before.lastLog) return null;
+  const sound = yearSoundFor({
+    config: before.config,
+    before: { turn: game.turn, record: before.record },
+    after: { turn: after.game?.turn ?? game.turn + 1, record: after.record, over: after.over },
+  });
+  return { key: `${before.seed}:${PLAYER_ID}:${founded}:${game.turn}`, sound };
+};
+
 const desktopWindow = (): boolean => typeof window !== "undefined" && typeof window.matchMedia === "function" && window.matchMedia(DESKTOP_QUERY).matches;
 
 /** The game itself: resources on top, the plan and the rivals side by side, the report over everything after each year or quarter. */
@@ -88,6 +114,7 @@ export const GameScreen = () => {
   const leave = useGame((state) => state.leave);
   const config = useGame((state) => state.config);
   const record = useGame((state) => state.record);
+  const seed = useGame((state) => state.seed);
   const words = useMemo(() => wordsFor(config), [config]);
   const career = config.career !== undefined;
 
@@ -112,6 +139,8 @@ export const GameScreen = () => {
   const skipRef = useRef<HTMLButtonElement | null>(null);
   // When the year started playing: the second click of a double click on End lands on Skip, and must not skip it.
   const playStartedAt = useRef(Number.NEGATIVE_INFINITY);
+  // The sound of the year playing out, heard as its summary opens.
+  const yearCueRef = useRef<YearCue | null>(null);
 
   const [tab, setTab] = useState<Tab>("plan");
   const [helpOpen, setHelpOpen] = useState(false);
@@ -119,6 +148,9 @@ export const GameScreen = () => {
   // A career's report opens on the year in brief; the full report is one button away. Reset as the report closes,
   // so every opening starts on the summary.
   const [fullReport, setFullReport] = useState(false);
+  // The career's market: the view the player chose, and the company selected in it.
+  const [chosenView, setChosenView] = useState<WorldViewKind>("office");
+  const [selectedSeat, setSelectedSeat] = useState<number | null>(null);
 
   const resource = useMemo(() => (game === null ? null : resourceView(game, config)), [game, config]);
   const planning = useMemo(() => (game === null || draft === null ? null : planningView(game, draft, config)), [game, draft, config]);
@@ -141,6 +173,22 @@ export const GameScreen = () => {
   // Going public and the coming office move, as the plan offers them; null in a race.
   const listing = useMemo(() => (game === null || draft === null ? null : listingView(game, draft, config)), [game, draft, config]);
   const move = useMemo(() => (planning === null ? null : officeMoveView(planning.projection, config)), [planning, config]);
+  // The market the world draws; null in a race, without a seed, and before any year was played.
+  const market = useMemo<MarketScene | null>(
+    () => (game === null || lastLog === null || seed === null || config.career === undefined ? null : marketSceneFor({ game, log: lastLog, config, seed })),
+    [game, lastLog, config, seed],
+  );
+  const marketRef = useRef<MarketScene | null>(market);
+  useEffect(() => {
+    marketRef.current = market;
+  }, [market]);
+  // Another run: nothing is selected in its market.
+  const runId = market?.runId ?? null;
+  const [selectedRun, setSelectedRun] = useState(runId);
+  if (runId !== selectedRun) {
+    setSelectedRun(runId);
+    setSelectedSeat(null);
+  }
 
   const onChange = useCallback((plan: Plan) => setDraft(plan), [setDraft]);
 
@@ -150,7 +198,15 @@ export const GameScreen = () => {
     playRef.current = finishYearPlay(playRef.current, officeSource, viewRef.current.handle);
     beatShown.current = null;
     setPlay(IDLE);
+    const cue = yearCueRef.current;
+    yearCueRef.current = null;
+    if (cue !== null) soundOnce(cue.key, cue.sound);
   }, [officeSource]);
+
+  // A new career screen: the last career's year keys are forgotten, so the same seed's first year is heard again.
+  useEffect(() => {
+    resetSoundOnce();
+  }, []);
 
   useEffect(() => {
     availabilityRef.current = availability;
@@ -172,7 +228,7 @@ export const GameScreen = () => {
 
   useEffect(() => {
     if (!career) return;
-    return officeProbe().attach(() => viewRef.current, officeSource, () => availabilityRef.current);
+    return officeProbe().attach(() => viewRef.current, officeSource, () => availabilityRef.current, () => marketRef.current);
   }, [career, officeSource]);
 
   // The office cell ends above the bottom bar with nothing scrolled.
@@ -248,10 +304,13 @@ export const GameScreen = () => {
       const playerOut = after.game === null || after.game.companies[PLAYER_ID].out !== null;
       if (yearPlaysOut({ log: before.lastLog }, { log: after.lastLog, failure: after.failure, playerOut })) {
         const now = performance.now();
-        playRef.current = startYearPlay(playRef.current, yearPlayback(after.lastLog?.companies[PLAYER_ID] ?? null, false), year, now);
+        playRef.current = startYearPlay(playRef.current, withMarket(yearPlayback(after.lastLog?.companies[PLAYER_ID] ?? null, false)), year, now);
         setPlayNow(now);
       }
       const started = playRef.current;
+      const cue = yearCueOf(before, after);
+      if (started.phase === "playing") yearCueRef.current = cue;
+      else if (cue !== null) soundOnce(cue.key, cue.sound);
       if (started.phase === "playing") {
         playStartedAt.current = performance.now();
         beatShown.current = 0;
@@ -262,6 +321,11 @@ export const GameScreen = () => {
       setPlay(started);
     } else {
       endQuarter();
+      // A career's year without playback is heard at once, as its summary opens; a race computes nothing.
+      if (before.config.career !== undefined) {
+        const cue = yearCueOf(before, gameStore.getState());
+        if (cue !== null) soundOnce(cue.key, cue.sound);
+      }
     }
     setTab("plan");
     window.scrollTo({ top: 0 });
@@ -293,6 +357,9 @@ export const GameScreen = () => {
     if (step.kind === "beat" && play.phase === "playing") {
       beatShown.current = step.index;
       officeSource.showBeat(play.playback, step.index);
+      const beat = play.playback.beats[step.index];
+      const sound = beat === undefined ? null : beatSoundFor(beat);
+      if (sound !== null) playCareerSound(sound);
     }
   }, [play, playNow, officeSource]);
 
@@ -327,6 +394,13 @@ export const GameScreen = () => {
 
   const closeHelp = useCallback(() => setHelpOpen(false), []);
 
+  /** "Show in market" on a rival's card: the market, that company selected, and the office cell in view. */
+  const showInMarket = useCallback((seat: number) => {
+    setChosenView("market");
+    setSelectedSeat(seat);
+    cellRef.current?.scrollIntoView({ block: "nearest" });
+  }, []);
+
   if (game === null || draft === null || resource === null || planning === null) return null;
   const company = game.companies[PLAYER_ID];
   const { projection } = planning;
@@ -338,6 +412,7 @@ export const GameScreen = () => {
   // caption are the one year in view.
   const dim = `transition-opacity duration-300 ${playing ? "opacity-40" : ""}`;
   const beat = beatNow(play, playNow);
+  const shownView = viewNow(chosenView, playing ? beat : null);
   const officeNames = rulesForTurn(config, game.turn).career?.offices.map((office) => office.name) ?? [];
 
   return (
@@ -411,13 +486,26 @@ export const GameScreen = () => {
               <div className="grid items-start gap-3 grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
                 <div className="space-y-3">
                   <div ref={cellRef} data-office className="overflow-hidden rounded-xl" style={cellHeight === null ? undefined : { height: cellHeight }}>
-                    <OfficeSlot source={officeSource} draft={draft} onMove={onMove} onView={onView} onFailed={onOfficeFailed} />
+                    <OfficeSlot
+                      source={officeSource}
+                      draft={draft}
+                      onMove={onMove}
+                      onView={onView}
+                      onFailed={onOfficeFailed}
+                      market={market}
+                      view={shownView}
+                      selectedSeat={selectedSeat}
+                      playing={playing}
+                      rivals={rivals}
+                      onSelectCompany={setSelectedSeat}
+                      onChooseView={setChosenView}
+                    />
                   </div>
                   <div className={`space-y-3 ${dim}`}>
                     {status !== null && <CareerStatus view={status} />}
                     <ResourceBar view={resource} boardRunwayTurns={rulesForTurn(config, game.turn).board.runwayTurns} words={words} rescueUsed={status !== null && status.rescueYear !== null} compact />
                     <ProjectionCard company={company} view={planning} words={words} move={move} />
-                    <RivalsPanel you={resource} rivals={rivals} words={words} careers={rivalCareers} />
+                    <RivalsPanel you={resource} rivals={rivals} words={words} careers={rivalCareers} onShow={market === null ? undefined : showInMarket} />
                   </div>
                 </div>
                 <div className={dim}>

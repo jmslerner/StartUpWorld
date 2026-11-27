@@ -64,6 +64,10 @@ export const CARRY_WORDS: { readonly keep: "Keep them"; readonly label: "Move a 
   label: "Move a person between teams",
 };
 
+/** A move that changes the plan but not the people drawn: `drawn` of `total` people are in the office. */
+export const unseenLine = (drawn: number, total: number): string =>
+  `Moved in the plan. The office draws ${drawn} of your ${total} people, so nobody walks.`;
+
 /** What the world highlights: the person carried, or nothing. Set after every tap, move, put-back and drop. */
 export const highlightFor = (carry: Carry): InteractableTarget | null =>
   carry === null ? null : { kind: "person", personId: carry.personId };

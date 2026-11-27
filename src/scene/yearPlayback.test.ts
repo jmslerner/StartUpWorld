@@ -5,7 +5,7 @@ import type { CompanyId, CompanyReport, GameState } from "../engine/index";
 import type { OfficeScene } from "../world/types/scene";
 import { officeSceneFor } from "./officeScene";
 import type { OfficeSceneInput } from "./officeScene";
-import { NO_PLAYBACK, beatScenes, playedOut, yearPlayback } from "./yearPlayback";
+import { MAX_PLAYBACK_SECONDS, NO_PLAYBACK, beatScenes, playedOut, withMarket, yearPlayback } from "./yearPlayback";
 
 const sceneOf = (game: GameState, companyId: CompanyId, extra: Partial<OfficeSceneInput> = {}) =>
   officeSceneFor({ game, companyId, config: CAREER_TEST, seed: 7, ...extra });
@@ -77,5 +77,39 @@ describe("a year playing out", () => {
     const after = at([1, 0, 1], { year: 1991 });
     const [leave] = beatScenes(before, after, yearPlayback(reportOf({ headcount: { poachedOut: 1, hired: 3 } }), false));
     expect([leave.office, leave.teams, leave.arriving]).toEqual([after.office, { product: 0, growth: 0, recruiting: 0 }, 3]);
+  });
+});
+
+describe("the year cuts to the market", () => {
+  const quietReport = () => reportOf({});
+  const leaveMoveArriveReport = () => reportOf({ headcount: { lostToEvent: 1, hired: 4 }, office: { from: 0, to: 1, bill: 1 } });
+
+  it("a quiet year then cuts to the market for two seconds", () => {
+    const out = withMarket(yearPlayback(quietReport(), false));
+    expect(out.beats.map((b) => [b.kind, b.seconds])).toEqual([["year", 1.2], ["market", 2]]);
+    expect(out.seconds).toBeCloseTo(3.2);
+  });
+
+  it("a full year is fitted into six seconds with the market last", () => {
+    const out = withMarket(yearPlayback(leaveMoveArriveReport(), false));
+    expect(out.beats.map((b) => b.kind)).toEqual(["leave", "move", "arrive", "market"]);
+    const k = 4 / 6.5;
+    expect(out.beats.map((b) => b.seconds)).toEqual([1.5 * k, 2.5 * k, 2.5 * k, 2].map((s) => expect.closeTo(s, 6)));
+    expect(out.beats.map((b) => [b.count, b.office])).toEqual([[1, null], [0, 1], [4, null], [0, null]]);
+    expect(out.seconds).toBeCloseTo(MAX_PLAYBACK_SECONDS);
+  });
+
+  it("no playback gets no market beat", () => {
+    expect(withMarket(NO_PLAYBACK)).toBe(NO_PLAYBACK);
+    expect(withMarket(yearPlayback(leaveMoveArriveReport(), true))).toBe(NO_PLAYBACK);
+  });
+
+  it("the market beat shows the office played out behind it", () => {
+    const before = at([3, 0, 0], { year: 1994, office: 0, capacity: 4 });
+    const after = at([3, 2, 1], { year: 1995, office: 1, capacity: 9, arriving: 2, era: "gold-rush" });
+    const playback = withMarket(yearPlayback(leaveMoveArriveReport(), false));
+    const scenes = beatScenes(before, after, playback);
+    expect(scenes).toHaveLength(4);
+    expect(scenes[3]).toEqual(playedOut(after));
   });
 });

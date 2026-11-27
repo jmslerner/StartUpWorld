@@ -1,7 +1,10 @@
 # StartUpWorld: the career game, in 3D
 
-Status: approved by the owner on 25 November 2026, as written. Nothing in this document is built yet; the build
-plans are in `docs/superpowers/plans/`.
+Status: approved by the owner on 25 November 2026, as written. Steps 1 to 5 of section 15 are built; the last, step 5,
+by the plan "The market view, eight era looks and sound for milestones"
+(`docs/superpowers/plans/2026-11-26-career-market-looks-sound.md`). The build plans are in `docs/superpowers/plans/`.
+On 26 November 2026 the owner decided that the 3D screen is for desktop browsers only and that phones keep the 2D
+screens; dated notes below record it beside the text it changes, which is kept as written.
 
 Items marked **(owner)** were decided by the owner. Items marked **(proposal)** were the implementer's calls, each
 with its reason; the owner approved them with the document. Section 16 lists the ones that most needed a yes or no.
@@ -312,6 +315,10 @@ The 3D world is therefore built by restoring that foundation and re-pointing it 
 again. What was tied to the old weekly game (its inspector cards, scripted staff reactions, command stations,
 purchasable toys) is dropped. The look stays this project's own. **(proposal)**
 
+> **Note, 26 November 2026 (owner's decision):** the 3D office and market are for desktop browsers only (a window of
+> 1024 px or more, a fine pointer, WebGL 2). Phones, touch screens and narrower windows keep the 2D screens, which are
+> complete. The phone framing and touch gestures of the restored foundation are not used by the career.
+
 ### 10.2 What you see
 
 - **Office (the main view).** Your company's office at its current size (C9), furnished for the era: for example
@@ -334,12 +341,28 @@ Era looks are laid over the five office plans, not drawn as new rooms per era: f
 old office. A look is a furniture set plus a palette, a lighting mood and two or three signature props. This version
 ships four furniture sets: 1990s, 2000s to 2010s, 2020s (all three in step 4) and the invented future from 2027 (step
 5). Each of the eight eras gets its own palette, lighting and signature props on top of one of those sets, so every
-era can be told apart at a glance without eight sets of furniture.
+era can be told apart at a glance without eight sets of furniture. The palette reaches the surfaces that fill most of the picture:
+each era lays its own tint over the floor, its own paint on the walls and its own finish on the desk tops, and a
+test holds any two eras visibly apart (a colour distance of at least 12 in L\*a\*b\*) in at least two of those three
+in every office. The two invented eras (agents, ambient) also have their own fittings: the walnut panelling, walnut
+casework, brass and leather of the full floor and the campus become light resin, pearl, chrome or silver and pale
+upholstery, with a cool glow in every office, so the future never reads as an old-money boardroom; a test pins the
+walnut and brass of every earlier era.
 
 **On a phone held upright** the screen is, from the top: the timeline strip; the office, fixed at about 40% of the
 height; and the plan in a sheet that pulls up from the bottom, whose closed state shows the three team steppers, the
 most serious warning and "End year". Moving people by touch aims at a team's area, not at a single figure (a figure
 is about 20 pixels wide there). A phone on its side gets the wide layout and no tuning of its own.
+
+> **Note, 26 November 2026 (owner's decision):** the 3D office and market are for desktop browsers only (a window of
+> 1024 px or more, a fine pointer, WebGL 2). Phones, touch screens and narrower windows keep the 2D screens, which are
+> complete. The upright phone layout and moving people by touch described above are not built.
+
+> **Note, 26 November 2026 (decision 9 of the step 5 plan, reading the owner's ruling):** the owner ruled that the
+> timeline shows eras and announced shifts only, and that crashes stay a surprise. It is read as: no dated card of a
+> future year is ever shown except the announced platform shift; past dated cards (a crash once it has happened) and
+> the career's milestones stay on the timeline as history, as the list above asks. A test over every year of the
+> shipped career pins it (`src/ui/careerTimeline.test.ts`).
 
 ### 10.3 What stays in HTML
 
@@ -361,6 +384,11 @@ No WebGL 2, the 3D code fails to load, the graphics context is lost, or the play
 in the existing 2D screens, which are complete. The 3D code is loaded separately after the first screen appears, so
 the first load stays as fast as today (the 3D part adds about 131 KB compressed, measured, on top of today's 111 KB).
 
+> **Measured, 26 November 2026,** on the build with the market, the eight era looks and the sounds (gzipped): the first
+> load is about 144 KB (144,109 B) and carries no three.js; the 3D part, loaded only by a career showing its office, is
+> about 249 KB (248,529 B), some 118 KB more than the estimate above, almost all of it the world's chunk (three.js, the
+> offices, the market and every era's props). The figures are in `docs/superpowers/specs/3d-office-check.md`.
+
 ### 10.6 Technology
 
 three.js r187 (the current release, and the one the old office used), pinned to that exact version, with its type
@@ -370,6 +398,12 @@ not on every frame. People are capped at 64 drawn figures; a bigger company show
 office did. The old figures cost eight draw calls each, which was fine for a side panel; as a main screen the office
 keeps to a budget of 300 draw calls on phones, and if the restored figures exceed it the far ones are drawn as simple
 instanced figures. No phone can be tested here, so the owner's own devices are the check (section 13).
+
+> **Note, 26 November 2026 (owner's decision):** the 3D office and market are for desktop browsers only (a window of
+> 1024 px or more, a fine pointer, WebGL 2). Phones, touch screens and narrower windows keep the 2D screens, which are
+> complete. The 300 draw-call phone budget and instanced far figures are therefore not built. On desktop each office keeps
+> to its own ceiling, `min(800, 80 + 14 × figures)`, and the market to 60; the measured figures are in
+> `docs/superpowers/specs/3d-office-check.md`.
 
 ## 11. The race stays
 
@@ -396,6 +430,11 @@ cannot use starts a new career. The career's record (milestones by year) is part
   the developer's machine before each push, not in CI.
 - **Limits:** speed on real phones cannot be measured here; it is managed by the adaptive quality levels and checked
   by the owner on their own devices.
+
+> **Note, 26 November 2026 (owner's decision):** the 3D office and market are for desktop browsers only (a window of
+> 1024 px or more, a fine pointer, WebGL 2). Phones, touch screens and narrower windows keep the 2D screens, which are
+> complete. The browser checks run at desktop size (1280×800); at phone size (390×844 with touch) they check only that the
+> 2D screens show, nothing overflows sideways and nothing throws. The machine they run on renders WebGL in software.
 
 ## 14. Approaches considered
 
@@ -460,6 +499,9 @@ request unless the owner would rather merge the finished race first.
   targets are new. If a target cannot be reached without changing a rule, work stops and the owner is asked.
 - **Size.** Five steps, each large. The order is chosen so that stopping after any step still leaves a playable game.
 - **3D on phones.** The old office handled phones with adaptive quality, but real devices cannot be tested here.
+
+  > **Note, 26 November 2026 (owner's decision):** phones keep the 2D screens, so this risk does not apply; the 3D
+  > screen is for desktop browsers only.
 - **A long game can drag.** The summary, carried-over plans and skippable playback keep a quiet year to seconds; the
   owner's play-testing decides whether 49 years is right.
 

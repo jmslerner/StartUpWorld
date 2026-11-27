@@ -1434,5 +1434,7 @@ The career is played in its 3D office on desktop, with the 2D screens as its com
   `officeLayoutFor`). Step 5's phone work lifts that gate: the upright layout (section 10.2), touch aimed at a team's
   area (register team-area targets low, as the groundwork ledger says), and the 300 draw-call budget with instanced
   far figures, using the draw calls this plan's report records.
+  Out, by the owner's decision of 2026-11-26: the 3D screen is for desktop browsers only, and phones keep the 2D
+  screens.
 - **How-to-play** explains picking people up and the 3D switch; the owner's play-test decides whether six seconds is
   the right longest playback.

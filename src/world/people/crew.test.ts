@@ -668,6 +668,26 @@ describe("Crew: seats, teams and offices changing", () => {
     expect(r.host.spawnCount).toBe(8);
   });
 
+  it("walks the people waiting at the door to their desks when they are hired before the new office has popped them in", () => {
+    // A year playing out: the move beat rebuilds the office with two hires waiting at the door, and the arrive beat
+    // gives them desks. On a slow machine the world has drawn less of the move beat than the clock gave it, so the
+    // arrive beat can come while the two are still hidden, due to pop in at the door: they must still walk in.
+    const r = office([2, 1, 0], { arriving: 2 });
+    r.apply([2, 1, 0], { office: 2, capacity: 22, arriving: 2 });
+    const hires = r.crew.cast.filter((actor) => r.studio.seating.seatOf(actor.id)?.kind === "waiting");
+    expect(hires).toHaveLength(2);
+    run(r.crew, 0.3);
+    for (const actor of hires) expect([actor.id, actor.visible]).toEqual([actor.id, false]);
+    r.apply([3, 2, 0], { office: 2, capacity: 22, arriving: 0 });
+    const walked = new Set<string>();
+    run(r.crew, SETTLED, () => {
+      for (const actor of hires) if (actor.mode === "walking" && actor.visible) walked.add(actor.id);
+    });
+    expect([...walked].sort()).toEqual(ids(hires).sort());
+    expectAllSeated(r);
+    for (const actor of hires) expect(r.studio.seating.seatOf(actor.id)?.kind).toBe("desk");
+  });
+
   it("seats newcomers at once when they arrive together with a new office, and nobody walks out of the old one", () => {
     const r = office([3, 0, 0]);
     r.apply([4, 0, 0], { office: 2, capacity: 22, year: 1991 });

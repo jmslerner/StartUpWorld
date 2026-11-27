@@ -4,6 +4,7 @@ import type { OfficeIndex } from "../types";
 import {
   bakeModel,
   canDrawTextures,
+  FURNITURE_SETS,
   canvasTexture,
   createDynamicTexture,
   disposeSharedResources,
@@ -20,25 +21,30 @@ import {
 } from "../core/palette";
 import { CHAIR_SIZE, DESK_SIZE, STATION_KINDS, STATION_SIZES, WALL_GAP } from "./footprints";
 import {
+  calendarPage,
   createChair,
   createDesk,
   createDoor,
   createFloor,
   createOverflowSign,
   createProductWall,
+  createSignatureProp,
   createStation,
   createWall,
   DESK_STYLE_FOR_PHASE,
   DESK_STYLES,
+  deskHardware,
   deskStyleFor,
   monitorFor,
   PROP_CATALOG,
   PROP_SETS,
   SCREEN_FOR_TEAM,
+  SIGNATURE_SIZES,
   STATION_FOOTPRINTS,
   wallStyleFor,
+  yearDisplayWidth,
 } from "./props";
-import type { CatalogEntry, PropHandle } from "./props";
+import type { CatalogEntry, PropHandle, SignatureKind } from "./props";
 
 const MESH_BUDGET = { hero: 25, decor: 10 } as const;
 
@@ -340,14 +346,29 @@ describe("prop catalog", () => {
     expect(new Set(LOOKS.map((look) => signature(createDesk({ style: "standard", look })))).size).toBeGreaterThan(1);
   });
 
-  it("each look puts its decade's computer on every desk", () => {
+  it("each furniture set puts its decade's computer on every desk", () => {
     expect(DESK_STYLES.map((style) => monitorFor(style, "classic"))).toEqual(["crt", "laptop", "flat", "wide", "flat"]);
     expect(DESK_STYLES.map((style) => monitorFor(style, "nineties"))).toEqual(Array(5).fill("crt"));
     expect(DESK_STYLES.map((style) => monitorFor(style, "noughties"))).toEqual(["flat", "flat", "flat", "wide", "wide"]);
     expect(DESK_STYLES.map((style) => monitorFor(style, "twenties"))).toEqual(Array(5).fill("laptop"));
   });
 
-  it("gives every office of every look a desk style, a floor and walls", () => {
+  it("the future puts a glass screen on every desk", () => {
+    expect(DESK_STYLES.map((style) => monitorFor(style, "future"))).toEqual(Array(5).fill("glass"));
+  });
+
+  it("the hardware on a desk belongs to the computer on it", () => {
+    for (const set of FURNITURE_SETS) for (const style of DESK_STYLES) {
+      const monitor = monitorFor(style, set);
+      const kit = deskHardware(style, set);
+      expect(kit.tower, `${style} ${set}`).toBe(monitor === "crt");
+      expect(kit.laptopStand, `${style} ${set}`).toBe(monitor === "laptop" && style === "hotdesk");
+      expect(kit.keyboard, `${style} ${set}`).toBe(
+        monitor === "crt" ? "beige" : monitor === "glass" ? "pad" : monitor === "laptop" ? "none" : "dark");
+    }
+  });
+
+  it("gives every office of every furniture set a desk style, a floor and walls", () => {
     for (const look of LOOKS) for (const office of PHASES) {
       expect(DESK_STYLES).toContain(deskStyleFor(office, look));
       expect(["drywall", "brick", "plaster", "glass", "panel"]).toContain(wallStyleFor(office, look));
@@ -380,6 +401,18 @@ describe("prop catalog", () => {
       handle.update?.(0.016, 1);
       expect(meshesOf(handle.group).length).toBeGreaterThan(0);
       handle.dispose();
+    }
+  });
+
+  it("builds every signature prop in the spot it needs, within one mesh", () => {
+    for (const kind of Object.keys(SIGNATURE_SIZES) as SignatureKind[]) {
+      const prop = createSignatureProp(kind, SIGNATURE_SIZES[kind], 0);
+      const meshes: THREE.Mesh[] = [];
+      prop.group.traverse((o) => {
+        if ((o as THREE.Mesh).isMesh) meshes.push(o as THREE.Mesh);
+      });
+      expect(meshes.length, kind).toBe(1);
+      prop.dispose();
     }
   });
 });
@@ -562,4 +595,15 @@ describe("building kit", () => {
       }
     }
   });
+});
+
+it("draws the calendar's year at least 0.18 tall, and fits it across the page, in every office", () => {
+  for (const width of [0.8, 0.9, 1.0, 1.2, 1.2]) {
+    const { pageW, digitH } = calendarPage(width);
+    expect(digitH).toBeGreaterThanOrEqual(0.18);
+    expect(yearDisplayWidth(digitH)).toBeLessThanOrEqual(pageW - 0.04 + 1e-9);
+    // A calendar of 1.0 or more keeps room for its day-dots beside the page (right edge pageW/2 + 0.17).
+    expect(pageW).toBeLessThanOrEqual((width >= 1.0 ? width - 0.36 : width - 0.12) + 1e-9);
+  }
+  expect(yearDisplayWidth(0.2)).toBeCloseTo(0.59);
 });

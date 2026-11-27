@@ -18,6 +18,7 @@ import {
   cssColor,
   darken,
   EMBER,
+  fittingsFor,
   glowMat,
   INK,
   lighten,
@@ -34,7 +35,7 @@ import {
   unitSphere,
   vertexMat,
 } from "../../core/palette";
-import type { CanvasDraw } from "../../core/palette";
+import type { CanvasDraw, LookFittings } from "../../core/palette";
 import { STATION_SIZES, WALL_GAP } from "../footprints";
 import { digitSegments } from "./digits";
 import { drawChair, drawMonitor, drawMug, drawPaperCup, drawPlant, SEAT_Y } from "./parts";
@@ -101,6 +102,7 @@ export const createProductWall = (office: OfficeIndex = 2, look: LookId = "class
   const size = STATION_SIZES[phaseTier(office)].ship;
   const tier = phaseTier(office);
   const theme = themeFor(office, look);
+  const fit = fittingsFor(look);
   const kit = new PropKit("station:ship");
 
   const width = size.width - 0.1;
@@ -111,7 +113,7 @@ export const createProductWall = (office: OfficeIndex = 2, look: LookId = "class
   const laneX = (column: number): number => -width / 2 + 0.07 + lane * (column + 0.5);
 
   const faceColor = [C.paper, 0xcfa873, C.white, 0xe3f1f5, C.marble][tier];
-  const frameColor = [C.galvanised, C.oak, C.greyDark, C.chrome, C.brass][tier];
+  const frameColor = [C.galvanised, C.oak, C.greyDark, C.chrome, fit.metal][tier];
   const inkColor = tier === 4 ? C.marbleVein : tier === 3 ? 0xa9cbd6 : 0xb7bcc2;
   const headers = [MIST, EMBER, theme.accents[0], theme.accents[1], NEON, C.good];
 
@@ -285,6 +287,7 @@ export const createGrowthCorner = (office: OfficeIndex = 2, look: LookId = "clas
   const size = STATION_SIZES[phaseTier(office)].launch;
   const tier = phaseTier(office);
   const theme = themeFor(office, look);
+  const fit = fittingsFor(look);
   const kit = new PropKit("station:launch");
 
   // Layout: a chart board on the left, the megaphone on the right.
@@ -297,7 +300,7 @@ export const createGrowthCorner = (office: OfficeIndex = 2, look: LookId = "clas
   const boardZ = -size.depth / 2 + 0.16;
   const led = tier >= 3;
   const boardColor = [C.cardboard, C.paper, C.white, C.black, C.black][tier];
-  const postColor = [C.pallet, theme.accents[1], theme.frame, C.white, C.brass][tier];
+  const postColor = [C.pallet, theme.accents[1], theme.frame, C.white, fit.metal][tier];
   const hornScale = [0.8, 0.9, 1, 1.1, 1.2][tier];
   const hornY = [0.62, 1.05, 1.15, 1.25, 1.3][tier];
 
@@ -319,7 +322,7 @@ export const createGrowthCorner = (office: OfficeIndex = 2, look: LookId = "clas
     }
     b.box(boardW, boardH, 0.045, boardColor, boardX, boardY, boardZ, { r: 0.014, rz: tier === 0 ? -0.03 : 0 });
     if (tier >= 2) {
-      const rim = tier === 4 ? C.brass : tier === 3 ? C.white : theme.frame;
+      const rim = tier === 4 ? fit.metal : tier === 3 ? C.white : theme.frame;
       b.box(boardW + 0.05, 0.04, 0.06, rim, boardX, boardY + boardH - 0.02, boardZ, { r: 0.012 });
       b.box(boardW + 0.05, 0.04, 0.06, rim, boardX, boardY - 0.02, boardZ, { r: 0.012 });
     }
@@ -330,14 +333,14 @@ export const createGrowthCorner = (office: OfficeIndex = 2, look: LookId = "clas
       for (const sy of [0.08, 0.2]) b.box(hornZone - 0.04, 0.03, 0.42, darken(C.pallet, 0.15), hornX, sy, 0.02, { r: 0 });
     } else {
       // Tripod / stand.
-      const stand = tier === 4 ? C.brass : tier >= 3 ? C.chrome : C.charcoal;
+      const stand = tier === 4 ? fit.metal : tier >= 3 ? C.chrome : C.charcoal;
       for (let i = 0; i < 3; i += 1) {
         const a = (i / 3) * Math.PI * 2 + 0.5;
         b.tube([hornX + Math.cos(a) * 0.2, 0, Math.sin(a) * 0.2], [hornX, hornY * 0.55, 0], 0.016, stand, { seg: 6 });
       }
       b.cyl(0.022, hornY * 0.5 - 0.1, stand, hornX, hornY * 0.5, 0, { seg: 8 });
     }
-    b.place(hornX, hornY, -0.12, { rx: -0.35 }, () => drawMegaphone(b, hornScale, tier === 4 ? C.brass : C.red, C.white));
+    b.place(hornX, hornY, -0.12, { rx: -0.35 }, () => drawMegaphone(b, hornScale, tier === 4 ? fit.metal : C.red, C.white));
   });
 
   // The chart itself: bars that glow on a flash (and at dusk on LED boards).
@@ -462,6 +465,7 @@ export const createInvestorLine = (office: OfficeIndex = 2, look: LookId = "clas
   const size = STATION_SIZES[phaseTier(office)].investors;
   const tier = phaseTier(office);
   const theme = themeFor(office, look);
+  const fit = fittingsFor(look);
   const kit = new PropKit("station:investors");
   const { width, depth } = size;
 
@@ -523,8 +527,8 @@ export const createInvestorLine = (office: OfficeIndex = 2, look: LookId = "clas
   } else {
     // Pitch podium in front of a presentation screen.
     const brass = tier === 4;
-    const body = brass ? C.walnut : C.white;
-    const trim = brass ? C.brass : theme.accents[0];
+    const body = brass ? fit.caseFront : C.white;
+    const trim = brass ? fit.metal : theme.accents[0];
     const screenW = width - 0.3;
     const screenH = screenW * 0.6;
     const screenY = 1.05;
@@ -543,16 +547,16 @@ export const createInvestorLine = (office: OfficeIndex = 2, look: LookId = "clas
       // Lectern.
       b.box(0.5, 0.06, 0.42, darken(body, 0.2), podiumX, 0.012, 0.2, { r: 0.014 });
       b.box(0.42, 0.96, 0.34, body, podiumX, 0.07, 0.2, { r: 0.02, taper: 1.12 });
-      b.box(0.52, 0.045, 0.42, brass ? C.walnutDark : theme.wood, podiumX, 1.03, 0.2, { r: 0.012, rx: 0.16 });
+      b.box(0.52, 0.045, 0.42, brass ? fit.casework : theme.wood, podiumX, 1.03, 0.2, { r: 0.012, rx: 0.16 });
       b.box(0.3, 0.3, 0.012, trim, podiumX, 0.5, 0.385, { r: 0 });
       // Gooseneck microphone.
       b.tube([podiumX - 0.14, 1.07, 0.1], [podiumX - 0.1, 1.3, 0.2], 0.01, C.charcoal, { seg: 6 });
       b.ball(0.03, C.charcoal, podiumX - 0.1, 1.28, 0.2, { seg: 8 });
       if (brass) {
         // Velvet-rope stanchion.
-        b.cyl(0.07, 0.02, C.brass, -width / 2 + 0.16, 0.012, depth / 2 - 0.16, { seg: 10 });
-        b.cyl(0.018, 0.8, C.brass, -width / 2 + 0.16, 0.03, depth / 2 - 0.16, { seg: 8 });
-        b.ball(0.035, C.brass, -width / 2 + 0.16, 0.81, depth / 2 - 0.16, { seg: 8 });
+        b.cyl(0.07, 0.02, fit.metal, -width / 2 + 0.16, 0.012, depth / 2 - 0.16, { seg: 10 });
+        b.cyl(0.018, 0.8, fit.metal, -width / 2 + 0.16, 0.03, depth / 2 - 0.16, { seg: 8 });
+        b.ball(0.035, fit.metal, -width / 2 + 0.16, 0.81, depth / 2 - 0.16, { seg: 8 });
       }
     });
     screen = createScreenSurface("deck");
@@ -638,26 +642,27 @@ const drawPizzaBox = (b: ModelBuilder, x: number, y: number, z: number, yaw: num
 };
 
 /** Chairs tucked along both long sides and the two ends of a table centred on the origin. */
-const drawChairsAround = (b: ModelBuilder, style: ChairStyle, tableW: number, tableD: number, perSide: number, ends: boolean, accents: readonly number[]): void => {
+const drawChairsAround = (b: ModelBuilder, style: ChairStyle, tableW: number, tableD: number, perSide: number, ends: boolean, accents: readonly number[], fit: LookFittings): void => {
   let n = 0;
   const tuck = tableD / 2 + 0.1;
   for (let i = 0; i < perSide; i += 1) {
     const x = perSide === 1 ? 0 : -tableW / 2 + 0.38 + (i * (tableW - 0.76)) / (perSide - 1);
-    b.at(x, 0, tuck, Math.PI, () => drawChair(b, style, accents[n % accents.length]));
+    b.at(x, 0, tuck, Math.PI, () => drawChair(b, style, accents[n % accents.length], fit));
     n += 1;
-    b.at(x, 0, -tuck, 0, () => drawChair(b, style, accents[n % accents.length]));
+    b.at(x, 0, -tuck, 0, () => drawChair(b, style, accents[n % accents.length], fit));
     n += 1;
   }
   if (!ends) return;
   const reach = tableW / 2 + 0.12;
-  b.at(reach, 0, 0, -Math.PI / 2, () => drawChair(b, style, accents[n % accents.length]));
-  b.at(-reach, 0, 0, Math.PI / 2, () => drawChair(b, style, accents[(n + 1) % accents.length]));
+  b.at(reach, 0, 0, -Math.PI / 2, () => drawChair(b, style, accents[n % accents.length], fit));
+  b.at(-reach, 0, 0, Math.PI / 2, () => drawChair(b, style, accents[(n + 1) % accents.length], fit));
 };
 
 export const createBoardTable = (office: OfficeIndex = 2, look: LookId = "classic"): StationHandle => {
   const size = STATION_SIZES[phaseTier(office)].boardroom;
   const tier = phaseTier(office);
   const theme = themeFor(office, look);
+  const fit = fittingsFor(look);
   const kit = new PropKit("station:boardroom");
   const { width, depth } = size;
   const top = 0.74;
@@ -698,8 +703,8 @@ export const createBoardTable = (office: OfficeIndex = 2, look: LookId = "classi
     const ends = tier !== 1;
     const tw = ends ? width - 1.02 : width - 0.4;
     const td = depth - (tier === 1 ? 1.0 : 0.94);
-    const wood = tier === 4 ? C.walnut : tier === 2 ? C.white : theme.wood;
-    const leg = tier === 4 ? C.walnutDark : theme.frame;
+    const wood = tier === 4 ? fit.caseFront : tier === 2 ? C.white : theme.wood;
+    const leg = tier === 4 ? fit.casework : theme.frame;
 
     if (tier === 1) {
       // Café table with a stool at each end.
@@ -717,14 +722,14 @@ export const createBoardTable = (office: OfficeIndex = 2, look: LookId = "classi
 
     // Proper meeting table.
     b.box(tw, 0.055, td, wood, 0, top - 0.055, 0, { r: tier >= 3 ? 0.027 : 0.016 });
-    if (tier === 4) b.box(tw - 0.3, 0.006, td - 0.3, C.brass, 0, top, 0, { r: 0 });
+    if (tier === 4) b.box(tw - 0.3, 0.006, td - 0.3, fit.metal, 0, top, 0, { r: 0 });
     if (tier === 4) b.box(tw - 0.34, 0.008, td - 0.34, wood, 0, top, 0, { r: 0 });
     for (const sx of [-1, 1]) {
       b.box(0.1, top - 0.06, td * 0.5, leg, sx * (tw / 2 - 0.4), 0, 0, { r: 0.016 });
       b.box(0.14, 0.03, td * 0.7, leg, sx * (tw / 2 - 0.4), 0, 0, { r: 0.012 });
     }
     b.box(tw - 0.8, 0.08, 0.05, leg, 0, top - 0.2, 0, { r: 0.012 });
-    drawChairsAround(b, chair, tw, td, perSide, ends, tier === 4 ? [C.leather] : theme.accents);
+    drawChairsAround(b, chair, tw, td, perSide, ends, tier === 4 ? [fit.upholstery] : theme.accents, fit);
 
     // On the table: conference phone, pads, drinks.
     b.cyl(0.09, 0.025, C.charcoal, 0, top, 0, { seg: 12 });
@@ -737,8 +742,8 @@ export const createBoardTable = (office: OfficeIndex = 2, look: LookId = "classi
       else drawMug(b, x + 0.16, top, -td / 2 + 0.2, C.white, i);
     }
     if (tier >= 3) {
-      drawPlant(b, "small", tw / 2 - 0.5, top, 0, tier === 4 ? C.brass : C.white, 1);
-      drawPlant(b, "small", -tw / 2 + 0.5, top, 0, tier === 4 ? C.brass : C.white, 2);
+      drawPlant(b, "small", tw / 2 - 0.5, top, 0, tier === 4 ? fit.metal : C.white, 1);
+      drawPlant(b, "small", -tw / 2 + 0.5, top, 0, tier === 4 ? fit.metal : C.white, 2);
     }
   });
 
@@ -787,6 +792,23 @@ export interface CalendarHandle extends StationHandle {
 
 const YEAR_DIGITS = 4;
 const SEGMENTS_PER_DIGIT = 7;
+
+/** How wide four digits of the calendar's year are at digit height `digitHeight` (digit 0.55 × h, pitch 0.8 × h). */
+export const yearDisplayWidth = (digitHeight: number): number => digitHeight * (0.55 + (YEAR_DIGITS - 1) * 0.8);
+
+/**
+ * The calendar's page for a calendar `width` wide: it fills the footprint (leaving the day-dots their room beside it
+ * from 1.0 wide), and the year's digits are as tall as fits across the page with 0.02 to spare on either side.
+ */
+export const calendarPage = (width: number): { readonly pageW: number; readonly pageH: number; readonly digitH: number } => {
+  const pageW = width >= 1.0 ? Math.min(1.0, width - 0.36) : width - 0.12;
+  const pageH = pageW * 1.2;
+  const digitH = Math.min((pageW - 0.04) / yearDisplayWidth(1), pageH * 0.3);
+  return { pageW, pageH, digitH };
+};
+
+/** Where the top edge of every calendar's page hangs, so a bigger page grows downwards (clear of the campus ticker). */
+const CALENDAR_PAGE_TOP = 1.892;
 
 /**
  * The year on the calendar's header: 28 bars laid out once, as four seven-segment digits. Each bar is an object named
@@ -862,15 +884,18 @@ export const createWallCalendar = (office: OfficeIndex = 2, look: LookId = "clas
   const size = STATION_SIZES[phaseTier(office)].calendar;
   const tier = phaseTier(office);
   const theme = themeFor(office, look);
+  const fit = fittingsFor(look);
   const kit = new PropKit("station:calendar");
   const digital = tier >= 3;
   const wall = wallFaceZ(size.depth);
-  const pageW = Math.min(0.66, size.width - 0.2);
-  const pageH = pageW * 1.2;
-  const pageY = 1.1;
+  const { pageW, pageH, digitH } = calendarPage(size.width);
+  const pageY = CALENDAR_PAGE_TOP - pageH;
+  // The year sits just under the binder rings; the header band reaches down far enough to hold it.
+  const yearY = pageY + pageH - 0.065 - digitH / 2;
+  const headerBottom = Math.min(pageY + pageH * 0.7, yearY - digitH / 2 - 0.02);
   const pageZ = wall + 0.075;
   const header = tier === 0 ? C.red : theme.accents[0];
-  const backing = [C.cardboard, theme.accents[1], C.white, C.white, C.brass][tier];
+  const backing = [C.cardboard, theme.accents[1], C.white, C.white, fit.metal][tier];
 
   kit.model(`calendar:${look}:${office}`, (b) => {
     // Backing board on the wall.
@@ -880,7 +905,7 @@ export const createWallCalendar = (office: OfficeIndex = 2, look: LookId = "clas
     } else {
       // A fat pad of pages, the top one drawn by the texture (or this fallback).
       b.box(pageW, pageH, 0.04, C.bone, 0, pageY, wall + 0.05, { r: 0.004 });
-      b.box(pageW, pageH * 0.3, 0.006, header, 0, pageY + pageH * 0.7, pageZ - 0.004, { r: 0 });
+      b.box(pageW, pageY + pageH - headerBottom, 0.006, header, 0, headerBottom, pageZ - 0.004, { r: 0 });
       b.box(pageW * 0.3, pageH * 0.28, 0.006, C.charcoal, 0, pageY + pageH * 0.18, pageZ - 0.004, { r: 0 });
       // Binder rings.
       for (let i = 0; i < 5; i += 1) b.torus(0.022, 0.007, C.charcoal, -pageW / 2 + 0.07 + (i * (pageW - 0.14)) / 4, pageY + pageH - 0.035, pageZ - 0.01, { axis: "x", seg: 8 });
@@ -914,7 +939,7 @@ export const createWallCalendar = (office: OfficeIndex = 2, look: LookId = "clas
   }
 
   // The year, in the header band at the top of the page, under the binder rings.
-  const setYear = addYearDisplay(kit, 0, pageY + pageH * 0.84, pageZ + 0.006, pageH * 0.16, digital ? NEON : C.white, digital);
+  const setYear = addYearDisplay(kit, 0, yearY, pageZ + 0.006, digitH, digital ? NEON : C.white, digital);
 
   return kit.finish(stationFootprint("calendar", office), { kind: "calendar" as const, office, setYear });
 };
@@ -977,6 +1002,7 @@ export const createCoffeeMachine = (office: OfficeIndex = 2, look: LookId = "cla
   const size = STATION_SIZES[phaseTier(office)].coffee;
   const tier = phaseTier(office);
   const theme = themeFor(office, look);
+  const fit = fittingsFor(look);
   const kit = new PropKit("station:coffee");
   const { width, depth } = size;
   const w = width - 0.06;
@@ -1016,13 +1042,13 @@ export const createCoffeeMachine = (office: OfficeIndex = 2, look: LookId = "cla
         const dx = -w / 2 + (w / doors) * (i + 0.5);
         const door = tier === 4 ? C.marbleLight : tier === 1 ? theme.accents[i % 3] : lighten(body, 0.25);
         b.box(w / doors - 0.04, COUNTER_TOP - 0.22, 0.014, door, dx, 0.12, d / 2 - 0.024, { r: 0 });
-        b.box(0.02, 0.12, 0.02, tier === 4 ? C.brass : C.greyDark, dx + (i % 2 ? -1 : 1) * (w / doors / 2 - 0.07), 0.5, d / 2 - 0.01, { r: 0 });
+        b.box(0.02, 0.12, 0.02, tier === 4 ? fit.metal : C.greyDark, dx + (i % 2 ? -1 : 1) * (w / doors / 2 - 0.07), 0.5, d / 2 - 0.01, { r: 0 });
       }
-      if (tier === 4) b.box(w + 0.03, 0.014, d + 0.03, C.brass, 0, COUNTER_TOP - 0.065, 0, { r: 0 });
+      if (tier === 4) b.box(w + 0.03, 0.014, d + 0.03, fit.metal, 0, COUNTER_TOP - 0.065, 0, { r: 0 });
     }
 
     // The machine, and whatever else fits along the counter.
-    const shell = tier === 4 ? C.brass : C.chrome;
+    const shell = tier === 4 ? fit.metal : C.chrome;
     if (espresso) {
       drawEspressoMachine(b, machineX, COUNTER_TOP, -0.03, machineW, shell);
       if (w > 1.0) drawGrinder(b, machineX + machineW / 2 + 0.16, COUNTER_TOP, -0.06, shell);
@@ -1061,7 +1087,7 @@ export const createCoffeeMachine = (office: OfficeIndex = 2, look: LookId = "cla
         b.tube([sx, COUNTER_TOP, -0.13], [sx, COUNTER_TOP + 0.2, -0.13], 0.012, C.chrome, { seg: 6 });
         b.tube([sx, COUNTER_TOP + 0.2, -0.13], [sx, COUNTER_TOP + 0.17, -0.02], 0.012, C.chrome, { seg: 6 });
       }
-      if (tier >= 3) drawPlant(b, "small", right + 0.02, COUNTER_TOP, -0.16, tier === 4 ? C.brass : C.white, 1);
+      if (tier >= 3) drawPlant(b, "small", right + 0.02, COUNTER_TOP, -0.16, tier === 4 ? fit.metal : C.white, 1);
     }
   });
 
@@ -1106,6 +1132,7 @@ const drawServers = (b: ModelBuilder, office: OfficeIndex, look: LookId, leds: L
   const { width, depth } = STATION_SIZES[phaseTier(office)].servers;
   const tier = phaseTier(office);
   const theme = themeFor(office, look);
+  const fit = fittingsFor(look);
   if (tier === 0) {
     // A beige tower under a plank shelf, with the router on top.
     for (const sx of [-1, 1]) {
@@ -1141,7 +1168,7 @@ const drawServers = (b: ModelBuilder, office: OfficeIndex, look: LookId, leds: L
   const rackH = rackHeight(tier);
   const rackD = depth - 0.12;
   const shell = tier === 4 ? 0x3a4250 : 0x4b5563;
-  const trim = tier === 4 ? C.brass : tier === 3 ? theme.glow : C.greyDark;
+  const trim = tier === 4 ? fit.metal : tier === 3 ? theme.glow : C.greyDark;
   for (let r = 0; r < count; r += 1) {
     const x = -width / 2 + 0.05 + rackW * (r + 0.5);
     b.box(rackW - 0.03, rackH, rackD, shell, x, 0.04, -0.02, { r: 0.016 });
@@ -1226,6 +1253,7 @@ export const createPricingBoard = (office: OfficeIndex = 2, look: LookId = "clas
   const size = STATION_SIZES[phaseTier(office)].pricing;
   const tier = phaseTier(office);
   const theme = themeFor(office, look);
+  const fit = fittingsFor(look);
   const kit = new PropKit("station:pricing");
   const wall = wallFaceZ(size.depth);
   const boardW = size.width - 0.06;
@@ -1244,7 +1272,7 @@ export const createPricingBoard = (office: OfficeIndex = 2, look: LookId = "clas
   kit.model(`pricing:${look}:${office}`, (b) => {
     b.box(boardW, boardH, 0.04, backing, 0, boardY, wall + 0.02, { r: 0.012 });
     if (tier >= 2) {
-      const rim = tier === 4 ? C.brass : tier === 3 ? C.chrome : theme.frame;
+      const rim = tier === 4 ? fit.metal : tier === 3 ? C.chrome : theme.frame;
       b.box(boardW + 0.04, 0.035, 0.055, rim, 0, boardY + boardH - 0.015, wall + 0.027, { r: 0.01 });
       b.box(boardW + 0.04, 0.035, 0.055, rim, 0, boardY - 0.02, wall + 0.027, { r: 0.01 });
     }
@@ -1263,8 +1291,8 @@ export const createPricingBoard = (office: OfficeIndex = 2, look: LookId = "clas
         // One, two or three coins: no text needed.
         for (let k = 0; k <= i; k += 1) {
           const cx = (k - i / 2) * coin * 1.5;
-          b.cyl(coin, 0.02, C.brass, cx, h * 0.42 - coin + (k % 2) * 0.02, 0.03, { axis: "z", seg: 12 });
-          b.cyl(coin * 0.62, 0.006, lighten(C.brass, 0.3), cx, h * 0.42 - coin * 0.62 + (k % 2) * 0.02, 0.043, { axis: "z", seg: 10 });
+          b.cyl(coin, 0.02, fit.metal, cx, h * 0.42 - coin + (k % 2) * 0.02, 0.03, { axis: "z", seg: 12 });
+          b.cyl(coin * 0.62, 0.006, lighten(fit.metal, 0.3), cx, h * 0.42 - coin * 0.62 + (k % 2) * 0.02, 0.043, { axis: "z", seg: 10 });
         }
         // Feature lines.
         for (let line = 0; line <= i; line += 1) b.box(cardW * 0.6, 0.02, 0.006, tier === 4 ? C.marbleVein : C.grey, 0, 0.06 + line * 0.05, 0.031, { r: 0 });

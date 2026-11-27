@@ -518,6 +518,23 @@ describe("Actor changing seats", () => {
     expectAtSeat(actor, desk(3));
   });
 
+  it("still pops in where it was due to when the seat changes before the pop, then walks over to the new seat", () => {
+    const stage = new TestStage(layout);
+    const actor = new Actor(person(), doorSpot(0));
+    actor.popInAtHome(0.5);
+    actor.rehome(desk(4), stage);
+    run(actor, stage, 0.5 + DT);
+    expect(actor.visible).toBe(true);
+    expect([actor.x, actor.z]).toEqual([doorSpot(0).x, doorSpot(0).z]);
+    let walked = false;
+    runUntil(actor, stage, () => actor.mode === "seated" && actor.x === desk(4).x, 120, () => {
+      if (actor.mode === "walking") walked = true;
+    });
+    expect(walked).toBe(true);
+    expectAtSeat(actor, desk(4));
+    expect(stage.settledCount).toBe(1);
+  });
+
   it("relocates by vanishing and popping in at the new seat", () => {
     const stage = new TestStage(layout);
     const actor = new Actor(person(), desk(0));

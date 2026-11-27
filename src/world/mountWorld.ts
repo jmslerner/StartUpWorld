@@ -7,7 +7,7 @@
  * by React renders, so a frame is never waiting on reconciliation and React never sees per-frame data.
  */
 import { createWorld, inspectWorld, WorldUnsupportedError } from "./core/World";
-import type { OfficeScene, WorldHandle } from "./types";
+import type { OfficeScene, WorldHandle, WorldSoundListener } from "./types";
 import { detectQuality, hasFinePointer, prefersReducedMotion } from "./ui/environment";
 import { INITIAL_STAGE_STATE, type StageStatus, type WorldStage } from "./ui/stage";
 
@@ -47,8 +47,16 @@ let liveTeardown: (() => void) | null = null;
  * "unsupported"; so does any other failure to start, after a line for the console.
  *
  * Mounting while an earlier mount's world is still alive takes that one down first, with a warning.
+ *
+ * `options.sound`, when given, is handed to the world as its sound listener (footsteps, chairs); it is read once.
  */
-export const mountWorld = (canvas: HTMLCanvasElement, viewport: HTMLElement, stage: WorldStage, source: SceneSource): (() => void) => {
+export const mountWorld = (
+  canvas: HTMLCanvasElement,
+  viewport: HTMLElement,
+  stage: WorldStage,
+  source: SceneSource,
+  options: { readonly sound?: WorldSoundListener } = {},
+): (() => void) => {
   if (liveTeardown) {
     console.warn(SECOND_WORLD);
     liveTeardown();
@@ -89,7 +97,8 @@ export const mountWorld = (canvas: HTMLCanvasElement, viewport: HTMLElement, sta
           if (mounted) store.setState({ status: "running" });
         },
       },
-      { quality, reducedMotion }
+      // The sound listener is read once, for this world.
+      options.sound === undefined ? { quality, reducedMotion } : { quality, reducedMotion, sound: options.sound }
     );
   } catch (error) {
     // No WebGL 2 is an expected situation. Anything else is a bug worth a line; either way the page carries on.

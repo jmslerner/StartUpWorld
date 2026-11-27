@@ -4,7 +4,7 @@ import { nextCast } from "../cast";
 import { sceneEvents } from "../sceneEvents";
 import type { OfficeIndex, OfficeScene, QualityLevel, WorldFrame } from "../types";
 import { LOOKS, PHASES } from "./colors";
-import { getLightingState, Lighting, LIGHTING_LOOKS, restingLook } from "./Lighting";
+import { getLightingState, Lighting, LIGHTING_LOOKS, lightingKeyFor, restingLook, type LightingLook } from "./Lighting";
 
 const FRAME = 1 / 60;
 
@@ -361,9 +361,27 @@ describe("Lighting endings", () => {
 });
 
 describe("Lighting looks", () => {
-  it("each look rests in its own light", () => {
-    expect(LOOKS.map((look) => restingLook(2, look))).toEqual(["morning", "afternoon", "morning", "sunrise"]);
-    expect(new Set(PHASES.map((office) => restingLook(office, "nineties")))).toEqual(new Set(["afternoon"]));
+  it("each era rests in a light of its own, the same in all five offices", () => {
+    expect(LOOKS.map((look) => restingLook(2, look))).toEqual(
+      ["morning", "afternoon", "noon", "overcast", "clear", "golden", "sunrise", "studio", "twilight"]);
+    // No two eras rest in one light, and none in the classic look's morning.
+    const eras = LOOKS.filter((look) => look !== "classic").map((look) => restingLook(2, look));
+    expect(new Set(eras).size).toBe(eras.length);
+    expect(eras).not.toContain("morning");
+    for (const look of LOOKS) expect(new Set(PHASES.map((office) => restingLook(office, look))).size).toBe(1);
+  });
+
+  it("lists every mood, and every mood is a light of its own", () => {
+    expect(LIGHTING_LOOKS).toEqual(["morning", "afternoon", "dusk", "night", "sunrise", "win", "loss", "noon", "overcast", "golden", "studio", "twilight", "clear"]);
+    // A light's key: sun colour, sun intensity and sky colour; no two moods share one.
+    const text = (mood: LightingLook): string => {
+      const k = lightingKeyFor(mood);
+      return `${k.sunColor.getHexString()}:${k.sunIntensity}:${k.skyColor.getHexString()}`;
+    };
+    expect(new Set(LIGHTING_LOOKS.map(text)).size).toBe(LIGHTING_LOOKS.length);
+    // The resting moods of the new eras are daylight: no prop glows in them but faintly at twilight.
+    expect(["noon", "overcast", "golden", "studio", "clear"].map((m) => lightingKeyFor(m as LightingLook).dusk)).toEqual([0, 0, 0, 0, 0]);
+    expect(lightingKeyFor("twilight").dusk).toBeLessThanOrEqual(0.3);
   });
 
   it("can be pinned to a named look, matching what frames produce", () => {
@@ -389,8 +407,8 @@ describe("Lighting looks", () => {
       lighting.showLook(look);
       seen.add(`${sun.color.getHexString()}|${sun.intensity}|${getLightingState(scene).daylight.toFixed(3)}`);
     }
-    expect(LIGHTING_LOOKS).toHaveLength(7);
-    expect(seen.size).toBe(7);
+    expect(LIGHTING_LOOKS).toHaveLength(13);
+    expect(seen.size).toBe(13);
   });
 });
 

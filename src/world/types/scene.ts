@@ -11,10 +11,16 @@ export const TEAMS: readonly Team[] = ["product", "growth", "recruiting"];
 export type OfficeIndex = 0 | 1 | 2 | 3 | 4;
 
 /**
- * How an office of a given size is dressed: one look per decade's furniture (the nineties, the noughties, the
- * twenties), and the classic look for any era the world does not know.
+ * How an office is dressed: one look per era of the career (its palette, its resting light, its signature props),
+ * named as the era is, and the classic look for any era the world does not know.
  */
-export type LookId = "classic" | "nineties" | "noughties" | "twenties";
+export type LookId = "classic" | "dial-up" | "gold-rush" | "bust" | "phones" | "cheap-money" | "winter-ai" | "agents" | "ambient";
+
+/**
+ * The furniture a look stands on: the desks, the computer on them, floors, walls and shells. Eight looks share the
+ * decades' three sets; the classic set is what the classic look keeps.
+ */
+export type FurnitureSet = "classic" | "nineties" | "noughties" | "twenties" | "future";
 
 export interface OfficeScene {
   /** Changes when another company or another game is shown: everything is rebuilt. */

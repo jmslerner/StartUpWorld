@@ -1,15 +1,19 @@
 import * as THREE from "three";
 import { FxSystem } from "../fx/FxSystem";
 import { Interaction } from "../interaction/Interaction";
+import { marketFrame } from "../market/marketLayout";
+import { MarketSystem } from "../market/MarketSystem";
 import { computeBuildingFrame, type LayoutFrame } from "../office/framing";
 import { OfficeSystem } from "../office/OfficeSystem";
 import { EmployeeSystem } from "../people/EmployeeSystem";
 import { teamOfTarget } from "../targets";
 import type {
   InteractableTarget,
+  MarketScene,
   OfficeLayout,
   OfficeScene,
   QualityLevel,
+  MarketScreenMarks,
   ScreenPoint,
   ScreenRect,
   WorldCallbacks,
@@ -21,10 +25,11 @@ import type {
   WorldSoundListener,
   WorldSoundSink,
   WorldStats,
+  WorldViewKind,
 } from "../types";
 import { detectQuality, prefersReducedMotion } from "../ui/environment";
 import { AdaptiveQualityGovernor } from "./adaptiveQuality";
-import { CameraRig } from "./CameraRig";
+import { CameraRig, type GroundBounds } from "./CameraRig";
 import { FrameLoop, MAX_FRAME_SECONDS, MIN_FRAME_SECONDS } from "./FrameLoop";
 import { layoutBounds } from "./layoutBounds";
 import { clamp } from "./math";
@@ -181,6 +186,15 @@ class World {
   private readonly interaction: Interaction;
   private readonly lighting: Lighting;
   private readonly fx: FxSystem;
+  /** The market view, drawn on the same canvas, camera and lights; its root is shown only while the view is the market's. */
+  private readonly market: MarketSystem;
+  /** Which view the canvas shows. */
+  private viewKind: WorldViewKind = "office";
+  /** The office's pan and shadow bounds, kept while the market shows so going back restores them. */
+  private officeBounds: GroundBounds | null = null;
+  /** The market bounds last applied while the market shows; null in the office. */
+  private marketBounds: GroundBounds | null = null;
+  private readonly reducedMotion: boolean;
   private readonly runner = new SystemRunner();
   /** Scene children that belong to this file's own systems; anything else is a rebuildable system's. */
   private readonly coreRoots: ReadonlySet<THREE.Object3D>;
@@ -195,7 +209,7 @@ class World {
   private people: EmployeeSystem | null = null;
   /** What the systems tell each other, and what the world tells them (whether it is being kept awake). */
   private readonly signals: WorldSignals = { doorTraffic: 0 };
-  /** The building frame the camera was last pointed at. */
+  /** The office's building frame: the one the camera was last pointed at in the office, kept while the market shows. */
   private shot: LayoutFrame | null = null;
   private readonly focusCentre = new THREE.Vector3();
   /** Scratch for focus(): the rect and the projected centre are read immediately, so they never need to allocate (L6). */
@@ -226,6 +240,8 @@ class World {
   private drawnRevision = -1;
   /** Frames drawn since creation, every call to the renderer counted. */
   private framesDrawn = 0;
+  /** Told after every frame drawn (WorldHandle.onFrame). */
+  private readonly frameListeners = new Set<() => void>();
   /** M2: decides when to shed pixel ratio, then shadows; owns the pixel-ratio cap in force. */
   private readonly adaptive: AdaptiveQualityGovernor;
   /** M2: the layout the governor last saw; a new one means a stage rebuild, so it warms up again. */
@@ -241,6 +257,7 @@ class World {
     });
     this.sound = options.sound ?? null;
     const reducedMotion = options.reducedMotion ?? prefersReducedMotion();
+    this.reducedMotion = reducedMotion;
 
     // Everything that can fail for lack of WebGL happens before anything else
     // is built, so an unsupported device leaves nothing half-initialised behind.
@@ -282,7 +299,10 @@ class World {
       shakeCamera: (strength) => this.rig.shake(strength),
       onBubble: this.sound?.onBubble ? (at) => this.tellSound((sound) => sound.onBubble?.({ pan: this.soundPan(at.x, at.z) })) : undefined,
     });
-    this.coreRoots = new Set<THREE.Object3D>([this.lighting.root, this.interaction.root, this.fx.root]);
+    this.market = new MarketSystem({ interactables: this.interaction, reducedMotion });
+    this.market.root.visible = false;
+    scene.add(this.market.root);
+    this.coreRoots = new Set<THREE.Object3D>([this.lighting.root, this.interaction.root, this.fx.root, this.market.root]);
 
     const ctx: WorldContext = {
       scene,
@@ -304,6 +324,7 @@ class World {
     this.runner.register("people", () => (this.people = new EmployeeSystem(ctx)));
     this.runner.register("lighting", () => this.lighting);
     this.runner.register("fx", () => this.fx);
+    this.runner.register("market", () => this.market);
     this.runner.start();
 
     canvas.addEventListener("webglcontextlost", this.onContextLost);
@@ -329,12 +350,18 @@ class World {
       stats: () => this.stats(),
       loseContext: () => this.loseContext(),
       restoreContext: () => this.restoreContext(),
-      teamOf: (target) => (this.disposed ? null : teamOfTarget(target, this.frames.last?.cast ?? null, this.frames.seating)),
-      personAt: (desk) => (this.disposed ? null : this.frames.seating.deskOccupant(desk)),
+      teamOf: (target) =>
+        this.disposed || this.viewKind !== "office" ? null : teamOfTarget(target, this.frames.last?.cast ?? null, this.frames.seating),
+      personAt: (desk) => (this.disposed || this.viewKind !== "office" ? null : this.frames.seating.deskOccupant(desk)),
       releaseFirst: (personId) => {
         if (!this.disposed) this.frames.releaseFirst(personId);
       },
       settle: () => this.settle(),
+      setMarket: (market) => this.setMarket(market),
+      setView: (view) => this.setView(view),
+      view: () => this.viewKind,
+      marketMarks: () => this.marketMarks(),
+      onFrame: (listener) => this.onFrame(listener),
       dispose: () => this.dispose(),
     };
     debugByHandle.set(this.handle, { ctx, rig: this.rig, renderer });
@@ -357,10 +384,69 @@ class World {
     this.frameLayout(staged);
     // One frame for every system, in registration order. The layout and the seating are already this frame's.
     this.runner.applyFrame(staged.next, staged.prev);
+    // A rebuilt office brings new roots: while the market shows, they stay hidden.
+    this.applyVisibility();
     // The systems read each other's signals in their updates (a desk goes dark for someone away): one update must
     // run before this scene is drawn, whoever draws it.
     this.unsettled = true;
     this.loop.wake();
+  }
+
+  private setMarket(market: MarketScene): void {
+    if (this.disposed) return;
+    this.market.show(market);
+    if (this.viewKind === "market") this.frameMarket(false);
+    this.loop.wake();
+  }
+
+  private setView(view: WorldViewKind): void {
+    if (this.disposed || view === this.viewKind) return;
+    this.viewKind = view;
+    this.applyVisibility();
+    this.market.setActive(view === "market");
+    if (view === "market") this.frameMarket(true);
+    else this.frameOffice();
+    this.loop.wake();
+  }
+
+  /** Only the shown view's roots are drawn (and so picked): the core roots always, the market's or the office's. */
+  private applyVisibility(): void {
+    const market = this.viewKind === "market";
+    for (const child of this.scene.children) {
+      if (child === this.market.root) child.visible = market;
+      else if (!this.coreRoots.has(child)) child.visible = !market;
+    }
+  }
+
+  /** Bounds and framing on the market's layout. `always`: frame even when the bounds are those already applied. */
+  private frameMarket(always: boolean): void {
+    const layout = this.market.layout();
+    if (!layout) return;
+    const bounds: GroundBounds = { ...layout.bounds };
+    const previous = this.marketBounds;
+    const same =
+      previous !== null &&
+      previous.minX === bounds.minX &&
+      previous.maxX === bounds.maxX &&
+      previous.minZ === bounds.minZ &&
+      previous.maxZ === bounds.maxZ;
+    this.marketBounds = bounds;
+    if (same && !always) return;
+    this.rig.setBounds(bounds, PAN_MARGIN);
+    this.lighting.setBounds(bounds);
+    const frame = marketFrame(layout);
+    this.rig.setFraming(frame.target, frame.height, { instant: this.reducedMotion, fitWidth: frame.width, fill: FRAME_FILL });
+  }
+
+  /** Back to the office's kept bounds and framing. */
+  private frameOffice(): void {
+    this.marketBounds = null;
+    if (this.officeBounds) {
+      this.rig.setBounds(this.officeBounds, PAN_MARGIN);
+      this.lighting.setBounds(this.officeBounds);
+    }
+    const shot = this.shot;
+    if (shot) this.rig.setFraming(shot.target, shot.height, { instant: this.reducedMotion, fitWidth: shot.width, fill: FRAME_FILL });
   }
 
   private resize(width: number, height: number): void {
@@ -377,6 +463,21 @@ class World {
 
   private project(target: InteractableTarget): ScreenPoint | null {
     return this.disposed ? null : this.interaction.project(target);
+  }
+
+  /** The market's marks projected with the camera as it stands now; null unless the market shows. */
+  private marketMarks(): MarketScreenMarks | null {
+    if (this.disposed || this.viewKind !== "market") return null;
+    const marks = this.market.marks();
+    if (marks === null) return null;
+    const project = (point: { x: number; y: number; z: number }): ScreenPoint => this.rig.project(point, { x: 0, y: 0 });
+    return {
+      lots: marks.lots.map(({ seat, centre, corners }) => ({
+        seat,
+        top: { x: project(centre).x, y: Math.min(...corners.map((corner) => project(corner).y)) },
+      })),
+      bar: marks.bar === null ? null : { left: project(marks.bar.left), right: project(marks.bar.right), top: project(marks.bar.top) },
+    };
   }
 
   private screenBounds(target: InteractableTarget): ScreenRect | null {
@@ -491,6 +592,7 @@ class World {
     this.disposed = true;
     // No frame is requested from here on, and nothing can start the loop again.
     this.loop.dispose();
+    this.frameListeners.clear();
 
     this.canvas.removeEventListener("webglcontextlost", this.onContextLost);
     this.canvas.removeEventListener("webglcontextrestored", this.onContextRestored);
@@ -537,6 +639,8 @@ class World {
     this.frames.clear();
     this.people = null;
     this.shot = null;
+    this.officeBounds = null;
+    this.marketBounds = null;
     debugByHandle.delete(this.handle);
     releaseContextWhenOrphaned(this.canvas, this.gl);
   }
@@ -551,6 +655,11 @@ class World {
   private rebuildForNewRun(): void {
     this.runner.stop(REBUILT_ON_RESET);
     this.interaction.clearRegistry();
+    // The registry forgot the companies too: while the market shows, off and on registers them again.
+    if (this.viewKind === "market") {
+      this.market.setActive(false);
+      this.market.setActive(true);
+    }
     for (const child of [...this.scene.children]) {
       if (this.coreRoots.has(child)) continue;
       this.scene.remove(child);
@@ -568,10 +677,15 @@ class World {
     // Bounds first: the new framing's target is clamped against them. Pan limits
     // reach the whole diorama (the ground tile and the doorway), and the shadow
     // frustum covers the same: the scenery on the tile casts shadows too.
+    // Kept for the office in any case; applied only while the office shows (the market has bounds of its own).
     const bounds = layoutBounds(layout);
-    this.rig.setBounds(bounds, PAN_MARGIN);
-    // The lighting does not call itself busy for this; setScene wakes the loop, so it is drawn all the same.
-    this.lighting.setBounds(bounds);
+    this.officeBounds = bounds;
+    const shown = this.viewKind === "office";
+    if (shown) {
+      this.rig.setBounds(bounds, PAN_MARGIN);
+      // The lighting does not call itself busy for this; setScene wakes the loop, so it is drawn all the same.
+      this.lighting.setBounds(bounds);
+    }
 
     // The default shot frames the building — floor, walls and doorway — tightly,
     // as on-screen extents, and the rig fits whichever of its width and height
@@ -589,7 +703,8 @@ class World {
       frame.height !== previousFrame.height ||
       frame.target.x !== previousFrame.target.x ||
       frame.target.z !== previousFrame.target.z;
-    if (!officeChanged && !frameChanged) return;
+    // While the market shows, the kept framing is all that changes: the camera stays on the market.
+    if (!shown || (!officeChanged && !frameChanged)) return;
     this.rig.setFraming(frame.target, frame.height, { instant: firstScene, fitWidth: frame.width, fill: FRAME_FILL });
   }
 
@@ -743,6 +858,23 @@ class World {
     } catch (error) {
       this.runner.reportFailure("render", error);
     }
+    for (const listener of this.frameListeners) {
+      try {
+        listener();
+      } catch {
+        // Whatever a listener does wrong stays out of the frame.
+      }
+    }
+  }
+
+  private onFrame(listener: () => void): () => void {
+    if (this.disposed) return () => {};
+    // Wrapped, so the same function given twice is two listeners, each stopped by its own call.
+    const own = (): void => listener();
+    this.frameListeners.add(own);
+    return () => {
+      this.frameListeners.delete(own);
+    };
   }
 
   /** The pointer did something on the canvas: the interaction layer acts on it, and a frame shows the result. */

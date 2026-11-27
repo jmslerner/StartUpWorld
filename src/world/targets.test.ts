@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { nextCast } from "./cast";
-import { teamOfTarget } from "./targets";
+import { targetKey, teamOfTarget } from "./targets";
 import type { OfficeScene } from "./types";
 
 const scene = (teams: [number, number, number], patch: Partial<OfficeScene> = {}): OfficeScene => ({
@@ -44,5 +44,10 @@ describe("the team of a target", () => {
     expect(teamOfTarget({ kind: "door" }, null, seating)).toBeNull();
     expect(teamOfTarget({ kind: "sign" }, null, seating)).toBeNull();
     expect(teamOfTarget({ kind: "station", station: "ship" }, null, seating)).toBeNull();
+  });
+
+  it("names a company by its seat, and a company has no team", () => {
+    expect(targetKey({ kind: "company", seat: 2 })).toBe("company:2");
+    expect(teamOfTarget({ kind: "company", seat: 2 }, null, { teamOfDesk: () => "product" })).toBeNull();
   });
 });
