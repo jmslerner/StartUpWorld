@@ -16,6 +16,7 @@ import {
   darken,
   desaturate,
   EMBER,
+  fittingsFor,
   glassMat,
   glowMat,
   LABEL_FONT,
@@ -212,6 +213,7 @@ export const createCouch = (options: { seats?: 2 | 3; color?: number } = {}): Pr
 export const createCoffeeTable = (office: OfficeIndex = 2, look: LookId = "classic"): PropHandle => {
   const theme = themeFor(office, look);
   const tier = phaseTier(office);
+  const metal = fittingsFor(look).metal;
   const kit = new PropKit("coffee-table");
   kit.model(`coffee-table:${look}:${office}`, (b) => {
     const top = 0.4;
@@ -227,12 +229,12 @@ export const createCoffeeTable = (office: OfficeIndex = 2, look: LookId = "class
     b.box(1.0, 0.045, 0.55, theme.wood, 0, top - 0.045, 0, { r: 0.022 });
     b.box(0.86, 0.02, 0.42, theme.woodDark, 0, 0.14, 0, { r: 0.008 });
     for (const sx of [-1, 1]) {
-      for (const sz of [-1, 1]) b.tube([sx * 0.46, 0, sz * 0.24], [sx * 0.4, top - 0.04, sz * 0.2], 0.018, tier === 4 ? C.brass : C.charcoal, { seg: 6 });
+      for (const sz of [-1, 1]) b.tube([sx * 0.46, 0, sz * 0.24], [sx * 0.4, top - 0.04, sz * 0.2], 0.018, tier === 4 ? metal : C.charcoal, { seg: 6 });
     }
     b.box(0.22, 0.012, 0.3, theme.accents[0], -0.24, top, 0.02, { ry: 0.2, r: 0 });
     b.box(0.22, 0.012, 0.3, C.paper, -0.2, top + 0.012, 0.0, { ry: -0.1, r: 0 });
     drawMug(b, 0.3, top, -0.1, C.white, 2.4);
-    drawPlant(b, "small", 0.1, top, 0.12, tier === 4 ? C.brass : C.white, 2);
+    drawPlant(b, "small", 0.1, top, 0.12, tier === 4 ? metal : C.white, 2);
     b.box(0.2, 0.012, 0.28, C.navy, 0.2, 0.16, 0, { ry: 0.3, r: 0 });
   });
   return kit.finish({ w: 1.0, d: 0.55 });
@@ -616,18 +618,20 @@ export const createVendingMachine = (options: { color?: number } = {}): PropHand
 };
 
 /** Display case of trophies and awards — for when there is something to show off. */
-export const createTrophyShelf = (): PropHandle => {
+export const createTrophyShelf = (options: { look?: LookId } = {}): PropHandle => {
+  // The case is the look's casework (walnut and brass until the future); the trophies stay gold.
+  const fit = fittingsFor(options.look ?? "classic");
   const kit = new PropKit("trophy-shelf");
-  kit.model("trophy-shelf", (b) => {
+  kit.model(`trophy-shelf:${hex(fit.casework)}:${hex(fit.caseFront)}`, (b) => {
     const w = 1.1;
     const h = 1.55;
     const d = 0.36;
-    b.box(w, 0.5, d, C.walnutDark, 0, 0, 0, { r: 0.014 });
-    b.box(w - 0.1, 0.36, 0.014, C.walnut, 0, 0.07, d / 2, { r: 0 });
-    b.ball(0.018, C.brass, 0, 0.26, d / 2 + 0.014, { seg: 6 });
-    b.box(w, h - 0.5, 0.03, C.walnutDark, 0, 0.5, -d / 2 + 0.015, { r: 0 });
-    for (const sx of [-1, 1]) b.box(0.04, h - 0.5, d, C.walnut, sx * (w / 2 - 0.02), 0.5, 0, { r: 0.008 });
-    for (const y of [0.5, 0.98, h - 0.04]) b.box(w, 0.04, d, C.walnut, 0, y, 0, { r: 0.008 });
+    b.box(w, 0.5, d, fit.casework, 0, 0, 0, { r: 0.014 });
+    b.box(w - 0.1, 0.36, 0.014, fit.caseFront, 0, 0.07, d / 2, { r: 0 });
+    b.ball(0.018, fit.metal, 0, 0.26, d / 2 + 0.014, { seg: 6 });
+    b.box(w, h - 0.5, 0.03, fit.casework, 0, 0.5, -d / 2 + 0.015, { r: 0 });
+    for (const sx of [-1, 1]) b.box(0.04, h - 0.5, d, fit.caseFront, sx * (w / 2 - 0.02), 0.5, 0, { r: 0.008 });
+    for (const y of [0.5, 0.98, h - 0.04]) b.box(w, 0.04, d, fit.caseFront, 0, y, 0, { r: 0.008 });
     const cup = (x: number, y: number, s: number, metal: number): void => {
       b.box(0.12 * s, 0.05 * s, 0.12 * s, C.black, x, y, 0, { r: 0.006 });
       b.lathe(
@@ -653,7 +657,7 @@ export const createTrophyShelf = (): PropHandle => {
     // Upper shelf: a star award, a plaque, a medal.
     b.box(0.14, 0.04, 0.1, C.black, -0.3, 1.02, 0, { r: 0.006 });
     b.prism(starPoints(0.1, 0.045, 5), 0.03, C.brass, -0.3, 1.18, 0);
-    b.box(0.26, 0.2, 0.03, C.walnut, 0.06, 1.02, -0.02, { rx: -0.2, r: 0.006 });
+    b.box(0.26, 0.2, 0.03, fit.caseFront, 0.06, 1.02, -0.02, { rx: -0.2, r: 0.006 });
     b.box(0.2, 0.14, 0.01, C.brass, 0.06, 1.05, 0.0, { rx: -0.2, r: 0 });
     b.cyl(0.05, 0.012, C.brass, 0.36, 1.1, 0, { axis: "z", seg: 10 });
     b.box(0.05, 0.1, 0.006, C.red, 0.36, 1.2, -0.004, { r: 0 });
@@ -688,20 +692,21 @@ const drawTicker =
   };
 
 /** Scrolling LED stock ticker on a pair of posts (public-company bragging rights). 2.8 wide, 2.5 tall. */
-export const createStockTicker = (options: { symbol?: string } = {}): PropHandle => {
+export const createStockTicker = (options: { symbol?: string; look?: LookId } = {}): PropHandle => {
   const symbol = (options.symbol ?? "SUW").slice(0, 5).toUpperCase();
+  const metal = fittingsFor(options.look ?? "classic").metal;
   const kit = new PropKit("ticker");
   const w = 2.8;
   const y = 2.0;
   const h = 0.34;
-  kit.model("ticker", (b) => {
+  kit.model(`ticker:${hex(metal)}`, (b) => {
     for (const sx of [-1, 1]) {
-      b.box(0.1, y + h, 0.1, C.brass, sx * (w / 2 - 0.2), 0, 0, { r: 0.016 });
+      b.box(0.1, y + h, 0.1, metal, sx * (w / 2 - 0.2), 0, 0, { r: 0.016 });
       b.box(0.3, 0.05, 0.3, C.marble, sx * (w / 2 - 0.2), 0, 0, { r: 0.012 });
     }
     b.box(w, h + 0.1, 0.14, C.black, 0, y - 0.05, 0, { r: 0.02 });
-    b.box(w + 0.04, 0.03, 0.16, C.brass, 0, y + h + 0.04, 0, { r: 0.008 });
-    b.box(w + 0.04, 0.03, 0.16, C.brass, 0, y - 0.07, 0, { r: 0.008 });
+    b.box(w + 0.04, 0.03, 0.16, metal, 0, y + h + 0.04, 0, { r: 0.008 });
+    b.box(w + 0.04, 0.03, 0.16, metal, 0, y - 0.07, 0, { r: 0.008 });
   });
   const texture = createDynamicTexture(1024, 64, drawTicker(symbol));
   if (texture) {
@@ -737,6 +742,7 @@ export const createReceptionDesk = (office: OfficeIndex = 3, look: LookId = "cla
   const tier = phaseTier(office);
   const theme = themeFor(office, look);
   const marble = tier >= 4;
+  const fit = fittingsFor(look);
   const kit = new PropKit("reception");
   const w = 2.3;
   kit.model(`reception:${look}:${office}`, (b) => {
@@ -749,21 +755,21 @@ export const createReceptionDesk = (office: OfficeIndex = 3, look: LookId = "cla
     b.box(w - 0.5, 0.04, 0.56, theme.wood, 0, 0.72, -0.1, { r: 0.012 });
     // Slatted front.
     const slats = 14;
-    for (let i = 0; i < slats; i += 1) b.box(0.05, 0.56, 0.02, marble ? C.brass : theme.woodDark, -w / 2 + 0.45 + (i * (w - 0.9)) / (slats - 1), 0.1, 0.415, { r: 0 });
+    for (let i = 0; i < slats; i += 1) b.box(0.05, 0.56, 0.02, marble ? fit.metal : theme.woodDark, -w / 2 + 0.45 + (i * (w - 0.9)) / (slats - 1), 0.1, 0.415, { r: 0 });
     drawMonitor(b, { kind: "flat", x: -0.4, y: 0.76, z: -0.05, yaw: Math.PI, shell: C.white });
     b.box(0.34, 0.02, 0.12, C.white, -0.4, 0.76, -0.24, { r: 0.006 });
     // Flowers, bell, visitor tablet.
-    b.cyl(0.07, 0.18, marble ? C.brass : 0x9fd4ee, 0.78, 1.11, 0.24, { taper: 1.3, seg: 10 });
+    b.cyl(0.07, 0.18, marble ? fit.metal : 0x9fd4ee, 0.78, 1.11, 0.24, { taper: 1.3, seg: 10 });
     [C.pink, C.yellow, C.coral, C.pink].forEach((bloom, i) => b.ball(0.06, bloom, 0.78 + Math.cos(i * 1.7) * 0.07, 1.34 + (i % 2) * 0.05, 0.24 + Math.sin(i * 1.7) * 0.07, { seg: 6 }));
-    b.cyl(0.05, 0.04, C.brass, 0.3, 1.11, 0.28, { seg: 10 });
-    b.ball(0.015, C.brass, 0.3, 1.15, 0.28, { seg: 6 });
+    b.cyl(0.05, 0.04, fit.metal, 0.3, 1.11, 0.28, { seg: 10 });
+    b.ball(0.015, fit.metal, 0.3, 1.15, 0.28, { seg: 6 });
     b.box(0.2, 0.26, 0.016, C.black, -0.75, 1.11, 0.26, { rx: -0.35, r: 0.006 });
-    drawChair(b, tier >= 4 ? "executive" : "premium", theme.accents[0]);
+    drawChair(b, tier >= 4 ? "executive" : "premium", theme.accents[0], fit);
   });
   const screen = createScreenSurface("sheet");
   kit.own(screen.material);
   kit.add(new THREE.Mesh(screenQuads("reception", [monitorScreen({ kind: "flat", x: -0.4, y: 0.76, z: -0.05, yaw: Math.PI })]), screen.material));
-  const band = kit.emissive(marble ? C.brass : lighten(theme.glow, 0.2), theme.glow, 0.5, 1.2);
+  const band = kit.emissive(marble ? fit.metal : lighten(theme.glow, 0.2), theme.glow, 0.5, 1.2);
   kit.add(shapeMesh(bakeModel("reception:band", (b) => b.box(w - 0.7, 0.07, 0.02, 0xffffff, 0, 0.8, 0.42, { r: 0 })), band, false));
   kit.onGlow((amount) => screen.setGlow(amount));
   return kit.finish({ w: w + 0.06, d: 0.9 });
@@ -777,7 +783,7 @@ export const createMeetingPod = (office: OfficeIndex = 3, look: LookId = "classi
   const w = 2.4;
   const d = 2.0;
   const h = 2.2;
-  const frame = tier >= 4 ? C.brass : tier === 3 ? C.white : C.charcoal;
+  const frame = tier >= 4 ? fittingsFor(look).metal : tier === 3 ? C.white : C.charcoal;
   kit.model(`meeting-pod:${look}:${office}`, (b) => {
     b.box(w, 0.06, d, theme.woodDark, 0, 0, 0, { r: 0.014 });
     b.box(w - 0.3, 0.012, d - 0.3, theme.accents[0], 0, 0.06, 0, { r: 0 });

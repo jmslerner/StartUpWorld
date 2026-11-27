@@ -6,8 +6,8 @@
  * Everything here is drawn at the builder's current transform; (x, y, z) place
  * the part's floor-centre origin unless noted.
  */
-import { C, darken, lighten, NEON, SCALE } from "../../core/palette";
-import type { ModelBuilder } from "../../core/palette";
+import { C, darken, fittingsFor, lighten, NEON, SCALE } from "../../core/palette";
+import type { LookFittings, ModelBuilder } from "../../core/palette";
 import type { ScreenQuad } from "./shared";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -30,7 +30,8 @@ const starBase = (b: ModelBuilder, frame: number, reach: number): void => {
   b.cyl(0.05, 0.06, frame, 0, 0.04, 0);
 };
 
-export const drawChair = (b: ModelBuilder, style: ChairStyle, accent: number = C.teal): void => {
+/** `fit`: the look's fittings, which dress the executive chair (leather on brass until the future). */
+export const drawChair = (b: ModelBuilder, style: ChairStyle, accent: number = C.teal, fit: Pick<LookFittings, "metal" | "upholstery"> = fittingsFor("classic")): void => {
   switch (style) {
     case "garage": {
       // Folding metal chair: an X of tube legs, thin pressed seat and back, their pads in the accent colour.
@@ -89,11 +90,11 @@ export const drawChair = (b: ModelBuilder, style: ChairStyle, accent: number = C
       return;
     }
     case "executive": {
-      // High-back leather with brass base.
-      const leather = C.leather;
+      // High back on a metal base: leather on brass until the future's own (fittingsFor).
+      const leather = fit.upholstery;
       const seam = darken(leather, 0.25);
-      starBase(b, C.brass, 0.27);
-      b.cyl(0.03, 0.25, C.brass, 0, 0.09, 0, { seg: 8 });
+      starBase(b, fit.metal, 0.27);
+      b.cyl(0.03, 0.25, fit.metal, 0, 0.09, 0, { seg: 8 });
       b.box(0.5, 0.11, 0.48, leather, 0, SEAT_Y - 0.11, 0.0, { r: 0.045 });
       b.box(0.5, 0.78, 0.1, leather, 0, 0.47, -0.25, { rx: -0.09, r: 0.045 });
       for (const sy of [0.72, 0.92, 1.1]) b.box(0.4, 0.012, 0.012, seam, 0, sy, -0.2 - (sy - 0.47) * 0.09, { r: 0 });

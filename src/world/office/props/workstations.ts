@@ -7,8 +7,8 @@
  * (+Z) side of the top with its screen facing back toward −Z.
  */
 import * as THREE from "three";
-import { bakeModel, C, darken, furnitureOf, lighten, LOOK_SURFACES, mixColor, modelMesh, phaseTier, SCALE } from "../../core/palette";
-import type { ColorFilter, ModelBuilder } from "../../core/palette";
+import { bakeModel, C, darken, fittingsFor, furnitureOf, lighten, LOOK_SURFACES, mixColor, modelMesh, phaseTier, SCALE } from "../../core/palette";
+import type { ColorFilter, LookFittings, ModelBuilder } from "../../core/palette";
 import type { FurnitureSet, LookId, OfficeIndex, Team } from "../../types";
 import { CHAIR_SIZE, DESK_SIZE } from "../footprints";
 import {
@@ -61,13 +61,23 @@ const DESK_TOPS: Record<DeskStyle, number> = {
   executive: C.walnut,
 };
 
+/** The top of each desk style in the invented future: resin, glass-white and silver, no wood. */
+const FUTURE_DESK_TOPS: Record<DeskStyle, number> = {
+  garage: C.greyLight,
+  hotdesk: C.paper,
+  standard: C.white,
+  premium: C.silver,
+  executive: C.chrome,
+};
+
 /** How far a look's desk finish covers a style's own top: the grain of each desk still shows through. */
 const DESK_FINISH_TAKES = 0.7;
 
-/** The colour of a desk style's top in a look: its own, under the look's finish (LOOK_SURFACES). */
+/** The colour of a desk style's top in a look: its own (its set's), under the look's finish (LOOK_SURFACES). */
 export const deskTopFor = (style: DeskStyle, look: LookId = "classic"): number => {
+  const own = furnitureOf(look) === "future" ? FUTURE_DESK_TOPS[style] : DESK_TOPS[style];
   const finish = LOOK_SURFACES[look].desk;
-  return finish === undefined ? DESK_TOPS[style] : mixColor(DESK_TOPS[style], finish, DESK_FINISH_TAKES);
+  return finish === undefined ? own : mixColor(own, finish, DESK_FINISH_TAKES);
 };
 
 /** The colour of the desk tops of an office in a look. */
@@ -158,13 +168,13 @@ const MONITOR_SHELL: Record<DeskStyle, number | undefined> = {
   hotdesk: C.chrome,
   standard: C.greyLight,
   premium: C.white,
-  executive: C.brass,
+  executive: C.brass, // the look's metal (fittingsFor)
 };
 
 /** Where a computer of each kind stands on the top: a tube sits back and to one side, a laptop near the edge. */
 const deskMonitors = (style: DeskStyle, look: LookId): MonitorSpec[] => {
   const kind = monitorFor(style, furnitureOf(look));
-  const shell = MONITOR_SHELL[style];
+  const shell = style === "executive" ? fittingsFor(look).metal : MONITOR_SHELL[style];
   const withShell = (spec: MonitorSpec): MonitorSpec => (shell === undefined ? spec : { ...spec, shell });
   switch (kind) {
     case "crt":
@@ -202,7 +212,7 @@ const drawTower = (b: ModelBuilder, style: DeskStyle): void => {
   b.box(0.03, 0.03, 0.01, C.good, x - 0.05, 0.2, front, { r: 0 });
 };
 
-const drawBody = (b: ModelBuilder, style: DeskStyle, accent: number, set: FurnitureSet, top: number): void => {
+const drawBody = (b: ModelBuilder, style: DeskStyle, accent: number, set: FurnitureSet, top: number, fit: LookFittings): void => {
   if (deskHardware(style, set).tower) drawTower(b, style);
   switch (style) {
     case "garage": {
@@ -211,12 +221,12 @@ const drawBody = (b: ModelBuilder, style: DeskStyle, accent: number, set: Furnit
       b.box(1.304, 0.012, 0.654, darken(top, 0.18), 0, TOP - 0.032, 0, { r: 0 });
       for (const sx of [-1, 1]) {
         const x = sx * 0.45;
-        b.box(0.08, 0.06, 0.6, C.pallet, x, TOP - 0.11, 0, { r: 0.01 });
+        b.box(0.08, 0.06, 0.6, fit.legs, x, TOP - 0.11, 0, { r: 0.01 });
         for (const sz of [-1, 1]) {
-          b.strut([x - 0.12, 0, sz * 0.25], [x - 0.012, TOP - 0.1, sz * 0.25], 0.046, C.pallet);
-          b.strut([x + 0.12, 0, sz * 0.25], [x + 0.012, TOP - 0.1, sz * 0.25], 0.046, C.pallet);
+          b.strut([x - 0.12, 0, sz * 0.25], [x - 0.012, TOP - 0.1, sz * 0.25], 0.046, fit.legs);
+          b.strut([x + 0.12, 0, sz * 0.25], [x + 0.012, TOP - 0.1, sz * 0.25], 0.046, fit.legs);
         }
-        b.box(0.03, 0.035, 0.5, darken(C.pallet, 0.12), x, 0.26, 0, { r: 0 });
+        b.box(0.03, 0.035, 0.5, darken(fit.legs, 0.12), x, 0.26, 0, { r: 0 });
       }
       return;
     }
@@ -262,20 +272,20 @@ const drawBody = (b: ModelBuilder, style: DeskStyle, accent: number, set: Furnit
       return;
     }
     case "executive": {
-      // Dark walnut partner's desk with brass inlay.
+      // A partner's desk on two pedestals with an inlay: walnut and brass until the future's own (fittingsFor).
       b.box(1.3, 0.06, 0.65, top, 0, TOP - 0.06, 0, { r: 0.02 });
-      b.box(1.308, 0.014, 0.658, C.brass, 0, TOP - 0.04, 0, { r: 0 });
+      b.box(1.308, 0.014, 0.658, fit.metal, 0, TOP - 0.04, 0, { r: 0 });
       for (const sx of [-1, 1]) {
         b.box(0.34, 0.02, 0.58, C.black, sx * 0.46, 0, 0, { r: 0 });
-        b.box(0.36, TOP - 0.08, 0.6, C.walnutDark, sx * 0.46, 0.02, 0, { r: 0.014 });
+        b.box(0.36, TOP - 0.08, 0.6, fit.casework, sx * 0.46, 0.02, 0, { r: 0.014 });
         for (let i = 0; i < 3; i += 1) {
-          b.box(0.3, 0.17, 0.012, C.walnut, sx * 0.46, 0.06 + i * 0.195, -0.304, { r: 0 });
-          b.ball(0.016, C.brass, sx * 0.46, 0.13 + i * 0.195, -0.318);
+          b.box(0.3, 0.17, 0.012, fit.caseFront, sx * 0.46, 0.06 + i * 0.195, -0.304, { r: 0 });
+          b.ball(0.016, fit.metal, sx * 0.46, 0.13 + i * 0.195, -0.318);
         }
       }
-      b.box(0.58, 0.5, 0.03, C.walnut, 0, 0.14, 0.27, { r: 0.008 });
-      b.box(0.5, 0.014, 0.008, C.brass, 0, 0.5, 0.288, { r: 0 });
-      b.box(0.5, 0.014, 0.008, C.brass, 0, 0.26, 0.288, { r: 0 });
+      b.box(0.58, 0.5, 0.03, fit.caseFront, 0, 0.14, 0.27, { r: 0.008 });
+      b.box(0.5, 0.014, 0.008, fit.metal, 0, 0.5, 0.288, { r: 0 });
+      b.box(0.5, 0.014, 0.008, fit.metal, 0, 0.26, 0.288, { r: 0 });
       return;
     }
   }
@@ -305,7 +315,7 @@ const MAT_AT: Record<DeskStyle, { w: number; d: number; x: number; z: number; t:
  * computer on the desk (`deskHardware`): a beige one with a tube, the desk's own with a flat screen, none beside a
  * laptop (it has its own keys), a pane of touch glass with the future's screen.
  */
-const drawHardware = (b: ModelBuilder, style: DeskStyle, accent: number, set: FurnitureSet): void => {
+const drawHardware = (b: ModelBuilder, style: DeskStyle, accent: number, set: FurnitureSet, fit: LookFittings): void => {
   const kit = deskHardware(style, set);
   const mat = MAT_AT[style];
   const finish = KEYS_FINISH[style];
@@ -313,7 +323,7 @@ const drawHardware = (b: ModelBuilder, style: DeskStyle, accent: number, set: Fu
   // The garage's and the hot desk's mats lie under the mouse only; the keyboard stands on the bare top.
   const keysY = style === "garage" || style === "hotdesk" ? TOP : top;
   if (kit.laptopStand) b.box(0.3, 0.07, 0.2, C.white, 0, TOP, 0.05, { r: 0.012, taperZ: 0.9 });
-  if (style === "executive") b.box(0.64, 0.004, 0.36, C.brass, mat.x, TOP, mat.z, { r: 0 });
+  if (style === "executive") b.box(0.64, 0.004, 0.36, fit.metal, mat.x, TOP, mat.z, { r: 0 });
   b.box(mat.w, mat.t, mat.d, accent, mat.x, TOP, mat.z, { r: 0 });
   const mouse = kit.keyboard === "beige" ? BEIGE : finish.body;
   switch (kit.keyboard) {
@@ -335,7 +345,7 @@ const drawHardware = (b: ModelBuilder, style: DeskStyle, accent: number, set: Fu
 };
 
 /** Personal mess — only on occupied desks. `variant` shuffles it so rows of desks do not look cloned. */
-const drawClutter = (b: ModelBuilder, style: DeskStyle, accent: number, variant: number): void => {
+const drawClutter = (b: ModelBuilder, style: DeskStyle, accent: number, variant: number, fit: LookFittings): void => {
   const v = ((variant % DESK_VARIANTS) + DESK_VARIANTS) % DESK_VARIANTS;
   const notes = [C.noteYellow, C.notePink, C.noteBlue];
   switch (style) {
@@ -391,8 +401,8 @@ const drawClutter = (b: ModelBuilder, style: DeskStyle, accent: number, variant:
     case "executive": {
       // Banker's lamp, nameplate, pen stand, folio.
       const lampX = -0.46;
-      b.cyl(0.065, 0.02, C.brass, lampX, TOP, 0.14, { seg: 12 });
-      b.cyl(0.013, 0.2, C.brass, lampX, TOP + 0.02, 0.14, { seg: 6 });
+      b.cyl(0.065, 0.02, fit.metal, lampX, TOP, 0.14, { seg: 12 });
+      b.cyl(0.013, 0.2, fit.metal, lampX, TOP + 0.02, 0.14, { seg: 6 });
       b.cyl(0.055, 0.24, 0x2f7d55, lampX, TOP + 0.19, 0.14, { axis: "x", seg: 10 });
       b.box(0.2, 0.012, 0.03, C.lampWarm, lampX, TOP + 0.186, 0.14, { r: 0 });
       b.prism(
@@ -402,7 +412,7 @@ const drawClutter = (b: ModelBuilder, style: DeskStyle, accent: number, variant:
           [0, 0.05],
         ],
         0.2,
-        C.brass,
+        fit.metal,
         0.36,
         TOP,
         0.25,
@@ -410,7 +420,7 @@ const drawClutter = (b: ModelBuilder, style: DeskStyle, accent: number, variant:
       );
       b.box(0.22, 0.02, 0.3, C.leatherDark, 0.46, TOP, -0.08, { ry: -0.2 + v * 0.15, r: 0.006 });
       b.cyl(0.03, 0.07, C.black, -0.5, TOP, -0.14, { seg: 8 });
-      b.box(0.01, 0.1, 0.01, C.brass, -0.5, TOP + 0.04, -0.14, { rz: 0.2, r: 0 });
+      b.box(0.01, 0.1, 0.01, fit.metal, -0.5, TOP + 0.04, -0.14, { rz: 0.2, r: 0 });
       if (v !== 2) drawMug(b, 0.5, TOP, 0.2, C.white, 0.9);
       return;
     }
@@ -429,10 +439,11 @@ const vacantFilter: ColorFilter = (color) => {
 const drawDesk = (b: ModelBuilder, style: DeskStyle, look: LookId, accent: number, occupied: boolean, variant: number): void => {
   if (!occupied) b.setColorFilter(vacantFilter);
   const set = furnitureOf(look);
-  drawBody(b, style, accent, set, deskTopFor(style, look));
+  const fit = fittingsFor(look);
+  drawBody(b, style, accent, set, deskTopFor(style, look), fit);
   for (const monitor of deskMonitors(style, look)) drawMonitor(b, monitor);
-  drawHardware(b, style, accent, set);
-  if (occupied) drawClutter(b, style, accent, variant);
+  drawHardware(b, style, accent, set, fit);
+  if (occupied) drawClutter(b, style, accent, variant, fit);
   b.setColorFilter(null);
 };
 
@@ -504,6 +515,8 @@ export interface ChairOptions {
   style: ChairStyle;
   /** Shell / mesh colour for the styles that have one. */
   accent?: number;
+  /** The office's look: the executive chair's upholstery and metal (fittingsFor). Default "classic". */
+  look?: LookId;
 }
 
 /**
@@ -513,7 +526,11 @@ export interface ChairOptions {
  */
 export const createChair = (options: ChairOptions): PropHandle => {
   const accent = options.accent ?? DESK_ACCENT[options.style];
+  const look = options.look ?? "classic";
+  const fit = fittingsFor(look);
   const kit = new PropKit(`chair:${options.style}`);
-  kit.model(`chair:${options.style}:${accent.toString(16)}`, (b) => drawChair(b, options.style, accent));
+  // Only the executive chair has fittings; the key keeps every other chair shared across looks.
+  const finish = options.style === "executive" ? `:${fit.metal.toString(16)}:${fit.upholstery.toString(16)}` : "";
+  kit.model(`chair:${options.style}:${accent.toString(16)}${finish}`, (b) => drawChair(b, options.style, accent, fit));
   return kit.finish(CHAIR_FOOTPRINT);
 };

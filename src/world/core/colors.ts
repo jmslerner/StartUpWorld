@@ -90,6 +90,8 @@ export const C = {
   sand: 0xe2cfae,
   violet: 0x7c5cc4,
   lavender: 0xb9a6e8,
+  frost: 0xe4eef0,
+  pearl: 0xece8f2,
   screenOff: 0x1c2128,
   screenDim: 0x27425a,
   // Lights
@@ -260,21 +262,21 @@ export const PHASE_THEMES: Record<LookId, OfficeThemes> = {
     { wood: C.plywood, woodDark: C.oak, frame: C.white, panel: C.white, accents: [C.leafDark, C.teal, C.yellow], glow: NEON },
     { wood: C.oak, woodDark: C.walnut, frame: C.black, panel: C.white, accents: [C.leaf, C.teal, C.brass], glow: EMBER },
   ],
-  // Cool white and mint: the years the machines start doing the work.
+  // Cool white and mint: the years the machines start doing the work. No wood: frosted resin, silver and chrome.
   agents: [
-    { wood: C.birch, woodDark: C.plywood, frame: C.white, panel: C.white, accents: [C.mint, C.teal, C.greyLight], glow: NEON },
-    { wood: C.birch, woodDark: C.oak, frame: C.chrome, panel: C.white, accents: [C.mint, C.blue, C.teal], glow: NEON },
-    { wood: C.plywood, woodDark: C.oak, frame: C.white, panel: C.paper, accents: [C.teal, C.mint, C.blue], glow: NEON },
-    { wood: C.birch, woodDark: C.oak, frame: C.chrome, panel: C.paper, accents: [C.mint, C.navy, C.teal], glow: NEON },
-    { wood: C.birch, woodDark: C.oak, frame: C.white, panel: C.white, accents: [C.mint, C.teal, C.chrome], glow: NEON },
+    { wood: C.frost, woodDark: C.silver, frame: C.white, panel: C.white, accents: [C.mint, C.teal, C.greyLight], glow: NEON },
+    { wood: C.paper, woodDark: C.greyLight, frame: C.chrome, panel: C.white, accents: [C.mint, C.blue, C.teal], glow: NEON },
+    { wood: C.frost, woodDark: C.greyLight, frame: C.white, panel: C.paper, accents: [C.teal, C.mint, C.blue], glow: NEON },
+    { wood: C.white, woodDark: C.silver, frame: C.chrome, panel: C.paper, accents: [C.mint, C.navy, C.teal], glow: NEON },
+    { wood: C.frost, woodDark: C.silver, frame: C.chrome, panel: C.white, accents: [C.mint, C.teal, C.chrome], glow: NEON },
   ],
-  // Soft sand and violet: computing that has melted into the room.
+  // Pearl and violet: computing that has melted into the room. No wood, no brass: pearl, lavender and silver.
   ambient: [
-    { wood: C.sand, woodDark: C.oak, frame: C.bone, panel: C.cream, accents: [C.violet, C.lavender, C.pink], glow: NEON },
-    { wood: C.sand, woodDark: C.oak, frame: C.white, panel: C.cream, accents: [C.lavender, C.violet, C.teal], glow: NEON },
-    { wood: C.sand, woodDark: C.walnut, frame: C.bone, panel: C.white, accents: [C.violet, C.pink, C.lavender], glow: NEON },
-    { wood: C.birch, woodDark: C.sand, frame: C.white, panel: C.cream, accents: [C.violet, C.lavender, C.coral], glow: NEON },
-    { wood: C.sand, woodDark: C.walnut, frame: C.brass, panel: C.cream, accents: [C.violet, C.navy, C.lavender], glow: EMBER },
+    { wood: C.pearl, woodDark: C.lavender, frame: C.bone, panel: C.cream, accents: [C.violet, C.lavender, C.pink], glow: NEON },
+    { wood: C.pearl, woodDark: C.silver, frame: C.white, panel: C.cream, accents: [C.lavender, C.violet, C.teal], glow: NEON },
+    { wood: C.pearl, woodDark: C.lavender, frame: C.white, panel: C.white, accents: [C.violet, C.pink, C.lavender], glow: NEON },
+    { wood: C.white, woodDark: C.pearl, frame: C.white, panel: C.cream, accents: [C.violet, C.lavender, C.coral], glow: NEON },
+    { wood: C.pearl, woodDark: C.silver, frame: C.chrome, panel: C.cream, accents: [C.violet, C.navy, C.lavender], glow: NEON },
   ],
 };
 
@@ -405,6 +407,49 @@ export const LOOK_SURFACES: Readonly<Record<LookId, LookSurfaces>> = {
   "winter-ai": { wall: 0x9fcf98, desk: 0xc2d6b6 },
   // Mint walls and grey-white desks on the white resin.
   agents: { wall: 0xc6eedc, desk: 0xb4bec6 },
-  // Lavender walls and sand desks; the resin goes warm.
-  ambient: { floor: { color: 0xe0c9a6, amount: 0.65 }, wall: 0xcdbcea, desk: 0xe2cfae },
+  // Lavender walls and pale lilac desks; the resin goes warm.
+  ambient: { floor: { color: 0xe0c9a6, amount: 0.65 }, wall: 0xcdbcea, desk: 0xdcd2ee },
 };
+
+/**
+ * The fine finishes of the best furniture and of the campus's walls, which the shapes themselves do not change from
+ * look to look: the wall panelling, the executive desk's casework, the metal of fittings (inlay, handles, the seams
+ * between panels, window frames, the campus's door, the chair bases), the executive chair's upholstery and the
+ * garage desk's trestles. Every look up to the twenties keeps the walnut, brass and leather they always had; the
+ * invented future has its own, with no wood or brass in them.
+ */
+export interface LookFittings {
+  /** The face of the wall panelling, and its darker back (the corner posts). */
+  readonly panel: number;
+  readonly panelDark: number;
+  /** The executive desk's pedestals, and its drawer fronts and modesty panel. */
+  readonly casework: number;
+  readonly caseFront: number;
+  /** Metal fittings. */
+  readonly metal: number;
+  /** The executive chair's seat and back. */
+  readonly upholstery: number;
+  /** The garage desk's trestles. */
+  readonly legs: number;
+}
+
+const CLASSIC_FITTINGS: LookFittings = Object.freeze({
+  panel: C.walnut,
+  panelDark: C.walnutDark,
+  casework: C.walnutDark,
+  caseFront: C.walnut,
+  metal: C.brass,
+  upholstery: C.leather,
+  legs: C.pallet,
+});
+
+/** The looks whose fittings are not the classic ones. */
+const LOOK_FITTINGS: Readonly<Partial<Record<LookId, LookFittings>>> = {
+  // Frosted resin panels, pale grey casework, chrome, grey-white upholstery.
+  agents: Object.freeze({ panel: C.frost, panelDark: C.silver, casework: C.greyLight, caseFront: C.white, metal: C.chrome, upholstery: C.greyLight, legs: C.silver }),
+  // Pearl panels, pearl and lavender casework, silver, lavender upholstery.
+  ambient: Object.freeze({ panel: C.pearl, panelDark: C.lavender, casework: C.lavender, caseFront: C.pearl, metal: C.silver, upholstery: C.lavender, legs: C.silver }),
+};
+
+/** The fittings of a look. */
+export const fittingsFor = (look: LookId): LookFittings => LOOK_FITTINGS[look] ?? CLASSIC_FITTINGS;

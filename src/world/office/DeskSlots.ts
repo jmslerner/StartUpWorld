@@ -236,7 +236,7 @@ export class DeskSlots {
   }
 
   private createChairFor(team: Team | null): PropHandle {
-    return createChair({ style: deskStyleFor(this.kit.office, this.kit.look), accent: deskAccentFor(team) });
+    return createChair({ style: deskStyleFor(this.kit.office, this.kit.look), accent: deskAccentFor(team), look: this.kit.look });
   }
 
   private setRegistered(slot: DeskSlot, registered: boolean): void {

@@ -12,7 +12,7 @@
  * built. The signs say plain words: the world is told no company's name.
  */
 import { CAMERA_AZIMUTH } from "../core/CameraRig";
-import { C, NEON, phaseTier, themeFor } from "../core/palette";
+import { C, fittingsFor, NEON, phaseTier, themeFor } from "../core/palette";
 import type { LookId, OfficeIndex } from "../types";
 import { decorSize, getLayoutDecor, groundRect, LOFT_ANNEX_WIDTH, WALL_GAP } from "./layouts";
 import { createSignatureProp, SIGNATURE_PROPS, SIGNATURE_SIZES } from "./props/signature";
@@ -89,6 +89,11 @@ const createGuestDesk = (variant: number): PropHandle => {
 };
 
 const COUCH_COLORS = [C.teal, C.coral, C.navy, C.purple, C.leather];
+/** A couch's colour in a look: the leather one takes the look's upholstery (the future has no leather). */
+const couchColor = (variant: number, look: LookId): number => {
+  const color = COUCH_COLORS[variant % COUCH_COLORS.length];
+  return color === C.leather ? fittingsFor(look).upholstery : color;
+};
 const LAMP_STYLES = ["classic", "arc", "work"] as const;
 
 const DECOR_FACTORIES: Record<DecorKind, (office: OfficeIndex, look: LookId, spot: DecorSpot) => PropHandle> = {
@@ -97,8 +102,8 @@ const DECOR_FACTORIES: Record<DecorKind, (office: OfficeIndex, look: LookId, spo
   bookshelf: (office, look) => createBookshelf(office, look),
   "filing-cabinet": (_office, _look, spot) => createFilingCabinet({ drawers: 2 + (spot.variant % 2) }),
   boxes: (_office, _look, spot) => createCardboardBoxes(spot.variant),
-  couch: (_office, _look, spot) => createCouch({ seats: 2, color: COUCH_COLORS[spot.variant % COUCH_COLORS.length] }),
-  "couch-wide": (_office, _look, spot) => createCouch({ seats: 3, color: COUCH_COLORS[spot.variant % COUCH_COLORS.length] }),
+  couch: (_office, look, spot) => createCouch({ seats: 2, color: couchColor(spot.variant, look) }),
+  "couch-wide": (_office, look, spot) => createCouch({ seats: 3, color: couchColor(spot.variant, look) }),
   "coffee-table": (office, look) => createCoffeeTable(office, look),
   "water-cooler": () => createWaterCooler(),
   whiteboard: () => createWhiteboard(),
@@ -106,8 +111,8 @@ const DECOR_FACTORIES: Record<DecorKind, (office: OfficeIndex, look: LookId, spo
   "ping-pong": () => createPingPongTable(),
   arcade: (_office, _look, spot) => createArcadeCabinet({ color: [C.purple, C.teal, C.red][spot.variant % 3] }),
   vending: (_office, _look, spot) => createVendingMachine({ color: [C.red, C.blue][spot.variant % 2] }),
-  "trophy-shelf": () => createTrophyShelf(),
-  "stock-ticker": () => createStockTicker(),
+  "trophy-shelf": (_office, look) => createTrophyShelf({ look }),
+  "stock-ticker": (_office, look) => createStockTicker({ look }),
   reception: (office, look) => createReceptionDesk(office, look),
   "meeting-pod": (office, look) => createMeetingPod(office, look),
   "floor-lamp": (_office, _look, spot) => createFloorLamp({ style: LAMP_STYLES[spot.variant % LAMP_STYLES.length] }),
@@ -369,10 +374,12 @@ const floorScene: Scene = (d) => {
 const campusScene: Scene = (d) => {
   const { floor } = d;
 
-  d.stand(createSign("HQ", { height: 0.5, background: C.marble, color: C.brass, lit: true }), d.backWallSpot(11.6, 1.55));
+  const { look } = d.kit;
+  const metal = fittingsFor(look).metal;
+  d.stand(createSign("HQ", { height: 0.5, background: C.marble, color: metal, lit: true }), d.backWallSpot(11.6, 1.55));
   // A ticker above the calendar: set dressing, the same made-up prices whatever the company does.
-  d.put(createStockTicker(), 0.2, floor.minZ + 0.32);
-  d.lay(createRug(2.2, 2.4, { color: C.burgundy, accent: C.brass, pattern: "border" }), 10.5, 7.9);
+  d.put(createStockTicker({ look }), 0.2, floor.minZ + 0.32);
+  d.lay(createRug(2.2, 2.4, { color: C.burgundy, accent: metal, pattern: "border" }), 10.5, 7.9);
   d.hangSide(createWallArt(3), -0.6, 1.25);
 
   // Skyline hints: towers close behind the back walls, which hide where they meet the ground.

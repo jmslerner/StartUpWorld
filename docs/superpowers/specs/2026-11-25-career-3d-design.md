@@ -344,7 +344,10 @@ ships four furniture sets: 1990s, 2000s to 2010s, 2020s (all three in step 4) an
 era can be told apart at a glance without eight sets of furniture. The palette reaches the surfaces that fill most of the picture:
 each era lays its own tint over the floor, its own paint on the walls and its own finish on the desk tops, and a
 test holds any two eras visibly apart (a colour distance of at least 12 in L\*a\*b\*) in at least two of those three
-in every office.
+in every office. The two invented eras (agents, ambient) also have their own fittings: the walnut panelling, walnut
+casework, brass and leather of the full floor and the campus become light resin, pearl, chrome or silver and pale
+upholstery, with a cool glow in every office, so the future never reads as an old-money boardroom; a test pins the
+walnut and brass of every earlier era.
 
 **On a phone held upright** the screen is, from the top: the timeline strip; the office, fixed at about 40% of the
 height; and the plan in a sheet that pulls up from the bottom, whose closed state shows the three team steppers, the

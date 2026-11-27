@@ -15,6 +15,7 @@ import {
   cssColor,
   darken,
   EMBER,
+  fittingsFor,
   furnitureOf,
   glassMat,
   glowMat,
@@ -332,14 +333,22 @@ interface WallLook {
   face: number;
   back: number;
   base: number;
+  /** Window frames, and the seams between panels. */
+  trim: number;
 }
 
-const WALL_LOOKS: Record<WallStyle, WallLook> = {
-  drywall: { face: 0xddd5c2, back: 0xbcae93, base: C.pallet },
-  brick: { face: C.brick, back: C.brickDark, base: C.charcoal },
-  plaster: { face: C.cream, back: C.bone, base: C.grey },
-  glass: { face: C.white, back: C.greyLight, base: C.greyDark },
-  panel: { face: C.walnut, back: C.walnutDark, base: C.marble },
+const WALL_LOOKS: Record<Exclude<WallStyle, "panel">, WallLook> = {
+  drywall: { face: 0xddd5c2, back: 0xbcae93, base: C.pallet, trim: C.white },
+  brick: { face: C.brick, back: C.brickDark, base: C.charcoal, trim: C.white },
+  plaster: { face: C.cream, back: C.bone, base: C.grey, trim: C.white },
+  glass: { face: C.white, back: C.greyLight, base: C.greyDark, trim: C.white },
+};
+
+/** A finish's own colours in a look: the panelling is the look's (walnut and brass until the future); the rest are fixed. */
+const ownWallLook = (style: WallStyle, look: LookId): WallLook => {
+  if (style !== "panel") return WALL_LOOKS[style];
+  const fit = fittingsFor(look);
+  return { face: fit.panel, back: fit.panelDark, base: C.marble, trim: fit.metal };
 };
 
 /** How far each finish takes a look's paint: painted brick and stained panelling keep some of their own colour. */
@@ -347,11 +356,11 @@ const PAINT_TAKES: Record<WallStyle, number> = { drywall: 0.85, brick: 0.6, plas
 
 /** A wall finish in a look: its own colours under the look's paint (LOOK_SURFACES); the skirting stays. */
 export const wallLookFor = (style: WallStyle, look: LookId = "classic"): WallLook => {
-  const own = WALL_LOOKS[style];
+  const own = ownWallLook(style, look);
   const paint = LOOK_SURFACES[look].wall;
   if (paint === undefined) return own;
   const amount = PAINT_TAKES[style];
-  return { face: mixColor(own.face, paint, amount), back: mixColor(own.back, darken(paint, 0.15), amount), base: own.base };
+  return { face: mixColor(own.face, paint, amount), back: mixColor(own.back, darken(paint, 0.15), amount), base: own.base, trim: own.trim };
 };
 
 /** The colour of an office's walls in a look, as the room sees them. */
@@ -402,7 +411,7 @@ const drawWallFinish = (b: ModelBuilder, look: WallLook, style: WallStyle, x0: n
   } else if (style === "panel") {
     for (let x = Math.ceil(x0) + 0; x < x1 - 0.05; x += 1) {
       if (x - x0 < 0.05) continue;
-      b.box(0.016, y1 - y0, 0.008, C.brass, x, y0, face + 0.002, { r: 0 });
+      b.box(0.016, y1 - y0, 0.008, look.trim, x, y0, face + 0.002, { r: 0 });
     }
   }
 };
@@ -450,7 +459,7 @@ const drawWall = (b: ModelBuilder, glass: ModelBuilder, length: number, height: 
     drawWallFinish(b, look, style, cursor, left, sillY, headY, face);
     cursor = wx + WINDOW_W / 2;
     // Frame, sill, glazing bars.
-    const trim = style === "panel" ? C.brass : C.white;
+    const trim = look.trim;
     b.box(WINDOW_W + 0.1, 0.05, t + 0.08, trim, wx, sillY - 0.03, 0.02, { r: 0.012 });
     b.box(WINDOW_W, 0.05, t * 0.7, trim, wx, headY - 0.05, 0, { r: 0 });
     for (const sx of [-1, 1]) b.box(0.05, headY - sillY, t * 0.7, trim, wx + sx * (WINDOW_W / 2 - 0.025), sillY, 0, { r: 0 });
@@ -541,7 +550,8 @@ export const createDoor = (office: OfficeIndex = 2, look: LookId = "classic"): D
   const tier = phaseTier(office);
   const theme = themeFor(office, look);
   const kit = new PropKit(`door:${look}:${office}`);
-  const frameColor = [C.pallet, theme.accents[1], C.greyDark, C.white, C.brass][tier];
+  const metal = fittingsFor(look).metal;
+  const frameColor = [C.pallet, theme.accents[1], C.greyDark, C.white, metal][tier];
   const double = tier === 4;
 
   kit.model(`door-frame:${look}:${office}`, (b) => {
@@ -557,11 +567,11 @@ export const createDoor = (office: OfficeIndex = 2, look: LookId = "classic"): D
     // Drawn with the hinge on the origin, the leaf extending toward +X.
     const glassDoor = tier === 1 || tier >= 3;
     if (glassDoor) {
-      const rail = tier === 1 ? theme.accents[1] : tier === 4 ? C.brass : C.chrome;
+      const rail = tier === 1 ? theme.accents[1] : tier === 4 ? metal : C.chrome;
       b.box(w, 0.1, 0.05, rail, w / 2, 0.02, 0, { r: 0.012 });
       b.box(w, 0.08, 0.05, rail, w / 2, DOOR_H - 0.09, 0, { r: 0.012 });
       for (const x of [0.03, w - 0.03]) b.box(0.06, DOOR_H - 0.04, 0.05, rail, x, 0.02, 0, { r: 0.012 });
-      b.box(0.03, 0.5, 0.05, tier === 4 ? C.brass : C.charcoal, w - 0.12, 0.85, 0.045, { r: 0.012 });
+      b.box(0.03, 0.5, 0.05, tier === 4 ? metal : C.charcoal, w - 0.12, 0.85, 0.045, { r: 0.012 });
     } else {
       const wood = tier === 0 ? 0x6f8f7a : theme.woodDark;
       b.box(w, DOOR_H - 0.03, 0.05, wood, w / 2, 0.02, 0, { r: 0.012 });
@@ -572,7 +582,7 @@ export const createDoor = (office: OfficeIndex = 2, look: LookId = "classic"): D
       } else {
         b.box(0.16, 1.2, 0.012, 0xbfe0ec, w - 0.26, 0.6, 0.026, { r: 0 });
       }
-      b.ball(0.035, tier === 0 ? C.brass : C.chrome, w - 0.1, 0.98, 0.05, { seg: 8 });
+      b.ball(0.035, tier === 0 ? metal : C.chrome, w - 0.1, 0.98, 0.05, { seg: 8 });
     }
   };
 
