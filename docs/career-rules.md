@@ -592,3 +592,7 @@ no loophole at these numbers: the pilot wins about a third as often as the bot, 
   that reads a year of runway.
 - `rescue.salaryYears` 0.5 passed all five targets, but C7 itself says the rescue resets cash to one year of salaries,
   so it was left at 1.
+- A third 1990s candidate a year (`career.eras.0.values.hiring.candidatesPerTurn` 3) was tried and not kept. On 1,000
+  careers it passed only just (Bootstrapper 39.0%, bot wins 16.5%); on 200 careers it failed the 40% cap
+  (Bootstrapper 40.5%). It mostly fed the rivals. The player already gets every 1990-1993 candidate with one
+  recruiter, and the plan now says so.

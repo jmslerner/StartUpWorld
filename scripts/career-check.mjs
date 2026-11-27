@@ -10,9 +10,17 @@
  * year's header, timeline, button, report and words, a reload, "Save and leave" and the end screen; then, from the
  * saves scripts/career-fixtures.ts makes, going public, the rescue, the board firing the founder and the rescue
  * keeping them on, the second failure, an office move and a full campus; no sideways scroll at 390 px; last (11), a
- * milestone's sound in the 2D screens: the office move's year ends and its sound is asked for once. Every
+ * milestone's sound in the 2D screens: the office move's year ends and its sound is asked for once; (12) in a career,
+ * + on Recruiting with everyone at work moves one person from Product, the row says so and the plan says how hiring
+ * works, on a desktop and an iPhone; (13) the start tour at 1280x800, from the goal to Done through the real controls,
+ * never covering its target, hidden while the summary is open, done after a reload, shown again by How to play and
+ * skipped; (14) the same tour on an iPhone (Playwright's "iPhone 13"): the Plan tab pressed for the plan's steps, every
+ * target on screen and above the bar, the card under 45% of the screen, nothing past the edges; (15) nothing cut off
+ * on an iPhone over a played year, tooltips open, and every text box 16 px or more. Every
  * year, "you are here" must sit inside the timeline; on an end screen the timeline must fit with no sideways scroll,
  * every era named in full and no "you are here"; and a finished career beside a race save is offered by its ending.
+ *
+ * Every fresh page marks the start tour as seen (localStorage "startupworld:tour:v1"), unless asked for the tour.
  *
  * Every page fails on any console error or page error. "Forbidden words" are period words a career never uses,
  * looked for in the page's text and its title and aria-label attributes, leaving out every element that carries
@@ -37,13 +45,16 @@ import { fileURLToPath } from "node:url";
 import { raceText, stubAnalytics } from "./race-text.mjs";
 
 const require = createRequire(import.meta.url);
-const { chromium } = require("playwright");
+const { chromium, devices } = require("playwright");
+/** The phone the owner played on, as Playwright describes it: 390x664, touch, a mobile viewport. */
+const IPHONE = devices["iPhone 13"];
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const PORT = 4180;
 const BASE = `http://localhost:${PORT}`;
 const RACE_KEY = "startupworld:tb:save";
 const CAREER_KEY = "startupworld:career:save";
+const TOUR_KEY = "startupworld:tour:v1";
 const DESKTOP = { width: 1280, height: 800 };
 const PHONE = { width: 390, height: 844 };
 const FIRST_YEAR = 1990;
@@ -208,8 +219,19 @@ const requested = new WeakMap();
 const requestsOf = (page) => requested.get(page) ?? [];
 
 /** A fresh context (fresh storage) and a page in it, its errors watched, its requests and office elements counted. */
-const freshPage = async (size = DESKTOP) => {
-  const context = await browser.newContext({ viewport: size });
+const freshPage = async (size = DESKTOP, { tour = false, device = null } = {}) => {
+  // A device descriptor (its viewport, touch, scale and user agent) stands in for the plain viewport; Chromium plays it.
+  const { defaultBrowserType: _browserType, ...asDevice } = device ?? {};
+  const context = await browser.newContext(device === null ? { viewport: size } : asDevice);
+  if (!tour) {
+    await context.addInitScript(([key]) => {
+      try {
+        if (localStorage.getItem(key) === null) localStorage.setItem(key, "done");
+      } catch {
+        // Blocked storage reads as seen.
+      }
+    }, [TOUR_KEY]);
+  }
   await context.addInitScript(countOfficeAdds, OFFICE_ADDS);
   const page = await context.newPage();
   const urls = [];
@@ -726,6 +748,254 @@ const milestoneSound = async ({ save, year }) => {
 };
 
 // ---------------------------------------------------------------------------------------------------------------
+// 12 to 15. The career's "+", its hiring words, the start tour, and nothing cut off on an iPhone
+
+const planPanel = (page) => page.locator('section[aria-label^="Plan for "]');
+const teamCount = async (page, name) => Number(await planPanel(page).locator(`[role="group"][aria-label="${name}"] output`).innerText());
+const teamButton = (page, which, name) => planPanel(page).getByRole("button", { name: `${which}: ${name}`, exact: true });
+const priceButton = (page, name) => planPanel(page).getByRole("group", { name: "Price", exact: true }).getByRole("button", { name: new RegExp(`^${name}`) });
+
+/** A new career, seed 1, named Check Co, on its first year. */
+const startCareer = async (page) => {
+  await page.goto(`${BASE}/`);
+  await page.getByLabel("Name your startup").waitFor();
+  await page.getByRole("group", { name: "Mode" }).getByRole("button", { name: /Career/ }).click();
+  await page.getByLabel("Name your startup").fill("Check Co");
+  await page.getByText("Replay a game with its seed").click();
+  await page.getByPlaceholder("for example 20417").fill("1");
+  await page.locator("form button[type=submit]").click();
+  await endButton(page, FIRST_YEAR).waitFor();
+};
+
+/** Sideways overflow, and elements past either edge that no scrolling or clipping box holds (1px boxes left out). */
+const edges = (page) =>
+  page.evaluate(() => {
+    const root = document.documentElement;
+    const width = root.clientWidth;
+    const held = (el) => {
+      for (let p = el.parentElement; p !== null && p !== document.body; p = p.parentElement) if (getComputedStyle(p).overflowX !== "visible") return true;
+      return false;
+    };
+    const out = [...document.body.querySelectorAll("*")]
+      .filter((el) => {
+        const r = el.getBoundingClientRect();
+        return r.width > 1 && r.height > 1 && (r.left < -0.5 || r.right > width + 0.5) && !held(el);
+      })
+      .slice(0, 5)
+      .map((el) => `${el.tagName.toLowerCase()} ${JSON.stringify(String(el.className).slice(0, 60))}`);
+    return { scrollWidth: root.scrollWidth, clientWidth: width, scrollX: window.scrollX, out };
+  });
+const fitsEdges = async (page, where) => {
+  const e = await edges(page);
+  assert(e.scrollWidth === e.clientWidth && e.scrollX === 0, `${where}: the page is ${e.scrollWidth} px wide in ${e.clientWidth} px, scrolled ${e.scrollX}`);
+  assert(e.out.length === 0, `${where}: past the edge: ${e.out.join(" | ")}`);
+};
+/** The tour card, and its box against the box of every visible target of the step. */
+const tourCard = (page) => page.locator('section[aria-label="Tour"]');
+const cardClear = async (page, target, where) => {
+  const card = await tourCard(page).boundingBox();
+  const boxes = await page.locator(`[data-tutorial="${target}"]`).evaluateAll((els) => els.filter((el) => el.getClientRects().length > 0).map((el) => el.getBoundingClientRect().toJSON()));
+  assert(card !== null && boxes.length > 0, `${where}: no card or no ${target}`);
+  for (const b of boxes) {
+    const overlap = card.x < b.right && b.left < card.x + card.width && card.y < b.bottom && b.top < card.y + card.height;
+    assert(!overlap, `${where}: the tour card covers ${target}`);
+  }
+};
+const tourKey = (page) => page.evaluate((key) => localStorage.getItem(key), TOUR_KEY);
+/** The card shows step `n` of 7, and says no forbidden word. */
+const onStep = async (page, n, where) => {
+  await tourCard(page).waitFor();
+  // textContent: the label is drawn in capitals.
+  const text = await tourCard(page).textContent();
+  assert(text.includes(`Step ${n} of 7`), `${where}: the card does not show "Step ${n} of 7": ${JSON.stringify(text)}`);
+  await noForbiddenWords(tourCard(page), `the tour's step ${n}`);
+};
+const tourButton = (page, name) => tourCard(page).getByRole("button", { name, exact: true });
+
+const careerPlus = async () => {
+  current = '12. A career\'s "+" and its hiring words';
+  const MOVED = /none is certain|At least \d+ joins?|expect \d+\./;
+  {
+    const { context, page } = await freshPage();
+    await startCareer(page);
+    const more = teamButton(page, "More", "Recruiting");
+    assert(await more.isEnabled(), '"More: Recruiting" is not enabled in 1990');
+    const product = await teamCount(page, "Product");
+    assert((await teamCount(page, "Recruiting")) === 0, "Recruiting is not 0 in a fresh 1990");
+    assert((await planPanel(page).innerText()).includes("Nobody is recruiting. Put one person on Recruiting to hire"), 'the plan does not say "Nobody is recruiting. Put one person on Recruiting to hire"');
+    await more.click();
+    assert((await teamCount(page, "Product")) === 2 && product === 3 && (await teamCount(page, "Recruiting")) === 1, `the counts after the click are Product ${await teamCount(page, "Product")} (was ${product}) and Recruiting ${await teamCount(page, "Recruiting")}`);
+    const plan = await planPanel(page).innerText();
+    assert(plan.includes("1 moved from Product"), 'the plan does not say "1 moved from Product"');
+    const hire = planPanel(page).getByRole("group", { name: "Hire at most", exact: true });
+    assert((await hire.count()) === 1, 'the "Hire at most" group does not show');
+    assert(plan.includes("Hires join next year"), 'the plan does not say "Hires join next year"');
+    assert(MOVED.test(plan), `the plan says no expected hires in the new words: ${JSON.stringify(plan.split("\n").find((line) => /expect/i.test(line)) ?? null)}`);
+    await noForbiddenWords(planPanel(page), "the plan");
+    await teamButton(page, "Less", "Recruiting").click();
+    assert(!(await planPanel(page).innerText()).includes("moved from"), '"Less: Recruiting" does not take the note away');
+    noErrors();
+    await context.close();
+  }
+  {
+    const { context, page } = await freshPage(PHONE, { device: IPHONE });
+    await startCareer(page);
+    await teamButton(page, "More", "Recruiting").click();
+    assert((await teamCount(page, "Product")) === 2 && (await teamCount(page, "Recruiting")) === 1, "on an iPhone, + on Recruiting did not move one person from Product");
+    assert((await planPanel(page).innerText()).includes("1 moved from Product"), 'on an iPhone the plan does not say "1 moved from Product"');
+    await fitsEdges(page, "an iPhone after + on Recruiting");
+    noErrors();
+    await context.close();
+  }
+  passed("in a career + on Recruiting with everyone at work moves one person from Product, the row says so, and the plan says how hiring works");
+};
+
+/** The start tour, from step 1 to Done: `check(n, target)` runs at every step. Leaves the page on 1991. */
+const tourThrough = async (page, check) => {
+  await onStep(page, 1, "1990");
+  await check(1, "status");
+  await tourButton(page, "Next").click();
+  await onStep(page, 2, "the team step");
+  await check(2, "team");
+  await teamButton(page, "More", "Recruiting").click();
+  await onStep(page, 3, '"More: Recruiting" pressed');
+  await check(3, "money");
+  await priceButton(page, "Premium").click();
+  await onStep(page, 4, 'Price "Premium" pressed');
+  await check(4, "cash");
+  await tourButton(page, "Next").click();
+  await onStep(page, 5, "the end step");
+  await check(5, "end");
+  await endButton(page, FIRST_YEAR).click();
+  await opened(page);
+  assert((await tourCard(page).count()) === 0, "the tour card shows while the summary is open");
+  await closeWith(page, `Plan ${FIRST_YEAR + 1}`);
+  await onStep(page, 6, "the summary closed");
+  await check(6, "report");
+  await tourButton(page, "Next").click();
+  await onStep(page, 7, "the closing card");
+  await tourButton(page, "Done").click();
+  await tourCard(page).waitFor({ state: "detached" });
+  assert((await tourKey(page)) === "done", `after Done the tour's key is ${JSON.stringify(await tourKey(page))}`);
+};
+
+const tourDesktop = async () => {
+  current = "13. The start tour at 1280x800 in 2D";
+  const { context, page } = await freshPage(DESKTOP, { tour: true });
+  await startCareer(page);
+  await tourThrough(page, async (n, target) => {
+    await cardClear(page, target, `step ${n}`);
+  });
+  await page.reload();
+  await endButton(page, FIRST_YEAR + 1).waitFor();
+  await page.waitForTimeout(SETTLE_MS);
+  assert((await tourCard(page).count()) === 0, "the tour shows again after a reload once done");
+  passed("the tour walks from the goal to Done through the real controls, never covers its target, hides while the summary is open, and stays done after a reload");
+
+  await page.getByRole("button", { name: "How to play", exact: true }).click();
+  await opened(page);
+  await closeWith(page, "Show me around");
+  await onStep(page, 1, '"Show me around"');
+  await tourButton(page, "Skip the tour").click();
+  await tourCard(page).waitFor({ state: "detached" });
+  assert((await tourKey(page)) === "skipped", `after Skip the tour's key is ${JSON.stringify(await tourKey(page))}`);
+  await stays2D(page, "the tour");
+  noErrors();
+  passed('How to play\'s "Show me around" shows step 1 again, and "Skip the tour" hides it and remembers "skipped"');
+  await context.close();
+};
+
+const tourPhone = async () => {
+  current = "14. The start tour on an iPhone";
+  const { context, page } = await freshPage(PHONE, { tour: true, device: IPHONE });
+  await startCareer(page);
+  await onStep(page, 1, "1990");
+  await page.getByRole("group", { name: "Show", exact: true }).getByRole("button", { name: "Rivals", exact: true }).click();
+  await tourThrough(page, async (n, target) => {
+    const where = `step ${n} on an iPhone`;
+    if (n === 2) {
+      const plan = page.getByRole("group", { name: "Show", exact: true }).getByRole("button", { name: "Plan", exact: true });
+      assert((await plan.getAttribute("aria-pressed")) === "true", `${where}: the Plan tab is not pressed`);
+    }
+    const look = await page.evaluate((target) => {
+      const bar = document.querySelector("div.fixed.inset-x-0.bottom-0");
+      const barTop = window.innerHeight - (bar?.offsetHeight ?? 0);
+      const els = [...document.querySelectorAll(`[data-tutorial="${target}"]`)].filter((el) => el.getClientRects().length > 0);
+      return {
+        barTop,
+        height: window.innerHeight,
+        width: window.innerWidth,
+        boxes: els.map((el) => ({ ...el.getBoundingClientRect().toJSON(), inBar: bar !== null && bar.contains(el) })),
+      };
+    }, target);
+    assert(look.boxes.length > 0, `${where}: no ${target} is shown`);
+    for (const b of look.boxes) {
+      assert(b.top >= -0.5 && b.left >= -0.5 && b.right <= look.width + 0.5 && b.bottom <= look.height + 0.5, `${where}: ${target} lies outside the screen: ${JSON.stringify(b)}`);
+      // The cash and End live in the bar itself; anything else must sit above it.
+      if (!b.inBar) assert(b.bottom <= look.barTop + 0.5, `${where}: ${target} is under the bar (${b.bottom} > ${look.barTop})`);
+    }
+    await cardClear(page, target, where);
+    const card = await tourCard(page).boundingBox();
+    assert(card.height <= 0.45 * look.height + 0.5, `${where}: the card is ${card.height} px high on a ${look.height} px screen`);
+    await fitsEdges(page, where);
+  });
+  noErrors();
+  passed("on an iPhone the tour presses the Plan tab, keeps every target on screen and above the bar, never covers it, stays under 45% of the screen, and nothing passes the edges");
+  await context.close();
+};
+
+const iphoneEdges = async () => {
+  current = "15. Nothing cut off on an iPhone over a played year";
+  const { context, page } = await freshPage(PHONE, { device: IPHONE });
+  await page.goto(`${BASE}/`);
+  await page.getByLabel("Name your startup").waitFor();
+  await page.getByRole("group", { name: "Mode" }).getByRole("button", { name: /Career/ }).click();
+  await page.getByText("Replay a game with its seed").click();
+  const sizes = await page.locator("input[type=text]").evaluateAll((els) => els.map((el) => parseFloat(getComputedStyle(el).fontSize)));
+  assert(sizes.length >= 2 && sizes.every((size) => size >= 16), `the text boxes' font sizes are ${JSON.stringify(sizes)}`);
+  await startCareer(page);
+  await fitsEdges(page, "1990");
+  const anchors = page.locator('section[aria-label="Your company"] [tabindex="0"]');
+  const count = await anchors.count();
+  assert(count === 8, `the company bar has ${count} anchors, not 8`);
+  for (let n = 0; n < count; n++) {
+    await anchors.nth(n).tap();
+    await page.waitForTimeout(150);
+    await fitsEdges(page, `the company bar's anchor ${n + 1} tapped`);
+  }
+  await endButton(page, FIRST_YEAR).click();
+  await opened(page);
+  await fitsEdges(page, "the summary of 1990");
+  await fullReport(page);
+  await fitsEdges(page, "the full report of 1990");
+  await closeWith(page, `Plan ${FIRST_YEAR + 1}`);
+  await endButton(page, FIRST_YEAR + 1).waitFor();
+  await fitsEdges(page, "1991");
+  const marketing = planPanel(page).getByRole("button", { name: "More: Marketing", exact: true });
+  for (let n = 0; n < 200 && (await marketing.isEnabled()); n++) await marketing.click();
+  assert(await marketing.isDisabled(), '"More: Marketing" never reached its maximum');
+  await fitsEdges(page, "marketing at its maximum");
+  await priceButton(page, "Premium").click();
+  await fitsEdges(page, 'Price "Premium"');
+  const sell = planPanel(page).getByRole("group", { name: "Raise money", exact: true }).getByRole("button", { name: /^Sell 10%/ });
+  if ((await sell.count()) > 0 && (await sell.isEnabled())) {
+    await sell.click();
+    await fitsEdges(page, '"Sell 10%"');
+  }
+  const tabs = page.getByRole("group", { name: "Show", exact: true });
+  await tabs.getByRole("button", { name: "Rivals", exact: true }).click();
+  await fitsEdges(page, "the Rivals tab");
+  await tabs.getByRole("button", { name: "Plan", exact: true }).click();
+  await fitsEdges(page, "the Plan tab");
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  await page.waitForTimeout(150);
+  await fitsEdges(page, "the page scrolled to the bottom");
+  noErrors();
+  passed("at iPhone width the page never scrolls sideways and nothing passes the edges over a played year, tooltips open; every text box is 16 px or more");
+  await context.close();
+};
+
+// ---------------------------------------------------------------------------------------------------------------
 // Main
 
 const main = async () => {
@@ -758,6 +1028,10 @@ const main = async () => {
     if (runs(9)) await fullCampus(fixtures.campus);
     if (runs(10)) await narrow(fixtures.office);
     if (runs(11)) await milestoneSound(fixtures.office);
+    if (runs(12)) await careerPlus();
+    if (runs(13)) await tourDesktop();
+    if (runs(14)) await tourPhone();
+    if (runs(15)) await iphoneEdges();
   } finally {
     await browser.close();
     stopServer();

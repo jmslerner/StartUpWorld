@@ -17,9 +17,13 @@
  * the buildings and the bar (their words, the player's "You", none overlapping or under the card, none a target, opaque,
  * hidden from screen readers, gone with the market); (16) every era's look within its draw-call ceiling; (17) the market's draw calls and labels in
  * every era; (18) the career's sounds: the
- * milestone once as the summary opens, the market's stream, footsteps, nothing on a reload. Step 14, no console
+ * milestone once as the summary opens, the market's stream, footsteps, nothing on a reload; (19) the start tour with the
+ * 3D office: the team step says how to move a person there, a click on a person still starts a carry with the card
+ * up, the card hides while the year plays out and its summary is open, and Done is remembered. Step 14, no console
  * errors on any page, runs last, always. Every page fails on any console error or page error, but the
  * software renderer's "GPU stall due to ReadPixels".
+ *
+ * Every fresh page marks the start tour as seen (localStorage "startupworld:tour:v1"), unless asked for the tour.
  *
  * Exits 1 on the first failed assertion, naming it. `--shots <dir>` saves screenshots into <dir>. `--no-build` serves
  * the `dist` that is there. `--only` runs only the steps named (for working on one). Not part of `npm test`: it
@@ -40,6 +44,7 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const PORT = 4181;
 const BASE = `http://localhost:${PORT}`;
 const CAREER_KEY = "startupworld:career:save";
+const TOUR_KEY = "startupworld:tour:v1";
 const OFFICE_KEY = "startupworld:office:v1";
 const DESKTOP = { width: 1280, height: 800 };
 const PHONE = { width: 390, height: 844 };
@@ -241,8 +246,17 @@ const requested = new WeakMap();
 const requestsOf = (page) => requested.get(page) ?? [];
 
 /** A fresh context (fresh storage) and a page in it, its errors watched, its requests and office elements counted. */
-const freshPage = async (browser, { size = DESKTOP, allowed = null, ...options } = {}) => {
+const freshPage = async (browser, { size = DESKTOP, allowed = null, tour = false, ...options } = {}) => {
   const context = await browser.newContext({ viewport: size, ...options });
+  if (!tour) {
+    await context.addInitScript(([key]) => {
+      try {
+        if (localStorage.getItem(key) === null) localStorage.setItem(key, "done");
+      } catch {
+        // Blocked storage reads as seen.
+      }
+    }, [TOUR_KEY]);
+  }
   await context.addInitScript(countOfficeAdds, OFFICE_ADDS);
   const page = await context.newPage();
   const urls = [];
@@ -416,9 +430,9 @@ const box = async (locator) => {
 
 /** The planning panel's count for a team. */
 const teamCount = async (page, name) => Number(await planPanel(page).locator(`[role="group"][aria-label="${name}"] output`).innerText());
-/** The hires the planning panel expects this year: "expect N." in its hiring hint, or 0 when it offers none. */
+/** The hires the planning panel expects this year: "expect N", "at least N", or 0 for "none is certain" or no hiring row. */
 const expectedHires = async (page) => {
-  const found = (await planPanel(page).innerText()).match(/expect (\d+)\./);
+  const found = (await planPanel(page).innerText()).match(/\b(?:expect|at least) (\d+)\b/i);
   return found === null ? 0 : Number(found[1]);
 };
 
@@ -1670,6 +1684,72 @@ const theSounds = async (browser, fixtures) => {
 };
 
 // ---------------------------------------------------------------------------------------------------------------
+// 19. The start tour with the 3D office
+
+const tourCard = (page) => page.locator('section[aria-label="Tour"]');
+const tourButton = (page, name) => tourCard(page).getByRole("button", { name, exact: true });
+const tourKey = (page) => page.evaluate((key) => localStorage.getItem(key), TOUR_KEY);
+/** The card's box against the box of every visible target of the step. */
+const cardClear = async (page, target, where) => {
+  const card = await tourCard(page).boundingBox();
+  const boxes = await page.locator(`[data-tutorial="${target}"]`).evaluateAll((els) => els.filter((el) => el.getClientRects().length > 0).map((el) => el.getBoundingClientRect().toJSON()));
+  assert(card !== null && boxes.length > 0, `${where}: no card or no ${target}`);
+  for (const b of boxes) {
+    const overlap = card.x < b.right && b.left < card.x + card.width && card.y < b.bottom && b.top < card.y + card.height;
+    assert(!overlap, `${where}: the tour card covers ${target}`);
+  }
+};
+/** The card shows step `n` of 7 (its label is drawn in capitals, so its textContent is read). */
+const onStep = async (page, n, where) => {
+  await tourCard(page).waitFor();
+  const text = await tourCard(page).textContent();
+  assert(text.includes(`Step ${n} of 7`), `${where}: the card does not show "Step ${n} of 7": ${JSON.stringify(text)}`);
+  await noForbiddenWords(tourCard(page), `the tour's step ${n}`);
+};
+
+const tourWithOffice = async (browser) => {
+  current = "19. The start tour with the 3D office";
+  const { context, page } = await freshPage(browser, { tour: true });
+  await startCareer(page);
+  await running(page);
+  await onStep(page, 1, "1990 with the office");
+  await tourButton(page, "Next").click();
+  await onStep(page, 2, "the team step");
+  const team = await tourCard(page).innerText();
+  assert(team.includes("click a person, then another team"), `the team step does not say how to move a person in the office: ${JSON.stringify(team)}`);
+  await cardClear(page, "team", "the team step");
+  await rests(page, "the team step");
+  await pickSomeone(page);
+  assert((await carryStrip(page).count()) === 1, "with the card up, a click on a person does not start a carry");
+  await carryStrip(page).getByRole("button", { name: "Keep them", exact: true }).click();
+  await page.waitForTimeout(300);
+  assert((await carryStrip(page).count()) === 0, '"Keep them" did not put the person back');
+  passed("with the tour's card up, the team step says how to move a person in the office, and a click on a person still starts a carry");
+  for (const n of [2, 3, 4]) {
+    await tourButton(page, "Next").click();
+    await onStep(page, n + 1, `Next from step ${n}`);
+  }
+  await cardClear(page, "end", "the end step");
+  await endButton(page, FIRST_YEAR).click();
+  await playBar(page).waitFor({ timeout: 5000 });
+  assert((await tourCard(page).count()) === 0, "the tour card shows while the year plays out");
+  await dialog(page).waitFor({ timeout: 30000 });
+  await page.waitForTimeout(SETTLE_MS);
+  assert((await tourCard(page).count()) === 0, "the tour card shows while the summary is open");
+  await closeWith(page, `Plan ${FIRST_YEAR + 1}`);
+  await onStep(page, 6, "the summary closed");
+  await cardClear(page, "report", "the report step");
+  await tourButton(page, "Next").click();
+  await onStep(page, 7, "the closing card");
+  await tourButton(page, "Done").click();
+  await tourCard(page).waitFor({ state: "detached" });
+  assert((await tourKey(page)) === "done", `after Done the tour's key is ${JSON.stringify(await tourKey(page))}`);
+  noErrors();
+  passed("the tour with the 3D office: hidden while 1990 plays out and its summary is open, on to the report step after, and Done remembered");
+  await context.close();
+};
+
+// ---------------------------------------------------------------------------------------------------------------
 // Main
 
 const main = async () => {
@@ -1711,6 +1791,7 @@ const main = async () => {
     if (runs(16)) await everyEraLook(browser, fixtures);
     if (runs(17)) await everyEraMarket(browser, fixtures);
     if (runs(18)) await theSounds(browser, fixtures);
+    if (runs(19)) await tourWithOffice(browser);
     current = "14. No console errors";
     noErrors();
     passed("no console error or page error on any page");

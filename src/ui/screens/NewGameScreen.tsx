@@ -96,6 +96,7 @@ export const NewGameScreen = () => {
             Name your startup
           </label>
           <div className="mt-1.5 flex flex-col gap-2 sm:flex-row">
+            {/* 16px on phones: iOS zooms in on a text box under 16px, and keeps the zoom for the whole game. */}
             <input
               id={nameId}
               type="text"
@@ -104,7 +105,7 @@ export const NewGameScreen = () => {
               autoComplete="off"
               placeholder="Your Startup"
               onChange={(event) => setName(event.target.value)}
-              className="min-w-0 flex-1 rounded-lg border border-white/10 bg-black/30 px-3 py-2.5 text-sm text-gray-100 placeholder:text-mist/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-neon/70"
+              className="min-w-0 flex-1 rounded-lg border border-white/10 bg-black/30 px-3 py-2.5 text-base text-gray-100 sm:text-sm placeholder:text-mist/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-neon/70"
             />
             <button type="submit" disabled={!seedIsValid} className={PRIMARY}>
               {mode === "career" ? "Start in 1990" : "Start the first quarter"}
@@ -125,7 +126,7 @@ export const NewGameScreen = () => {
               placeholder="for example 20417"
               onChange={(event) => setSeedText(event.target.value)}
               aria-invalid={!seedIsValid}
-              className="mt-1.5 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm text-gray-100 placeholder:text-mist/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-neon/70 sm:w-56"
+              className="mt-1.5 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-base text-gray-100 sm:text-sm placeholder:text-mist/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-neon/70 sm:w-56"
             />
             {!seedIsValid && <p className="mt-1 text-xs text-amber-400">A seed is a whole number from 1 to {MAX_SEED.toLocaleString("en-US")}.</p>}
           </details>

@@ -2,7 +2,7 @@ import { useId, useRef } from "react";
 import type { RulesConfig } from "../../engine/types";
 import { careerHelp } from "../careerHelp";
 import { count, money, percent } from "../format";
-import { PRIMARY } from "../styles";
+import { BUTTON, PRIMARY } from "../styles";
 import { useDialog } from "../useDialog";
 
 interface HowToPlayProps {
@@ -83,10 +83,12 @@ export const HowToPlay = ({ config }: HowToPlayProps) => {
 
 interface HowToPlayDialogProps extends HowToPlayProps {
   onClose: () => void;
+  /** A career: "Show me around" starts the start tour. The race never passes it. */
+  onTour?: () => void;
 }
 
 /** The same rules, over the game. */
-export const HowToPlayDialog = ({ config, onClose }: HowToPlayDialogProps) => {
+export const HowToPlayDialog = ({ config, onClose, onTour }: HowToPlayDialogProps) => {
   const titleId = useId();
   const closeRef = useRef<HTMLButtonElement | null>(null);
 
@@ -100,6 +102,18 @@ export const HowToPlayDialog = ({ config, onClose }: HowToPlayDialogProps) => {
             How to play
           </h2>
           <HowToPlay config={config} />
+          {onTour !== undefined && (
+            <button
+              type="button"
+              onClick={() => {
+                onTour();
+                close();
+              }}
+              className={`${BUTTON} mt-4 w-full px-4 py-2.5 text-sm`}
+            >
+              Show me around
+            </button>
+          )}
           <button ref={closeRef} type="button" onClick={close} className={`${PRIMARY} mt-4 w-full`}>
             Back to the game
           </button>

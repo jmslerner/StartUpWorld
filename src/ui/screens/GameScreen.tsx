@@ -18,11 +18,14 @@ import { ProjectionCard } from "../components/ProjectionCard";
 import { QuarterReport } from "../components/QuarterReport";
 import { ResourceBar } from "../components/ResourceBar";
 import { careerEndView } from "../careerEnd";
+import { careerHiringView } from "../careerHiring";
 import { beatSoundFor, playCareerSound, resetSoundOnce, soundOnce, yearSoundFor } from "../careerSound";
 import { listingView, officeMoveView } from "../careerPlan";
 import { careerReportView, rivalCareerRows } from "../careerReport";
 import { careerStatusView, datedYear, timelineView } from "../careerTimeline";
 import { CareerStatus } from "../components/CareerStatus";
+import { CareerTour } from "../components/CareerTour";
+import { nextStep, observeTour, readTourSeen, shouldStartTour, startTour, tabFor, tourSteps, writeTourSeen, type TourState, type TourWatch } from "../careerTour";
 import { RivalsPanel } from "../components/RivalsPanel";
 import { SoundMenu } from "../components/SoundMenu";
 import { Timeline } from "../components/Timeline";
@@ -154,6 +157,7 @@ export const GameScreen = () => {
 
   const resource = useMemo(() => (game === null ? null : resourceView(game, config)), [game, config]);
   const planning = useMemo(() => (game === null || draft === null ? null : planningView(game, draft, config)), [game, draft, config]);
+  const hiring = useMemo(() => (game === null || draft === null || planning === null ? null : careerHiringView(game, draft, planning, config)), [game, draft, planning, config]);
   const rivals = useMemo(() => (game === null ? [] : rivalsView(game, config)), [game, config]);
   const rivalCareers = useMemo(() => (game === null ? [] : rivalCareerRows(game, config)), [game, config]);
   const event = useMemo(() => (game === null ? null : eventView(game.event, game, config)), [game, config]);
@@ -191,6 +195,62 @@ export const GameScreen = () => {
   }
 
   const onChange = useCallback((plan: Plan) => setDraft(plan), [setDraft]);
+
+  // The career's start tour: whether this browser has seen it, how it last ended here, where it is, and what it
+  // watches on the screen. The tour moves on as the screen changes, worked out while rendering.
+  const [seenBefore] = useState(() => readTourSeen(browserStorage()));
+  const [tourEnd, setTourEnd] = useState<"done" | "skipped" | null>(null);
+  const tourSeen = seenBefore || tourEnd !== null;
+  const [tour, setTour] = useState<TourState | null>(null);
+  const [tourStarted, setTourStarted] = useState(false);
+  const [tabbedFor, setTabbedFor] = useState<number | null>(null);
+  const steps = useMemo(() => tourSteps(config, { office: layout === "3d" }), [config, layout]);
+  const turnNow = game?.turn ?? null;
+  const allocationNow = draft?.allocation ?? null;
+  const marketingNow = draft?.marketing ?? null;
+  const priceNow = draft?.price ?? null;
+  const tourWatch = useMemo<TourWatch | null>(
+    () =>
+      turnNow === null || allocationNow === null || marketingNow === null || priceNow === null
+        ? null
+        : { turn: turnNow, allocation: allocationNow, marketing: marketingNow, price: priceNow },
+    [turnNow, allocationNow, marketingNow, priceNow],
+  );
+  const endTour = useCallback((how: "done" | "skipped") => {
+    setTourEnd(how);
+    setTour(null);
+  }, []);
+  // Remembered only on Done or Skip, apart from both saves.
+  useEffect(() => {
+    if (tourEnd !== null) writeTourSeen(browserStorage(), tourEnd);
+  }, [tourEnd]);
+  // A first career in 1990, before any report, in a browser that has not seen the tour: it starts once per screen.
+  if (!tourStarted && tourWatch !== null && shouldStartTour({ career, turn: tourWatch.turn, hasReport: lastLog !== null, seen: tourSeen })) {
+    setTourStarted(true);
+    setTour(startTour(tourWatch));
+  }
+  // The player did what the step asks, or played the year: the tour moves on.
+  if (tour !== null && tourWatch !== null) {
+    const next = observeTour(tour, tourWatch, steps);
+    if (next === "finished") endTour("done");
+    else if (next !== tour) setTour(next);
+  }
+  // On a phone, a step that points into the plan shows the Plan tab first, once as the step opens.
+  const tourIndex = tour?.index ?? null;
+  if (tourIndex !== tabbedFor) {
+    setTabbedFor(tourIndex);
+    if (tourIndex !== null && tabFor(steps[tourIndex]?.target ?? null) === "plan") setTab("plan");
+  }
+  const onTourNext = useCallback(() => {
+    if (tour === null || tourWatch === null) return;
+    const next = nextStep(tour, tourWatch, steps);
+    if (next === "finished") endTour("done");
+    else setTour(next);
+  }, [tour, tourWatch, steps, endTour]);
+  const onTourSkip = useCallback(() => endTour("skipped"), [endTour]);
+  const replayTour = useCallback(() => {
+    if (tourWatch !== null) setTour(startTour(tourWatch));
+  }, [tourWatch]);
 
   /** The year stops playing: the new year shows, the world finishes what is moving, and the summary opens. */
   const finishPlay = useCallback(() => {
@@ -414,6 +474,11 @@ export const GameScreen = () => {
   const beat = beatNow(play, playNow);
   const shownView = viewNow(chosenView, playing ? beat : null);
   const officeNames = rulesForTurn(config, game.turn).career?.offices.map((office) => office.name) ?? [];
+  // The tour waits while a report, How to play or a year's playback is open, and after the career ends; a step that
+  // points into the plan waits for the Plan tab.
+  const tourHeld = report !== null || helpOpen || playing || over;
+  const tourStep = tour === null ? undefined : steps[tour.index];
+  const tourShown = tour !== null && !tourHeld && tourStep !== undefined && (tabFor(tourStep.target) !== "plan" || tab === "plan");
 
   return (
     <>
@@ -427,7 +492,7 @@ export const GameScreen = () => {
             </h1>
             <div className="flex items-center gap-1.5">
               {lastLog !== null && (
-                <button type="button" onClick={openReport} className={`${BUTTON} hidden px-2 py-1 text-[0.65rem] lg:block`}>
+                <button type="button" data-tutorial={career ? "report" : undefined} onClick={openReport} className={`${BUTTON} hidden px-2 py-1 text-[0.65rem] lg:block`}>
                   Last report
                 </button>
               )}
@@ -509,7 +574,7 @@ export const GameScreen = () => {
                   </div>
                 </div>
                 <div className={dim}>
-                  <PlanningPanel company={company} turn={game.turn} draft={draft} view={planning} config={rulesForTurn(config, game.turn)} words={words} listing={listing} onChange={onChange} />
+                  <PlanningPanel company={company} turn={game.turn} draft={draft} view={planning} config={rulesForTurn(config, game.turn)} words={words} listing={listing} career={career} hiring={hiring} onChange={onChange} />
                 </div>
               </div>
             </>
@@ -529,7 +594,7 @@ export const GameScreen = () => {
               <button type="button" aria-pressed={tab === "rivals"} onClick={() => setTab("rivals")} className={`${tab === "rivals" ? BUTTON_ON : BUTTON} flex-1 py-2 text-xs`}>
                 Rivals
               </button>
-              <button type="button" disabled={lastLog === null} onClick={openReport} className={`${BUTTON} flex-1 py-2 text-xs`}>
+              <button type="button" data-tutorial={career ? "report" : undefined} disabled={lastLog === null} onClick={openReport} className={`${BUTTON} flex-1 py-2 text-xs`}>
                 Report
               </button>
             </div>
@@ -537,7 +602,7 @@ export const GameScreen = () => {
             {/* Wide screens: the plan on the left; its projection and the rivals on the right. Phones: one tab at a time. */}
             <div className="grid items-start gap-3 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
               <div className={tab === "plan" ? "" : "hidden lg:block"}>
-                <PlanningPanel company={company} turn={game.turn} draft={draft} view={planning} config={rulesForTurn(config, game.turn)} words={words} listing={listing} onChange={onChange} />
+                <PlanningPanel company={company} turn={game.turn} draft={draft} view={planning} config={rulesForTurn(config, game.turn)} words={words} listing={listing} career={career} hiring={hiring} onChange={onChange} />
               </div>
               <div className="space-y-3">
                 <div className={tab === "plan" ? "" : "hidden lg:block"}>
@@ -557,7 +622,7 @@ export const GameScreen = () => {
           {/* Narrow screens have no room beside the button: the warning gets lines of its own above it. */}
           {headline !== undefined && <p className={`mx-auto line-clamp-3 w-full max-w-6xl px-3 pt-2 text-[0.7rem] leading-snug md:hidden ${TONE[headline.level]}`}>{headline.text}</p>}
           <div className="mx-auto flex w-full max-w-6xl items-center gap-3 px-3 py-2.5">
-            <div className="min-w-0 shrink-0 text-xs">
+            <div data-tutorial={career ? "cash" : undefined} className="min-w-0 shrink-0 text-xs">
               <div className="text-[0.6rem] uppercase tracking-[0.16em] text-mist/60">Cash after {words.when(game.turn)}</div>
               <div className={`font-semibold tabular-nums ${cashTone}`}>
                 <span className="sm:hidden">≥ </span>
@@ -568,13 +633,16 @@ export const GameScreen = () => {
             <p className={`hidden min-w-0 flex-1 truncate text-xs md:block ${headline === undefined ? "" : TONE[headline.level]}`} title={headline?.text}>
               {headline?.text}
             </p>
-            <button type="button" onClick={onEndQuarter} className={`${PRIMARY} ml-auto shrink-0 md:ml-0`}>
+            <button type="button" data-tutorial={career ? "end" : undefined} onClick={onEndQuarter} className={`${PRIMARY} ml-auto shrink-0 md:ml-0`}>
               End {words.when(game.turn)}
             </button>
           </div>
         </div>
       </div>
 
+      {tourShown && tour !== null && tourStep !== undefined && (
+        <CareerTour step={tourStep} index={tour.index} count={steps.length} barRef={barRef} onNext={onTourNext} onSkip={onTourSkip} />
+      )}
       {play.phase === "playing" && (
         <div className="panel-surface fixed inset-x-0 bottom-0 z-40 rounded-t-xl border-b-0" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
           <div className="mx-auto flex w-full max-w-6xl items-center gap-3 px-3 py-2.5" role="status">
@@ -595,7 +663,7 @@ export const GameScreen = () => {
         ) : (
           <QuarterReport companyName={resource.companyName} view={report} over={over} words={words} career={careerReport} datedNext={datedNext} historyEnds={timeline?.historyEnds ?? null} onClose={onCloseReport} />
         ))}
-      {helpOpen && <HowToPlayDialog config={config} onClose={closeHelp} />}
+      {helpOpen && <HowToPlayDialog config={config} onClose={closeHelp} onTour={career ? replayTour : undefined} />}
     </>
   );
 };
