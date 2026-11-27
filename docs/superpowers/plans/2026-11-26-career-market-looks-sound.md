@@ -41,8 +41,8 @@ users (it needs a users field on `OfficeScene`, through every builder and the la
 1. **Eight looks, one per era, over four furniture sets as in section 10.2, plus the `classic` fallback for an era id
    the world does not know.** `LookId` becomes the era ids themselves (`"dial-up"`,
    `"gold-rush"`, `"bust"`, `"phones"`, `"cheap-money"`, `"winter-ai"`, `"agents"`, `"ambient"`) plus `"classic"` for
-   any id the world does not know. A look owns a palette (`PHASE_THEMES`), a resting light (`RESTING_LOOKS`, with five
-   new moods so no two eras rest in the same light) and three signature props. A `FurnitureSet` (`"classic"`,
+   any id the world does not know. A look owns a palette (`PHASE_THEMES`), a resting light (`RESTING_LOOKS`, with six
+   new moods so no two eras rest in the same light, and none in the classic morning) and three signature props. A `FurnitureSet` (`"classic"`,
    `"nineties"`, `"noughties"`, `"twenties"`, `"future"`) owns the desks, the computer on them, floors, walls and shells;
    `furnitureOf(look)` maps dial-up and gold-rush to the nineties, bust, phones and cheap-money to the noughties,
    winter-ai to the twenties, agents and ambient to the future (section 10.2: four sets, eight looks; `classic` is not
@@ -179,7 +179,7 @@ in the task named.
 **Files:**
 - Modify: `src/world/types/scene.ts:17` (`LookId`, new `FurnitureSet`), `src/world/core/colors.ts:126-200` (`LOOKS`,
   `ERA_LOOKS`, `lookFor`, new `FURNITURE_SETS`, `furnitureOf`, `PHASE_THEMES` for nine looks),
-  `src/world/core/Lighting.ts:18,99-130` (five new `LightingLook` moods and their `LightKey`s, `RESTING_LOOKS` for
+  `src/world/core/Lighting.ts:18,99-130` (six new `LightingLook` moods and their `LightKey`s, `RESTING_LOOKS` for
   nine looks; `LightKey` exported as a type and a new `lightingKeyFor`),
   `src/world/office/props/signature.ts:28` (`SIGNATURE_PROPS` re-keyed by era with stand-in rows: dial-up and
   gold-rush take the old nineties row, bust, phones and cheap-money the noughties row, winter-ai, agents and ambient
@@ -214,7 +214,7 @@ in the task named.
   export const furnitureOf: (look: LookId) => FurnitureSet;
   // src/world/core/Lighting.ts
   export type LightingLook = "morning" | "afternoon" | "dusk" | "night" | "sunrise" | "win" | "loss"
-    | "noon" | "overcast" | "golden" | "studio" | "twilight";
+    | "noon" | "overcast" | "golden" | "studio" | "twilight" | "clear";
   export type { LightKey };                                         // the interface at l.18, now exported
   export const lightingKeyFor: (mood: LightingLook) => LightKey;   // LOOKS[mood]
   // src/world/office/props/signature.ts
@@ -248,11 +248,15 @@ it("eight looks sit on four furniture sets, the decade's", () => {
 // Lighting.test.ts, replacing the resting-look test
 it("each era rests in a light of its own, the same in all five offices", () => {
   expect(LOOKS.map((look) => restingLook(2, look))).toEqual(
-    ["morning", "afternoon", "noon", "overcast", "morning", "golden", "sunrise", "studio", "twilight"]);
+    ["morning", "afternoon", "noon", "overcast", "clear", "golden", "sunrise", "studio", "twilight"]);
+  // No two eras rest in one light, and none in the classic look's morning.
+  const eras = LOOKS.filter((look) => look !== "classic").map((look) => restingLook(2, look));
+  expect(new Set(eras).size).toBe(eras.length);
+  expect(eras).not.toContain("morning");
   for (const look of LOOKS) expect(new Set(PHASES.map((office) => restingLook(office, look))).size).toBe(1);
 });
 it("lists every mood, and every mood is a light of its own", () => {
-  expect(LIGHTING_LOOKS).toEqual(["morning", "afternoon", "dusk", "night", "sunrise", "win", "loss", "noon", "overcast", "golden", "studio", "twilight"]);
+  expect(LIGHTING_LOOKS).toEqual(["morning", "afternoon", "dusk", "night", "sunrise", "win", "loss", "noon", "overcast", "golden", "studio", "twilight", "clear"]);
   // A light's key: sun colour, sun intensity and sky colour; no two moods share one.
   const text = (mood: LightingLook): string => {
     const k = lightingKeyFor(mood);
@@ -260,7 +264,7 @@ it("lists every mood, and every mood is a light of its own", () => {
   };
   expect(new Set(LIGHTING_LOOKS.map(text)).size).toBe(LIGHTING_LOOKS.length);
   // The resting moods of the new eras are daylight: no prop glows in them but faintly at twilight.
-  expect(["noon", "overcast", "golden", "studio"].map((m) => lightingKeyFor(m as LightingLook).dusk)).toEqual([0, 0, 0, 0]);
+  expect(["noon", "overcast", "golden", "studio", "clear"].map((m) => lightingKeyFor(m as LightingLook).dusk)).toEqual([0, 0, 0, 0, 0]);
   expect(lightingKeyFor("twilight").dusk).toBeLessThanOrEqual(0.3);
 });
 
@@ -320,7 +324,7 @@ it("every era of the shipped career has the look of its own name", () => {
   `furnitureOf` as pinned. `PHASE_THEMES` gets one entry per era (the builder's colours; the existing nineties palette
   goes to dial-up, noughties to bust, twenties to winter-ai, and each other era gets its own, within the distinctness
   test: gold-rush brighter primaries on the same beige, phones white gloss and silver, cheap-money warm wood and coral,
-  agents cool white and mint, ambient soft sand and violet). The five new moods get `LightKey`s of their own, with
+  agents cool white and mint, ambient soft sand and violet). The six new moods get `LightKey`s of their own, with
   `key(sunColor, sunIntensity, sunDirection, skyColor, groundColor, hemiIntensity, fillIntensity, dusk)` as at
   `Lighting.ts:30` (`dusk` drives `duskAmount` and so every prop's `setGlow`, hence 0 by day):
   ```ts
@@ -329,6 +333,7 @@ it("every era of the shipped career has the look of its own name", () => {
   const GOLDEN = key(0xffd08a, 1.75, [0.2, 0.62, 0.95], 0xf6e6d2, 0x9c8468, 1.1, 0.9, 0);   // warm late sun
   const STUDIO = key(0xf2f6ff, 1.6, [-0.25, 1, 0.55], 0xeef3ff, 0xc2c6cc, 1.45, 1.2, 0);    // even cool white
   const TWILIGHT = key(0xffc49a, 1.4, [0.25, 0.5, 1], 0xc8b8f0, 0x5c5070, 1.0, 0.7, 0.3);   // violet sky, low warm sun
+  const CLEAR = key(0xffffff, 1.95, [-0.35, 1, 0.4], 0xb9d6ff, 0xc4c8cc, 1.2, 1.15, 0);     // a clear blue day (phones)
   ```
   If an existing brightness test over the resting looks fails for one of them, change that key's intensities, not the
   test. `SIGNATURE_PROPS` takes the stand-in rows the Files line names (types only change; no new kind yet).
