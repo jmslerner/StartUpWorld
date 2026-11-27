@@ -430,7 +430,7 @@ const box = async (locator) => {
 
 /** The planning panel's count for a team. */
 const teamCount = async (page, name) => Number(await planPanel(page).locator(`[role="group"][aria-label="${name}"] output`).innerText());
-/** The hires the planning panel expects this year: "expect N", "at least N", or 0 for "none for sure" or no hiring row. */
+/** The hires the planning panel expects this year: "expect N", "at least N", or 0 for "none is certain" or no hiring row. */
 const expectedHires = async (page) => {
   const found = (await planPanel(page).innerText()).match(/\b(?:expect|at least) (\d+)\b/i);
   return found === null ? 0 : Number(found[1]);

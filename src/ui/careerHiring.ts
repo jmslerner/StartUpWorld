@@ -42,8 +42,11 @@ export const careerHiringView = (game: GameState, draft: Plan, view: PlanningVie
   else if (expected >= best) outlook = `${candidates(cand)} this year: expect ${expected}.`;
   else {
     const order = ahead === 0 ? "you pick first" : ahead === 1 ? "1 rival picks before you" : `${ahead} rivals pick before you`;
-    const least = expected === 0 ? "none for sure" : `at least ${expected}`;
-    outlook = `${candidates(cand)} this year, handed out one at a time with the most hype first; ${order}. Expect ${least}, and up to ${best} if rivals hire fewer.`;
+    // Lead with what can happen: "none for sure" first read as hiring being broken.
+    outlook =
+      expected === 0
+        ? `Up to ${best} of ${candidates(cand)} could join, handed out most hype first; ${order}, so none is certain.`
+        : `At least ${expected} ${expected === 1 ? "joins" : "join"}, up to ${best} of ${candidates(cand)}, handed out most hype first; ${order}.`;
   }
   const broke = view.projection.cash < 0 ? " This plan already ends the year below $0." : "";
   return { teamLine, hireText: `${cost}${outlook}${broke}` };

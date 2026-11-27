@@ -27,13 +27,12 @@ describe("the career's hiring words", () => {
       teamLine: null,
       hireText:
         "$20K fee each now, then $50K a year in salary. Hires join next year. " +
-        "2 candidates this year, handed out one at a time with the most hype first; 3 rivals pick before you. " +
-        "Expect none for sure, and up to 2 if rivals hire fewer.",
+        "Up to 2 of 2 candidates could join, handed out most hype first; 3 rivals pick before you, so none is certain.",
     });
   });
 
   it("says at least what it can, when the player picks first", () => {
-    expect(words(withCompany(real(), HUMAN, { hype: 30 }), one)?.hireText).toMatch(/; you pick first\. Expect at least 1, and up to 2 if rivals hire fewer\.$/);
+    expect(words(withCompany(real(), HUMAN, { hype: 30 }), one)?.hireText).toMatch(/ At least 1 joins, up to 2 of 2 candidates, handed out most hype first; you pick first\.$/);
   });
 
   it("gives a plain number when every hire wanted is expected", () => {

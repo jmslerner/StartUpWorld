@@ -814,7 +814,7 @@ const tourButton = (page, name) => tourCard(page).getByRole("button", { name, ex
 
 const careerPlus = async () => {
   current = '12. A career\'s "+" and its hiring words';
-  const MOVED = /Expect none for sure|Expect at least \d+|expect \d+\./;
+  const MOVED = /none is certain|At least \d+ joins?|expect \d+\./;
   {
     const { context, page } = await freshPage();
     await startCareer(page);
