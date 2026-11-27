@@ -1,7 +1,8 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import type { Company, Department, Plan, PriceTier, RulesConfig } from "../../engine/types";
 import { assignEveryone, setLayoffs, setRaise, stepDepartment, stepHireLimit, stepMarketing } from "../draft";
 import type { ListingView } from "../careerPlan";
+import { careerCanIncrease, careerStepDepartment, dropMove, moveNote, NO_MOVES, noteMove, type MoveNotes } from "../careerTeam";
 import { money, percent } from "../format";
 import { BUTTON, HINT, LABEL, TONE } from "../styles";
 import type { PlanningView } from "../viewModel";
@@ -50,12 +51,32 @@ interface PlanningPanelProps {
   words: Words;
   /** Going public as the plan offers it; null in a race. */
   listing: ListingView | null;
+  /** A career: "+" moves someone from another team. The race never passes it. */
+  career?: boolean;
   onChange: (plan: Plan) => void;
 }
 
 /** The player's plan for the coming quarter or year. What it is projected to do is shown by ProjectionCard. */
-export const PlanningPanel = ({ company, turn, draft, view, config, words, listing, onChange }: PlanningPanelProps) => {
+export const PlanningPanel = ({ company, turn, draft, view, config, words, listing, career, onChange }: PlanningPanelProps) => {
   const { projection } = view;
+  // Where people moved by the career's "+" came from, for this year only.
+  const [moves, setMoves] = useState<{ turn: number; notes: MoveNotes }>({ turn, notes: NO_MOVES });
+  const notes = moves.turn === turn ? moves.notes : NO_MOVES;
+  const stepTeam = (department: Department, delta: 1 | -1): void => {
+    if (career !== true) {
+      onChange(stepDepartment(company, draft, department, delta));
+      return;
+    }
+    const step = careerStepDepartment(company, draft, department, delta);
+    if (step.plan === draft) return;
+    const next = step.from !== null ? noteMove(notes, step.from, department) : delta < 0 ? dropMove(notes, department) : notes;
+    setMoves({ turn, notes: next });
+    onChange(step.plan);
+  };
+  const teamHint = (department: Department): string => {
+    const note = career === true ? moveNote(notes, department) : null;
+    return note === null ? departmentHint[department] : `${departmentHint[department]} · ${note}`;
+  };
   const capacity = view.hiring.capacity;
   const { hireLimit } = draft;
   // A number is a limit the player set and it stays put; "no limit" follows what recruiting can find.
@@ -81,13 +102,13 @@ export const PlanningPanel = ({ company, turn, draft, view, config, words, listi
       {/* ── Team ── */}
       <div className="mt-3 space-y-2">
         {(["product", "growth", "recruiting"] as const).map((department) => (
-          <Row key={department} title={DEPARTMENT_NAME[department]} hint={departmentHint[department]}>
+          <Row key={department} title={DEPARTMENT_NAME[department]} hint={teamHint(department)}>
             <Stepper
               label={DEPARTMENT_NAME[department]}
               value={draft.allocation[department]}
-              onStep={(delta) => onChange(stepDepartment(company, draft, department, delta))}
+              onStep={(delta) => stepTeam(department, delta)}
               canDecrease={draft.allocation[department] > 0}
-              canIncrease={view.unassigned > 0}
+              canIncrease={career === true ? careerCanIncrease(company, draft, department) : view.unassigned > 0}
             />
           </Row>
         ))}

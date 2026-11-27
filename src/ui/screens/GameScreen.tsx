@@ -509,7 +509,7 @@ export const GameScreen = () => {
                   </div>
                 </div>
                 <div className={dim}>
-                  <PlanningPanel company={company} turn={game.turn} draft={draft} view={planning} config={rulesForTurn(config, game.turn)} words={words} listing={listing} onChange={onChange} />
+                  <PlanningPanel company={company} turn={game.turn} draft={draft} view={planning} config={rulesForTurn(config, game.turn)} words={words} listing={listing} career={career} onChange={onChange} />
                 </div>
               </div>
             </>
@@ -537,7 +537,7 @@ export const GameScreen = () => {
             {/* Wide screens: the plan on the left; its projection and the rivals on the right. Phones: one tab at a time. */}
             <div className="grid items-start gap-3 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
               <div className={tab === "plan" ? "" : "hidden lg:block"}>
-                <PlanningPanel company={company} turn={game.turn} draft={draft} view={planning} config={rulesForTurn(config, game.turn)} words={words} listing={listing} onChange={onChange} />
+                <PlanningPanel company={company} turn={game.turn} draft={draft} view={planning} config={rulesForTurn(config, game.turn)} words={words} listing={listing} career={career} onChange={onChange} />
               </div>
               <div className="space-y-3">
                 <div className={tab === "plan" ? "" : "hidden lg:block"}>
