@@ -18,6 +18,7 @@ import { ProjectionCard } from "../components/ProjectionCard";
 import { QuarterReport } from "../components/QuarterReport";
 import { ResourceBar } from "../components/ResourceBar";
 import { careerEndView } from "../careerEnd";
+import { careerHiringView } from "../careerHiring";
 import { beatSoundFor, playCareerSound, resetSoundOnce, soundOnce, yearSoundFor } from "../careerSound";
 import { listingView, officeMoveView } from "../careerPlan";
 import { careerReportView, rivalCareerRows } from "../careerReport";
@@ -154,6 +155,7 @@ export const GameScreen = () => {
 
   const resource = useMemo(() => (game === null ? null : resourceView(game, config)), [game, config]);
   const planning = useMemo(() => (game === null || draft === null ? null : planningView(game, draft, config)), [game, draft, config]);
+  const hiring = useMemo(() => (game === null || draft === null || planning === null ? null : careerHiringView(game, draft, planning, config)), [game, draft, planning, config]);
   const rivals = useMemo(() => (game === null ? [] : rivalsView(game, config)), [game, config]);
   const rivalCareers = useMemo(() => (game === null ? [] : rivalCareerRows(game, config)), [game, config]);
   const event = useMemo(() => (game === null ? null : eventView(game.event, game, config)), [game, config]);
@@ -509,7 +511,7 @@ export const GameScreen = () => {
                   </div>
                 </div>
                 <div className={dim}>
-                  <PlanningPanel company={company} turn={game.turn} draft={draft} view={planning} config={rulesForTurn(config, game.turn)} words={words} listing={listing} career={career} onChange={onChange} />
+                  <PlanningPanel company={company} turn={game.turn} draft={draft} view={planning} config={rulesForTurn(config, game.turn)} words={words} listing={listing} career={career} hiring={hiring} onChange={onChange} />
                 </div>
               </div>
             </>
@@ -537,7 +539,7 @@ export const GameScreen = () => {
             {/* Wide screens: the plan on the left; its projection and the rivals on the right. Phones: one tab at a time. */}
             <div className="grid items-start gap-3 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
               <div className={tab === "plan" ? "" : "hidden lg:block"}>
-                <PlanningPanel company={company} turn={game.turn} draft={draft} view={planning} config={rulesForTurn(config, game.turn)} words={words} listing={listing} career={career} onChange={onChange} />
+                <PlanningPanel company={company} turn={game.turn} draft={draft} view={planning} config={rulesForTurn(config, game.turn)} words={words} listing={listing} career={career} hiring={hiring} onChange={onChange} />
               </div>
               <div className="space-y-3">
                 <div className={tab === "plan" ? "" : "hidden lg:block"}>

@@ -21,6 +21,11 @@ describe("how to play a career", () => {
     for (const words of ["Market", "users", "bar", "public", "Show in market", "Yours is the first, on the left"]) expect(text).toContain(words);
   });
 
+  it("says how + moves people and who gets the candidates", () => {
+    const text = help.find((s) => s.title === "Product, Growth, Recruiting")!.text;
+    for (const words of ["Press +", "largest other team", "most hype", "start next year"]) expect(text).toContain(words);
+  });
+
   it("says what makes a sound and where to turn it off", () => {
     expect(help.find((s) => s.title === "Sound")!.text).toContain("Sound menu");
   });

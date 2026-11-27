@@ -59,7 +59,7 @@ export const careerHelp = (config: RulesConfig): readonly HelpSection[] => {
     },
     {
       title: "Product, Growth, Recruiting",
-      text: "Product raises quality; once it is good enough you launch and start winning users, and higher quality keeps them. Growth adds pull: each year's new users are shared out by pull, which is quality lifted by growth work, marketing, a lower price and hype. Recruiting hires people, who start next year. Bigger teams lose a little to coordination.",
+      text: "Product raises quality; once it is good enough you launch and start winning users, and higher quality keeps them. Growth adds pull: each year's new users are shared out by pull, which is quality lifted by growth work, marketing, a lower price and hype. Press + on a team to move one person into it; with nobody free, they come from your largest other team. Recruiting hires people, who start next year. Each year has only so many candidates, and they go to the companies with the most hype first. Bigger teams lose a little to coordination.",
     },
     {
       title: "Cash and raising money",

@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react";
 import type { Company, Department, Plan, PriceTier, RulesConfig } from "../../engine/types";
 import { assignEveryone, setLayoffs, setRaise, stepDepartment, stepHireLimit, stepMarketing } from "../draft";
+import type { CareerHiringView } from "../careerHiring";
 import type { ListingView } from "../careerPlan";
 import { careerCanIncrease, careerStepDepartment, dropMove, moveNote, NO_MOVES, noteMove, type MoveNotes } from "../careerTeam";
 import { money, percent } from "../format";
@@ -53,11 +54,13 @@ interface PlanningPanelProps {
   listing: ListingView | null;
   /** A career: "+" moves someone from another team. The race never passes it. */
   career?: boolean;
+  /** A career's hiring words. The race never passes it. */
+  hiring?: CareerHiringView | null;
   onChange: (plan: Plan) => void;
 }
 
 /** The player's plan for the coming quarter or year. What it is projected to do is shown by ProjectionCard. */
-export const PlanningPanel = ({ company, turn, draft, view, config, words, listing, career, onChange }: PlanningPanelProps) => {
+export const PlanningPanel = ({ company, turn, draft, view, config, words, listing, career, hiring, onChange }: PlanningPanelProps) => {
   const { projection } = view;
   // Where people moved by the career's "+" came from, for this year only.
   const [moves, setMoves] = useState<{ turn: number; notes: MoveNotes }>({ turn, notes: NO_MOVES });
@@ -123,10 +126,15 @@ export const PlanningPanel = ({ company, turn, draft, view, config, words, listi
             </button>
           )}
         </div>
+        {hiring?.teamLine != null && <p className={HINT}>{hiring.teamLine}</p>}
         {capacity > 0 && (
           <Row
             title="Hire at most"
-            hint={`${limitNote}${money(view.hiring.fee)} fee each, then ${money(config.salary)} a ${words.period} in salary; they start next ${words.period}. ${plural(view.hiring.candidates, "candidate", "candidates")} this ${words.period}, most hype picks first: expect ${view.hiring.expected}.`}
+            hint={
+              hiring == null
+                ? `${limitNote}${money(view.hiring.fee)} fee each, then ${money(config.salary)} a ${words.period} in salary; they start next ${words.period}. ${plural(view.hiring.candidates, "candidate", "candidates")} this ${words.period}, most hype picks first: expect ${view.hiring.expected}.`
+                : `${limitNote}${hiring.hireText}`
+            }
           >
             <Stepper
               label="Hire at most"
