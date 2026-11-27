@@ -15,7 +15,9 @@ The game has two modes:
   WebGL 2, its main screen is a 3D office and market: the team at their desks, the year playing out in a few seconds,
   the four companies as buildings sized by their users, a look of its own for every era and a sound for each year's
   main milestone. Everywhere else (phones, touch screens, narrower windows, no WebGL, or 3D switched off) the career
-  is played in its complete 2D screens. Its rules, rulings and tuning log are in
+  is played in its complete 2D screens. A first career opens with a short tour of the controls, which How to play can
+  show again. In a career, + on a team moves one person over from the largest other team, and the plan says how many
+  hires to expect and why. Its rules, rulings and tuning log are in
   [docs/career-rules.md](docs/career-rules.md); its design is in
   [docs/superpowers/specs/2026-11-25-career-3d-design.md](docs/superpowers/specs/2026-11-25-career-3d-design.md).
 
