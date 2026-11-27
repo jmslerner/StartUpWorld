@@ -16,7 +16,7 @@ export const CareerStatus = ({ view }: CareerStatusProps) => {
     view.rescueYear === null ? "Rescue not used" : `Rescue used in ${view.rescueYear}`,
   ];
   return (
-    <section aria-label="Your career" className="panel-surface flex flex-wrap items-center gap-x-2 gap-y-1 rounded-xl px-3 py-2 text-xs text-mist">
+    <section aria-label="Your career" data-tutorial="status" className="panel-surface flex flex-wrap items-center gap-x-2 gap-y-1 rounded-xl px-3 py-2 text-xs text-mist">
       {parts.map((part, index) => (
         <span key={index} className={index === 0 ? "font-semibold text-gray-100" : undefined}>
           {index > 0 && <span className="mr-2 text-mist/40">·</span>}

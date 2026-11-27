@@ -14,6 +14,8 @@
  * year, "you are here" must sit inside the timeline; on an end screen the timeline must fit with no sideways scroll,
  * every era named in full and no "you are here"; and a finished career beside a race save is offered by its ending.
  *
+ * Every fresh page marks the start tour as seen (localStorage "startupworld:tour:v1"), unless asked for the tour.
+ *
  * Every page fails on any console error or page error. "Forbidden words" are period words a career never uses,
  * looked for in the page's text and its title and aria-label attributes, leaving out every element that carries
  * `data-card-text` (a card's name and text come from the config as they are).
@@ -44,6 +46,7 @@ const PORT = 4180;
 const BASE = `http://localhost:${PORT}`;
 const RACE_KEY = "startupworld:tb:save";
 const CAREER_KEY = "startupworld:career:save";
+const TOUR_KEY = "startupworld:tour:v1";
 const DESKTOP = { width: 1280, height: 800 };
 const PHONE = { width: 390, height: 844 };
 const FIRST_YEAR = 1990;
@@ -208,8 +211,17 @@ const requested = new WeakMap();
 const requestsOf = (page) => requested.get(page) ?? [];
 
 /** A fresh context (fresh storage) and a page in it, its errors watched, its requests and office elements counted. */
-const freshPage = async (size = DESKTOP) => {
+const freshPage = async (size = DESKTOP, { tour = false } = {}) => {
   const context = await browser.newContext({ viewport: size });
+  if (!tour) {
+    await context.addInitScript(([key]) => {
+      try {
+        if (localStorage.getItem(key) === null) localStorage.setItem(key, "done");
+      } catch {
+        // Blocked storage reads as seen.
+      }
+    }, [TOUR_KEY]);
+  }
   await context.addInitScript(countOfficeAdds, OFFICE_ADDS);
   const page = await context.newPage();
   const urls = [];

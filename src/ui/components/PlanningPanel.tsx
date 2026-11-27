@@ -103,7 +103,7 @@ export const PlanningPanel = ({ company, turn, draft, view, config, words, listi
       <h2 className={LABEL}>Plan for {words.when(turn)}</h2>
 
       {/* ── Team ── */}
-      <div className="mt-3 space-y-2">
+      <div data-tutorial={career === true ? "team" : undefined} className="mt-3 space-y-2">
         {(["product", "growth", "recruiting"] as const).map((department) => (
           <Row key={department} title={DEPARTMENT_NAME[department]} hint={teamHint(department)}>
             <Stepper
@@ -149,7 +149,7 @@ export const PlanningPanel = ({ company, turn, draft, view, config, words, listi
       </div>
 
       {/* ── Marketing ── */}
-      <div className="mt-4 border-t border-white/5 pt-3">
+      <div data-tutorial={career === true ? "money" : undefined} className="mt-4 border-t border-white/5 pt-3">
         <Row
           title="Marketing"
           hint={
@@ -187,7 +187,7 @@ export const PlanningPanel = ({ company, turn, draft, view, config, words, listi
       </div>
 
       {/* ── Price ── */}
-      <div className="mt-4 border-t border-white/5 pt-3">
+      <div data-tutorial={career === true ? "money" : undefined} className="mt-4 border-t border-white/5 pt-3">
         <div className="mb-1.5 text-sm text-gray-100">Price</div>
         <Segmented
           label="Price"

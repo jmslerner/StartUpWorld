@@ -21,6 +21,8 @@
  * errors on any page, runs last, always. Every page fails on any console error or page error, but the
  * software renderer's "GPU stall due to ReadPixels".
  *
+ * Every fresh page marks the start tour as seen (localStorage "startupworld:tour:v1"), unless asked for the tour.
+ *
  * Exits 1 on the first failed assertion, naming it. `--shots <dir>` saves screenshots into <dir>. `--no-build` serves
  * the `dist` that is there. `--only` runs only the steps named (for working on one). Not part of `npm test`: it
  * needs a browser and takes minutes. The fixtures come from `npx tsx scripts/career-fixtures.ts`.
@@ -40,6 +42,7 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const PORT = 4181;
 const BASE = `http://localhost:${PORT}`;
 const CAREER_KEY = "startupworld:career:save";
+const TOUR_KEY = "startupworld:tour:v1";
 const OFFICE_KEY = "startupworld:office:v1";
 const DESKTOP = { width: 1280, height: 800 };
 const PHONE = { width: 390, height: 844 };
@@ -241,8 +244,17 @@ const requested = new WeakMap();
 const requestsOf = (page) => requested.get(page) ?? [];
 
 /** A fresh context (fresh storage) and a page in it, its errors watched, its requests and office elements counted. */
-const freshPage = async (browser, { size = DESKTOP, allowed = null, ...options } = {}) => {
+const freshPage = async (browser, { size = DESKTOP, allowed = null, tour = false, ...options } = {}) => {
   const context = await browser.newContext({ viewport: size, ...options });
+  if (!tour) {
+    await context.addInitScript(([key]) => {
+      try {
+        if (localStorage.getItem(key) === null) localStorage.setItem(key, "done");
+      } catch {
+        // Blocked storage reads as seen.
+      }
+    }, [TOUR_KEY]);
+  }
   await context.addInitScript(countOfficeAdds, OFFICE_ADDS);
   const page = await context.newPage();
   const urls = [];
