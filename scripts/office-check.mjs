@@ -14,8 +14,8 @@
  * office's chunk blocked, a context lost during a year; (11) a reload while a year plays out; (12) a whole career
  * through the 3D screen; (13) a narrow touch window; (15) the market view: the switch, the buildings, a company's card,
  * the year ending on the market, and Skip, a narrowed window or a lost context during that beat, and the labels over
- * the buildings and the bar (their words, the player's "You", none overlapping or under the card, none a target, gone
- * with the market); (16) every era's look within its draw-call ceiling; (17) the market's draw calls and labels in
+ * the buildings and the bar (their words, the player's "You", none overlapping or under the card, none a target, opaque,
+ * hidden from screen readers, gone with the market); (16) every era's look within its draw-call ceiling; (17) the market's draw calls and labels in
  * every era; (18) the career's sounds: the
  * milestone once as the summary opens, the market's stream, footsteps, nothing on a reload. Step 14, no console
  * errors on any page, runs last, always. Every page fails on any console error or page error, but the
@@ -1183,6 +1183,7 @@ const labelsReadable = async (page, market, where, covers = null) => {
         pointer: getComputedStyle(layer).pointerEvents,
         focusable: element.querySelectorAll("a, button, input, select, textarea, [tabindex]").length + (element.hasAttribute("tabindex") ? 1 : 0),
         underIs: under === null ? null : under.tagName.toLowerCase(),
+        readerHidden: element.closest('[aria-hidden="true"]') !== null,
       };
     })
   );
@@ -1218,8 +1219,35 @@ const labelsReadable = async (page, market, where, covers = null) => {
     assert(label.pointer === "none", `${where}: the label ${JSON.stringify(label.text)} takes the pointer (${label.pointer})`);
     assert(label.focusable === 0, `${where}: the label ${JSON.stringify(label.text)} can be focused`);
     assert(label.underIs === "canvas", `${where}: under the label ${JSON.stringify(label.text)} is a ${label.underIs}, not the canvas`);
+    // The rivals' panel reads the same out properly; the labels' badge and name run together ("YouCheck Co").
+    assert(label.readerHidden, `${where}: the label ${JSON.stringify(label.text)} is read out by a screen reader`);
+    // Opaque: a ring of the bar drawn behind a label never shows through it.
+    assert(/^rgb\(/.test(label.background), `${where}: the label ${JSON.stringify(label.text)} lets the canvas through (${label.background})`);
   }
   return labels;
+};
+
+/** Each company's label stands over its building as the world draws it now: above the building's top, and beside it. */
+const labelsOverLots = async (page, where) => {
+  const marks = await office(page, "marketMarks");
+  assert(marks !== null, `${where}: the market's marks are not given`);
+  const canvas = await box(page.locator("[data-office] canvas"));
+  const labels = await page.evaluate(() =>
+    [...document.querySelectorAll('[data-market-label^="company:"]')].map((element) => {
+      const rect = element.getBoundingClientRect();
+      return { seat: Number(element.getAttribute("data-market-label").slice("company:".length)), left: rect.left, right: rect.right, bottom: rect.bottom, text: element.textContent };
+    })
+  );
+  assert(labels.length > 0, `${where}: no company labels`);
+  for (const label of labels) {
+    const top = marks.lots.find((lot) => lot.seat === label.seat)?.top;
+    assert(top !== undefined, `${where}: the label ${JSON.stringify(label.text)} has no building`);
+    const x = canvas.x + top.x;
+    const y = canvas.y + top.y;
+    const width = label.right - label.left;
+    assert(label.bottom <= y + 1, `${where}: the label ${JSON.stringify(label.text)} is not above its building (bottom ${label.bottom}, the top at ${y})`);
+    assert(label.left - width <= x && x <= label.right + width, `${where}: the label ${JSON.stringify(label.text)} is not beside its building (${label.left}..${label.right}, the top at ${x})`);
+  }
 };
 
 /**
@@ -1320,6 +1348,37 @@ const theMarket = async (browser, fixtures) => {
     assert(stats.drawCalls <= MARKET_DRAW_CEILING, `the market draws ${stats.drawCalls} draw calls, over ${MARKET_DRAW_CEILING}`);
     measured.push({ where: `${year + 1}, the market (office fixture)`, office: "market", figures: stats.figures, drawCalls: stats.drawCalls, ceiling: MARKET_DRAW_CEILING });
     const labels = await labelsReadable(page, market, "the market at 1280x800");
+    await labelsOverLots(page, "the market at rest");
+    // At rest the labels ask for no frame: nothing runs while nothing can move them.
+    const framesAsked = await page.evaluate(
+      () =>
+        new Promise((done) => {
+          let asked = 0;
+          const original = window.requestAnimationFrame;
+          window.requestAnimationFrame = (callback) => {
+            asked += 1;
+            return original.call(window, callback);
+          };
+          setTimeout(() => {
+            window.requestAnimationFrame = original;
+            done(asked);
+          }, 1000);
+        })
+    );
+    assert(framesAsked === 0, `the market at rest asked for ${framesAsked} animation frames in a second`);
+    // The world moves (a zoom): the labels follow it, and rest again with it.
+    const zoomAt = await box(page.locator("[data-office] canvas"));
+    const before = await page.evaluate(() => [...document.querySelectorAll("[data-market-label]")].map((each) => each.getBoundingClientRect().top));
+    await page.mouse.move(zoomAt.x + zoomAt.width / 2, zoomAt.y + zoomAt.height / 2);
+    await page.mouse.wheel(0, 240);
+    await rests(page, "the market zoomed out");
+    const after = await page.evaluate(() => [...document.querySelectorAll("[data-market-label]")].map((each) => each.getBoundingClientRect().top));
+    assert(JSON.stringify(before) !== JSON.stringify(after), `zoomed out, the labels stayed where they were: ${JSON.stringify(after)}`);
+    await labelsOverLots(page, "the market zoomed out");
+    await labelsReadable(page, market, "the market zoomed out");
+    await page.mouse.wheel(0, -240);
+    await rests(page, "the market zoomed back in");
+    await labelsOverLots(page, "the market zoomed back in");
     if (process.env.MARKS) console.log(JSON.stringify({ size: DESKTOP, canvas: await box(page.locator("[data-office] canvas")), marks: await office(page, "marketMarks"), market }));
     await shot(page, `${year + 1}-market.png`);
     const tallest = market.companies.filter((c) => c.state === "rival").sort((a, b) => b.height - a.height)[0];

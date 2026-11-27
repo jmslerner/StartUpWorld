@@ -140,6 +140,11 @@ export interface WorldHandle {
   view(): WorldViewKind;
   /** Where the market's buildings and bar are drawn right now; null unless the market shows. */
   marketMarks(): MarketScreenMarks | null;
+  /**
+   * Calls `listener` right after every frame drawn, until the function returned is called (or the world is taken
+   * down): what follows the picture (labels over the market) moves with it, and rests when it rests.
+   */
+  onFrame(listener: () => void): () => void;
   /** Finish at once whatever is moving (walks, an office rising, the lights, the camera's glide), then draw it. */
   settle(): void;
   dispose(): void;

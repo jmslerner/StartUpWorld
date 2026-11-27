@@ -9,6 +9,7 @@ import { drawnTeams } from "../../world/cast";
 import WorldView from "../../world/WorldView";
 import { WorldBoundary, WorldUnavailableNote } from "../../world/ui/WorldShell";
 import { careerWorldSound } from "../careerSound";
+import { createLabelFollower } from "../labelFollow";
 import { LABEL_WORDS, placeMarketLabels, type LabelRect, type PlacedLabel } from "../marketLabels";
 import { marketCard, MARKET_WORDS } from "../marketView";
 import { asDrawn, CARRY_WORDS, carryLine, carryStep, highlightFor, TEAM_NAMES, unseenLine, type Carry, type Picked } from "../officeMoves";
@@ -212,16 +213,17 @@ const CareerOffice = ({ source, draft, onMove, onView, onFailed, market, view, s
       ? null
       : marketCard(company, company.state === "player" ? null : (rivals.find((row) => row.id === company.seat) ?? null), market.barUsers);
 
-  // The labels over the market follow where the world draws it, every frame the market shows (the camera glides in,
-  // the player pans or zooms, the window changes), and stand clear of the view switch and the company's card. They
-  // are drawn only while the market shows on a running world: gone with the office, a lost context or the 2D layout.
+  // The labels over the market follow where the world draws it (the camera glides in, the buildings grow, the player
+  // pans or zooms): they are placed again right after each frame the world draws, and on the next animation frame after
+  // a resize or a change of the company's card or the view switch. While the world rests and nothing changes, nothing
+  // runs. They stand clear of the view switch and the card, and are drawn only while the market shows on a running
+  // world: gone with the office, a lost context or the 2D layout.
   const labelled = shown === "market" && running && handle !== null && market !== null;
+  const cardKey = card === null ? null : selectedSeat;
   useLayoutEffect(() => {
     if (!labelled || handle === null || market === null) return;
-    let frame = 0;
     let last = "";
-    const tick = (): void => {
-      frame = window.requestAnimationFrame(tick);
+    const place = (): void => {
       const canvas = cellRef.current?.querySelector("canvas");
       if (!canvas) return;
       const at = canvas.getBoundingClientRect();
@@ -242,9 +244,22 @@ const CareerOffice = ({ source, draft, onMove, onView, onFailed, market, view, s
       last = key;
       setLabels(next);
     };
-    tick();
-    return () => window.cancelAnimationFrame(frame);
-  }, [labelled, handle, market]);
+    const follower = createLabelFollower(place, {
+      request: (callback) => window.requestAnimationFrame(callback),
+      cancel: (id) => window.cancelAnimationFrame(id),
+    });
+    const stopFrames = handle.onFrame(follower.frameDrawn);
+    const resized = typeof ResizeObserver === "function" ? new ResizeObserver(() => follower.wake()) : null;
+    for (const element of [cellRef.current, switchRef.current, cardRef.current]) if (element !== null) resized?.observe(element);
+    window.addEventListener("resize", follower.wake);
+    follower.wake();
+    return () => {
+      follower.stop();
+      stopFrames();
+      resized?.disconnect();
+      window.removeEventListener("resize", follower.wake);
+    };
+  }, [labelled, handle, market, cardKey]);
 
   // A new year in the office, or a year starting to play out, puts back whatever is carried.
   useEffect(() => {
@@ -295,8 +310,10 @@ const CareerOffice = ({ source, draft, onMove, onView, onFailed, market, view, s
         <WorldView source={source} onState={viewState} onTap={onTap} sound={careerWorldSound} />
       </WorldBoundary>
       {labelled && labels.length > 0 && (
-        // Over the canvas, under the switch and the card; never a target, never focused.
-        <div data-market-labels className="pointer-events-none absolute inset-0 z-[5] select-none overflow-hidden">
+        // Over the canvas, under the switch and the card; never a target, never focused. Hidden from screen readers:
+        // the rivals' panel reads the same names and numbers out properly. Opaque, so a ring of the bar drawn behind a
+        // label never shows through its words.
+        <div data-market-labels aria-hidden="true" className="pointer-events-none absolute inset-0 z-[5] select-none overflow-hidden">
           {labels.map((label) => (
             <div
               key={label.key}
@@ -304,10 +321,10 @@ const CareerOffice = ({ source, draft, onMove, onView, onFailed, market, view, s
               style={{ left: label.left, top: label.top, width: label.width, height: label.height }}
               className={`absolute overflow-hidden whitespace-nowrap rounded border px-[6px] py-[3px] text-[11px] leading-[14px] shadow ${
                 label.kind === "bar"
-                  ? "border-amber-400/70 bg-black/60 text-amber-200"
+                  ? "border-amber-400/70 bg-ink text-amber-200"
                   : label.you
                     ? "border-sky-200 bg-sky-200 text-gray-900"
-                    : "border-white/15 bg-black/60 text-gray-100"
+                    : "border-white/15 bg-ink text-gray-100"
               }`}
             >
               {label.kind === "bar" ? (

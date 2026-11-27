@@ -46,6 +46,7 @@ const fakeHandle = (): WorldHandle => ({
   setView: vi.fn(),
   view: vi.fn(() => "office" as const),
   marketMarks: vi.fn(() => null),
+  onFrame: vi.fn(() => () => {}),
   dispose: vi.fn(),
 });
 

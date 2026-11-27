@@ -240,6 +240,8 @@ class World {
   private drawnRevision = -1;
   /** Frames drawn since creation, every call to the renderer counted. */
   private framesDrawn = 0;
+  /** Told after every frame drawn (WorldHandle.onFrame). */
+  private readonly frameListeners = new Set<() => void>();
   /** M2: decides when to shed pixel ratio, then shadows; owns the pixel-ratio cap in force. */
   private readonly adaptive: AdaptiveQualityGovernor;
   /** M2: the layout the governor last saw; a new one means a stage rebuild, so it warms up again. */
@@ -359,6 +361,7 @@ class World {
       setView: (view) => this.setView(view),
       view: () => this.viewKind,
       marketMarks: () => this.marketMarks(),
+      onFrame: (listener) => this.onFrame(listener),
       dispose: () => this.dispose(),
     };
     debugByHandle.set(this.handle, { ctx, rig: this.rig, renderer });
@@ -589,6 +592,7 @@ class World {
     this.disposed = true;
     // No frame is requested from here on, and nothing can start the loop again.
     this.loop.dispose();
+    this.frameListeners.clear();
 
     this.canvas.removeEventListener("webglcontextlost", this.onContextLost);
     this.canvas.removeEventListener("webglcontextrestored", this.onContextRestored);
@@ -854,6 +858,23 @@ class World {
     } catch (error) {
       this.runner.reportFailure("render", error);
     }
+    for (const listener of this.frameListeners) {
+      try {
+        listener();
+      } catch {
+        // Whatever a listener does wrong stays out of the frame.
+      }
+    }
+  }
+
+  private onFrame(listener: () => void): () => void {
+    if (this.disposed) return () => {};
+    // Wrapped, so the same function given twice is two listeners, each stopped by its own call.
+    const own = (): void => listener();
+    this.frameListeners.add(own);
+    return () => {
+      this.frameListeners.delete(own);
+    };
   }
 
   /** The pointer did something on the canvas: the interaction layer acts on it, and a frame shows the result. */
