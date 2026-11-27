@@ -140,17 +140,19 @@ game shows the leaderboard as offline.
 
 A free Redis database is taken away when nothing uses it: Upstash archives one after 30 days without activity, and its
 terms allow deleting one after a week without requests. To prevent that, `vercel.json` schedules one request a day to
-`/api/keepalive`, which writes a timestamp to the database.
+`/api/keepalive`, which writes a timestamp to the database. If the write fails, the same run tries it once more, on a
+new connection when the old one had stopped answering.
 
 To check that the schedule is working, open `/api/keepalive` in a browser:
 
 - `200` with `"ok": true` means a scheduled run was recorded in the last 50 hours. The schedule runs once a day between
   07:00 and 08:00 UTC, so a healthy `lastScheduledPing` is from the most recent 07:00 hour.
-- `503` means no scheduled run was recorded in the last 50 hours (or ever), or the database cannot be reached. The
-  `error` field says which. Check the Cron Jobs tab of the Vercel project.
+- `503` means no scheduled run was recorded in the last 50 hours (or ever), or the database cannot be reached or does
+  not answer. The `error` field says which. Check the Cron Jobs tab of the Vercel project.
 
 `lastScheduledPing` is the time of the last request that identified itself as Vercel's scheduler. A manual run from the
 dashboard updates it too, so a value from another time of day does not show that the schedule works.
 
 For an alert when it stops, point an uptime monitor at `/api/keepalive`: it reports a non-200 answer, and its own
-requests also reach the database.
+requests also reach the database. A monitor's request is answered within about 8 seconds even when the database does
+not answer (up to 5 to connect and 3 for the reply), so give the monitor a longer timeout than that.

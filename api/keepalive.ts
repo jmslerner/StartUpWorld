@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { getRedis } from "./_lib/redis.js";
+import { getRedis, withReplyDeadline } from "./_lib/redis.js";
 
 // A free Redis database is taken away when nothing uses it: Upstash archives one after 30 days without activity, and
 // its terms allow deleting one after a week without requests. That has taken the leaderboard and the graveyard offline
@@ -49,11 +49,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (isScheduledRun(req)) {
       const now = new Date().toISOString();
-      await redis.set(LAST_PING_KEY, now);
+      try {
+        await withReplyDeadline(redis, redis.set(LAST_PING_KEY, now));
+      } catch (err) {
+        // This write is all a scheduled run is for, and the scheduler does not come back until tomorrow, so it gets
+        // a second try. A connection that had stopped answering was dropped by the deadline, and getRedis() opens a
+        // new one; one that had been closed is reconnecting by now. Readers get no second try: a monitor asks again
+        // by itself.
+        console.warn(`keepalive: scheduled write failed, trying once more: ${describeError(err)}`);
+        const again = await getRedis();
+        if (!again) throw new Error("no connection for the second try");
+        await withReplyDeadline(again, again.set(LAST_PING_KEY, now));
+      }
       return res.json({ ok: true, scheduled: true, lastScheduledPing: now });
     }
 
-    const stored = await redis.get(LAST_PING_KEY);
+    const stored = await withReplyDeadline(redis, redis.get(LAST_PING_KEY));
     const lastScheduledPing = stored === null ? null : String(stored);
     const hoursSinceLastPing = lastScheduledPing === null ? null : hoursSince(lastScheduledPing);
 
