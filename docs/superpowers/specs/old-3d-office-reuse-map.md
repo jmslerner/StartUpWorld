@@ -1,5 +1,10 @@
 # The old 3D office: what can be reused
 
+> **Archived: this describes code that no longer exists.** It is a reading of the 3D office this project had
+> before November 2026 (commit `63b4bed`), kept as history for the 3D plans. None of the files, types or imports it
+> names (`WorldEvent`, `commands.ts`, `../engine`, and the rest) are in today's code. For the 3D office as it is now,
+> read `src/world` and `docs/superpowers/specs/3d-office-check.md`.
+
 Research notes from a read of the three.js office that this project had until the turn-based rebuild removed it. The
 code is no longer on `main`: the turn-based game was merged there on 25 November 2026. It is in the commit just before
 that merge, `63b4bed`, under `src/world` (read a file with `git show 63b4bed:src/world/<path>`). Where these notes say

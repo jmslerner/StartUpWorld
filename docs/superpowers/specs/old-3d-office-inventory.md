@@ -1,5 +1,10 @@
 # The old 3D office, file by file
 
+> **Archived: this describes code that no longer exists.** It is a reading of the 3D office this project had
+> before November 2026 (commit `63b4bed`), kept as history for the 3D plans. None of the files, types or imports it
+> names (`WorldEvent`, `commands.ts`, `../engine`, and the rest) are in today's code. For the 3D office as it is now,
+> read `src/world` and `docs/superpowers/specs/3d-office-check.md`.
+
 A file-by-file reading of the three.js office this project had before the turn-based rebuild, made for the plan
 `docs/superpowers/plans/2026-11-25-career-3d-groundwork.md`. The code is in commit `63b4bed` under `src/world` (read a
 file with `git show 63b4bed:src/world/<path>`). Four readers took one group of folders each, read every file whole,

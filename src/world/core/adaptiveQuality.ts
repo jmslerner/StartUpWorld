@@ -1,8 +1,9 @@
 /**
  * M2 adaptive quality: a pure governor that decides when a world sheds
  * rendering cost (pixel ratio first, then shadows) under sustained, real
- * overload. World feeds it once per frame and applies whatever rung it names;
- * all of the judgement lives here so it can be tested with synthetic timings.
+ * overload. The render loop (RenderLoop.ts) feeds it once per frame and
+ * applies whatever rung it names; all of the judgement lives here so it can
+ * be tested with synthetic timings.
  *
  * Two signals, because neither alone tells overload from a slow display:
  *
@@ -39,7 +40,7 @@
  * intervals live in a fixed ring buffer.
  */
 
-/** What World should apply after a sample. */
+/** What the render loop should apply after a sample. */
 export type AdaptiveStep = "none" | "pixel-ratio" | "shadows";
 
 export interface AdaptiveQualityOptions {
@@ -145,7 +146,7 @@ export class AdaptiveQualityGovernor {
    * Feed one frame: `intervalMs` is the raw requestAnimationFrame interval
    * since the previous frame, `workMs` the measured update + render time, and
    * `devicePixelRatio` the current one (it can change when the window moves
-   * to another screen). Returns the rung World must apply now, if any.
+   * to another screen). Returns the rung the render loop must apply now, if any.
    */
   sample(intervalMs: number, workMs: number, devicePixelRatio: number): AdaptiveStep {
     if (!(intervalMs >= 0) || !(workMs >= 0)) return "none";

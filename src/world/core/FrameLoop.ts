@@ -8,7 +8,7 @@
  * `setKeepAwake` holds it running whatever moves.
  *
  * It knows nothing of three.js or the page: frames are requested through the host it is given, so a test can play
- * them one by one. The World is its host.
+ * them one by one. The world's render loop (./RenderLoop.ts) is its host.
  */
 import { AWAKE, restStep } from "./rest";
 import type { RestState } from "./rest";
