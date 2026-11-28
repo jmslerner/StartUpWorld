@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { getOfficeLayout } from "../office/layouts";
 import type { OfficeLayout, QualityLevel, WorldSystem } from "../types";
+import { AdaptiveQualityGovernor } from "./adaptiveQuality";
 import { CameraRig } from "./CameraRig";
 import { FIRST_FRAME_SECONDS, MAX_FRAME_SECONDS, MIN_FRAME_SECONDS } from "./FrameLoop";
 import { qualityGovernor, RenderLoop } from "./RenderLoop";
@@ -470,4 +471,27 @@ describe("RenderLoop: adaptive quality", () => {
     expect(h.renderer.ratios).toEqual([2]);
     expect(h.shadows).toEqual([]);
   });
+
+  it.each(["pixel-ratio", "shadows"] as const)(
+    "applies no %s step on a frame whose listener disposed the world while it was drawn",
+    (step) => {
+      const h = harness("high");
+      vi.spyOn(AdaptiveQualityGovernor.prototype, "sample").mockReturnValue(step);
+      h.loop.start();
+      // The first frame shows the governor a layout it has not seen: it only warms up. The second takes the step.
+      h.clock.tick();
+      h.clock.tick();
+      const ratios = h.renderer.ratios.length;
+      const shadows = h.shadows.length;
+      const drawn = draws(h);
+      expect(ratios + shadows).toBe(1);
+      // A listener told of the next picture disposes the world: the renderer and the lighting are gone after it.
+      h.loop.onFrame(() => h.loop.dispose());
+      h.clock.tick();
+      expect(draws(h)).toBe(drawn + 1);
+      expect(h.renderer.ratios).toHaveLength(ratios);
+      expect(h.shadows).toHaveLength(shadows);
+      expect(h.clock.pending.size).toBe(0);
+    }
+  );
 });

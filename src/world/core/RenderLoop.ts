@@ -266,6 +266,9 @@ export class RenderLoop {
     // A listener called above may have disposed or paused the world.
     if (this.disposed || this.paused || this.contextLost) return false;
     this.render();
+    // A frame listener told of this picture may have disposed the world: no quality step for a renderer and lighting
+    // that are gone.
+    if (this.disposed) return false;
     this.trackQuality(intervalMs, performance.now() - workStart);
 
     // Still moving: any system, a camera glide or shake, or a camera that was moved since the last frame (a drag,
