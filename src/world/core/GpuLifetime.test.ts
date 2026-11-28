@@ -1,29 +1,74 @@
 import * as THREE from "three";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   acquireContext,
   clearScene,
   CONTEXT_RELEASE_DELAY_MS,
   disposeTree,
+  GpuLifetime,
   releaseContextWhenOrphaned,
   WorldUnsupportedError,
 } from "./GpuLifetime";
+import { configureRenderer } from "./rendererLook";
+
+/**
+ * What the class does, in order: the renderer made (or refusing to start), configured, reset and disposed, the shared
+ * caches emptied, the systems stopped, and every geometry, material and texture disposed, each by name.
+ */
+const fakes = vi.hoisted(() => {
+  const log: string[] = [];
+  const renderers = { fail: null as Error | null };
+  class FakeRenderer {
+    readonly options: unknown;
+    constructor(options: unknown) {
+      if (renderers.fail !== null) throw renderers.fail;
+      this.options = options;
+      log.push("renderer");
+    }
+    resetState(): void {
+      log.push("resetState");
+    }
+    dispose(): void {
+      log.push("dispose");
+    }
+  }
+  return { log, renderers, FakeRenderer };
+});
+
+// The real three.js but for its renderer, which needs a real GPU.
+vi.mock("three", async (importOriginal) => ({ ...(await importOriginal<typeof import("three")>()), WebGLRenderer: fakes.FakeRenderer }));
+vi.mock("./rendererLook", () => ({
+  configureRenderer: vi.fn(() => {
+    fakes.log.push("configure");
+  }),
+}));
+vi.mock("./palette", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./palette")>()),
+  disposeSharedResources: () => {
+    fakes.log.push("shared");
+  },
+}));
 
 /** A WebGL 2 context, as far as getting and releasing one asks of it: whether it is lost, and its lose extension. */
 const context = (lost = false) => {
-  const state = { lost, losses: 0 };
+  const state = { lost, losses: 0, restores: 0 };
   const gl = {
     isContextLost: () => state.lost,
-    getExtension: (name: string) =>
-      name === "WEBGL_lose_context"
+    getExtension: (name: string) => {
+      fakes.log.push(`extension ${name}`);
+      return name === "WEBGL_lose_context"
         ? {
             loseContext: () => {
               state.losses += 1;
               state.lost = true;
             },
-            restoreContext: () => {},
+            restoreContext: () => {
+              state.restores += 1;
+              state.lost = false;
+            },
           }
-        : null,
+        : null;
+    },
   };
   return { gl: gl as unknown as WebGL2RenderingContext, state };
 };
@@ -40,10 +85,21 @@ const fakePageTimers = (): void => {
   });
 };
 
+beforeEach(() => {
+  fakes.log.length = 0;
+  fakes.renderers.fail = null;
+  vi.mocked(configureRenderer).mockClear();
+});
+
 afterEach(() => {
   vi.useRealTimers();
   vi.unstubAllGlobals();
 });
+
+/** Log each dispose of `thing` as `name`. */
+const logDispose = (thing: THREE.Texture | THREE.BufferGeometry | THREE.Material, name: string): void => {
+  (thing as THREE.EventDispatcher<{ dispose: object }>).addEventListener("dispose", () => fakes.log.push(name));
+};
 
 describe("GpuLifetime: getting a context", () => {
   it("asks the canvas for WebGL 2 with exactly the attributes the renderer would ask for itself", () => {
@@ -121,28 +177,24 @@ describe("GpuLifetime: releasing a context", () => {
 
 describe("GpuLifetime: freeing what is on stage", () => {
   it("frees every geometry, material and material texture of a tree, however deep", () => {
-    const freed: string[] = [];
-    const on = (thing: THREE.Texture | THREE.BufferGeometry | THREE.Material, name: string): void => {
-      (thing as THREE.EventDispatcher<{ dispose: object }>).addEventListener("dispose", () => freed.push(name));
-    };
     const map = new THREE.Texture();
     const box = new THREE.BoxGeometry();
     const basic = new THREE.MeshBasicMaterial({ map });
     const plane = new THREE.PlaneGeometry();
     const lambert = new THREE.MeshLambertMaterial();
     const second = new THREE.MeshBasicMaterial();
-    on(map, "map");
-    on(box, "box");
-    on(basic, "basic");
-    on(plane, "plane");
-    on(lambert, "lambert");
-    on(second, "second");
+    logDispose(map, "map");
+    logDispose(box, "box");
+    logDispose(basic, "basic");
+    logDispose(plane, "plane");
+    logDispose(lambert, "lambert");
+    logDispose(second, "second");
     const root = new THREE.Group();
     const nested = new THREE.Group();
     root.add(new THREE.Mesh(box, basic), nested);
     nested.add(new THREE.Mesh(plane, [lambert, second]));
     disposeTree(root);
-    expect(freed.sort()).toEqual(["basic", "box", "lambert", "map", "plane", "second"]);
+    expect([...fakes.log].sort()).toEqual(["basic", "box", "lambert", "map", "plane", "second"]);
   });
 
   it("takes everything but what it keeps off the scene, and frees what it took", () => {
@@ -162,5 +214,105 @@ describe("GpuLifetime: freeing what is on stage", () => {
     expect(left.parent).toBeNull();
     expect(empty.parent).toBeNull();
     expect(freed).toEqual(["leftover"]);
+  });
+});
+
+describe("GpuLifetime: the class, from the context to its release", () => {
+  it("makes the renderer on the context it got, configures it, and only then fetches the extension that loses it", () => {
+    const { gl } = context();
+    const canvas = canvasWith(() => gl);
+    const gpu = new GpuLifetime(canvas, "low");
+    expect(fakes.log).toEqual(["renderer", "configure", "extension WEBGL_lose_context"]);
+    expect((gpu.renderer as unknown as { options: unknown }).options).toEqual({
+      canvas,
+      context: gl,
+      antialias: true,
+      alpha: true,
+      powerPreference: "high-performance",
+    });
+    expect(vi.mocked(configureRenderer)).toHaveBeenCalledWith(gpu.renderer, "low");
+  });
+
+  it("says why when the renderer cannot start, with its error as the cause, and builds nothing without a context", () => {
+    const failure = new Error("the renderer cannot start");
+    fakes.renderers.fail = failure;
+    let thrown: unknown = null;
+    try {
+      new GpuLifetime(canvasWith(() => context().gl), "high");
+    } catch (error) {
+      thrown = error;
+    }
+    expect(thrown).toBeInstanceOf(WorldUnsupportedError);
+    expect((thrown as Error).message).toBe("WebGL 2 is available, but the renderer could not start.");
+    expect((thrown as Error).cause).toBe(failure);
+
+    fakes.renderers.fail = null;
+    expect(() => new GpuLifetime(canvasWith(() => null), "high")).toThrow(WorldUnsupportedError);
+    // Neither got as far as a renderer, its look or the extension.
+    expect(fakes.log).toEqual([]);
+  });
+
+  it("takes the context away only while there is one, and gives it back only once it has gone", () => {
+    const { gl, state } = context();
+    const gpu = new GpuLifetime(canvasWith(() => gl), "high");
+    gpu.restoreContext();
+    expect(state.restores).toBe(0);
+    gpu.loseContext();
+    gpu.loseContext();
+    expect(state.losses).toBe(1);
+    gpu.restoreContext();
+    gpu.restoreContext();
+    expect(state.restores).toBe(1);
+  });
+
+  it("hands the stage back in its one order: systems stopped, the rest freed, every noted material again, the caches, the renderer", () => {
+    const gpu = new GpuLifetime(canvasWith(() => context().gl), "high");
+    const scene = new THREE.Scene();
+    const map = new THREE.Texture();
+    const kept = new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshBasicMaterial({ map }));
+    const takenOff = new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshBasicMaterial());
+    scene.add(kept, takenOff);
+    logDispose(kept.geometry, "kept geometry");
+    logDispose(map, "kept map");
+    logDispose(kept.material, "kept material");
+    logDispose(takenOff.geometry, "taken-off geometry");
+    logDispose(takenOff.material, "taken-off material");
+    fakes.log.length = 0;
+    gpu.disposeStage(scene, () => {
+      fakes.log.push("stop");
+      // A system takes its mesh off the stage as it goes, and leaves its material behind.
+      scene.remove(takenOff);
+    });
+    expect(fakes.log).toEqual([
+      "stop",
+      "kept geometry",
+      "kept map",
+      "kept material",
+      // The materials noted before the systems stopped, the one freed with its tree a second time (the L5 note).
+      "kept material",
+      "taken-off material",
+      "shared",
+      "resetState",
+      "dispose",
+    ]);
+    expect(scene.children).toHaveLength(0);
+  });
+
+  it("released, hands the context back 300 ms later once the canvas has left the page, unless a world is made on it again", () => {
+    fakePageTimers();
+    const first = context();
+    new GpuLifetime(canvasWith(() => first.gl, false), "high").release();
+    vi.advanceTimersByTime(299);
+    expect(first.state.losses).toBe(0);
+    vi.advanceTimersByTime(1);
+    expect(first.state.losses).toBe(1);
+
+    // React StrictMode: a second world on the same canvas before the release is due keeps the context.
+    const again = context();
+    const canvas = canvasWith(() => again.gl, false);
+    new GpuLifetime(canvas, "high").release();
+    new GpuLifetime(canvas, "high");
+    vi.runAllTimers();
+    expect(again.state.losses).toBe(0);
   });
 });
