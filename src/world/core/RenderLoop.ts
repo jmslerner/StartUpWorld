@@ -76,6 +76,11 @@ export interface RenderLoopDeps {
   readonly callbacks: Pick<WorldCallbacks, "onContextLost" | "onContextRestored">;
 }
 
+/**
+ * After dispose() its owner calls nothing on it but framesDrawn, which stays readable. The other methods (applySize,
+ * settle, onFrame, sceneApplied, listen and the rest) assume a live world and do not check: World guards every call
+ * with its own disposed flag.
+ */
 export class RenderLoop {
   private readonly canvas: EventTarget;
   private readonly renderer: RenderLoopDeps["renderer"];
