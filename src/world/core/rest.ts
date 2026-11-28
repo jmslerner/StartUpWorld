@@ -7,7 +7,7 @@
  * size) wakes it. The second of grace is what lets the people's idle poses, a hover and the highlights settle
  * before the picture freezes.
  *
- * Pure: the World feeds it once per frame and acts on what comes back.
+ * Pure: the frame loop (./FrameLoop.ts) feeds it once per frame and acts on what comes back.
  */
 
 /** How long nothing has to move before the loop stops drawing. */
